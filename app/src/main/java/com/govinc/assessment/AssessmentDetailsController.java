@@ -35,6 +35,7 @@ public class AssessmentDetailsController {
             Map<String, Map<String, Object>> answerSummary = assessmentDetailsService.computeAnswerSummary(ad);
             model.addAttribute("assessment", ad);
             model.addAttribute("answerSummary", answerSummary);
+            // (No direct access to urls here - use assessment list for urls)
             return "assessment-details";
         } else {
             return "redirect:/assessmentdetails/list";

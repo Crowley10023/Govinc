@@ -25,6 +25,16 @@
                 </td>
             </tr>
             <tr>
+                <td><label for="users">Assign Users:</label></td>
+                <td>
+                    <select name="userIds" id="users" multiple>
+                        <option th:each="user : ${users}"
+                                th:value="${user.id}"
+                                th:text="${user.name + ' (' + user.email + ')'}"></option>
+                    </select>
+                </td>
+            </tr>
+            <tr>
                 <td colspan="2" style="text-align: center;">
                     <button type="submit">Create Assessment</button>
                 </td>

@@ -103,6 +103,51 @@
                     <th>Status</th>
                     <td th:text="${assessment.status}"></td>
                 </tr>
+                <tr>
+                    <th>Assessment URL</th>
+                    <td>
+                        <span th:if="${assessment.assessmentUrls != null && assessment.assessmentUrls.url != null}">
+                            <a th:href="@{'/assessment-direct/' + ${assessment.assessmentUrls.url}}" th:text="'/assessment-direct/' + ${assessment.assessmentUrls.url}" target="_blank"></a>
+                        </span>
+                        <span th:if="${assessment.assessmentUrls == null || assessment.assessmentUrls.url == null}">Not set</span>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Predecessor Assessment</th>
+                    <td>
+                        <form th:action="@{'/assessment/' + ${assessment.id} + '/set-predecessor'}" method="post">
+                            <select name="predecessorId">
+                                <option value="" th:selected="${assessment.predecessor == null}">-- None --</option>
+                                <option th:each="a : ${allAssessments}"
+                                        th:value="${a.id}"
+                                        th:selected="${assessment.predecessor != null and assessment.predecessor.id == a.id}"
+                                        th:text="${a.name + ' (' + a.id + ')'}"
+                                        th:if="${a.id != assessment.id}"></option>
+                            </select>
+                            <button type="submit">Set Predecessor</button>
+                        </form>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Users</th>
+                    <td>
+                        <span th:if="${!assessment.isOpen}">
+                            <span th:if="${assessment.users == null || #lists.isEmpty(assessment.users)}">None</span>
+                            <span th:each="user : ${assessment.users}" th:text="${user.name + ' (' + user.email + ')'} + ', '"></span>
+                        </span>
+                        <span th:if="${assessment.isOpen}">
+                            <form th:action="@{'/assessment/' + ${assessment.id} + '/update-users'}" method="post" style="display:inline;">
+                                <select name="userIds" multiple>
+                                    <option th:each="user : ${users}"
+                                            th:value="${user.id}"
+                                            th:selected="${assessment.users.contains(user)}"
+                                            th:text="${user.name + ' (' + user.email + ')'}"></option>
+                                </select>
+                                <button type="submit">Update Users</button>
+                            </form>
+                        </span>
+                    </td>
+                </tr>
             </table>
 
         </section>
@@ -244,6 +289,14 @@
                 <button type="submit">Export to Excel</button>
             </form>
         </section>
+        <!-- Create URL Button Section -->
+        <section>
+            <button id="create-url-btn" type="button">Create URL</button>
+            <span id="create-url-feedback"></span>
+            <div id="direct-url-row" style="margin-top:8px; display:none;">
+                <strong>Direct assessment link:</strong> <a id="direct-url-link" href="#" target="_blank"></a>
+            </div>
+        </section>
         <div class="nav-back">
             <a href="/assessment/list">&larr; Back to list</a>
         </div>
@@ -251,6 +304,48 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
         $(document).ready(function () {
+            // Create URL button logic
+            $("#create-url-btn").click(function () {
+                let assessmentId = /*[[${assessment.id}]]*/[[${ assessment.id }]];
+                $("#create-url-btn").prop('disabled', true);
+                $("#create-url-feedback").text('Creating...');
+                $.ajax({
+                    url: '/assessment/' + assessmentId + '/create-url',
+                    type: 'POST',
+                    success: function (data) {
+                        $("#create-url-feedback").html('<span style="color: green;">Created!</span>');
+                        setTimeout(function(){
+                            $("#create-url-feedback").empty();
+                            $("#create-url-btn").prop('disabled', false);
+                        }, 1800);
+
+                        if(data && data.directUrl) {
+                            $("#direct-url-link").attr('href', data.directUrl);
+                            $("#direct-url-link").text(window.location.origin + data.directUrl);
+                            $("#direct-url-row").show();
+
+                            // Also update the Assessment URL row in the table
+                            var $urlTd = $("th:contains('Assessment URL')").next('td');
+                            if ($urlTd.length > 0) {
+                                var anchor = $urlTd.find('a');
+                                if (anchor.length > 0) {
+                                    anchor.attr('href', data.directUrl);
+                                    anchor.text(window.location.origin + data.directUrl);
+                                    anchor.parent().show();
+                                    anchor.parent().siblings('span').hide();
+                                } else {
+                                    // In case anchor didn't exist before (URL was not set initially)
+                                    $urlTd.html('<span><a href="'+data.directUrl+'" target="_blank">' + window.location.origin + data.directUrl + '</a></span>');
+                                }
+                            }
+                        }
+                    },
+                    error: function (err) {
+                        $("#create-url-feedback").html('<span style="color: red;">Error creating URL</span>');
+                        $("#create-url-btn").prop('disabled', false);
+                    }
+                });
+            });
             let assessmentId = /*[[${assessment.id}]]*/[[${ assessment.id }]];
             function showSuccessIcon(container) {
                 container.html('<span class="answer-success" title="Saved"><svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="#d8ffd8" stroke="#33aa33" stroke-width="2"/><path d="M5 9l3 3 5-5" fill="none" stroke="#33aa33" stroke-width="2"/></svg></span>');

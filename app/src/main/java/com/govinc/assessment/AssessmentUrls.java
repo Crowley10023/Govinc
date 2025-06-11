@@ -16,11 +16,14 @@ public class AssessmentUrls {
 
     private int lifetime = 1; // in days, default is 1
 
-    @ManyToOne
-    @JoinColumn(name = "assessmentdetails_id")
-    private AssessmentDetails assessmentDetails;
+    // Removed assessmentDetails link
+    
+    @OneToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "assessment_id", nullable = false)
+    private Assessment assessment;
 
-    public AssessmentUrls() {}
+    public AssessmentUrls() {
+    }
 
     public AssessmentUrls(String url, String responsiblePerson, int lifetime) {
         this.url = url;
@@ -28,23 +31,48 @@ public class AssessmentUrls {
         this.lifetime = lifetime;
     }
 
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-
-    public String getUrl() { return url; }
-    public void setUrl(String url) { this.url = url; }
-
-    public String getResponsiblePerson() { return responsiblePerson; }
-    public void setResponsiblePerson(String responsiblePerson) { this.responsiblePerson = responsiblePerson; }
-
-    public int getLifetime() { return lifetime; }
-    public void setLifetime(int lifetime) { this.lifetime = lifetime; }
-
-    public AssessmentDetails getAssessmentDetails() {
-        return assessmentDetails;
+    public Long getId() {
+        return id;
     }
 
-    public void setAssessmentDetails(AssessmentDetails assessmentDetails) {
-        this.assessmentDetails = assessmentDetails;
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getUrl() {
+        return url;
+    }
+
+    public void setUrl(String url) {
+        this.url = url;
+    }
+
+    public String getResponsiblePerson() {
+        return responsiblePerson;
+    }
+
+    public void setResponsiblePerson(String responsiblePerson) {
+        this.responsiblePerson = responsiblePerson;
+    }
+
+    public int getLifetime() {
+        return lifetime;
+    }
+
+    public void setLifetime(int lifetime) {
+        this.lifetime = lifetime;
+    }
+
+    // No getter/setter for assessmentDetails anymore
+
+    public Assessment getAssessment() {
+        return assessment;
+    }
+
+    public void setAssessment(Assessment assessment) {
+        this.assessment = assessment;
+        if (assessment != null && assessment.getAssessmentUrls() != this) {
+            assessment.setAssessmentUrls(this);
+        }
     }
 }

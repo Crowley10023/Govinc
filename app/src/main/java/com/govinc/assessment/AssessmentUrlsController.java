@@ -3,52 +3,43 @@ package com.govinc.assessment;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
-@RequestMapping("/api/assessment-urls")
+@RequestMapping("/assessment-direct")
 public class AssessmentUrlsController {
     @Autowired
-    private AssessmentUrlsRepository repository;
+    private AssessmentUrlsService assessmentUrlsService;
 
-    @GetMapping
-    public List<AssessmentUrls> getAll() {
-        return repository.findAll();
+    @PostMapping("/{id}/urls/create")
+    public Map<String, String> createOrReplaceUrl(@PathVariable Long id) {
+        AssessmentUrls url = assessmentUrlsService.createOrReplaceUrl(id);
+        String fullUrl = "/assessment-direct/" + url.getUrl();
+        return Map.of("directUrl", fullUrl);
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<AssessmentUrls> getById(@PathVariable Long id) {
-        Optional<AssessmentUrls> url = repository.findById(id);
-        return url.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+    // New endpoints for prolong and delete
+    @PostMapping("/urls/{id}/prolong")
+    public ResponseEntity<?> prolongLifetime(@PathVariable Long id) {
+        assessmentUrlsService.prolongLifetime(id);
+        return ResponseEntity.ok().build();
     }
 
-    @PostMapping
-    public AssessmentUrls create(@RequestBody AssessmentUrls urls) {
-        return repository.save(urls);
+    @DeleteMapping("/urls/{id}")
+    public ResponseEntity<?> deleteUrl(@PathVariable Long id) {
+        assessmentUrlsService.deleteUrl(id);
+        return ResponseEntity.ok().build();
     }
 
-    @PutMapping("/{id}")
-    public ResponseEntity<AssessmentUrls> update(@PathVariable Long id, @RequestBody AssessmentUrls updated) {
-        Optional<AssessmentUrls> found = repository.findById(id);
-        if (!found.isPresent()) {
-            return ResponseEntity.notFound().build();
-        }
-        AssessmentUrls existing = found.get();
-        existing.setUrl(updated.getUrl());
-        existing.setResponsiblePerson(updated.getResponsiblePerson());
-        existing.setLifetime(updated.getLifetime());
-        return ResponseEntity.ok(repository.save(existing));
-    }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        Optional<AssessmentUrls> found = repository.findById(id);
-        if (!found.isPresent()) {
-            return ResponseEntity.notFound().build();
-        }
-        repository.deleteById(id);
-        return ResponseEntity.noContent().build();
+    // --- Add POST handler for deletion (for HTML Form Compatibility) ---
+    @PostMapping("/urls/{id}/delete")
+    public ResponseEntity<?> deleteUrlPost(@PathVariable Long id) {
+        assessmentUrlsService.deleteUrl(id);
+        return ResponseEntity.ok().build();
     }
 }

@@ -27,10 +27,11 @@ public class AssessmentDetails {
     @JoinColumn(name = "assessmentdetails_id")
     private Set<AssessmentControlAnswer> controlAnswers = new HashSet<>();
 
-    @OneToMany(mappedBy = "assessmentDetails", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Set<AssessmentUrls> assessmentUrls = new HashSet<>();
+    // No direct URLs attached anymore; view only via Assessments if needed
 
     private LocalDate date;
+    
+    private String name; // Added field
 
     public AssessmentDetails() {}
 
@@ -59,18 +60,20 @@ public class AssessmentDetails {
         }
     }
 
-    public Set<AssessmentUrls> getAssessmentUrls() {
-        return assessmentUrls;
-    }
-
-    public void setAssessmentUrls(Set<AssessmentUrls> assessmentUrls) {
-        this.assessmentUrls = assessmentUrls;
-    }
+    // No getter/setter for assessmentUrls
 
     public LocalDate getDate() {
         return date;
     }
     public void setDate(LocalDate date) {
         this.date = date;
+    }
+    
+    // Getter and Setter for name
+    public String getName() {
+        return name;
+    }
+    public void setName(String name) {
+        this.name = name;
     }
 }

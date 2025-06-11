@@ -1,9 +1,10 @@
 package com.govinc.assessment;
 
 import java.time.LocalDate;
-
 import com.govinc.catalog.SecurityCatalog;
-
+import com.govinc.user.User;
+import java.util.Set;
+import java.util.HashSet;
 import jakarta.persistence.*;
 
 @Entity
@@ -23,6 +24,16 @@ public class Assessment {
 
     @Enumerated(EnumType.STRING)
     private AssessmentStatus status = AssessmentStatus.OPEN;
+
+    // Removed assessmentUrl field
+
+    @OneToOne(mappedBy = "assessment", cascade = CascadeType.ALL)
+    private AssessmentUrls assessmentUrls;
+    
+    // NEW: Predecessor assessment reference
+    @ManyToOne
+    @JoinColumn(name = "predecessor_id")
+    private Assessment predecessor;
 
     public Assessment() {
         this.status = AssessmentStatus.OPEN;
@@ -84,5 +95,40 @@ public class Assessment {
 
     public boolean isOpen() {
         return AssessmentStatus.OPEN.equals(this.status);
-    }    
+    }
+    
+    // Removed getAssessmentUrl and setAssessmentUrl methods
+    
+    public AssessmentUrls getAssessmentUrls() {
+        return assessmentUrls;
+    }
+
+    public void setAssessmentUrls(AssessmentUrls assessmentUrls) {
+        this.assessmentUrls = assessmentUrls;
+    }
+
+    @ManyToMany
+    @JoinTable(
+        name = "assessment_users",
+        joinColumns = @JoinColumn(name = "assessment_id"),
+        inverseJoinColumns = @JoinColumn(name = "user_id")
+    )
+    private Set<User> users = new HashSet<>();
+
+    public Set<User> getUsers() {
+        return users;
+    }
+
+    public void setUsers(Set<User> users) {
+        this.users = users;
+    }
+
+    // NEW: Getter and Setter for predecessor
+    public Assessment getPredecessor() {
+        return predecessor;
+    }
+
+    public void setPredecessor(Assessment predecessor) {
+        this.predecessor = predecessor;
+    }
 }
