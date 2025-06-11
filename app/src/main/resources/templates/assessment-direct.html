@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Assessment Direct Link</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <main class="container">
+        <div th:if="${assessment.status == 'CLOSED'}">
+            <h1>SORRY NOT LONGER AVAILABLE</h1>
+        </div>
+        <div th:if="${assessment.status != 'CLOSED'}">
+            <h1>Assessment (Direct URL)</h1>
+        <section>
+            <h2 th:text="${assessment.name}"></h2>
+            <table class="table card">
+                <tr>
+                    <th>Date</th>
+                    <td th:text="${assessment.date}"></td>
+                </tr>
+                <tr>
+                    <th>Security Catalog</th>
+                    <td th:text="${assessment.securityCatalog.name}"></td>
+                </tr>
+                <tr>
+                    <th>Status</th>
+                    <td th:text="${assessment.status}"></td>
+                </tr>
+            </table>
+        </section>
+        <section>
+            <h2>Summary of Answers</h2>
+            <table class="table card" style="margin-bottom: 2em;">
+                <thead>
+                    <tr>
+                        <th>Answer Category</th>
+                        <th>Count</th>
+                        <th>Percent (%)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:if="${answerSummary == null || answerSummary.isEmpty()}">
+                        <td colspan="3">No answers yet</td>
+                    </tr>
+                    <tr th:each="entry : ${answerSummary}">
+                        <td th:text="${entry.key}"></td>
+                        <td th:text="${entry.value.count}"></td>
+                        <td th:text="${#numbers.formatDecimal(entry.value.percent, 0, 2)}"></td>
+                    </tr>
+                </tbody>
+            </table>
+            <h2>Controls &amp; Answers</h2>
+            <div>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Control</th>
+                            <th>Your Answer</th>
+                            <th>Correct Answer</th>
+                        </tr>
+                    </thead>
+                </table>
+                <div class="controls-scroll-wrapper">
+                    <table class="table">
+                        <tbody>
+                            <tr th:each="ctrl : ${assessment.securityCatalog.securityControls}">
+                                <td th:text="${ctrl.name}"></td>
+                                <td>
+                                    <span style="white-space:nowrap;" th:if="${assessment.isOpen}">
+                                        <select th:name="${'control_' + ctrl.id}" th:data-control-id="${ctrl.id}"
+                                            class="answer-select">
+                                            <option value="">-- select an answer --</option>
+                                            <option th:each="ans : ${maturityAnswers}" th:value="${ans.id}"
+                                                th:selected="${controlAnswers[ctrl.id]} != null ? (${ans.id} == ${controlAnswers[ctrl.id]}) : false"
+                                                th:text="${ans.answer}"></option>
+                                        </select>
+                                        <span class="answer-feedback"></span>
+                                    </span>
+                                    <span th:if="${!assessment.isOpen}">
+                                        <span th:text="${controlAnswers != null && controlAnswers[ctrl.id] != null ? controlAnswers[ctrl.id] : 'No answer'}"></span>
+                                    </span>
+                                </td>
+                                <td>
+                                    <span th:if="${correctAnswers != null}" th:text="${correctAnswers[ctrl.id] != null ? correctAnswers[ctrl.id] : 'N/A'}"></span>
+                                    <span th:if="${correctAnswers == null}">N/A</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </div> <!-- end not CLOSED div -->
+    </main>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function () {
+            let assessmentId = /*[[${assessment.id}]]*/[[${ assessment.id }]];
+            function showSuccessIcon(container) {
+                container.html('<span class="answer-success" title="Saved"><svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="#d8ffd8" stroke="#33aa33" stroke-width="2"/><path d="M5 9l3 3 5-5" fill="none" stroke="#33aa33" stroke-width="2"/></svg></span>');
+            }
+            function showErrorIcon(container) {
+                container.html('<span class="answer-error" title="Error saving"><svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="#ffd8d8" stroke="#cc2222" stroke-width="2"/><path d="M6 6l6 6M12 6l-6 6" fill="none" stroke="#cc2222" stroke-width="2"/></svg></span>');
+            }
+            function clearIcon(container) {
+                container.empty();
+            }
+            $('.answer-select').on('change', function () {
+                var select = $(this);
+                var controlId = select.data('control-id');
+                var answerId = select.val();
+                var feedbackIcon = select.closest('span').find('.answer-feedback');
+                select.css('background', ''); // reset
+                clearIcon(feedbackIcon);
+                if (!answerId) {
+                    clearIcon(feedbackIcon);
+                    return;
+                }
+                if (assessmentId && controlId) {
+                    $.post({
+                        url: '/assessment/' + assessmentId + '/answer',
+                        data: {
+                            controlId: controlId,
+                            answerId: answerId
+                        },
+                        success: function (response) {
+                            select.css('background', '#d8ffd8');
+                            showSuccessIcon(feedbackIcon);
+                            setTimeout(function () { clearIcon(feedbackIcon); select.css('background', ''); }, 1500);
+                        },
+                        error: function (xhr) {
+                            select.css('background', '#ffd8d8');
+                            showErrorIcon(feedbackIcon);
+                        }
+                    });
+                }
+            });
+        });
+    </script>
+    <style>
+        .answer-feedback {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            vertical-align: middle;
+            margin-left: 5px;
+        }
+        .answer-feedback svg {
+            width: 18px;
+            height: 18px;
+        }
+        .answer-success {
+            color: #33aa33;
+        }
+        .answer-error {
+            color: #cc2222;
+        }
+    </style>
+</body>
+</html>

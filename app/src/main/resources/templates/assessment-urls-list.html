@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Assessment URLs</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div th:replace="navigation :: mainNav"></div>
+<main class="container">
+    <h1>Assessment URLs</h1>
+    <section>
+        <table class="table card">
+            <thead>
+            <tr>
+                <th>Obfuscated URL</th>
+                <th>Assessment Name</th>
+                <th>Responsible Person</th>
+                <th>Lifetime (days)</th>
+                <th>Actions</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="url : ${urls}">
+                <td>
+                    <a th:href="@{'/assessment-direct/' + ${url.url}}" th:text="${url.url}" target="_blank"></a>
+                </td>
+                <td th:text="${url.assessment != null ? url.assessment.name : ''}"></td>
+                <td th:text="${url.responsiblePerson}"></td>
+                <td th:text="${url.lifetime}"></td>
+                <td>
+                    <form th:action="@{'/assessment-direct/urls/' + ${url.id} + '/prolong'}" method="post" style="display:inline">
+                        <button type="submit">Prolong</button>
+                    </form>
+                    <form th:action="@{'/assessment-direct/urls/' + ${url.id} + '/delete'}" method="post" style="display:inline" onsubmit="return confirm('Are you sure you want to delete this entry?');">
+                        <button type="submit">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+</main>
+</body>
+</html>
