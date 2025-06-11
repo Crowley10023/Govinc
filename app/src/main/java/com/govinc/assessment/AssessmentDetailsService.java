@@ -83,7 +83,6 @@ public class AssessmentDetailsService {
      * Returns a map of MaturityAnswer.answer to a summary containing count and percentage for each answer in AssessmentDetails.
      */
     public Map<String, Map<String, Object>> computeAnswerSummary(AssessmentDetails details) {
-        System.out.println("\n\n\n yeah, called\n\n\n");
         Map<String, Integer> counts = new HashMap<>();
         int total = 0;
         if (details != null && details.getControlAnswers() != null) {

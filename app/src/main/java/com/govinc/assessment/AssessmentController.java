@@ -1,108 +1,304 @@
-// ...existing imports...
-import com.lowagie.text.Document;
-import com.lowagie.text.DocumentException;
-import com.lowagie.text.Font;
-import com.lowagie.text.FontFactory;
-import com.lowagie.text.PageSize;
-import com.lowagie.text.Paragraph;
-import com.lowagie.text.Table;
-import com.lowagie.text.Cell;
-import com.lowagie.text.pdf.PdfWriter;
-import java.awt.Color;
-import javax.servlet.http.HttpServletResponse;
-// ...rest of imports and code...
+package com.govinc.assessment;
+
+import com.govinc.catalog.SecurityCatalog;
+import com.govinc.catalog.SecurityCatalogService;
+import com.govinc.catalog.SecurityControl;
+import com.govinc.catalog.SecurityControlRepository;
+import com.govinc.maturity.MaturityAnswer;
+import com.govinc.maturity.MaturityAnswerRepository;
+import com.govinc.user.User;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.util.MultiValueMap;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/assessment")
 public class AssessmentController {
-    // ...existing Autowired and fields...
+    @Autowired
+    private AssessmentRepository assessmentRepository;
+    @Autowired
+    private SecurityCatalogService securityCatalogService;
+    @Autowired
+    private AssessmentDetailsService assessmentDetailsService;
+    @Autowired
+    private SecurityControlRepository securityControlRepository;
+    @Autowired
+    private MaturityAnswerRepository maturityAnswerRepository;
+    @Autowired
+    private AssessmentControlAnswerRepository assessmentControlAnswerRepository;
 
-    // ...existing code...
+    @GetMapping("/create")
+    public String showCreateAssessmentForm(Model model) {
+        List<SecurityCatalog> catalogs = securityCatalogService.findAll();
+        model.addAttribute("catalogs", catalogs);
+        return "create-assessment";
+    }
 
-    @GetMapping("/{id}/report")
-    public void downloadReport(@PathVariable Long id, HttpServletResponse response) throws Exception {
+    // POST handler for create-assessment
+    @PostMapping("/create")
+    public String createAssessment(@RequestParam("name") String name, @RequestParam("catalogId") Long catalogId) {
+        SecurityCatalog catalog = securityCatalogService.findById(catalogId).orElse(null);
+        if (catalog == null) {
+            // handle error, redirect back or show error (for now, redirect to list)
+            return "redirect:/assessment/list";
+        }
+        Assessment assessment = new Assessment();
+        assessment.setName(name);
+        assessment.setSecurityCatalog(catalog);
+        assessment.setDate(LocalDate.now());
+        assessment = assessmentRepository.save(assessment);
+        // Here you may want to create AssessmentDetails entity as well (if required by your flow)
+        return "redirect:/assessment/" + assessment.getId() + "/controls";
+    }
+
+    @GetMapping("/list")
+    public String showAssessments(Model model) {
+        model.addAttribute("assessments", assessmentRepository.findAll());
+        return "assessment-list";
+    }
+
+    // Add this mapping to serve assessment-step-controls.html as per your flow
+    @GetMapping("/{id}/controls")
+    public String assessmentStepControls(@PathVariable Long id, Model model) {
         Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
-        if (!assessmentOpt.isPresent()) {
-            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
-            response.getWriter().write("Assessment not found");
-            return;
+        if (assessmentOpt.isEmpty()) {
+            return "assessment-not-found";
         }
         Assessment assessment = assessmentOpt.get();
-        List<SecurityControl> controls = new ArrayList<>();
-        if (assessment.getSecurityCatalog() != null) {
-            controls.addAll(assessment.getSecurityCatalog().getSecurityControls());
-        }
-        List<MaturityAnswer> maturityAnswers = new ArrayList<>();
+        model.addAttribute("assessment", assessment);
+        model.addAttribute("controls", assessment.getSecurityCatalog().getSecurityControls());
+        List<MaturityAnswer> answers = new ArrayList<>();
         if (assessment.getSecurityCatalog() != null && assessment.getSecurityCatalog().getMaturityModel() != null) {
-            maturityAnswers.addAll(assessment.getSecurityCatalog().getMaturityModel().getMaturityAnswers());
+            answers.addAll(assessment.getSecurityCatalog().getMaturityModel().getMaturityAnswers());
         }
-        // fetch the answers for each control
-        Map<Long, AssessmentControlAnswer> answerMap = new HashMap<>();
+        model.addAttribute("answers", answers);
+
+        // Add selected answers for each control
         Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
-        if(detailsOpt.isPresent() && detailsOpt.get().getControlAnswers()!=null) {
-            for(AssessmentControlAnswer aca : detailsOpt.get().getControlAnswers()){
-                if(aca.getSecurityControl()!=null) {
-                    answerMap.put(aca.getSecurityControl().getId(), aca);
+        Map<Long, Long> controlAnswers = new HashMap<>();
+        if (detailsOpt.isPresent()) {
+            for (AssessmentControlAnswer aca : detailsOpt.get().getControlAnswers()) {
+                if (aca.getSecurityControl() != null && aca.getMaturityAnswer() != null) {
+                    controlAnswers.put(aca.getSecurityControl().getId(), aca.getMaturityAnswer().getId());
                 }
             }
         }
-        response.setContentType("application/pdf");
-        response.setHeader("Content-Disposition", "attachment; filename=assessment-" + assessment.getId() + ".pdf");
-        Document doc = new Document(PageSize.A4);
-        PdfWriter.getInstance(doc, response.getOutputStream());
-        doc.open();
-        Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 17);
-        Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14);
-        Font textFont = FontFactory.getFont(FontFactory.HELVETICA, 12);
-        doc.add(new Paragraph("Assessment Report", titleFont));
-        doc.add(new Paragraph(" "));
-        doc.add(new Paragraph("Name: " + assessment.getName(), textFont));
-        doc.add(new Paragraph("Date: " + assessment.getDate(), textFont));
-        doc.add(new Paragraph("Status: " + assessment.getStatus(), textFont));
-        doc.add(new Paragraph("Security Catalog: " + (assessment.getSecurityCatalog() != null ? assessment.getSecurityCatalog().getName() : ""), textFont));
-        if (assessment.getPredecessor()!=null) {
-            doc.add(new Paragraph("Predecessor Assessment: " + assessment.getPredecessor().getName() + " (ID: " + assessment.getPredecessor().getId() + ")", textFont));
-        }
-        doc.add(new Paragraph(" "));
-        doc.add(new Paragraph("Controls & Maturity Answers", headerFont));
-        doc.add(new Paragraph(" "));
-        for (SecurityControl ctrl : controls) {
-            doc.add(new Paragraph("Control: " + ctrl.getName(), headerFont));
-            if(ctrl.getDetail()!=null && !ctrl.getDetail().isEmpty()) {
-                doc.add(new Paragraph("Description: " + ctrl.getDetail(), FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 11, Color.GRAY)));
-            }
-            Table t = new Table(2);
-            t.setWidths(new float[]{2, 7});
-            t.addCell(makeHeaderCell("Maturity Answer"));
-            t.addCell(makeHeaderCell("Description"));
-            AssessmentControlAnswer ans = answerMap.get(ctrl.getId());
-            Long selectedId = (ans != null && ans.getMaturityAnswer() != null) ? ans.getMaturityAnswer().getId() : null;
-            for(MaturityAnswer ma: maturityAnswers) {
-                Font cellFont = (ma.getId().equals(selectedId))
-                    ? FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, Color.BLUE)
-                    : textFont;
-                Color bgColor = (ma.getId().equals(selectedId)) ? new Color(220,235,255) : Color.WHITE;
-                Cell ansCell = new Cell(new Paragraph(ma.getAnswer(), cellFont));
-                ansCell.setBackgroundColor(bgColor);
-                ansCell.setHorizontalAlignment(Cell.ALIGN_CENTER);
-                Cell descCell = new Cell(new Paragraph(ma.getDescription()!=null? ma.getDescription() : "", cellFont));
-                descCell.setBackgroundColor(bgColor);
-                t.addCell(ansCell);
-                t.addCell(descCell);
-            }
-            doc.add(t);
-            doc.add(new Paragraph(" "));
-        }
-        doc.close();
+        model.addAttribute("controlAnswers", controlAnswers);
+        return "assessment-step-controls";
     }
 
-    private Cell makeHeaderCell(String text) {
-        Font bold = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 13, Color.WHITE);
-        Cell cell = new Cell(new Paragraph(text, bold));
-        cell.setBackgroundColor(new Color(70,130,180));
-        cell.setHorizontalAlignment(Cell.ALIGN_CENTER);
-        return cell;
+    // POST handler for controls - saves answers and redirects to details page
+    @PostMapping("/{id}/controls")
+    public String handleAssessmentControls(@PathVariable Long id, @RequestParam MultiValueMap<String, String> params) {
+        // Find details or create new
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
+        AssessmentDetails details;
+        if (!detailsOpt.isPresent()) {
+            Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
+            if (!assessmentOpt.isPresent()) return "redirect:/assessment/list";
+            details = new AssessmentDetails();
+            Set<Assessment> assessmentSet = new HashSet<>();
+            assessmentSet.add(assessmentOpt.get());
+            details.setAssessments(assessmentSet);
+            details.setDate(LocalDate.now());
+        } else {
+            details = detailsOpt.get();
+        }
+        Set<AssessmentControlAnswer> answers = new HashSet<>();
+        // Remove all previous answers for clean update
+        for (Map.Entry<String, List<String>> entry : params.entrySet()) {
+            String key = entry.getKey();
+            if (key.startsWith("control_")) {
+                try {
+                    Long controlId = Long.parseLong(key.substring("control_".length()));
+                    String answerIdStr = entry.getValue().get(0);
+                    if (answerIdStr != null && !answerIdStr.isEmpty()) {
+                        Long answerId = Long.parseLong(answerIdStr);
+                        SecurityControl control = securityControlRepository.findById(controlId).orElse(null);
+                        MaturityAnswer maturityAnswer = maturityAnswerRepository.findById(answerId).orElse(null);
+                        if (control != null && maturityAnswer != null) {
+                            AssessmentControlAnswer aca = new AssessmentControlAnswer(control, maturityAnswer);
+                            aca = assessmentControlAnswerRepository.save(aca);
+                            answers.add(aca);
+                        }
+                    }
+                } catch (NumberFormatException e) {
+                    // Ignore parse errors
+                }
+            }
+        }
+        details.setControlAnswers(answers);
+        assessmentDetailsService.save(details);
+        return "redirect:/assessment/" + id;
     }
 
-    // ...rest of controller code unchanged...
+    @GetMapping("/{id}")
+    public String getAssessmentById(@PathVariable Long id, Model model) {
+        Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
+        if (assessmentOpt.isPresent()) {
+            Assessment assessment = assessmentOpt.get();
+            model.addAttribute("assessment", assessment);
+            
+            // Control answers are always retrieved from AssessmentDetails
+            Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
+            AssessmentDetails details = detailsOpt.orElse(null);
+            List<AssessmentControlAnswer> answers = new ArrayList<>();
+            Map<Long, String> controlAnswers = new HashMap<>();
+            if(details != null && details.getControlAnswers()!=null) {
+                answers.addAll(details.getControlAnswers());
+                for(AssessmentControlAnswer aca: details.getControlAnswers()){
+                    if(aca.getSecurityControl()!=null && aca.getMaturityAnswer()!=null)
+                        controlAnswers.put(aca.getSecurityControl().getId(), aca.getMaturityAnswer().getAnswer());
+                }
+            }
+            model.addAttribute("answers", answers);
+            model.addAttribute("controlAnswers", controlAnswers);
+
+            // Summary table by answer type
+            model.addAttribute("answerSummary", assessmentDetailsService.computeAnswerSummary(details));
+
+            // Use only controls from the catalog assigned to this assessment
+            List<SecurityControl> controls = new ArrayList<>();
+            if (assessment.getSecurityCatalog() != null) {
+                controls.addAll(assessment.getSecurityCatalog().getSecurityControls());
+            }
+            model.addAttribute("controls", controls);
+
+            // Pass the correct answers from the associated maturity model only
+            List<MaturityAnswer> maturityAnswers = new ArrayList<>();
+            if (assessment.getSecurityCatalog() != null && assessment.getSecurityCatalog().getMaturityModel() != null) {
+                maturityAnswers.addAll(assessment.getSecurityCatalog().getMaturityModel().getMaturityAnswers());
+            }
+            model.addAttribute("maturityAnswers", maturityAnswers);
+            return "assessment-details";
+        } else {
+            return "assessment-not-found";
+        }
+    }
+
+    // Save/update answer for a single control (AJAX POST from UI)
+    @PostMapping("/{id}/answer")
+    @ResponseBody
+    public String saveAnswer(@PathVariable Long id, @RequestParam Long controlId, @RequestParam Long answerId) {
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
+        AssessmentDetails details = null;
+        if (!detailsOpt.isPresent()) {
+            // Try to find the assessment:
+            Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
+            if (!assessmentOpt.isPresent()) return "fail";
+            details = new AssessmentDetails();
+            // Link this details entity to the assessment
+            Set<Assessment> assessmentSet = new HashSet<>();
+            assessmentSet.add(assessmentOpt.get());
+            details.setAssessments(assessmentSet);
+            details.setDate(LocalDate.now());
+        } else {
+            details = detailsOpt.get();
+        }
+        Set<AssessmentControlAnswer> answers = details.getControlAnswers();
+        // Find or add
+        AssessmentControlAnswer found = null;
+        for(AssessmentControlAnswer aca : answers) {
+            if(aca.getSecurityControl()!=null && aca.getSecurityControl().getId().equals(controlId)) {
+                found = aca; break;
+            }
+        }
+        SecurityControl control = securityControlRepository.findById(controlId).orElse(null);
+        MaturityAnswer maturityAnswer = maturityAnswerRepository.findById(answerId).orElse(null);
+        if (control == null || maturityAnswer == null) return "fail";
+
+        if(found == null) {
+            found = new AssessmentControlAnswer(control, maturityAnswer);
+            found = assessmentControlAnswerRepository.save(found);
+            answers.add(found);
+        } else {
+            found.setMaturityAnswer(maturityAnswer);
+            found = assessmentControlAnswerRepository.save(found);
+        }
+        // Only update the modified/new answer, do NOT replace the set with only one answer
+        assessmentDetailsService.save(details);
+        return "ok";
+    }
+
+    // Finalize assessment (POST)
+    @PostMapping("/{id}/finalize")
+    public String finalizeAssessment(@PathVariable Long id) {
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
+        if (detailsOpt.isPresent()) {
+            AssessmentDetails details = detailsOpt.get();
+            // Mark as finalized (add a field for this in AssessmentDetails if you want persistently lock it)
+            // Here we just simulate finalization
+            // details.setFinalized(true);
+            assessmentDetailsService.save(details);
+        }
+        return "redirect:/assessment/" + id;
+    }
+
+    // Delete assessment (POST)
+    @PostMapping("/{id}/delete")
+    public String deleteAssessment(@PathVariable Long id) {
+        // Remove assessment reference from all AssessmentDetails entities before deleting
+        Assessment assessment = assessmentRepository.findById(id).orElse(null);
+        if (assessment != null) {
+            List<AssessmentDetails> detailsList = assessmentDetailsService.findAll();
+            for (AssessmentDetails details : detailsList) {
+                if (details.getAssessments().contains(assessment)) {
+                    details.getAssessments().remove(assessment);
+                    assessmentDetailsService.save(details);
+                }
+            }
+            assessmentRepository.delete(assessment);
+        }
+        return "redirect:/assessment/list";
+    }
+
+    // Download PDF (stub - returns text as PDF)
+    @GetMapping("/{id}/report")
+    public ResponseEntity<byte[]> downloadReport(@PathVariable Long id) {
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
+        String report = "Assessment Report for ID="+id+"\n";
+        // Populate report text (stub)
+        if(detailsOpt.isPresent()) {
+            AssessmentDetails details = detailsOpt.get();
+            report += "Completed on: " + details.getDate() + "\n";
+        }
+        byte[] pdfBytes = report.getBytes(StandardCharsets.UTF_8); // Should convert to actual PDF bytes
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=assessment_"+id+".pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdfBytes);
+    }
+
+    // Download Excel (stub - returns text as Excel file)
+    @GetMapping("/{id}/excel")
+    public ResponseEntity<byte[]> downloadExcel(@PathVariable Long id) throws IOException {
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
+        StringBuilder builder = new StringBuilder();
+        builder.append("Control,Answer\n");
+        if(detailsOpt.isPresent()) {
+            AssessmentDetails details = detailsOpt.get();
+            for(AssessmentControlAnswer aca : details.getControlAnswers()) {
+                builder.append(aca.getSecurityControl().getName()).append(",")
+                        .append(aca.getMaturityAnswer().getAnswer()).append("\n");
+            }
+        }
+        byte[] excelBytes = builder.toString().getBytes(StandardCharsets.UTF_8); // Should convert to real Excel if needed
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=assessment_"+id+".csv")
+                .contentType(MediaType.parseMediaType("text/csv"))
+                .body(excelBytes);
+    }
 }

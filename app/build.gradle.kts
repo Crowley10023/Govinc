@@ -18,6 +18,7 @@ dependencies {
     implementation("org.hibernate.orm:hibernate-core:6.4.4.Final") // Hibernate Core with MariaDB dialect
     implementation("javax.servlet:javax.servlet-api:4.0.1") // Added for servlet support
     implementation("org.apache.pdfbox:pdfbox:2.0.30") // Apache PDFBox for PDF processing
+    implementation("com.github.librepdf:openpdf:1.3.30") // OpenPDF for PDF generation/processing
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
 

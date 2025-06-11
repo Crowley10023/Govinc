@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Map;
 
 @Controller
 public class AssessmentDirectController {
@@ -24,10 +25,9 @@ public class AssessmentDirectController {
         if (maybeUrl.isPresent()) {
             AssessmentUrls urlEntity = maybeUrl.get();
             Assessment assessment = urlEntity.getAssessment();
-
             model.addAttribute("assessment", assessment);
-            // Optionally add summary, answers, etc. as in details page
-            // ...
+
+
             return "assessment-direct";
         } else {
             return "error";
