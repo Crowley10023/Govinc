@@ -1,0 +1,76 @@
+<div th:fragment="mainNav">
+  <div class="main-navigation">
+      <div class="landing-main">
+          <div class="landing-image">
+              <img src="/title.png" style="width: 50px; padding: 10px" alt="Compliance Incubator Logo" class="ci-logo-img" />
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:0.8em;">
+              <div style="margin-bottom:0.5em;display:flex;align-items:center;">
+                  <span class="ci-headline">compliance incubator</span>
+                  <a href="/" style="margin-left:1.25em;text-decoration:none;"><button type="button">Home</button></a>
+              </div>
+              <div class="nav-row" style="display:flex;flex-direction:row;align-items:center;gap:1.2em;">
+                <div class="nav-entry" style="display:flex;align-items:center;gap:0.4em;">
+                  <span class="entry-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <circle cx="12" cy="12" r="10" stroke="#2274A5" stroke-width="2" fill="#eaf3fa"/>
+                      <rect x="8" y="11" width="8" height="2" rx="1" fill="#2274A5"/>
+                    </svg>
+                  </span>
+                  <form action="/assessment/create" method="get" class="entry-form" style="margin:0;">
+                    <button type="submit">Create Assessment</button>
+                  </form>
+                </div>
+                <div class="nav-entry" style="display:flex;align-items:center;gap:0.4em;">
+                  <a href="/assessment/list" class="entry-link"><button type="button">Vieww Assessments</button></a>
+                </div>
+                <div class="nav-entry" style="display:flex;align-items:center;gap:0.4em;">
+                  <span class="entry-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <rect x="3" y="7" width="18" height="10" rx="2" stroke="#2274A5" stroke-width="2" fill="#eaf3fa"/>
+                      <rect x="6" y="11" width="12" height="2" rx="1" fill="#2274A5"/>
+                    </svg>
+                  </span>
+                  <a href="/security-control/list" class="entry-link"><button type="button">Security Controls</button></a>
+                </div>
+                <div class="nav-entry" style="display:flex;align-items:center;gap:0.4em;">
+                  <span class="entry-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <rect x="6" y="6" width="12" height="12" rx="3" stroke="#2274A5" stroke-width="2" fill="#eaf3fa"/>
+                      <circle cx="12" cy="12" r="2" fill="#2274A5"/>
+                    </svg>
+                  </span>
+                  <a href="/security-catalog/list" class="entry-link"><button type="button">Security Catalogs</button></a>
+                </div>
+                <div class="nav-entry" style="display:flex;align-items:center;gap:0.4em;">
+                  <span class="entry-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <ellipse cx="12" cy="12" rx="9" ry="6" stroke="#2274A5" stroke-width="2" fill="#eaf3fa"/>
+                      <rect x="8" y="11" width="8" height="2" rx="1" fill="#2274A5"/>
+                    </svg>
+                  </span>
+                  <a href="/maturitymodel/list" class="entry-link"><button type="button">Maturity Models</button></a>
+                </div>
+                <div class="nav-entry" style="display:flex;align-items:center;gap:0.4em;">
+                  <span class="entry-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <ellipse cx="12" cy="12" rx="6" ry="9" stroke="#2274A5" stroke-width="2" fill="#eaf3fa"/>
+                      <rect x="8" y="11" width="8" height="2" rx="1" fill="#2274A5"/>
+                    </svg>
+                  </span>
+                  <a href="/maturityanswer/list" class="entry-link"><button type="button">Maturity Model Answers</button></a>
+                </div>
+                <div class="nav-entry" style="display:flex;align-items:center;gap:0.4em;">
+                  <span class="entry-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <rect x="4" y="4" width="16" height="16" rx="4" stroke="#2274A5" stroke-width="2" fill="#eaf3fa"/>
+                      <path d="M8 15V9M12 15V12M16 15V7" stroke="#2274A5" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                  </span>
+                  <a href="/statistics" class="entry-link"><button type="button">Statistics</button></a>
+                </div>
+              </div>
+          </div>
+      </div>
+  </div>
+</div>

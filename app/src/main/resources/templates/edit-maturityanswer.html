@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Edit Maturity Answer</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div th:replace="navigation :: mainNav"></div>
+    <main class="container">
+        <h1>Edit Maturity Answer</h1>
+        <section class="card">
+            <form th:action="@{'/maturityanswer/edit'}" method="post">
+                <input type="hidden" name="id" th:value="${maturityAnswer.id}" />
+
+                <div class="field">
+                    <label for="answer">Answer</label>
+                    <input type="text" id="answer" name="answer" th:value="${maturityAnswer.answer}" required />
+                </div>
+                <div class="field">
+                    <label for="description">Description</label>
+                    <textarea id="description" name="description" rows="3" cols="30" th:text="${maturityAnswer.description}"></textarea>
+                </div>
+                <div class="actions-row">
+                    <button type="submit">Save</button>
+                    <a th:href="@{'/maturityanswer/list'}" class="btn-cancel">Cancel</a>
+                </div>
+            </form>
+        </section>
+    </main>
+</body>
+</html>

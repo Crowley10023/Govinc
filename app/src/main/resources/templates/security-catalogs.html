@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Security Catalogs List</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div th:replace="navigation :: mainNav"></div>
+    <h1>Security Catalogs</h1>
+    <a href="/security-catalog/create">Create New Security Catalog</a>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Revision</th>
+                <th>Security Controls</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="catalog : ${catalogs}">
+                <td th:text="${catalog.id}"></td>
+                <td th:text="${catalog.name}"></td>
+                <td th:text="${catalog.description}"></td>
+                <td th:text="${catalog.revision}"></td>
+                <td>
+                    <span th:each="control : ${catalog.securityControls}" th:text="${control.name}" th:append=", " th:remove="tag"></span>
+                </td>
+                <td>
+                    <a th:href="@{'/security-catalog/edit'(id=${catalog.id})}">Edit</a>
+                    <form th:action="@{/security-catalog/delete}" method="post" style="display:inline">
+                        <input type="hidden" name="id" th:value="${catalog.id}" />
+                        <button type="submit" onclick="return confirm('Are you sure?')">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <a href="/">Back to main</a>
+</body>
+</html>

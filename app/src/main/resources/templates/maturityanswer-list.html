@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Maturity Answer List</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div th:replace="navigation :: mainNav"></div>
+    <h1>Maturity Answers</h1>
+    <a href="/maturityanswer/create">Create New Maturity Answer</a>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Answer</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="answerObj : ${answers}">
+                <td th:text="${answerObj.id}"></td>
+                <td th:text="${answerObj.answer}"></td>
+                <td th:text="${answerObj.description}"></td>
+                <td>
+                    <a th:href="@{'/maturityanswer/edit'(id=${answerObj.id})}">Edit</a>
+                    <form th:action="@{/maturityanswer/delete}" method="post" style="display:inline">
+                        <input type="hidden" name="id" th:value="${answerObj.id}" />
+                        <button type="submit" onclick="return confirm('Are you sure?')">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <a href="/">Back to main</a>
+</body>
+</html>

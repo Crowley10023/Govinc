@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Edit Maturity Model</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <h1 th:text="${maturityModel.id != null && maturityModel.id > 0 ? 'Edit Maturity Model' : 'Create Maturity Model'}"></h1>
+    <div class="entity-edit-frame">
+        <form th:object="${maturityModel}" action="/maturitymodel/save" method="post">
+            <input type="hidden" th:field="*{id}" />
+            <label>Name: <input th:field="*{name}" required/></label><br>
+            <label>Description: <textarea th:field="*{description}" required></textarea></label><br>
+
+            <label>Maturity Answers:</label><br>
+            <select name="maturityAnswers" multiple size="7">
+                <option th:each="ans : ${allAnswers}"
+                        th:value="${ans.id}"
+                        th:text="${ans.answer} + ' (' + ${ans.description} + ')'"
+                        th:selected="${maturityModel.maturityAnswers.contains(ans)}">
+                </option>
+            </select>
+            <br>
+
+            <button type="submit">Save</button>
+            <a href="/maturitymodel/list">Cancel</a>
+        </form>
+    </div>
+</body>
+</html>

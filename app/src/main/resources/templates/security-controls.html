@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Security Controls List</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div th:replace="navigation :: mainNav"></div>
+    <h1>Security Controls</h1>
+    <a href="/security-control/create">Create New Security Control</a>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Detail</th>
+                <th>Reference</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="control : ${controls}">
+                <td th:text="${control.id}"></td>
+                <td th:text="${control.name}"></td>
+                <td th:text="${control.detail}"></td>
+                <td th:text="${control.reference}"></td>
+                <td>
+                    <a th:href="@{'/security-control/edit'(id=${control.id})}">Edit</a>
+                    <form th:action="@{/security-control/delete}" method="post" style="display:inline">
+                        <input type="hidden" name="id" th:value="${control.id}" />
+                        <button type="submit" onclick="return confirm('Are you sure?')">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <a href="/">Back to main</a>
+</body>
+</html>

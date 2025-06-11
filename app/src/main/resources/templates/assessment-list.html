@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Assessment List</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div th:replace="navigation :: mainNav"></div>
+    <main class="container">
+        <h1>Assessments</h1>
+        <div class="actions-row">
+            <a href="/assessment/create" class="btn">Create New Assessment</a>
+        </div>
+        <section>
+            <table class="table card">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Catalog</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="assessment : ${assessments}">
+                        <td th:text="${assessment.name}"></td>
+                        <td th:text="${assessment.date}"></td>
+                        <td th:text="${assessment.status}"></td>
+                        <td th:text="${assessment.securityCatalog.name}"></td>
+                        <td>
+                            <a th:href="@{'/assessment/' + ${assessment.id}}">View</a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+    </main>
+</body>
+</html>

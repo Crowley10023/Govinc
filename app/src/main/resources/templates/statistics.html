@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Statistics</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div th:replace="navigation :: mainNav"></div>
+    <main class="container">
+        <h1>Statistics</h1>
+        <section>
+            <h2>Assessments Per Year</h2>
+            <table class="table card">
+                <thead>
+                    <tr>
+                        <th>Year</th>
+                        <th>Number of Assessments</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="stat : ${assessmentsPerYear}">
+                        <td th:text="${stat.year}"></td>
+                        <td th:text="${stat.count}"></td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        <section>
+            <h2>Security Controls Overview</h2>
+            <table class="table card">
+                <tr>
+                    <th>Total Security Controls</th>
+                    <td th:text="${totalControls}"></td>
+                </tr>
+                <tr>
+                    <th>Total Controls Answered</th>
+                    <td th:text="${totalAnswered}"></td>
+                </tr>
+            </table>
+        </section>
+    </main>
+</body>
+</html>

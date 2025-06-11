@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Edit Security Control</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <h1>Edit Security Control</h1>
+    <div class="entity-edit-frame">
+        <form th:action="@{/security-control/edit}" th:object="${securityControl}" method="post">
+            <input type="hidden" th:field="*{id}" />
+            <div>
+                <label for="name">Name:</label>
+                <input type="text" th:field="*{name}" id="name" required />
+            </div>
+            <div>
+                <label for="detail">Detail:</label>
+                <textarea th:field="*{detail}" id="detail" required></textarea>
+            </div>
+            <div>
+                <label for="reference">Reference:</label>
+                <input type="text" th:field="*{reference}" id="reference" />
+            </div>
+            <button type="submit">Save</button>
+            <a th:href="@{/security-control/list}" class="button">Cancel</a>
+        </form>
+    </div>
+</body>
+</html>

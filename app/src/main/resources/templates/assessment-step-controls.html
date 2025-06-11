@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Assessment Step Controls</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div th:replace="navigation :: mainNav"></div>
+    <main class="container">
+        <h1 th:text="'Assessment: ' + ${assessment.name}"></h1>
+        <section>
+            <form th:action="@{'/assessment/' + ${assessment.id} + '/controls'}" method="post">
+                <table class="table card">
+                    <thead>
+                        <tr>
+                            <th>Security Control</th>
+                            <th>Maturity Answer</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="control : ${controls}">
+                            <td th:text="${control.name}"></td>
+                            <td>
+                                <select th:name="${'control_' + control.id}">
+                                    <option value="">-- select an answer --</option>
+                                    <option th:each="ans : ${answers}"
+                                            th:value="${ans.id}"
+                                            th:text="${ans.answer + ' - ' + ans.description}"
+                                            th:selected="${controlAnswers[control.id]} == ${ans.id}"></option>
+                                </select>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div style="margin: 1em 0;">
+                    <button type="submit">Save Answers</button>
+                </div>
+            </form>
+        </section>
+        <div class="nav-back">
+            <a href="/assessment/list">&larr; Back to list</a>
+        </div>
+    </main>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Edit Security Catalog</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <h1>Edit Security Catalog</h1>
+    <div class="entity-edit-frame">
+        <form th:action="@{/security-catalog/edit}" th:object="${securityCatalog}" method="post">
+            <input type="hidden" th:field="*{id}" />
+            <table>
+                <tr>
+                    <td><label for="name">Name:</label></td>
+                    <td><input type="text" th:field="*{name}" id="name" required /></td>
+                </tr>
+                <tr>
+                    <td><label for="description">Description:</label></td>
+                    <td><textarea th:field="*{description}" id="description" required></textarea></td>
+                </tr>
+                <tr>
+                    <td><label for="revision">Revision:</label></td>
+                    <td><input type="text" th:field="*{revision}" id="revision" required /></td>
+                </tr>
+                <tr>
+                    <td><label for="securityControls">Security Controls:</label></td>
+                    <td>
+                        <select th:field="*{securityControls}" id="securityControls" multiple>
+                            <option th:each="control : ${securityControls}" th:value="${control.id}" th:text="${control.name}"></option>
+                        </select>
+                    </td>
+                </tr>
+                <tr>
+                    <td><label for="maturityModelId">Maturity Model:</label></td>
+                    <td>
+                        <select id="maturityModelId" name="maturityModelId" required>
+                            <option value="" disabled th:selected="${securityCatalog.maturityModel == null}">-- Select one --</option>
+                            <option th:each="maturityModel : ${maturityModels}"
+                                    th:value="${maturityModel.id}"
+                                    th:text="${maturityModel.name}"
+                                    th:selected="${securityCatalog.maturityModel != null and maturityModel.id == securityCatalog.maturityModel.id}">
+                            </option>
+                        </select>
+                    </td>
+                </tr>
+            </table>
+            <button type="submit">Save</button>
+        </form>
+        <div th:if="${success}">
+            <p style="color:green;">Security Catalog saved!</p>
+        </div>
+        <a href="/security-catalog/list">Back to catalog list</a>
+    </div>
+</body>
+</html>

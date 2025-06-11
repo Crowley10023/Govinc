@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Create Assessment</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div th:replace="navigation :: mainNav"></div>
+    <h1>Create Assessment</h1>
+    <form th:action="@{/assessment/create}" method="post">
+        <table class="table" style="width:auto; margin: 0 auto;">
+            <tr>
+                <td><label for="name">Assessment Name:</label></td>
+                <td><input type="text" id="name" name="name" required /></td>
+            </tr>
+            <tr>
+                <td><label for="catalog">Select Security Catalog:</label></td>
+                <td>
+                    <select id="catalog" name="catalogId" required>
+                        <option th:each="catalog: ${catalogs}" 
+                                th:value="${catalog.id}" 
+                                th:text="${catalog.name}"></option>
+                    </select>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2" style="text-align: center;">
+                    <button type="submit">Create Assessment</button>
+                </td>
+            </tr>
+        </table>
+    </form>
+</body>
+</html>
