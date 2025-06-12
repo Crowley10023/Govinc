@@ -7,6 +7,7 @@ import com.govinc.catalog.SecurityControlRepository;
 import com.govinc.maturity.MaturityAnswer;
 import com.govinc.maturity.MaturityAnswerRepository;
 import com.govinc.user.User;
+import com.govinc.user.UserRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -39,11 +40,21 @@ public class AssessmentController {
     private MaturityAnswerRepository maturityAnswerRepository;
     @Autowired
     private AssessmentControlAnswerRepository assessmentControlAnswerRepository;
+    
+    @Autowired
+    private AssessmentUrlsService assessmentUrlsService;
+
+    // --- Inject UserRepository ---
+    @Autowired
+    private UserRepository userRepository;
 
     @GetMapping("/create")
     public String showCreateAssessmentForm(Model model) {
         List<SecurityCatalog> catalogs = securityCatalogService.findAll();
         model.addAttribute("catalogs", catalogs);
+        // --- Add users list to model ---
+        List<User> users = userRepository.findAll();
+        model.addAttribute("users", users);
         return "create-assessment";
     }
 
@@ -300,5 +311,14 @@ public class AssessmentController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=assessment_"+id+".csv")
                 .contentType(MediaType.parseMediaType("text/csv"))
                 .body(excelBytes);
+    }
+
+    // --- Create direct URL for assessment ---
+    @PostMapping("/{id}/create-url")
+    @ResponseBody
+    public Map<String, String> createUrl(@PathVariable Long id) {
+        AssessmentUrls url = assessmentUrlsService.createOrReplaceUrl(id);
+        String fullUrl = "/assessment-direct/" + url.getUrl();
+        return Map.of("directUrl", fullUrl);
     }
 }

@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
+import com.govinc.user.UserRepository; // <-- add import for UserRepository
+
 @Controller
 @RequestMapping("/assessmentdetails")
 public class AssessmentDetailsController {
@@ -20,6 +22,8 @@ public class AssessmentDetailsController {
     private AssessmentDetailsService assessmentDetailsService;
     @Autowired
     private AssessmentControlAnswerRepository assessmentControlAnswerRepository;
+    @Autowired
+    private UserRepository userRepository; // <-- Inject UserRepository
 
     @GetMapping("/list")
     public String list(Model model) {
@@ -33,8 +37,20 @@ public class AssessmentDetailsController {
         if (details.isPresent()) {
             AssessmentDetails ad = details.get();
             Map<String, Map<String, Object>> answerSummary = assessmentDetailsService.computeAnswerSummary(ad);
-            model.addAttribute("assessment", ad);
+
+            // Try to get the first linked assessment
+            Assessment assessment = null;
+            if (ad.getAssessments() != null && !ad.getAssessments().isEmpty()) {
+                assessment = ad.getAssessments().iterator().next();
+            }
+            if (assessment != null) {
+                model.addAttribute("assessment", assessment);
+            } else {
+                // Fallback: just show details as before
+                model.addAttribute("assessment", ad);
+            }
             model.addAttribute("answerSummary", answerSummary);
+            model.addAttribute("users", userRepository.findAll()); // <-- Add all users to the model
             // (No direct access to urls here - use assessment list for urls)
             return "assessment-details";
         } else {

@@ -81,6 +81,42 @@
             display: inline-block;
             width: 100%;
         }
+        /* Modal styles */
+        .modal-bg {
+            display: none;
+            position: fixed;
+            z-index: 105;
+            left: 0;
+            top: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0,0,0,0.25);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-popup {
+            background: #fffbe7;
+            border-radius: 10px;
+            box-shadow: 0 1.5px 14px rgba(0,0,0,0.15);
+            padding: 2em 2em 1.2em 2em;
+            min-width: 320px;
+            max-width: 95vw;
+            text-align: center;
+            position: relative;
+        }
+        .modal-popup h3 {
+            margin-top: 0;
+        }
+        .modal-popup select {
+            width: 90%;
+            margin-bottom: 1em;
+        }
+        .modal-btn-row {
+            display: flex;
+            gap: 1.5em;
+            justify-content: center;
+            margin-top: 1em;
+        }
     </style>
 </head>
 
@@ -88,12 +124,20 @@
     <div th:replace="navigation :: mainNav"></div>
     <main class="container">
         <h1>Assessment Details</h1>
+        <button id="choose-orgunit-btn" type="button">Choose Org Unit</button>
+        <!-- User Selection Button -->
+        <button id="choose-users-btn" type="button" style="margin-bottom: 1em;">Choose Users</button>
+        
         <section>
             <h2 th:text="${assessment.name}"></h2>
             <table class="table card">
                 <tr>
                     <th>Date</th>
                     <td th:text="${assessment.date}"></td>
+                </tr>
+                <tr>
+                    <th>Organization Unit</th>
+                    <td th:text="${assessment.orgUnit != null ? assessment.orgUnit.name : 'None'}"></td>
                 </tr>
                 <tr>
                     <th>Security Catalog</th>
@@ -130,21 +174,10 @@
                 </tr>
                 <tr>
                     <th>Users</th>
-                    <td>
-                        <span th:if="${!assessment.isOpen}">
-                            <span th:if="${assessment.users == null || #lists.isEmpty(assessment.users)}">None</span>
-                            <span th:each="user : ${assessment.users}" th:text="${user.name + ' (' + user.email + ')'} + ', '"></span>
-                        </span>
-                        <span th:if="${assessment.isOpen}">
-                            <form th:action="@{'/assessment/' + ${assessment.id} + '/update-users'}" method="post" style="display:inline;">
-                                <select name="userIds" multiple>
-                                    <option th:each="user : ${users}"
-                                            th:value="${user.id}"
-                                            th:selected="${assessment.users.contains(user)}"
-                                            th:text="${user.name + ' (' + user.email + ')'}"></option>
-                                </select>
-                                <button type="submit">Update Users</button>
-                            </form>
+                    <td id="assessment-users-cell">
+                        <span th:if="${assessment.users == null || #lists.isEmpty(assessment.users)}">None</span>
+                        <span th:each="user,iterStat : ${assessment.users}">
+                            <span th:text="${user.name + ' (' + user.email + ')'}"></span><span th:if="${!iterStat.last}">, </span>
                         </span>
                     </td>
                 </tr>
@@ -300,9 +333,108 @@
         <div class="nav-back">
             <a href="/assessment/list">&larr; Back to list</a>
         </div>
+
+        <!-- Org Unit Selection Modal -->
+        <div class="modal-bg" id="orgunit-modal-bg">
+            <div class="modal-popup">
+                <h3>Choose Organization Unit</h3>
+                <form id="orgunit-form" th:action="@{'/assessment/' + ${assessment.id} + '/set-orgunit'}" method="post">
+                    <select id="orgunit-select" name="orgUnitId" required>
+                        <option th:each="ou : ${orgUnits}" th:value="${ou.id}" th:text="${ou.name}" th:selected="${assessment.orgUnit != null and assessment.orgUnit.id == ou.id}"></option>
+                    </select>
+                    <div class="modal-btn-row">
+                        <button type="submit">Confirm</button>
+                        <button type="button" onclick="closeOrgUnitModal()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- User Selection Modal -->
+        <div class="modal-bg" id="users-modal-bg">
+            <div class="modal-popup">
+                <h3>Choose Users for Assessment</h3>
+                <form id="users-modal-form">
+                    <select id="users-multiselect" name="userIds" multiple size="8" style="min-width:220px;max-width:400px;">
+                        <option th:each="user : ${users}"
+                                th:value="${user.id}"
+                                th:selected="${assessment.users != null and assessment.users.contains(user)}"
+                                th:text="${user.name + ' (' + user.email + ')'}"></option>
+                    </select>
+                    <div class="modal-btn-row">
+                        <button id="users-modal-save-btn" type="submit">Save</button>
+                        <button id="users-modal-cancel-btn" type="button">Cancel</button>
+                    </div>
+                </form>
+                <div id="users-modal-error" style="color:#c44;display:none;margin-top:.5em;"></div>
+            </div>
+        </div>
     </main>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
+        $(document).ready(function () {
+            // Modal logic
+            $('#choose-orgunit-btn').click(function(){
+                $('#orgunit-modal-bg').css('display','flex');
+            });
+            
+            // User Modal logic
+            $('#choose-users-btn').click(function(){
+                $('#users-modal-bg').css('display', 'flex');
+                $('#users-modal-error').hide();
+            });
+            $('#users-modal-cancel-btn').click(function(){
+                $('#users-modal-bg').hide();
+            });
+            $('#users-modal-bg').on('mousedown', function(event){
+                if(event.target === this){ $('#users-modal-bg').hide(); }
+            });
+            // AJAX Save users selection
+            $('#users-modal-form').submit(function(event){
+                event.preventDefault();
+                var $select = $('#users-multiselect');
+                var selected = $select.val() || [];
+                var assessmentId = /*[[${assessment.id}]]*/ [[${assessment.id}]];
+                $('#users-modal-save-btn').prop('disabled', true);
+                $('#users-modal-error').hide();
+                $.ajax({
+                    url: '/assessment/' + assessmentId + '/users',
+                    type: 'PUT',
+                    contentType: 'application/json',
+                    data: JSON.stringify(selected),
+                    success: function(updatedUsers){
+                        // Update users text in the table
+                        if (updatedUsers && Array.isArray(updatedUsers)) {
+                            var html = '';
+                            if (updatedUsers.length === 0) {
+                                html = 'None';
+                            } else {
+                                for (let i = 0; i < updatedUsers.length; i++) {
+                                    const u = updatedUsers[i];
+                                    html += $('<span/>').text(u.name + ' (' + u.email + ')').prop('outerHTML');
+                                    if (i !== updatedUsers.length-1) html += ', ';
+                                }
+                            }
+                            $('#assessment-users-cell').html(html);
+                        }
+                        $('#users-modal-bg').hide();
+                        $('#users-modal-save-btn').prop('disabled', false);
+                        $('#users-modal-error').hide();
+                    },
+                    error: function(xhr){
+                        let msg = "Could not update users.";
+                        if(xhr.responseJSON && xhr.responseJSON.message) msg += " " + xhr.responseJSON.message;
+                        $('#users-modal-error').show().text(msg);
+                        $('#users-modal-save-btn').prop('disabled', false);
+                    }
+                });
+            });
+        });
+        function closeOrgUnitModal() {
+            $('#orgunit-modal-bg').hide();
+        }
+
+        // Existing JS remains here
         $(document).ready(function () {
             // Create URL button logic
             $("#create-url-btn").click(function () {

@@ -24,6 +24,19 @@
                     </select>
                 </td>
             </tr>
+            <!-- Org Unit Choice Row start -->
+            <tr>
+                <td><label for="orgUnit">Select Org Unit:</label></td>
+                <td>
+                    <select id="orgUnit" name="orgUnitId" required>
+                        <option value="" disabled selected>-- Select Org Unit --</option>
+                        <option th:each="orgUnit : ${orgUnits}"
+                                th:value="${orgUnit.id}"
+                                th:text="${orgUnit.name}"></option>
+                    </select>
+                </td>
+            </tr>
+            <!-- Org Unit Choice Row end -->
             <tr>
                 <td><label for="users">Assign Users:</label></td>
                 <td>

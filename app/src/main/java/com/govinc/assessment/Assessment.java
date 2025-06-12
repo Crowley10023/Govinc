@@ -3,6 +3,7 @@ package com.govinc.assessment;
 import java.time.LocalDate;
 import com.govinc.catalog.SecurityCatalog;
 import com.govinc.user.User;
+import com.govinc.organization.OrgUnit;
 import java.util.Set;
 import java.util.HashSet;
 import jakarta.persistence.*;
@@ -17,6 +18,12 @@ public class Assessment {
     @ManyToOne
     @JoinColumn(name = "security_catalog_id")
     private SecurityCatalog securityCatalog;
+
+    // --- New ManyToOne Relationship to OrgUnit ---
+    @ManyToOne(optional = true)
+    @JoinColumn(name = "orgunit_id")
+    private OrgUnit orgUnit;
+    // ------------------------------------------------
 
     private LocalDate date;
     
@@ -61,6 +68,15 @@ public class Assessment {
     public void setSecurityCatalog(SecurityCatalog securityCatalog) {
         this.securityCatalog = securityCatalog;
     }
+
+    // --- OrgUnit Getter & Setter ---
+    public OrgUnit getOrgUnit() {
+        return orgUnit;
+    }
+    public void setOrgUnit(OrgUnit orgUnit) {
+        this.orgUnit = orgUnit;
+    }
+    // -------------------------------
 
     public LocalDate getDate() {
         return date;

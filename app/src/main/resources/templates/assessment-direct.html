@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
+
 <head>
     <meta charset="UTF-8">
     <title>Assessment Direct Link</title>
     <link rel="stylesheet" href="/style.css">
 </head>
+
 <body>
     <main class="container">
         <div th:if="${assessment.status == 'CLOSED'}">
@@ -12,86 +14,94 @@
         </div>
         <div th:if="${assessment.status != 'CLOSED'}">
             <h1>Assessment (Direct URL)</h1>
-        <section>
-            <h2 th:text="${assessment.name}"></h2>
-            <table class="table card">
-                <tr>
-                    <th>Date</th>
-                    <td th:text="${assessment.date}"></td>
-                </tr>
-                <tr>
-                    <th>Security Catalog</th>
-                    <td th:text="${assessment.securityCatalog.name}"></td>
-                </tr>
-                <tr>
-                    <th>Status</th>
-                    <td th:text="${assessment.status}"></td>
-                </tr>
-            </table>
-        </section>
-        <section>
-            <h2>Summary of Answers</h2>
-            <table class="table card" style="margin-bottom: 2em;">
-                <thead>
+            <section>
+                <h2 th:text="${assessment.name}"></h2>
+                <table class="table card">
                     <tr>
-                        <th>Answer Category</th>
-                        <th>Count</th>
-                        <th>Percent (%)</th>
+                        <th>Date</th>
+                        <td th:text="${assessment.date}"></td>
                     </tr>
-                </thead>
-                <tbody>
-                    <tr th:if="${answerSummary == null || answerSummary.isEmpty()}">
-                        <td colspan="3">No answers yet</td>
+                    <tr>
+                        <th>Security Catalog</th>
+                        <td th:text="${assessment.securityCatalog.name}"></td>
                     </tr>
-                    <tr th:each="entry : ${answerSummary}">
-                        <td th:text="${entry.key}"></td>
-                        <td th:text="${entry.value.count}"></td>
-                        <td th:text="${#numbers.formatDecimal(entry.value.percent, 0, 2)}"></td>
+                    <tr>
+                        <th>Status</th>
+                        <td th:text="${assessment.status}"></td>
                     </tr>
-                </tbody>
-            </table>
-            <h2>Controls &amp; Answers</h2>
-            <div>
-                <table class="table">
+                </table>
+            </section>
+            <section>
+                <h2>Summary of Answers</h2>
+                <table class="table card" style="margin-bottom: 2em;">
                     <thead>
                         <tr>
-                            <th>Control</th>
-                            <th>Your Answer</th>
-                            <th>Correct Answer</th>
+                            <th>Answer Category</th>
+                            <th>Count</th>
+                            <th>Percent (%)</th>
                         </tr>
                     </thead>
+                    <tbody>
+                        <tr th:if="${answerSummary == null || answerSummary.isEmpty()}">
+                            <td colspan="3">No answers yet</td>
+                        </tr>
+                        <tr th:each="entry : ${answerSummary}">
+                            <td th:text="${entry.key}"></td>
+                            <td th:text="${entry.value.count}"></td>
+                            <td th:text="${#numbers.formatDecimal(entry.value.percent, 0, 2)}"></td>
+                        </tr>
+                    </tbody>
                 </table>
-                <div class="controls-scroll-wrapper">
+                <h2>Controls &amp; Answers</h2>
+                <div>
                     <table class="table">
-                        <tbody>
-                            <tr th:each="ctrl : ${assessment.securityCatalog.securityControls}">
-                                <td th:text="${ctrl.name}"></td>
-                                <td>
-                                    <span style="white-space:nowrap;" th:if="${assessment.isOpen}">
-                                        <select th:name="${'control_' + ctrl.id}" th:data-control-id="${ctrl.id}"
-                                            class="answer-select">
-                                            <option value="">-- select an answer --</option>
-                                            <option th:each="ans : ${maturityAnswers}" th:value="${ans.id}"
-                                                th:selected="${controlAnswers[ctrl.id]} != null ? (${ans.id} == ${controlAnswers[ctrl.id]}) : false"
-                                                th:text="${ans.answer}"></option>
-                                        </select>
-                                        <span class="answer-feedback"></span>
-                                    </span>
-                                    <span th:if="${!assessment.isOpen}">
-                                        <span th:text="${controlAnswers != null && controlAnswers[ctrl.id] != null ? controlAnswers[ctrl.id] : 'No answer'}"></span>
-                                    </span>
-                                </td>
-                                <td>
-                                    <span th:if="${correctAnswers != null}" th:text="${correctAnswers[ctrl.id] != null ? correctAnswers[ctrl.id] : 'N/A'}"></span>
-                                    <span th:if="${correctAnswers == null}">N/A</span>
-                                </td>
+                        <thead>
+                            <tr>
+                                <th>Control</th>
+                                <th>Your Answer</th>
+                                <th>Correct Answer</th>
                             </tr>
-                        </tbody>
+                        </thead>
                     </table>
+                    <div class="controls-scroll-wrapper">
+                        <table class="table">
+                            <tbody>
+                                <tr th:each="ctrl : ${assessment.securityCatalog.securityControls}">
+                                    <td th:text="${ctrl.name}"></td>
+                                    <td>
+                                        <span style="white-space:nowrap;" th:if="${assessment.isOpen}">
+                                            <select th:name="${'control_' + ctrl.id}" th:data-control-id="${ctrl.id}"
+                                                class="answer-select">
+                                                <option value="">-- select an answer --</option>
+                                                <option th:each="ans : ${maturityAnswers}" th:value="${ans.id}"
+                                                    th:selected="${controlAnswers[ctrl.id]} != null ? (ans.id == controlAnswers[ctrl.id]) : false"
+                                                    th:text="${ans.answer}"></option>
+                                            </select>
+                                            <span class="answer-feedback"></span>
+                                        </span>
+                                        <span th:if="${!assessment.isOpen}">
+                                            <span th:if="${controlAnswers != null && controlAnswers[ctrl.id] != null}">
+                                                <span
+                                                    th:with="answerObj=${#lists.findFirst(maturityAnswers, ans -> ans.id == controlAnswers[ctrl.id])}"
+                                                    th:text="${answerObj != null ? answerObj.answer : controlAnswers[ctrl.id]}"></span>
+                                            </span>
+                                            <span
+                                                th:if="${controlAnswers == null || controlAnswers[ctrl.id] == null}">No
+                                                answer</span>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span th:if="${correctAnswers != null}"
+                                            th:text="${correctAnswers[ctrl.id] != null ? correctAnswers[ctrl.id] : 'N/A'}"></span>
+                                        <span th:if="${correctAnswers == null}">N/A</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
-        </section>
-    </div> <!-- end not CLOSED div -->
+            </section>
+        </div> <!-- end not CLOSED div -->
     </main>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
@@ -146,16 +156,20 @@
             vertical-align: middle;
             margin-left: 5px;
         }
+
         .answer-feedback svg {
             width: 18px;
             height: 18px;
         }
+
         .answer-success {
             color: #33aa33;
         }
+
         .answer-error {
             color: #cc2222;
         }
     </style>
 </body>
+
 </html>
