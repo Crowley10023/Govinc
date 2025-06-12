@@ -81,6 +81,7 @@
             display: inline-block;
             width: 100%;
         }
+
         /* Modal styles */
         .modal-bg {
             display: none;
@@ -90,27 +91,31 @@
             top: 0;
             width: 100vw;
             height: 100vh;
-            background: rgba(0,0,0,0.25);
+            background: rgba(0, 0, 0, 0.25);
             justify-content: center;
             align-items: center;
         }
+
         .modal-popup {
             background: #fffbe7;
             border-radius: 10px;
-            box-shadow: 0 1.5px 14px rgba(0,0,0,0.15);
+            box-shadow: 0 1.5px 14px rgba(0, 0, 0, 0.15);
             padding: 2em 2em 1.2em 2em;
             min-width: 320px;
             max-width: 95vw;
             text-align: center;
             position: relative;
         }
+
         .modal-popup h3 {
             margin-top: 0;
         }
+
         .modal-popup select {
             width: 90%;
             margin-bottom: 1em;
         }
+
         .modal-btn-row {
             display: flex;
             gap: 1.5em;
@@ -127,7 +132,7 @@
         <button id="choose-orgunit-btn" type="button">Choose Org Unit</button>
         <!-- User Selection Button -->
         <button id="choose-users-btn" type="button" style="margin-bottom: 1em;">Choose Users</button>
-        
+
         <section>
             <h2 th:text="${assessment.name}"></h2>
             <table class="table card">
@@ -151,25 +156,11 @@
                     <th>Assessment URL</th>
                     <td>
                         <span th:if="${assessment.assessmentUrls != null && assessment.assessmentUrls.url != null}">
-                            <a th:href="@{'/assessment-direct/' + ${assessment.assessmentUrls.url}}" th:text="'/assessment-direct/' + ${assessment.assessmentUrls.url}" target="_blank"></a>
+                            <a th:href="@{'/assessment-direct/' + ${assessment.assessmentUrls.url}}"
+                                th:text="${assessment.name}" target="_blank"></a>
                         </span>
-                        <span th:if="${assessment.assessmentUrls == null || assessment.assessmentUrls.url == null}">Not set</span>
-                    </td>
-                </tr>
-                <tr>
-                    <th>Predecessor Assessment</th>
-                    <td>
-                        <form th:action="@{'/assessment/' + ${assessment.id} + '/set-predecessor'}" method="post">
-                            <select name="predecessorId">
-                                <option value="" th:selected="${assessment.predecessor == null}">-- None --</option>
-                                <option th:each="a : ${allAssessments}"
-                                        th:value="${a.id}"
-                                        th:selected="${assessment.predecessor != null and assessment.predecessor.id == a.id}"
-                                        th:text="${a.name + ' (' + a.id + ')'}"
-                                        th:if="${a.id != assessment.id}"></option>
-                            </select>
-                            <button type="submit">Set Predecessor</button>
-                        </form>
+                        <span th:if="${assessment.assessmentUrls == null || assessment.assessmentUrls.url == null}">Not
+                            set</span>
                     </td>
                 </tr>
                 <tr>
@@ -177,7 +168,8 @@
                     <td id="assessment-users-cell">
                         <span th:if="${assessment.users == null || #lists.isEmpty(assessment.users)}">None</span>
                         <span th:each="user,iterStat : ${assessment.users}">
-                            <span th:text="${user.name + ' (' + user.email + ')'}"></span><span th:if="${!iterStat.last}">, </span>
+                            <span th:text="${user.name + ' (' + user.email + ')'}"></span><span
+                                th:if="${!iterStat.last}">, </span>
                         </span>
                     </td>
                 </tr>
@@ -340,7 +332,8 @@
                 <h3>Choose Organization Unit</h3>
                 <form id="orgunit-form" th:action="@{'/assessment/' + ${assessment.id} + '/set-orgunit'}" method="post">
                     <select id="orgunit-select" name="orgUnitId" required>
-                        <option th:each="ou : ${orgUnits}" th:value="${ou.id}" th:text="${ou.name}" th:selected="${assessment.orgUnit != null and assessment.orgUnit.id == ou.id}"></option>
+                        <option th:each="ou : ${orgUnits}" th:value="${ou.id}" th:text="${ou.name}"
+                            th:selected="${assessment.orgUnit != null and assessment.orgUnit.id == ou.id}"></option>
                     </select>
                     <div class="modal-btn-row">
                         <button type="submit">Confirm</button>
@@ -355,11 +348,11 @@
             <div class="modal-popup">
                 <h3>Choose Users for Assessment</h3>
                 <form id="users-modal-form">
-                    <select id="users-multiselect" name="userIds" multiple size="8" style="min-width:220px;max-width:400px;">
-                        <option th:each="user : ${users}"
-                                th:value="${user.id}"
-                                th:selected="${assessment.users != null and assessment.users.contains(user)}"
-                                th:text="${user.name + ' (' + user.email + ')'}"></option>
+                    <select id="users-multiselect" name="userIds" multiple size="8"
+                        style="min-width:220px;max-width:400px;">
+                        <option th:each="user : ${users}" th:value="${user.id}"
+                            th:selected="${assessment.users != null and assessment.users.contains(user)}"
+                            th:text="${user.name + ' (' + user.email + ')'}"></option>
                     </select>
                     <div class="modal-btn-row">
                         <button id="users-modal-save-btn" type="submit">Save</button>
@@ -374,27 +367,27 @@
     <script>
         $(document).ready(function () {
             // Modal logic
-            $('#choose-orgunit-btn').click(function(){
-                $('#orgunit-modal-bg').css('display','flex');
+            $('#choose-orgunit-btn').click(function () {
+                $('#orgunit-modal-bg').css('display', 'flex');
             });
-            
+
             // User Modal logic
-            $('#choose-users-btn').click(function(){
+            $('#choose-users-btn').click(function () {
                 $('#users-modal-bg').css('display', 'flex');
                 $('#users-modal-error').hide();
             });
-            $('#users-modal-cancel-btn').click(function(){
+            $('#users-modal-cancel-btn').click(function () {
                 $('#users-modal-bg').hide();
             });
-            $('#users-modal-bg').on('mousedown', function(event){
-                if(event.target === this){ $('#users-modal-bg').hide(); }
+            $('#users-modal-bg').on('mousedown', function (event) {
+                if (event.target === this) { $('#users-modal-bg').hide(); }
             });
             // AJAX Save users selection
-            $('#users-modal-form').submit(function(event){
+            $('#users-modal-form').submit(function (event) {
                 event.preventDefault();
                 var $select = $('#users-multiselect');
                 var selected = $select.val() || [];
-                var assessmentId = /*[[${assessment.id}]]*/ [[${assessment.id}]];
+                var assessmentId = /*[[${assessment.id}]]*/[[${ assessment.id }]];
                 $('#users-modal-save-btn').prop('disabled', true);
                 $('#users-modal-error').hide();
                 $.ajax({
@@ -402,7 +395,7 @@
                     type: 'PUT',
                     contentType: 'application/json',
                     data: JSON.stringify(selected),
-                    success: function(updatedUsers){
+                    success: function (updatedUsers) {
                         // Update users text in the table
                         if (updatedUsers && Array.isArray(updatedUsers)) {
                             var html = '';
@@ -412,7 +405,7 @@
                                 for (let i = 0; i < updatedUsers.length; i++) {
                                     const u = updatedUsers[i];
                                     html += $('<span/>').text(u.name + ' (' + u.email + ')').prop('outerHTML');
-                                    if (i !== updatedUsers.length-1) html += ', ';
+                                    if (i !== updatedUsers.length - 1) html += ', ';
                                 }
                             }
                             $('#assessment-users-cell').html(html);
@@ -421,9 +414,9 @@
                         $('#users-modal-save-btn').prop('disabled', false);
                         $('#users-modal-error').hide();
                     },
-                    error: function(xhr){
+                    error: function (xhr) {
                         let msg = "Could not update users.";
-                        if(xhr.responseJSON && xhr.responseJSON.message) msg += " " + xhr.responseJSON.message;
+                        if (xhr.responseJSON && xhr.responseJSON.message) msg += " " + xhr.responseJSON.message;
                         $('#users-modal-error').show().text(msg);
                         $('#users-modal-save-btn').prop('disabled', false);
                     }
@@ -446,12 +439,12 @@
                     type: 'POST',
                     success: function (data) {
                         $("#create-url-feedback").html('<span style="color: green;">Created!</span>');
-                        setTimeout(function(){
+                        setTimeout(function () {
                             $("#create-url-feedback").empty();
                             $("#create-url-btn").prop('disabled', false);
                         }, 1800);
 
-                        if(data && data.directUrl) {
+                        if (data && data.directUrl) {
                             $("#direct-url-link").attr('href', data.directUrl);
                             $("#direct-url-link").text(window.location.origin + data.directUrl);
                             $("#direct-url-row").show();
@@ -467,7 +460,7 @@
                                     anchor.parent().siblings('span').hide();
                                 } else {
                                     // In case anchor didn't exist before (URL was not set initially)
-                                    $urlTd.html('<span><a href="'+data.directUrl+'" target="_blank">' + window.location.origin + data.directUrl + '</a></span>');
+                                    $urlTd.html('<span><a href="' + data.directUrl + '" target="_blank">' + window.location.origin + data.directUrl + '</a></span>');
                                 }
                             }
                         }
