@@ -23,7 +23,7 @@
             <tbody>
             <tr th:each="url : ${urls}">
                 <td>
-                    <a th:href="@{'/assessment-direct/' + ${url.url}}" th:text="${url.url}" target="_blank"></a>
+                    <a th:href="@{'/assessment-direct/' + ${url.url}}" th:text="${url.assessment.name}" target="_blank"></a>
                 </td>
                 <td th:text="${url.assessment != null ? url.assessment.name : ''}"></td>
                 <td th:text="${url.responsiblePerson}"></td>

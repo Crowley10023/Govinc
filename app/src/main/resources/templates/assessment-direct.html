@@ -154,6 +154,12 @@
                 }
             });
         });
+        function toggleDesc(btn) {
+            var $tooltip = $(btn).siblings('.ctrl-desc-tooltip');
+            // Hide any other visible tooltips first
+            $('.ctrl-desc-tooltip').not($tooltip).fadeOut(120);
+            $tooltip.fadeToggle(120);
+        }
     </script>
     <style>
         .answer-feedback {

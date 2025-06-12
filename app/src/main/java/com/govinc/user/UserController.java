@@ -5,6 +5,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Optional;
 
 @Controller
@@ -12,6 +13,11 @@ import java.util.Optional;
 public class UserController {
     @Autowired
     private UserRepository userRepository;
+
+    @ModelAttribute("allUsers")
+    public List<User> populateUsers() {
+        return userRepository.findAll();
+    }
 
     @GetMapping
     public String listUsers(Model model) {

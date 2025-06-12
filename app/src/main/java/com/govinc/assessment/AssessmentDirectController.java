@@ -10,9 +10,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import java.util.List;
 import java.util.Optional;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.govinc.maturity.MaturityAnswer;
 import com.govinc.maturity.MaturityAnswerRepository;
+import com.govinc.catalog.SecurityCatalog;
+import com.govinc.maturity.MaturityModel;
 
 @Controller
 public class AssessmentDirectController {
@@ -37,9 +41,20 @@ public class AssessmentDirectController {
             List<AssessmentDetails> allDetails = detailsService.findAll();
             model.addAttribute("assessmentDetails", allDetails);
 
-            // Load all maturity answers
-            List<MaturityAnswer> maturityAnswers = maturityAnswerRepository.findAll();
-            model.addAttribute("maturityAnswers", maturityAnswers);
+            // Load maturity answers that are valid for the assessment's security catalog
+            SecurityCatalog catalog = assessment.getSecurityCatalog();
+            Set<MaturityAnswer> validMaturityAnswers = null;
+            if (catalog != null && catalog.getMaturityModel() != null) {
+                MaturityModel maturityModel = catalog.getMaturityModel();
+                validMaturityAnswers = maturityModel.getMaturityAnswers();
+            }
+            
+            if (validMaturityAnswers == null) {
+                // fallback: show no answers
+                model.addAttribute("maturityAnswers", java.util.Collections.emptyList());
+            } else {
+                model.addAttribute("maturityAnswers", validMaturityAnswers);
+            }
 
             // Defensive: always provide controlAnswers non-null
             model.addAttribute("controlAnswers", new java.util.HashMap<>());
