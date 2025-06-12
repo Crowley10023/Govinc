@@ -54,8 +54,7 @@ public class AssessmentDetailsController {
             }
             model.addAttribute("answerSummary", answerSummary);
             model.addAttribute("users", userRepository.findAll()); // <-- Add all users to the model
-            model.addAttribute("orgUnits", orgUnitService.getAllOrgUnits()); // <-- Add all org units to the model
-            // (No direct access to urls here - use assessment list for urls)
+            model.addAttribute("orgUnits", orgUnitService.getAllOrgUnits()); // Add org units for popup dropdown
             return "assessment-details";
         } else {
             return "redirect:/assessmentdetails/list";

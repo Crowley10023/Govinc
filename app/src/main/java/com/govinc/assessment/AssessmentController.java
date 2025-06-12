@@ -69,7 +69,12 @@ public class AssessmentController {
 
     // POST handler for create-assessment
     @PostMapping("/create")
-    public String createAssessment(@RequestParam("name") String name, @RequestParam("catalogId") Long catalogId) {
+    public String createAssessment(
+            @RequestParam("name") String name,
+            @RequestParam("catalogId") Long catalogId,
+            @RequestParam(value = "orgUnitId", required = false) Long orgUnitId,
+            @RequestParam(value = "userIds", required = false) List<Long> userIds
+    ) {
         SecurityCatalog catalog = securityCatalogService.findById(catalogId).orElse(null);
         if (catalog == null) {
             // handle error, redirect back or show error (for now, redirect to list)
@@ -79,8 +84,22 @@ public class AssessmentController {
         assessment.setName(name);
         assessment.setSecurityCatalog(catalog);
         assessment.setDate(LocalDate.now());
+        // Persist org unit if set
+        if (orgUnitId != null) {
+            OrgUnit orgUnit = orgUnitService.getOrgUnit(orgUnitId).orElse(null);
+            if (orgUnit != null) {
+                assessment.setOrgUnit(orgUnit);
+            }
+        }
+        // Persist selected users
+        if (userIds != null && !userIds.isEmpty()) {
+            Set<User> users = userIds.stream()
+                .map(id -> userRepository.findById(id).orElse(null))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+            assessment.setUsers(users);
+        }
         assessment = assessmentRepository.save(assessment);
-        // Here you may want to create AssessmentDetails entity as well (if required by your flow)
         return "redirect:/assessment/" + assessment.getId() + "/controls";
     }
 
