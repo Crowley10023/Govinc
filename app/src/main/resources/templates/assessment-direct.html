@@ -53,13 +53,13 @@
                     </tbody>
                 </table>
                 <h2>Controls &amp; Answers</h2>
-                <div>
+                <!-- Editable/Active Assessment: Show sticky header above scroll -->
+                <div th:if="${assessment.isOpen}">
                     <table class="table">
                         <thead>
                             <tr>
                                 <th>Control</th>
-                                <th>Your Answer</th>
-                                <th>Correct Answer</th>
+                                <th>Answer</th>
                             </tr>
                         </thead>
                     </table>
@@ -67,40 +67,47 @@
                         <table class="table">
                             <tbody>
                                 <tr th:each="ctrl : ${assessment.securityCatalog.securityControls}">
-                                    <td th:text="${ctrl.name}"></td>
+                                    <td>
+                                        <div class="ctrl-desc-wrap">
+                                            <span th:text="${ctrl.name}"></span>
+                                            <button type="button" class="ctrl-desc-btn" tabindex="0"
+                                                title="Show description" onclick="toggleDesc(this)">
+                                                <svg viewBox="0 0 24 24">
+                                                    <circle cx="12" cy="12" r="10" fill="#fff" stroke="#2274A5"
+                                                        stroke-width="2" /><text x="12" y="17" text-anchor="middle"
+                                                        font-family="Arial,Helvetica,sans-serif" font-size="15" dy="-2"
+                                                        fill="#2274A5">?</text>
+                                                </svg>
+                                            </button>
+                                            <div class="ctrl-desc-tooltip">
+                                                <b>Description:</b>
+                                                <div th:utext="${#strings.escapeXml(ctrl.detail) ?: 'No detail'}"></div>
+                                            </div>
+                                        </div>
+                                    </td>
                                     <td>
                                         <span style="white-space:nowrap;" th:if="${assessment.isOpen}">
                                             <select th:name="${'control_' + ctrl.id}" th:data-control-id="${ctrl.id}"
                                                 class="answer-select">
                                                 <option value="">-- select an answer --</option>
                                                 <option th:each="ans : ${maturityAnswers}" th:value="${ans.id}"
-                                                    th:selected="${controlAnswers[ctrl.id]} != null ? (ans.id == controlAnswers[ctrl.id]) : false"
+                                                    th:selected="${controlAnswers != null and controlAnswers[ctrl.id] != null} ? ${ans.answer} == ${controlAnswers[ctrl.id]} : false"
                                                     th:text="${ans.answer}"></option>
                                             </select>
                                             <span class="answer-feedback"></span>
                                         </span>
-                                        <span th:if="${!assessment.isOpen}">
-                                            <span th:if="${controlAnswers != null && controlAnswers[ctrl.id] != null}">
-                                                <span
-                                                    th:with="answerObj=${#lists.findFirst(maturityAnswers, ans -> ans.id == controlAnswers[ctrl.id])}"
-                                                    th:text="${answerObj != null ? answerObj.answer : controlAnswers[ctrl.id]}"></span>
-                                            </span>
+                                        <span th:if="${assessment.status} == 'CLOSED'">
                                             <span
-                                                th:if="${controlAnswers == null || controlAnswers[ctrl.id] == null}">No
-                                                answer</span>
+                                                th:text="${controlAnswers != null and #lists.contains(answers.^map(a -> a.answer), controlAnswers[ctrl.id]) ? controlAnswers[ctrl.id] : (controlAnswers != null and controlAnswers[ctrl.id] != null ? controlAnswers[ctrl.id] : 'No answer')}"></span>
                                         </span>
-                                    </td>
-                                    <td>
-                                        <span th:if="${correctAnswers != null}"
-                                            th:text="${correctAnswers[ctrl.id] != null ? correctAnswers[ctrl.id] : 'N/A'}"></span>
-                                        <span th:if="${correctAnswers == null}">N/A</span>
                                     </td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
-            </section>
+        </div>
+        </section>
         </div> <!-- end not CLOSED div -->
     </main>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>

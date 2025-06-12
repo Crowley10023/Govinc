@@ -11,12 +11,17 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Map;
 
+import com.govinc.maturity.MaturityAnswer;
+import com.govinc.maturity.MaturityAnswerRepository;
+
 @Controller
 public class AssessmentDirectController {
     @Autowired
     private AssessmentUrlsService assessmentUrlsService;
     @Autowired
     private AssessmentDetailsService detailsService;
+    @Autowired
+    private MaturityAnswerRepository maturityAnswerRepository; // Added for maturity answers
 
     @GetMapping("/assessment-direct/{obfuscatedId}")
     public String showAssessmentDirect(@PathVariable String obfuscatedId, Model model) {
@@ -27,6 +32,17 @@ public class AssessmentDirectController {
             Assessment assessment = urlEntity.getAssessment();
             model.addAttribute("assessment", assessment);
 
+            // Load assessment details for this assessment
+            // If you want to filter by assessment, update this line accordingly
+            List<AssessmentDetails> allDetails = detailsService.findAll();
+            model.addAttribute("assessmentDetails", allDetails);
+
+            // Load all maturity answers
+            List<MaturityAnswer> maturityAnswers = maturityAnswerRepository.findAll();
+            model.addAttribute("maturityAnswers", maturityAnswers);
+
+            // Defensive: always provide controlAnswers non-null
+            model.addAttribute("controlAnswers", new java.util.HashMap<>());
 
             return "assessment-direct";
         } else {

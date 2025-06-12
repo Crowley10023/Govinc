@@ -245,14 +245,14 @@
                                             class="answer-select">
                                             <option value="">-- select an answer --</option>
                                             <option th:each="ans : ${maturityAnswers}" th:value="${ans.id}"
-                                                th:selected="${controlAnswers[ctrl.id] != null} ? ${ans.answer} == ${controlAnswers[ctrl.id]} : false"
+                                                th:selected="${controlAnswers != null and controlAnswers[ctrl.id] != null} ? ${ans.answer} == ${controlAnswers[ctrl.id]} : false"
                                                 th:text="${ans.answer}"></option>
                                         </select>
                                         <span class="answer-feedback"></span>
                                     </span>
                                     <span th:if="${assessment.status} == 'CLOSED'">
                                         <span
-                                            th:text="${#lists.contains(answers.^map(a -> a.answer), controlAnswers[ctrl.id]) ? controlAnswers[ctrl.id] : (controlAnswers[ctrl.id] != null ? controlAnswers[ctrl.id] : 'No answer')}"></span>
+                                            th:text="${controlAnswers != null and #lists.contains(answers.^map(a -> a.answer), controlAnswers[ctrl.id]) ? controlAnswers[ctrl.id] : (controlAnswers != null and controlAnswers[ctrl.id] != null ? controlAnswers[ctrl.id] : 'No answer')}"></span>
                                     </span>
                                 </td>
                             </tr>
@@ -296,7 +296,7 @@
                                 </td>
                                 <td>
                                     <span
-                                        th:text="${controlAnswers[ctrl.id] != null ? controlAnswers[ctrl.id] : 'No answer'}"></span>
+                                        th:text="${controlAnswers != null and controlAnswers[ctrl.id] != null ? controlAnswers[ctrl.id] : 'No answer'}"></span>
                                 </td>
                             </tr>
                         </tbody>

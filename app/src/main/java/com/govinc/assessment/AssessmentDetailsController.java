@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import com.govinc.user.UserRepository; // <-- add import for UserRepository
+import com.govinc.organization.OrgUnitService; // <-- add import
 
 @Controller
 @RequestMapping("/assessmentdetails")
@@ -24,6 +25,8 @@ public class AssessmentDetailsController {
     private AssessmentControlAnswerRepository assessmentControlAnswerRepository;
     @Autowired
     private UserRepository userRepository; // <-- Inject UserRepository
+    @Autowired
+    private OrgUnitService orgUnitService; // <-- Inject OrgUnitService
 
     @GetMapping("/list")
     public String list(Model model) {
@@ -51,6 +54,7 @@ public class AssessmentDetailsController {
             }
             model.addAttribute("answerSummary", answerSummary);
             model.addAttribute("users", userRepository.findAll()); // <-- Add all users to the model
+            model.addAttribute("orgUnits", orgUnitService.getAllOrgUnits()); // <-- Add all org units to the model
             // (No direct access to urls here - use assessment list for urls)
             return "assessment-details";
         } else {

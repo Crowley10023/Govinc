@@ -6,6 +6,8 @@ import com.govinc.catalog.SecurityControl;
 import com.govinc.catalog.SecurityControlRepository;
 import com.govinc.maturity.MaturityAnswer;
 import com.govinc.maturity.MaturityAnswerRepository;
+import com.govinc.organization.OrgUnit;
+import com.govinc.organization.OrgUnitService;
 import com.govinc.user.User;
 import com.govinc.user.UserRepository;
 
@@ -48,6 +50,10 @@ public class AssessmentController {
     @Autowired
     private UserRepository userRepository;
 
+    // --- Inject OrgUnitService ---
+    @Autowired
+    private OrgUnitService orgUnitService;
+
     @GetMapping("/create")
     public String showCreateAssessmentForm(Model model) {
         List<SecurityCatalog> catalogs = securityCatalogService.findAll();
@@ -55,6 +61,9 @@ public class AssessmentController {
         // --- Add users list to model ---
         List<User> users = userRepository.findAll();
         model.addAttribute("users", users);
+        // --- Add org units to model ---
+        List<OrgUnit> orgUnits = orgUnitService.getAllOrgUnits();
+        model.addAttribute("orgUnits", orgUnits);
         return "create-assessment";
     }
 
