@@ -331,9 +331,9 @@
             <div class="modal-popup">
                 <h3>Choose Organization Unit</h3>
                 <form id="orgunit-form" th:action="@{'/assessment/' + ${assessment.id} + '/set-orgunit'}" method="post">
+                    <!-- Org units will be loaded dynamically via JS -->
                     <select id="orgunit-select" name="orgUnitId" required>
-                        <option th:each="ou : ${orgUnits}" th:value="${ou.id}" th:text="${ou.name}"
-                            th:selected="${assessment.orgUnit != null and assessment.orgUnit.id == ou.id}"></option>
+                        <option value="">-- Please choose an organization unit --</option>
                     </select>
                     <div class="modal-btn-row">
                         <button type="submit">Confirm</button>
@@ -368,6 +368,24 @@
         $(document).ready(function () {
             // Modal logic
             $('#choose-orgunit-btn').click(function () {
+                // Fetch org units dynamically
+                const $select = $('#orgunit-select');
+                $select.prop('disabled', true);
+                $select.html('<option>Loading...</option>');
+                // Assessment org unit id for preselect (from Thymeleaf)
+                var currentOrgUnitId = /*[[${assessment.orgUnit != null ? assessment.orgUnit.id : ''}]]*/ '';
+                $.getJSON('/assessmentdetails/orgunits', function (units) {
+                    $select.empty();
+                    $select.append($('<option>').val('').text('-- Please choose an organization unit --'));
+                    units.forEach(function (unit) {
+                        let $opt = $('<option>').val(unit.id).text(unit.name);
+                        if (currentOrgUnitId && String(unit.id) === String(currentOrgUnitId)) {
+                            $opt.prop('selected', true);
+                        }
+                        $select.append($opt);
+                    });
+                    $select.prop('disabled', false);
+                });
                 $('#orgunit-modal-bg').css('display', 'flex');
             });
 

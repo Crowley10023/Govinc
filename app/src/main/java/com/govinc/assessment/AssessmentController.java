@@ -349,4 +349,20 @@ public class AssessmentController {
         String fullUrl = "/assessment-direct/" + url.getUrl();
         return Map.of("directUrl", fullUrl);
     }
+
+    // --- Set OrgUnit for Assessment ---
+    @PostMapping("/{id}/set-orgunit")
+    public String setOrgUnitForAssessment(@PathVariable Long id, 
+                                          @RequestParam(value = "orgUnitId", required = false) Long orgUnitId) {
+        Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
+        if (assessmentOpt.isPresent() && orgUnitId != null) {
+            OrgUnit orgUnit = orgUnitService.getOrgUnit(orgUnitId).orElse(null);
+            if (orgUnit != null) {
+                Assessment assessment = assessmentOpt.get();
+                assessment.setOrgUnit(orgUnit);
+                assessmentRepository.save(assessment);
+            }
+        }
+        return "redirect:/assessment/" + id;
+    }
 }

@@ -3,6 +3,7 @@ package com.govinc.assessment;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -12,9 +13,11 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 import com.govinc.user.UserRepository; // <-- add import for UserRepository
 import com.govinc.organization.OrgUnitService; // <-- add import
+import com.govinc.organization.OrgUnit; // <-- add import
 
 @Controller
 @RequestMapping("/assessmentdetails")
@@ -90,5 +93,12 @@ public class AssessmentDetailsController {
     public String delete(@PathVariable Long id) {
         assessmentDetailsService.deleteById(id);
         return "redirect:/assessmentdetails/list";
+    }
+
+    // --- REST endpoint to provide org units for assessmentdetails.html ---
+    @GetMapping("/orgunits")
+    @ResponseBody
+    public List<OrgUnit> getAllOrgUnitsForAssessment() {
+        return orgUnitService.getAllOrgUnits();
     }
 }
