@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Organization Tree View</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .org-svg-tree {
+            width: 100%;
+            min-height: 500px;
+        }
+        .org-node {
+            fill: #f7fafc;
+            stroke: #4682b4;
+            stroke-width: 2;
+            rx: 6;
+        }
+        .org-label {
+            font-family: Arial, sans-serif;
+            font-size: 16px;
+            fill: #2c3e50;
+            font-weight: bold;
+            text-anchor: middle;
+            alignment-baseline: middle;
+        }
+        .org-link {
+            stroke: #b0b0b0;
+            stroke-width: 2;
+        }
+    </style>
+</head>
+<body>
+    <div th:replace="navigation :: mainNav"></div>
+    <h1>Org Unit Tree View</h1>
+    <div th:if="${orgUnit == null}">
+        <p>No organization unit found for this ID.</p>
+    </div>
+    <div th:if="${orgUnit != null}">
+        <div style="width: 100%; overflow-x: auto;">
+            <svg class="org-svg-tree" xmlns="http://www.w3.org/2000/svg"
+                 th:with="treeSpacing=160, levelHeight=90"
+                 th:attr="height=600, width=1200">
+                <g th:replace="::svgNodeFragment(${orgUnit}, 600, 40, 0, 1200, ${treeSpacing}, ${levelHeight})"></g>
+            </svg>
+        </div>
+        <a th:href="@{'/orgunits/list'}">&larr; Back to Org Units List</a>
+    </div>
+
+    <!-- SVG Node Fragment Recursion -->
+    <th:block th:fragment="svgNodeFragment(node, x, y, depth, width, treeSpacing, levelHeight)">
+        <th:block th:if="${node != null}">
+            <g>
+                <!-- Draw connecting lines to children -->
+                <th:block th:if="${node != null and node.children != null and node.children.size() > 0}">
+                    <line th:each="child,iter : ${node.children}"
+                          th:x1="${x}"
+                          th:y1="${y+20}"
+                          th:x2="${x - width/2 + (iter.index + 0.5) * (width/(node.children.size()+1))}"
+                          th:y2="${y + levelHeight - 20}"
+                          class="org-link" />
+                </th:block>
+                <!-- Draw node rectangle -->
+                <rect th:x="${x-60}" th:y="${y}" width="120" height="40" class="org-node" />
+                <text th:x="${x}" th:y="${y+22}" class="org-label" th:text="${node.name}"></text>
+                <!-- Draw children recursively -->
+                <th:block th:if="${node != null and node.children != null and node.children.size() > 0}">
+                    <g th:each="child,iter : ${node.children}"
+                       th:with="childX=${x - width/2 + (iter.index + 0.5) * (width/(node.children.size()+1))}, childY=${y+levelHeight}"
+                       th:insert="::svgNodeFragment(${child}, ${childX}, ${childY}, ${depth+1}, ${width/(node.children.size()+1)}, ${treeSpacing}, ${levelHeight})"></g>
+                </th:block>
+            </g>
+        </th:block>
+    </th:block>
+</body>
+</html>

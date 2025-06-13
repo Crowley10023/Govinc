@@ -96,4 +96,13 @@ public class OrgUnitController {
     public void deleteOrgUnit(@PathVariable Long id) {
         orgUnitService.deleteOrgUnit(id);
     }
+
+    // Handle tree view rendering for selected org unit as root and all its children
+    @GetMapping("/tree-view/{id}")
+    public String orgTreeView(@PathVariable Long id, Model model) {
+        Optional<OrgUnit> orgUnitOpt = orgUnitService.getOrgUnitWithChildrenRecursive(id);
+        OrgUnit orgUnit = orgUnitOpt.orElse(null);
+        model.addAttribute("orgUnit", orgUnit);
+        return "org-tree-view";
+    }
 }

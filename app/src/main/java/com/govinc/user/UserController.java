@@ -1,5 +1,6 @@
 package com.govinc.user;
 
+import com.govinc.session.UserSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -13,11 +14,9 @@ import java.util.Optional;
 public class UserController {
     @Autowired
     private UserRepository userRepository;
-
-    @ModelAttribute("allUsers")
-    public List<User> populateUsers() {
-        return userRepository.findAll();
-    }
+    
+    @Autowired
+    private UserSession userSession;
 
     @GetMapping
     public String listUsers(Model model) {
@@ -59,5 +58,15 @@ public class UserController {
     public String deleteUser(@PathVariable Long id) {
         userRepository.deleteById(id);
         return "redirect:/users";
+    }
+
+    // --- SESSION USER SETTING ----
+    @PostMapping("/set-session-user")
+    public String setSessionUser(@RequestParam("userId") String userId, @RequestParam(value = "redirect", required = false) String redirect) {
+        userSession.setUserId(userId);
+        if (redirect != null && !redirect.isEmpty()) {
+            return "redirect:" + redirect;
+        }
+        return "redirect:/";
     }
 }

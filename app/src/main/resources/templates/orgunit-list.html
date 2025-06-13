@@ -21,7 +21,8 @@
                 <td th:text="${orgUnit.id}"></td>
                 <td th:text="${orgUnit.name}"></td>
                 <td>
-                    <a th:href="@{'/orgunits/edit/' + ${orgUnit.id}}">Edit</a>
+                    <a th:href="@{'/orgunits/edit/' + ${orgUnit.id}}">Edit</a> |
+                    <a th:href="@{'/orgunits/tree-view/' + ${orgUnit.id}}" class="btn-tree-view" style="background:#28a745;color:#fff;padding:4px 10px;border-radius:3px;text-decoration:none;">Tree View</a>
                 </td>
             </tr>
         </tbody>

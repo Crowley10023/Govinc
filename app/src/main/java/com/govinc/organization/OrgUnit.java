@@ -12,7 +12,7 @@ public class OrgUnit {
 
     private String name;
 
-    @OneToMany
+    @OneToMany(fetch = FetchType.EAGER, mappedBy = "parent")
     private Set<OrgUnit> children;
 
     @ManyToOne
