@@ -21,7 +21,8 @@ public class OrgUnit {
     @OneToOne
     private User leader;
 
-    public OrgUnit() {}
+    public OrgUnit() {
+    }
 
     public OrgUnit(String name, OrgUnit parent, User leader) {
         this.name = name;
@@ -63,6 +64,10 @@ public class OrgUnit {
 
     public User getLeader() {
         return leader;
+    }
+
+    public boolean isHasChildren() {
+        return children != null && !children.isEmpty();
     }
 
     public void setLeader(User leader) {

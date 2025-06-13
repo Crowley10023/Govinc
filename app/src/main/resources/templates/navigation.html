@@ -11,12 +11,13 @@
           <span class="ci-headline">compliance incubator</span>
           <a href="/" style="margin-left:1.25em;text-decoration:none;"><button type="button">Home</button></a>
           <!-- Select User Dropdown -->
-          <form method="get" action="/users" style="margin-left:2em;">
+          <form method="post" action="/users/set-session-user" style="margin-left:2em;">
             <label for="select-user">Select User:</label>
             <select id="select-user" name="userId" onchange="this.form.submit()">
-              <option th:each="u : ${allUsers}" th:value="${u.id}" th:text="${u.name}" th:selected="${u.id == userId}">
-              </option>
+              <option th:each="u : ${allUsers}" th:value="${u.id}" th:text="${u.name}" th:selected="${u.id == userId}"></option>
             </select>
+            <!-- CSRF token placeholder for Spring Security -->
+            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
           </form>
         </div>
         <div class="nav-row" style="display:flex;flex-direction:row;align-items:center;gap:1.2em;">

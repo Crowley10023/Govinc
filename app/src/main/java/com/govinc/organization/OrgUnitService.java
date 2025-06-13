@@ -55,4 +55,11 @@ public class OrgUnitService {
             orgUnit.setChildren(fullyLoadedChildren); // replace
         }
     }
+
+    /**
+     * Returns the direct children for a given parent org unit ID
+     */
+    public List<OrgUnit> getChildrenOfOrgUnit(Long parentId) {
+        return orgUnitRepository.findByParentId(parentId);
+    }
 }
