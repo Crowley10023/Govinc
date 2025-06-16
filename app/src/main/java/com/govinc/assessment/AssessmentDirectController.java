@@ -15,12 +15,14 @@ import java.util.stream.Collectors;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Comparator;
+import java.util.Objects;
 
 import com.govinc.maturity.MaturityAnswer;
 import com.govinc.maturity.MaturityAnswerRepository;
 import com.govinc.assessment.Assessment;
 import com.govinc.catalog.SecurityCatalog;
 import com.govinc.catalog.SecurityControl;
+import com.govinc.catalog.SecurityControlDomain;
 import com.govinc.maturity.MaturityModel;
 
 @Controller
@@ -68,6 +70,15 @@ public class AssessmentDirectController {
                 controls.sort(Comparator.comparing(SecurityControl::getName, Comparator.nullsLast(String::compareTo)));
             }
             model.addAttribute("controls", controls);
+
+            // Add securityControlDomains to model (prevents null in Thymeleaf)
+            List<SecurityControlDomain> securityControlDomains = controls.stream()
+                .map(SecurityControl::getSecurityControlDomain)
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted(Comparator.comparing(SecurityControlDomain::getName, Comparator.nullsLast(String::compareTo)))
+                .collect(Collectors.toList());
+            model.addAttribute("securityControlDomains", securityControlDomains);
 
             // Pass the correct answers from the associated maturity model only
             // Sorted maturity answers

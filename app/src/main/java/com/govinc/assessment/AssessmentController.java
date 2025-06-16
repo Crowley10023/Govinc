@@ -10,6 +10,7 @@ import com.govinc.organization.OrgUnit;
 import com.govinc.organization.OrgUnitService;
 import com.govinc.user.User;
 import com.govinc.user.UserRepository;
+import com.govinc.catalog.SecurityControlDomain;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -234,6 +235,15 @@ public class AssessmentController {
                 maturityAnswers.sort(Comparator.comparing(MaturityAnswer::getAnswer, Comparator.nullsLast(String::compareTo)));
             }
             model.addAttribute("maturityAnswers", maturityAnswers);
+            
+            // --- Pass securityControlDomains: all unique domains of controls in this catalog ---
+            List<SecurityControlDomain> securityControlDomains = controls.stream()
+                .map(SecurityControl::getSecurityControlDomain)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+            model.addAttribute("securityControlDomains", securityControlDomains);
+
             return "assessment-details";
         } else {
             return "assessment-not-found";
