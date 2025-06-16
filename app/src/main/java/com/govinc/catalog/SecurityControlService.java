@@ -30,7 +30,7 @@ public class SecurityControlService {
                 existingControl.setName(control.getName());
                 existingControl.setDetail(control.getDetail());
                 existingControl.setReference(control.getReference());
-                // Note: associations are not updated here, only simple attributes
+                existingControl.setSecurityControlDomain(control.getSecurityControlDomain());
                 return repository.save(existingControl);
             }
         }

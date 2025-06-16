@@ -2,6 +2,7 @@ package com.govinc.catalog;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.HashSet;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -27,7 +28,7 @@ public class SecurityCatalogService {
                 existing.setName(catalog.getName());
                 existing.setDescription(catalog.getDescription());
                 existing.setRevision(catalog.getRevision());
-                existing.setSecurityControls(catalog.getSecurityControls());
+                existing.setSecurityControls(new HashSet<>(catalog.getSecurityControls()));
                 // Fix: set maturity model, too
                 existing.setMaturityModel(catalog.getMaturityModel());
                 return repository.save(existing);

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <title>Edit Security Control Domain</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <h1 th:text="${domain.id != null} ? 'Edit Security Control Domain' : 'Create Security Control Domain'"></h1>
+    <div class="entity-edit-frame">
+        <form th:action="@{/security-control-domain/edit}" th:object="${domain}" method="post">
+            <input type="hidden" th:field="*{id}" />
+            <div>
+                <label for="name">Name:</label>
+                <input type="text" th:field="*{name}" id="name" required />
+            </div>
+            <div>
+                <label for="description">Description:</label>
+                <textarea th:field="*{description}" id="description"></textarea>
+            </div>
+            <button type="submit">Save</button>
+            <a th:href="@{/security-control-domain/list}" class="button">Cancel</a>
+        </form>
+    </div>
+</body>
+</html>

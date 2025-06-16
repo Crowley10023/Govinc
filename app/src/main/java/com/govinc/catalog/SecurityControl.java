@@ -5,6 +5,8 @@ import java.util.Set;
 
 import jakarta.persistence.*;
 
+// Import SecurityControlDomain
+
 @Entity
 @Table(name = "security_controls")
 public class SecurityControl {
@@ -19,6 +21,10 @@ public class SecurityControl {
 
     @ManyToMany(mappedBy = "securityControls")
     private Set<SecurityCatalog> securityCatalogs = new HashSet<>();
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "security_control_domain_id")
+    private SecurityControlDomain securityControlDomain;
 
     public SecurityControl() {}
 
@@ -66,5 +72,12 @@ public class SecurityControl {
     
     public void setSecurityCatalogs(Set<SecurityCatalog> securityCatalogs) {
         this.securityCatalogs = securityCatalogs;
+    }
+
+    public SecurityControlDomain getSecurityControlDomain() {
+        return securityControlDomain;
+    }
+    public void setSecurityControlDomain(SecurityControlDomain securityControlDomain) {
+        this.securityControlDomain = securityControlDomain;
     }
 }

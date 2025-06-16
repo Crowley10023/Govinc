@@ -23,6 +23,17 @@
                 <label for="reference">Reference:</label>
                 <input type="text" th:field="*{reference}" id="reference" />
             </div>
+            <div>
+                <label for="securityControlDomain">Security Control Domain:</label>
+                <select th:field="*{securityControlDomain.id}" id="securityControlDomain">
+                    <option value="" disabled th:selected="${securityControl.securityControlDomain == null}">-- Select Domain --</option>
+                    <option th:each="domain : ${securityControlDomains}" 
+                            th:value="${domain.id}" 
+                            th:text="${domain.name}" 
+                            th:selected="${securityControl.securityControlDomain != null and domain.id == securityControl.securityControlDomain.id}">
+                    </option>
+                </select>
+            </div>
             <button type="submit">Save</button>
             <a th:href="@{/security-control/list}" class="button">Cancel</a>
         </form>

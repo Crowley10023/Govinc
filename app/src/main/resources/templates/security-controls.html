@@ -17,6 +17,7 @@
                 <th>Name</th>
                 <th>Detail</th>
                 <th>Reference</th>
+                <th>Domain</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -26,6 +27,7 @@
                 <td th:text="${control.name}"></td>
                 <td th:text="${control.detail}"></td>
                 <td th:text="${control.reference}"></td>
+                <td th:text="${control.securityControlDomain != null ? control.securityControlDomain.name : ''}"></td>
                 <td>
                     <a th:href="@{'/security-control/edit'(id=${control.id})}">Edit</a>
                     <form th:action="@{/security-control/delete}" method="post" style="display:inline">

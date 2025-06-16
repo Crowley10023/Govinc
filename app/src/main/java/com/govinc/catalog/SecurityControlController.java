@@ -17,17 +17,26 @@ public class SecurityControlController {
         return "security-controls";
     }
 
+    @Autowired
+    private SecurityControlDomainService securityControlDomainService;
+
     @GetMapping("/edit")
     public String editSecurityControl(@RequestParam(required = false) Long id, Model model) {
         SecurityControl control = id != null ? service.findById(id).orElse(new SecurityControl()) : new SecurityControl();
         model.addAttribute("securityControl", control);
+        model.addAttribute("securityControlDomains", securityControlDomainService.findAll());
         return "edit-security-control";
     }
 
     @PostMapping("/edit")
-    public String saveSecurityControl(@ModelAttribute SecurityControl control, Model model) {
+    public String saveSecurityControl(@ModelAttribute SecurityControl control) {
+        if (control.getSecurityControlDomain() != null && control.getSecurityControlDomain().getId() != null) {
+            SecurityControlDomain domain = securityControlDomainService.findById(control.getSecurityControlDomain().getId()).orElse(null);
+            control.setSecurityControlDomain(domain);
+        } else {
+            control.setSecurityControlDomain(null);
+        }
         service.save(control);
-        // Redirect to list after save
         return "redirect:/security-control/list";
     }
 
@@ -40,6 +49,7 @@ public class SecurityControlController {
     @GetMapping("/create")
     public String createSecurityControl(Model model) {
         model.addAttribute("securityControl", new SecurityControl());
+        model.addAttribute("securityControlDomains", securityControlDomainService.findAll());
         return "edit-security-control";
     }
 }

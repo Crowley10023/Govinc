@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <title>Security Control Domains List</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div th:replace="~{navigation :: mainNav}"></div>
+    <h1>Security Control Domains</h1>
+    <a href="/security-control-domain/create">Create New Security Control Domain</a>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="domain : ${domains}">
+                <td th:text="${domain.id}"></td>
+                <td th:text="${domain.name}"></td>
+                <td th:text="${domain.description}"></td>
+                <td>
+                    <a th:href="@{'/security-control-domain/edit'(id=${domain.id})}">Edit</a>
+                    <form th:action="@{/security-control-domain/delete}" method="post" style="display:inline">
+                        <input type="hidden" name="id" th:value="${domain.id}" />
+                        <button type="submit" onclick="return confirm('Are you sure?')">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <a href="/">Back to main</a>
+</body>
+</html>
