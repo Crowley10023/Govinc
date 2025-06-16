@@ -8,9 +8,7 @@ import org.springframework.web.bind.annotation.*;
 import com.govinc.maturity.MaturityModel;
 import com.govinc.maturity.MaturityModelRepository;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Controller
@@ -23,7 +21,43 @@ public class SecurityCatalogController {
     private SecurityControlService securityControlService;
 
     @Autowired
+    private SecurityControlDomainService securityControlDomainService;
+
+    @Autowired
     private MaturityModelRepository maturityModelRepository;
+
+    // Helper: All security controls by domain, also handles unassigned controls
+    private List<SecurityControlDomain> getAllDomainsWithAllControlsGrouped() {
+        List<SecurityControlDomain> domains = securityControlDomainService.findAll();
+        List<SecurityControl> allControls = securityControlService.findAll();
+        Map<Long, SecurityControlDomain> domainMap = domains.stream().collect(Collectors.toMap(SecurityControlDomain::getId, d -> d));
+
+        // Track assigned controls
+        Set<Long> assignedControlIds = new HashSet<>();
+        for (SecurityControlDomain domain : domains) {
+            Set<SecurityControl> controlsForDomain = new HashSet<>();
+            for (SecurityControl control : domain.getSecurityControls()) {
+                controlsForDomain.add(control);
+                assignedControlIds.add(control.getId());
+            }
+            domain.setSecurityControls(controlsForDomain);
+        }
+
+        // Add a synthetic domain for unassigned controls if necessary
+        List<SecurityControl> unassignedControls = allControls.stream()
+                .filter(ctrl -> ctrl.getSecurityControlDomain() == null || !domainMap.containsKey(ctrl.getSecurityControlDomain().getId()))
+                .collect(Collectors.toList());
+
+        if (!unassignedControls.isEmpty()) {
+            SecurityControlDomain unassigned = new SecurityControlDomain();
+            unassigned.setName("Unassigned");
+            unassigned.setDescription("Security controls that are not assigned to any domain.");
+            unassigned.setSecurityControls(new HashSet<>(unassignedControls));
+            domains = new ArrayList<>(domains); // ensure it's mutable
+            domains.add(unassigned);
+        }
+        return domains;
+    }
 
     @GetMapping("/list")
     public String listSecurityCatalogs(Model model) {
@@ -35,7 +69,7 @@ public class SecurityCatalogController {
     public String editSecurityCatalog(@RequestParam(required = false) Long id, Model model) {
         SecurityCatalog catalog = id != null ? service.findById(id).orElse(new SecurityCatalog()) : new SecurityCatalog();
         model.addAttribute("securityCatalog", catalog);
-        model.addAttribute("securityControls", securityControlService.findAll()); // for dropdown
+        model.addAttribute("securityControlDomains", getAllDomainsWithAllControlsGrouped());
         model.addAttribute("maturityModels", maturityModelRepository.findAll());
         return "edit-security-catalog";
     }
@@ -71,7 +105,7 @@ public class SecurityCatalogController {
     @GetMapping("/create")
     public String createSecurityCatalog(Model model) {
         model.addAttribute("securityCatalog", new SecurityCatalog());
-        model.addAttribute("securityControls", securityControlService.findAll());
+        model.addAttribute("securityControlDomains", getAllDomainsWithAllControlsGrouped());
         model.addAttribute("maturityModels", maturityModelRepository.findAll());
         return "edit-security-catalog";
     }

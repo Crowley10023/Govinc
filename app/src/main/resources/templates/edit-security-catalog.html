@@ -5,6 +5,31 @@
     <title>Edit Security Catalog</title>
     <meta charset="UTF-8">
     <link rel="stylesheet" href="/style.css">
+    <style>
+        .security-controls-group {
+            margin-bottom: 2em;
+            padding: 1em;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background-color: #fafbfc;
+        }
+        .security-control-domain {
+            font-weight: bold;
+            margin-bottom: 0.5em;
+            font-size: 1.1em;
+        }
+        .security-control-checkbox-list {
+            display: flex;
+            flex-direction: column;
+            row-gap: 0.5em;
+            margin-left: 1em;
+        }
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 0.4em;
+        }
+    </style>
 </head>
 <body>
     <h1>Edit Security Catalog</h1>
@@ -25,16 +50,21 @@
                     <td><input type="text" th:field="*{revision}" id="revision" required /></td>
                 </tr>
                 <tr>
-                    <td><label for="securityControls">Security Controls:</label></td>
+                    <td valign="top"><label for="securityControls">Security Controls:</label></td>
                     <td>
-                        
-                        <select name="securityControls" id="securityControls" multiple required>
-                            <option th:each="control : ${securityControls}"
-                                    th:value="${control.id}"
-                                    th:text="${control.name}"
-                                    th:selected="${securityCatalog.securityControls != null and securityCatalog.securityControls.contains(control)}">
-                            </option>
-                        </select>
+                        <!-- Grouped by domain, using domain.securityControls per your model -->
+                        <div th:each="domain : ${securityControlDomains}" class="security-controls-group">
+                            <div class="security-control-domain" th:text="${domain.name}"></div>
+                            <div class="security-control-checkbox-list">
+                                <label class="checkbox-label" th:each="control : ${domain.securityControls}">
+                                    <input type="checkbox"
+                                           name="securityControls"
+                                           th:value="${control.id}"
+                                           th:checked="${securityCatalog.securityControls != null and securityCatalog.securityControls.contains(control)}" />
+                                    <span th:text="${control.name}"></span>
+                                </label>
+                            </div>
+                        </div>
                     </td>
                 </tr>
                 <tr>
