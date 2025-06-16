@@ -8,6 +8,11 @@ import org.springframework.web.bind.annotation.*;
 import com.govinc.maturity.MaturityModel;
 import com.govinc.maturity.MaturityModelRepository;
 
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 @Controller
 @RequestMapping("/security-catalog")
 public class SecurityCatalogController {
@@ -36,9 +41,23 @@ public class SecurityCatalogController {
     }
 
     @PostMapping("/edit")
-    public String saveSecurityCatalog(@ModelAttribute SecurityCatalog catalog, @RequestParam Long maturityModelId, Model model) {
+    public String saveSecurityCatalog(
+            @ModelAttribute SecurityCatalog catalog,
+            @RequestParam Long maturityModelId,
+            @RequestParam(value = "securityControls", required = false) List<Long> securityControlIds,
+            Model model) {
         MaturityModel maturityModel = maturityModelRepository.findById(maturityModelId).orElse(null);
         catalog.setMaturityModel(maturityModel);
+
+        // Convert received IDs to Set<SecurityControl>
+        Set<SecurityControl> selectedControls = new HashSet<>();
+        if (securityControlIds != null) {
+            selectedControls = securityControlService.findAll().stream()
+                    .filter(control -> securityControlIds.contains(control.getId()))
+                    .collect(Collectors.toSet());
+        }
+        catalog.setSecurityControls(selectedControls);
+
         service.save(catalog);
         return "redirect:/security-catalog/list";
     }

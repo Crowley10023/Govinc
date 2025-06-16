@@ -27,8 +27,13 @@
                 <tr>
                     <td><label for="securityControls">Security Controls:</label></td>
                     <td>
-                        <select th:field="*{securityControls}" id="securityControls" multiple>
-                            <option th:each="control : ${securityControls}" th:value="${control.id}" th:text="${control.name}"></option>
+                        
+                        <select name="securityControls" id="securityControls" multiple required>
+                            <option th:each="control : ${securityControls}"
+                                    th:value="${control.id}"
+                                    th:text="${control.name}"
+                                    th:selected="${securityCatalog.securityControls != null and securityCatalog.securityControls.contains(control)}">
+                            </option>
                         </select>
                     </td>
                 </tr>
