@@ -1,11 +1,12 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>Edit Org Service</title>
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-    <div th:replace="navigation :: mainNav"></div>
+    <div th:replace="~{navigation :: mainNav}"></div>
     <h1 th:text="${orgService.id != null} ? 'Edit Org Service' : 'Create Org Service'"></h1>
     <form th:action="@{'/orgservices/save'}" method="post">
         <input type="hidden" name="id" th:value="${orgService.id}"/>

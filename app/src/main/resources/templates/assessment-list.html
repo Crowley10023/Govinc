@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <meta charset="UTF-8">
     <title>Assessment List</title>
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-    <div th:replace="navigation :: mainNav"></div>
+    <div th:replace="~{navigation :: mainNav}"></div>
     <main class="container">
         <h1>Assessments</h1>
         <div class="actions-row">

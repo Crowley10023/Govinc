@@ -2,6 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 
 <head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>Organization Tree View</title>
     <link rel="stylesheet" href="/style.css">
     <style>
@@ -43,7 +44,7 @@
 </head>
 
 <body>
-    <div th:replace="navigation :: mainNav"></div>
+    <div th:replace="~{navigation :: mainNav}"></div>
     <h1>Org Unit Tree View</h1>
     <div th:if="${orgUnit == null}">
         <p>No organization unit found for this ID.</p>

@@ -1,11 +1,12 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>User List</title>
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-<div th:replace="navigation :: mainNav"></div>
+<div th:replace="~{navigation :: mainNav}"></div>
 <h1>User List</h1>
 <a href="/users/new"><button>Add User</button></a>
 <table border="1">

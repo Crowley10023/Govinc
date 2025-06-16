@@ -1,11 +1,12 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title th:text="${user.id} != null ? 'Edit User' : 'Add User'">Add/Edit User</title>
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-<div th:replace="navigation :: mainNav"></div>
+<div th:replace="~{navigation :: mainNav}"></div>
 <h1 th:text="${user.id} != null ? 'Edit User' : 'Add User'"></h1>
 <form th:action="${user.id} != null ? @{'/users/update/' + ${user.id}} : @{/users}" th:object="${user}" method="post">
     <label for="name">Name:</label>

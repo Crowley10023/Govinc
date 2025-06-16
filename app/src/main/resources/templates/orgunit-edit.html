@@ -1,11 +1,12 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>Edit Org Unit</title>
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-    <div th:replace="navigation :: mainNav"></div>
+    <div th:replace="~{navigation :: mainNav}"></div>
     <h1 th:text="${orgUnit.id != null} ? 'Edit Organization Unit' : 'Create Organization Unit'"></h1>
     <form th:action="@{'/orgunits/save'}" method="post">
         <input type="hidden" name="id" th:value="${orgUnit.id}"/>

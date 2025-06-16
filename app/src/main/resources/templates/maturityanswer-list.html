@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>Maturity Answer List</title>
     <meta charset="UTF-8">
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-    <div th:replace="navigation :: mainNav"></div>
+    <div th:replace="~{navigation :: mainNav}"></div>
     <h1>Maturity Answers</h1>
     <a href="/maturityanswer/create">Create New Maturity Answer</a>
     <table border="1">
