@@ -10,6 +10,14 @@
     <div th:replace="~{navigation :: mainNav}"></div>
     <h1>Security Controls</h1>
     <a href="/security-control/create">Create New Security Control</a>
+
+    <h2>Import Security Controls from CSV</h2>
+    <form th:action="@{/security-control/import}" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" accept=".csv" required />
+        <button type="submit">Import</button>
+    </form>
+    <br/>
+
     <table border="1">
         <thead>
             <tr>
