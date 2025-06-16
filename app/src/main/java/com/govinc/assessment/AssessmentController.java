@@ -118,10 +118,18 @@ public class AssessmentController {
         }
         Assessment assessment = assessmentOpt.get();
         model.addAttribute("assessment", assessment);
-        model.addAttribute("controls", assessment.getSecurityCatalog().getSecurityControls());
+        // Sorted controls by name
+        List<SecurityControl> controls = new ArrayList<>();
+        if (assessment.getSecurityCatalog() != null) {
+            controls.addAll(assessment.getSecurityCatalog().getSecurityControls());
+            controls.sort(Comparator.comparing(SecurityControl::getName, Comparator.nullsLast(String::compareTo)));
+        }
+        model.addAttribute("controls", controls);
+        // Sorted answers
         List<MaturityAnswer> answers = new ArrayList<>();
         if (assessment.getSecurityCatalog() != null && assessment.getSecurityCatalog().getMaturityModel() != null) {
             answers.addAll(assessment.getSecurityCatalog().getMaturityModel().getMaturityAnswers());
+            answers.sort(Comparator.comparing(MaturityAnswer::getAnswer, Comparator.nullsLast(String::compareTo)));
         }
         model.addAttribute("answers", answers);
 
@@ -210,16 +218,20 @@ public class AssessmentController {
             model.addAttribute("answerSummary", assessmentDetailsService.computeAnswerSummary(details));
 
             // Use only controls from the catalog assigned to this assessment
+            // Sorted controls by name
             List<SecurityControl> controls = new ArrayList<>();
             if (assessment.getSecurityCatalog() != null) {
                 controls.addAll(assessment.getSecurityCatalog().getSecurityControls());
+                controls.sort(Comparator.comparing(SecurityControl::getName, Comparator.nullsLast(String::compareTo)));
             }
             model.addAttribute("controls", controls);
 
             // Pass the correct answers from the associated maturity model only
+            // Sorted maturity answers
             List<MaturityAnswer> maturityAnswers = new ArrayList<>();
             if (assessment.getSecurityCatalog() != null && assessment.getSecurityCatalog().getMaturityModel() != null) {
                 maturityAnswers.addAll(assessment.getSecurityCatalog().getMaturityModel().getMaturityAnswers());
+                maturityAnswers.sort(Comparator.comparing(MaturityAnswer::getAnswer, Comparator.nullsLast(String::compareTo)));
             }
             model.addAttribute("maturityAnswers", maturityAnswers);
             return "assessment-details";

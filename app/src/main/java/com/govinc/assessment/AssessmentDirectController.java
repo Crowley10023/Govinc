@@ -12,10 +12,15 @@ import java.util.Optional;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Comparator;
 
 import com.govinc.maturity.MaturityAnswer;
 import com.govinc.maturity.MaturityAnswerRepository;
+import com.govinc.assessment.Assessment;
 import com.govinc.catalog.SecurityCatalog;
+import com.govinc.catalog.SecurityControl;
 import com.govinc.maturity.MaturityModel;
 
 @Controller
@@ -29,35 +34,49 @@ public class AssessmentDirectController {
 
     @GetMapping("/assessment-direct/{obfuscatedId}")
     public String showAssessmentDirect(@PathVariable String obfuscatedId, Model model) {
-        System.out.println("show assessment 1 ;-) : " + obfuscatedId);
         Optional<AssessmentUrls> maybeUrl = assessmentUrlsService.findByObfuscated(obfuscatedId);
         if (maybeUrl.isPresent()) {
             AssessmentUrls urlEntity = maybeUrl.get();
-            Assessment assessment = urlEntity.getAssessment();
+            com.govinc.assessment.Assessment assessment = urlEntity.getAssessment();
+            System.out.println("\n\nassessment: " + assessment.getName());
+
             model.addAttribute("assessment", assessment);
 
-            // Load assessment details for this assessment
-            // If you want to filter by assessment, update this line accordingly
-            List<AssessmentDetails> allDetails = detailsService.findAll();
-            model.addAttribute("assessmentDetails", allDetails);
-
-            // Load maturity answers that are valid for the assessment's security catalog
-            SecurityCatalog catalog = assessment.getSecurityCatalog();
-            Set<MaturityAnswer> validMaturityAnswers = null;
-            if (catalog != null && catalog.getMaturityModel() != null) {
-                MaturityModel maturityModel = catalog.getMaturityModel();
-                validMaturityAnswers = maturityModel.getMaturityAnswers();
+            // Control answers are always retrieved from AssessmentDetails
+            Optional<AssessmentDetails> detailsOpt = detailsService.findById(assessment.getId());
+            AssessmentDetails details = detailsOpt.orElse(null);
+            List<AssessmentControlAnswer> answers = new ArrayList<>();
+            Map<Long, String> controlAnswers = new HashMap<>();
+            if (details != null && details.getControlAnswers() != null) {
+                answers.addAll(details.getControlAnswers());
+                for (AssessmentControlAnswer aca : details.getControlAnswers()) {
+                    if (aca.getSecurityControl() != null && aca.getMaturityAnswer() != null)
+                        controlAnswers.put(aca.getSecurityControl().getId(), aca.getMaturityAnswer().getAnswer());
+                }
             }
-            
-            if (validMaturityAnswers == null) {
-                // fallback: show no answers
-                model.addAttribute("maturityAnswers", java.util.Collections.emptyList());
-            } else {
-                model.addAttribute("maturityAnswers", validMaturityAnswers);
-            }
+            model.addAttribute("answers", answers);
+            model.addAttribute("controlAnswers", controlAnswers);
 
-            // Defensive: always provide controlAnswers non-null
-            model.addAttribute("controlAnswers", new java.util.HashMap<>());
+            // Summary table by answer type
+            model.addAttribute("answerSummary", detailsService.computeAnswerSummary(details));
+
+            // Use only controls from the catalog assigned to this assessment
+            // Sorted controls by name
+            List<SecurityControl> controls = new ArrayList<>();
+            if (assessment.getSecurityCatalog() != null) {
+                controls.addAll(assessment.getSecurityCatalog().getSecurityControls());
+                controls.sort(Comparator.comparing(SecurityControl::getName, Comparator.nullsLast(String::compareTo)));
+            }
+            model.addAttribute("controls", controls);
+
+            // Pass the correct answers from the associated maturity model only
+            // Sorted maturity answers
+            List<MaturityAnswer> maturityAnswers = new ArrayList<>();
+            if (assessment.getSecurityCatalog() != null && assessment.getSecurityCatalog().getMaturityModel() != null) {
+                maturityAnswers.addAll(assessment.getSecurityCatalog().getMaturityModel().getMaturityAnswers());
+                maturityAnswers.sort(Comparator.comparing(MaturityAnswer::getAnswer, Comparator.nullsLast(String::compareTo)));
+            }
+            model.addAttribute("maturityAnswers", maturityAnswers);
 
             return "assessment-direct";
         } else {
@@ -68,7 +87,6 @@ public class AssessmentDirectController {
     // Allow using /assessment-direct.html?id=...
     @GetMapping("/assessment-direct.html")
     public String showAssessmentDirectByParam(@RequestParam("id") String obfuscatedId, Model model) {
-        System.out.println("show assessment 2 ;-) : " + obfuscatedId);
         return showAssessmentDirect(obfuscatedId, model);
     }
 

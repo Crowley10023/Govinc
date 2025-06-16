@@ -2,6 +2,10 @@ package com.govinc.catalog;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.stream.Collectors;
 
 import com.govinc.maturity.MaturityModel;
 
@@ -58,8 +62,14 @@ public class SecurityCatalog {
     public void setRevision(String revision) {
         this.revision = revision;
     }
-    public Set<SecurityControl> getSecurityControls() {
-        return securityControls;
+    /**
+     * Returns security controls sorted by name.
+     * @return a list of security controls sorted by name
+     */
+    public List<SecurityControl> getSecurityControls() {
+        return securityControls.stream()
+            .sorted(Comparator.comparing(SecurityControl::getName, String.CASE_INSENSITIVE_ORDER))
+            .collect(Collectors.toList());
     }
     public void setSecurityControls(Set<SecurityControl> securityControls) {
         this.securityControls = securityControls;

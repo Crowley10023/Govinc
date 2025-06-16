@@ -71,19 +71,21 @@
                                     <td>
                                         <div class="ctrl-desc-wrap">
                                             <span th:text="${ctrl.name}"></span>
-                                            <button type="button" class="ctrl-desc-btn" tabindex="0"
-                                                title="Show description" onclick="toggleDesc(this)">
-                                                <svg viewBox="0 0 24 24">
+                                            <span class="ctrl-desc-tooltip-icon" tabindex="0">
+                                                <svg viewBox="0 0 24 24" width="20" height="20">
                                                     <circle cx="12" cy="12" r="10" fill="#fff" stroke="#2274A5"
-                                                        stroke-width="2" /><text x="12" y="17" text-anchor="middle"
+                                                        stroke-width="2" />
+                                                    <text x="12" y="17" text-anchor="middle"
                                                         font-family="Arial,Helvetica,sans-serif" font-size="15" dy="-2"
                                                         fill="#2274A5">?</text>
                                                 </svg>
-                                            </button>
-                                            <div class="ctrl-desc-tooltip">
-                                                <b>Description:</b>
-                                                <div th:utext="${#strings.escapeXml(ctrl.detail) ?: 'No detail'}"></div>
-                                            </div>
+                                                <div class="ctrl-desc-tooltip">
+                                                    <b>Description:</b>
+                                                    <div th:utext="${#strings.escapeXml(ctrl.detail) ?: 'No detail'}">
+                                                    </div>
+                                                </div>
+                                            </span>
+
                                         </div>
                                     </td>
                                     <td>
@@ -155,13 +157,8 @@
                 }
             });
         });
-        function toggleDesc(btn) {
-            var $tooltip = $(btn).siblings('.ctrl-desc-tooltip');
-            // Hide any other visible tooltips first
-            $('.ctrl-desc-tooltip').not($tooltip).fadeOut(120);
-            $tooltip.fadeToggle(120);
-        }
     </script>
+
     <style>
         .answer-feedback {
             display: inline-block;
@@ -182,6 +179,47 @@
 
         .answer-error {
             color: #cc2222;
+        }
+    </style>
+    <style>
+        .ctrl-desc-tooltip-icon {
+            display: inline-block;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .ctrl-desc-tooltip-icon svg {
+            vertical-align: middle;
+        }
+
+        .ctrl-desc-tooltip {
+            visibility: hidden;
+            opacity: 0;
+            background: #fffbe8;
+            color: #333;
+            border: 1px solid #d4cead;
+            border-radius: 5px;
+            padding: 12px 15px;
+            min-width: 240px;
+            max-width: 300px;
+            position: absolute;
+            left: 30px;
+            top: -10px;
+            z-index: 99;
+            box-shadow: 0 0 10px 2px #0001;
+            transition: opacity 0.24s, visibility 0.24s;
+            font-size: 0.95em;
+            line-height: 1.3em;
+            text-align: left;
+            white-space: normal;
+        }
+
+        /* Show the tooltip on hover or focus */
+        .ctrl-desc-tooltip-icon:hover .ctrl-desc-tooltip,
+        .ctrl-desc-tooltip-icon:focus .ctrl-desc-tooltip,
+        .ctrl-desc-tooltip-icon:focus-within .ctrl-desc-tooltip {
+            visibility: visible;
+            opacity: 1;
         }
     </style>
 </body>
