@@ -1,6 +1,7 @@
 package com.govinc.organization;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -10,6 +11,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.ModelAndView;
 
 import javax.servlet.http.HttpServletRequest;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -19,6 +22,9 @@ import java.util.stream.Collectors;
 public class OrgUnitController {
     @Autowired
     private OrgUnitService orgUnitService;
+
+    @Autowired
+    private Environment env;
 
     // View for HTML rendering (Thymeleaf)
     @GetMapping({ "/list", "/list.html" })
@@ -117,7 +123,6 @@ public class OrgUnitController {
         orgUnitService.deleteOrgUnit(id);
     }
 
-    // REST endpoint: Full org unit tree from a given root ID
     @ResponseBody
     @GetMapping(value = "/tree/{id}/fulltree", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> getOrgUnitFullTree(@PathVariable Long id) {
@@ -125,7 +130,24 @@ public class OrgUnitController {
         if (orgUnitOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok(orgUnitOpt.get());
+    
+        // Print the full tree to sysout
+        OrgUnit root = orgUnitOpt.get();
+        printOrgUnitTree(root, 0);
+    
+        return ResponseEntity.ok(root);
+    }
+    
+    // Helper method to print the OrgUnit tree recursively
+    private void printOrgUnitTree(OrgUnit orgUnit, int level) {
+        // Indentation for readability
+        String indent = "  ".repeat(level);
+        System.out.println(indent + "OrgUnit ID: " + orgUnit.getId() + ", Name: " + orgUnit.getName());
+        if (orgUnit.getChildren() != null) {
+            for (OrgUnit child : orgUnit.getChildren()) {
+                printOrgUnitTree(child, level + 1);
+            }
+        }
     }
 
     // Handle tree view rendering for selected org unit as root and all its children
@@ -153,16 +175,39 @@ public class OrgUnitController {
     // Exception Handler for this controller
     @ExceptionHandler(Exception.class)
     public Object handleException(Exception ex, HttpServletRequest request) {
+        if (ex == null) {
+            System.out.println("that's weird");
+            return null;
+        }
         ex.printStackTrace();
+        boolean showDetails = false;
+        for (String profile : env.getActiveProfiles()) {
+            if (profile.equalsIgnoreCase("dev") || profile.equalsIgnoreCase("development")) {
+                showDetails = true;
+                break;
+            }
+        }
         String accept = request.getHeader("Accept");
         if (accept != null && accept.contains("application/json")) {
+            String details = null;
+            if (showDetails) {
+                StringWriter sw = new StringWriter();
+                ex.printStackTrace(new PrintWriter(sw));
+                details = sw.toString();
+            }
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(new ErrorResponse("error", ex.getMessage()));
+                    .body(new ErrorResponseDetailed("error", ex.getMessage(), showDetails, details));
         } else {
             ModelAndView mav = new ModelAndView();
-            mav.addObject("errorMessage", ex.getMessage());
             mav.setViewName("error");
+            mav.addObject("message", ex.getMessage());
+            mav.addObject("showDetails", showDetails);
+            if (showDetails) {
+                StringWriter sw = new StringWriter();
+                ex.printStackTrace(new PrintWriter(sw));
+                mav.addObject("details", sw.toString());
+            }
             return mav;
         }
     }
@@ -177,5 +222,22 @@ public class OrgUnitController {
         }
         public String getStatus() { return status; }
         public String getMessage() { return message; }
+    }
+    // ErrorResponseDetailed inner class for detailed error info
+    static class ErrorResponseDetailed {
+        public String status;
+        public String message;
+        public boolean showDetails;
+        public String details;
+        public ErrorResponseDetailed(String status, String message, boolean showDetails, String details) {
+            this.status = status;
+            this.message = message;
+            this.showDetails = showDetails;
+            this.details = details;
+        }
+        public String getStatus() { return status; }
+        public String getMessage() { return message; }
+        public boolean isShowDetails() { return showDetails; }
+        public String getDetails() { return details; }
     }
 }

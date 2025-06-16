@@ -1,5 +1,7 @@
 package com.govinc.organization;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.govinc.user.User;
 import jakarta.persistence.*;
 import java.util.Set;
@@ -13,9 +15,11 @@ public class OrgUnit {
     private String name;
 
     @OneToMany(fetch = FetchType.EAGER, mappedBy = "parent")
+    @JsonManagedReference
     private Set<OrgUnit> children;
 
     @ManyToOne
+    @JsonBackReference
     private OrgUnit parent;
 
     @OneToOne

@@ -9,6 +9,6 @@
     "java.format.settings.url": "DATA\\theia01\\app\\src\\.vscode\\java-formatter.xml",
     "ai-features.openAiOfficial.officialOpenAiModels": [
         "gpt-4.1",
-        "o1-pro"
+        "gpt-4.5-preview"
     ]
 }

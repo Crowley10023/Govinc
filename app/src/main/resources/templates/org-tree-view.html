@@ -35,6 +35,10 @@
             fill: #4682b4;
             user-select: none;
         }
+        .selected-node {
+            stroke: #e67e22 !important;
+            stroke-width: 4 !important;
+        }
     </style>
 </head>
 
@@ -51,52 +55,102 @@
         <a th:href="@{'/orgunits/list'}">&larr; Back to Org Units List</a>
     </div>
 
-    <!-- SVG Node Fragment (no recursion, AJAX on demand) -->
-    <th:block th:fragment="svgNodeFragmentAjax(node, x, y, depth, width, treeSpacing, levelHeight)">
-        <th:block th:if="${node != null}">
-            <g th:attr="id='node-' + ${node.id}">
-                <!-- Node rectangle -->
-                <rect th:x="${x-60}" th:y="${y}" width="120" height="40" class="org-node" />
-                <text th:x="${x}" th:y="${y+22}" class="org-label" th:text="${node.name}"></text>
-
-                <!-- Expand/collapse button if hasChildren -->
-                <g th:if="${node.hasChildren}" th:attr="id='expander-'+${node.id}">
-                    <circle th:attr="cx=${x+70}, cy=${y+20}, r=10" class="expand-btn" />
-                    <text th:attr="x=${x+70}, y=${y+25}" font-size="16" fill="#fff" text-anchor="middle"
-                        class="expand-btn" style="pointer-events:none;">&#9654;</text>
-                </g>
-
-                <!-- Place for dynamically loaded children -->
-                <g th:attr="id='children-'+${node.id}" />
-
-                <!-- Example: connecting lines JS will add on expansion -->
-            </g>
-        </th:block>
-    </th:block>
-
     <script>
         // Fetch full org tree at once, then render the whole tree immediately.
         document.addEventListener('DOMContentLoaded', function () {
-            // Replace {rootId} below with actual root id (available as a JS variable or data attribute)
             const rootId = "[[${orgUnit != null ? orgUnit.id : ''}]]";
             if (!rootId) return;
+            // This endpoint needs to return the 'full' node, including parent if available
             fetch(`/orgunits/tree/${rootId}/fulltree`)
                 .then(resp => resp.json())
                 .then(tree => {
-                    drawOrgTreeFull(tree, 800, 40, 0, 1600);
+                    // If the node has a parent, use the parent as virtual root
+                    if (tree.parent && tree.parent.children) {
+                        drawOrgTreeWithSiblings(tree.parent, rootId, 800, 40, 0, 1600);
+                    } else {
+                        // Fallback to normal rendering
+                        drawOrgTreeFull(tree, 800, 40, 0, 1600);
+                    }
                 });
         });
 
+        // Recursive-aware draw: shows all parent's children and recursively expands them
+        function drawOrgTreeWithSiblings(parentNode, selectedNodeId, svgWidth, startY, level, svgDisplayWidth) {
+            const svg = document.getElementById('orgTreeSvg');
+            svg.innerHTML = '';
+            const nodeW = 120, nodeH = 40, vSpacing = 90;
+            const children = parentNode.children || [];
+            const n = children.length;
+            const spacing = svgDisplayWidth / (n + 1);
+            // Draw parent (optional, could be omitted as visual anchor)
+            /* Uncomment if you want to show parent as top node
+            const parentX = svgDisplayWidth/2, parentY = startY;
+            drawNode(svg, parentNode, parentX, parentY, nodeW, nodeH);
+            let yOffset = startY + vSpacing;
+            */
+            let yOffset = startY;
+            // Recursively draw nodes and their children
+            function drawRecursively(node, x, y, spacing, vSpacing, selectedId) {
+                drawNode(svg, node, x, y, nodeW, nodeH, node.id == selectedId);
+                if (node.children && node.children.length) {
+                    const childCount = node.children.length;
+                    const childSpacing = spacing / childCount;
+                    node.children.forEach((child, idx) => {
+                        const childX = x - spacing / 2 + childSpacing * (idx + 0.5);
+                        const childY = y + vSpacing;
+                        drawLink(svg, x, y + nodeH, childX, childY);
+                        drawRecursively(child, childX, childY, childSpacing, vSpacing, selectedId);
+                    });
+                }
+            }
+
+            children.forEach((sib, idx) => {
+                const x = spacing * (idx + 1);
+                drawNode(svg, sib, x, yOffset, nodeW, nodeH, sib.id == selectedNodeId);
+                // If this is the selected node, expand its children below it
+                drawRecursively(sib, x, yOffset, spacing, vSpacing, selectedNodeId);
+            });
+        }
+
+        function drawNode(svg, node, x, y, w, h, highlight) {
+            const nodeGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            nodeGroup.setAttribute('id', 'node-' + node.id);
+            const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            r.setAttribute('x', x - w/2);
+            r.setAttribute('y', y);
+            r.setAttribute('width', w);
+            r.setAttribute('height', h);
+            r.classList.add('org-node');
+            if (highlight) r.classList.add('selected-node');
+            nodeGroup.appendChild(r);
+            const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            t.setAttribute('x', x);
+            t.setAttribute('y', y + h/2 + 6);
+            t.classList.add('org-label');
+            t.textContent = node.name;
+            nodeGroup.appendChild(t);
+            svg.appendChild(nodeGroup);
+        }
+
+        function drawLink(svg, x1, y1, x2, y2) {
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', x1);
+            line.setAttribute('y1', y1);
+            line.setAttribute('x2', x2);
+            line.setAttribute('y2', y2);
+            line.classList.add('org-link');
+            svg.appendChild(line);
+        }
+
+        // fallback if parent is not present (original code)
         function drawOrgTreeFull(root, svgWidth, startY, level, svgDisplayWidth) {
             const svg = document.getElementById('orgTreeSvg');
             svg.innerHTML = '';
             const nodeW = 120, nodeH = 40, hSpacing = 160, vSpacing = 90;
-            // Compute tree width recursively
             function computeSubtreeWidth(node) {
                 if (!node.children || node.children.length === 0) return 1;
                 return node.children.map(computeSubtreeWidth).reduce((a,b)=>a+b,0);
             }
-            // Position nodes, store {node, x, y, subtreeWidth}
             let positions = [];
             function layout(node, depth, left, width) {
                 const sw = computeSubtreeWidth(node);
@@ -104,9 +158,7 @@
                 const nodeY = startY + depth*vSpacing;
                 positions.push({ node, x: nodeX, y: nodeY, subtreeWidth: sw });
                 if (node.children && node.children.length) {
-                    // Allocate width proportional to subtree widths?
-                    let total = node.children.map(computeSubtreeWidth)
-                                 .reduce((a,b)=>a+b,0);
+                    let total = node.children.map(computeSubtreeWidth).reduce((a,b)=>a+b,0);
                     let curX = left;
                     node.children.forEach(child => {
                         const w = width * computeSubtreeWidth(child) / total;
@@ -116,7 +168,6 @@
                 }
             }
             layout(root, level, 0, svgDisplayWidth);
-            // Draw links
             positions.forEach(pos => {
                 if (pos.node.children && pos.node.children.length) {
                     pos.node.children.forEach(child => {
@@ -133,11 +184,9 @@
                     });
                 }
             });
-            // Draw nodes
             positions.forEach(pos => {
                 const nodeGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
                 nodeGroup.setAttribute('id', 'node-'+pos.node.id);
-                // Rectangle
                 const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
                 r.setAttribute('x', pos.x-nodeW/2);
                 r.setAttribute('y', pos.y);
@@ -145,7 +194,6 @@
                 r.setAttribute('height', nodeH);
                 r.classList.add('org-node');
                 nodeGroup.appendChild(r);
-                // Label
                 const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
                 t.setAttribute('x', pos.x);
                 t.setAttribute('y', pos.y+nodeH/2+6);
