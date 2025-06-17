@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import com.govinc.catalog.SecurityCatalog;
 import com.govinc.user.User;
 import com.govinc.organization.OrgUnit;
+import com.govinc.organization.OrgService; // add this import
 import java.util.Set;
 import java.util.HashSet;
 import jakarta.persistence.*;
@@ -41,6 +42,23 @@ public class Assessment {
     @ManyToOne
     @JoinColumn(name = "predecessor_id")
     private Assessment predecessor;
+
+    // NEW: OrgService relationship (many-to-many)
+    @ManyToMany
+    @JoinTable(
+        name = "assessment_orgservice",
+        joinColumns = @JoinColumn(name = "assessment_id"),
+        inverseJoinColumns = @JoinColumn(name = "orgservice_id")
+    )
+    private Set<OrgService> orgServices = new HashSet<>();
+
+    public Set<OrgService> getOrgServices() {
+        return orgServices;
+    }
+
+    public void setOrgServices(Set<OrgService> orgServices) {
+        this.orgServices = orgServices;
+    }
 
     public Assessment() {
         this.status = AssessmentStatus.OPEN;

@@ -152,6 +152,14 @@
                     <th>Status</th>
                     <td th:text="${assessment.status}"></td>
                 </tr>
+                <tr th:if="${orgServices != null}">
+                    <th>Org Services</th>
+                    <td>
+                        <ul>
+                            <li th:each="orgService : ${orgServices}" th:text="${orgService.name}"></li>
+                        </ul>
+                    </td>
+                </tr>                
                 <tr>
                     <th>Assessment URL</th>
                     <td>
