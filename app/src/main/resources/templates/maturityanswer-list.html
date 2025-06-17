@@ -16,6 +16,8 @@
                 <th>ID</th>
                 <th>Answer</th>
                 <th>Description</th>
+                <th>Rating (%)</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -23,6 +25,7 @@
                 <td th:text="${answerObj.id}"></td>
                 <td th:text="${answerObj.answer}"></td>
                 <td th:text="${answerObj.description}"></td>
+                <td th:text="${answerObj.rating}"></td>
                 <td>
                     <a th:href="@{'/maturityanswer/edit'(id=${answerObj.id})}">Edit</a>
                     <form th:action="@{/maturityanswer/delete}" method="post" style="display:inline">

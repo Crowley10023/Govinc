@@ -25,7 +25,10 @@ public class MaturityAnswerController {
     }
 
     @PostMapping("/edit")
-    public String saveAnswer(@ModelAttribute MaturityAnswer maturityAnswer) {
+    public String saveAnswer(@ModelAttribute MaturityAnswer maturityAnswer, @RequestParam(value = "rating", required = false) Integer rating) {
+        if (rating != null) {
+            maturityAnswer.setRating(rating);
+        }
         maturityAnswerRepository.save(maturityAnswer);
         return "redirect:/maturityanswer/list";
     }

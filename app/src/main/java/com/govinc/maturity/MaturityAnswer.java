@@ -15,6 +15,12 @@ public class MaturityAnswer {
     private String answer;
     private String description;
 
+    /**
+     * Rating as a percentage (0 to 100).
+     */
+    @Column(nullable = false)
+    private int rating = 0;
+
     @ManyToMany(mappedBy = "maturityAnswers")
     private Set<MaturityModel> maturityModels = new HashSet<>();
 
@@ -49,6 +55,15 @@ public class MaturityAnswer {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public int getRating() {
+        return rating;
+    }
+    public void setRating(int rating) {
+        if (rating < 0) rating = 0;
+        if (rating > 100) rating = 100;
+        this.rating = rating;
     }
 
     public Set<MaturityModel> getMaturityModels() {
