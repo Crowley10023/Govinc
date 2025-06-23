@@ -7,6 +7,7 @@
 <body>
 <div th:replace="~{navigation :: mainNav}"></div>
 <h1>Org Service Assessment for <span th:text="${assessment.orgService.name}"></span></h1>
+<p class="caption-info">Number of applicable maturity answers: <span th:text="${applicableCount}"></span></p>
 <form th:action="@{/orgservice-assessment/save}" method="post">
     <input type="hidden" name="id" th:value="${assessment.id}" />
     <input type="hidden" name="orgService.id" th:value="${assessment.orgService.id}" />

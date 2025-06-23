@@ -20,8 +20,10 @@ public class OrgServiceAssessmentController {
     @GetMapping("/edit/{orgServiceId}")
     public String editAssessment(@PathVariable Long orgServiceId, Model model) {
         OrgServiceAssessment assessment = assessmentService.findOrCreateAssessment(orgServiceId);
+        long applicableCount = assessment.getControls().stream().filter(OrgServiceAssessmentControl::isApplicable).count();
         model.addAttribute("assessment", assessment);
         model.addAttribute("controls", assessment.getControls());
+        model.addAttribute("applicableCount", applicableCount);
         return "orgservice-assessment";
     }
 
