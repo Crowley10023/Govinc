@@ -60,6 +60,12 @@ public class MaturityAnswer {
     public int getRating() {
         return rating;
     }
+
+    /** For compatibility: consider 'rating' as the score (0-100) for this maturity answer */
+    public int getScore() {
+        return this.rating;
+    }
+
     public void setRating(int rating) {
         if (rating < 0) rating = 0;
         if (rating > 100) rating = 100;

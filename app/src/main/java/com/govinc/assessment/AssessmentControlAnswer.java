@@ -50,4 +50,14 @@ public class AssessmentControlAnswer {
     public MaturityAnswer getAnswer() {
         return getMaturityAnswer();
     }
+
+    /**
+     * Returns the rating (score 0-100) of the maturity answer for this control (or 0 if missing)
+     */
+    public int getScore() {
+        if (maturityAnswer != null) {
+            return maturityAnswer.getRating();
+        }
+        return 0;
+    }
 }
