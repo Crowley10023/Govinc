@@ -122,6 +122,15 @@
             justify-content: center;
             margin-top: 1em;
         }
+        .taken-over {
+            background: #eee !important;
+            color: #888 !important;
+        }
+        .taken-over-label {
+            color: #ab6f00;
+            font-size: 0.92em;
+            margin-left: 8px;
+        }
     </style>
 </head>
 
@@ -282,13 +291,19 @@
                                     <td>
                                         <span style="white-space:nowrap;">
                                             <select th:name="${'control_' + ctrl.id}" th:data-control-id="${ctrl.id}"
-                                                class="answer-select">
+                                                class="answer-select"
+                                                th:disabled="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])}"
+                                                th:classappend="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])} ? 'taken-over' : ''">
                                                 <option value="">-- select an answer --</option>
                                                 <option th:each="ans : ${maturityAnswers}" th:value="${ans.id}"
                                                     th:selected="${controlAnswers != null and controlAnswers[ctrl.id] != null} ? ${ans.answer} == ${controlAnswers[ctrl.id]} : false"
                                                     th:text="${ans.answer}"></option>
                                             </select>
                                             <span class="answer-feedback"></span>
+                                            <span th:if="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])}"
+                                                  class="taken-over-label" title="Answer is taken from an Org Service">
+                                                (taken over from Org Service)
+                                            </span>
                                         </span>
                                     </td>
                                     </th:block>

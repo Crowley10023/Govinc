@@ -24,7 +24,8 @@ public class OrgServiceAssessmentControl {
     @Column(nullable = false)
     private int percent;
 
-    public OrgServiceAssessmentControl() {}
+    public OrgServiceAssessmentControl() {
+    }
 
     public OrgServiceAssessmentControl(SecurityControl securityControl, boolean applicable, int percent) {
         this.securityControl = securityControl;
@@ -32,14 +33,43 @@ public class OrgServiceAssessmentControl {
         this.percent = percent;
     }
 
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public OrgServiceAssessment getOrgServiceAssessment() { return orgServiceAssessment; }
-    public void setOrgServiceAssessment(OrgServiceAssessment orgServiceAssessment) { this.orgServiceAssessment = orgServiceAssessment; }
-    public SecurityControl getSecurityControl() { return securityControl; }
-    public void setSecurityControl(SecurityControl securityControl) { this.securityControl = securityControl; }
-    public boolean isApplicable() { return applicable; }
-    public void setApplicable(boolean applicable) { this.applicable = applicable; }
-    public int getPercent() { return percent; }
-    public void setPercent(int percent) { this.percent = percent; }
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public OrgServiceAssessment getOrgServiceAssessment() {
+        return orgServiceAssessment;
+    }
+
+    public void setOrgServiceAssessment(OrgServiceAssessment orgServiceAssessment) {
+        this.orgServiceAssessment = orgServiceAssessment;
+    }
+
+    public SecurityControl getSecurityControl() {
+        return securityControl;
+    }
+
+    public void setSecurityControl(SecurityControl securityControl) {
+        this.securityControl = securityControl;
+    }
+
+    public boolean isApplicable() {
+        return applicable;
+    }
+
+    public void setApplicable(boolean applicable) {
+        this.applicable = applicable;
+    }
+
+    public int getPercent() {
+        return percent;
+    }
+
+    public void setPercent(int percent) {
+        this.percent = percent;
+    }
 }

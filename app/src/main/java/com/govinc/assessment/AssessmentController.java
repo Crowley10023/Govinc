@@ -10,6 +10,8 @@ import com.govinc.organization.OrgUnit;
 import com.govinc.organization.OrgUnitService;
 import com.govinc.organization.OrgService;
 import com.govinc.organization.OrgServiceService;
+import com.govinc.organization.OrgServiceAssessment;
+import com.govinc.organization.OrgServiceAssessmentControl;
 import com.govinc.user.User;
 import com.govinc.user.UserRepository;
 import com.govinc.catalog.SecurityControlDomain;
@@ -44,6 +46,9 @@ public class AssessmentController {
     private MaturityAnswerRepository maturityAnswerRepository;
     @Autowired
     private AssessmentControlAnswerRepository assessmentControlAnswerRepository;
+
+    @Autowired
+    private com.govinc.organization.OrgServiceAssessmentRepository orgServiceAssessmentRepository;
 
     @Autowired
     private AssessmentUrlsService assessmentUrlsService;
@@ -226,15 +231,95 @@ public class AssessmentController {
             AssessmentDetails details = detailsOpt.orElse(null);
             List<AssessmentControlAnswer> answers = new ArrayList<>();
             Map<Long, String> controlAnswers = new HashMap<>();
+            Set<Long> answeredControls = new HashSet<>();
             if (details != null && details.getControlAnswers() != null) {
                 answers.addAll(details.getControlAnswers());
                 for (AssessmentControlAnswer aca : details.getControlAnswers()) {
-                    if (aca.getSecurityControl() != null && aca.getMaturityAnswer() != null)
+                    if (aca.getSecurityControl() != null && aca.getMaturityAnswer() != null) {
                         controlAnswers.put(aca.getSecurityControl().getId(), aca.getMaturityAnswer().getAnswer());
+                        answeredControls.add(aca.getSecurityControl().getId());
+                    }
+                }
+            }
+            // Prepare taken-over map and supply prefilled answers for inherited responses
+            Map<Long, Boolean> controlAnswerIsTakenOver = new HashMap<>();
+            Map<Integer, String> percentToAnswer = new HashMap<>();
+            List<MaturityAnswer> maturityAnswers = new ArrayList<>();
+            if (assessment.getSecurityCatalog() != null && assessment.getSecurityCatalog().getMaturityModel() != null) {
+                maturityAnswers.addAll(assessment.getSecurityCatalog().getMaturityModel().getMaturityAnswers());
+                maturityAnswers
+                        .sort(Comparator.comparing(MaturityAnswer::getAnswer, Comparator.nullsLast(String::compareTo)));
+                for (MaturityAnswer ma : maturityAnswers) {
+                    percentToAnswer.put(ma.getRating(), ma.getAnswer());
+                    System.out.println("...." + ma.getRating() + "  <--->   " + ma.getAnswer());
+                }
+            }
+            if (assessment.getOrgServices() != null) {
+                for (OrgService orgService : assessment.getOrgServices()) {
+                    List<OrgServiceAssessment> osaList = orgServiceAssessmentRepository
+                            .findByOrgServiceId(orgService.getId());
+                    
+                    if (osaList != null) {
+                        for (OrgServiceAssessment osa : osaList) {
+                            System.out.println("Assessment: " + osa.getControls());
+                            if (osa.getControls() != null) {
+                                for (OrgServiceAssessmentControl osac : osa.getControls()) {
+                                    Long ctrlId = osac.getSecurityControl().getId();
+                                    System.out.println(" -- Control ID:" + osac.getSecurityControl().getName());
+                                    // Only if not already answered directly, is applicable
+                                    if (answeredControls.contains(ctrlId) && osac.isApplicable()) {
+                                        String mappedAnswer = percentToAnswer.get(osac.getPercent());
+                                        System.out.println("   -- " + mappedAnswer);
+                                        if (mappedAnswer != null) {
+                                            controlAnswers.put(ctrlId, mappedAnswer);
+                                            controlAnswerIsTakenOver.put(ctrlId, Boolean.TRUE);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // DEBUG: print mappings
+            System.out.println("DEBUG controlAnswers: " + controlAnswers);
+            System.out.println("DEBUG controlAnswerIsTakenOver: " + controlAnswerIsTakenOver);
+
+            // Defensive: always set even if empty
+            if (controlAnswerIsTakenOver == null) {
+                controlAnswerIsTakenOver = new HashMap<>();
+            }
+            model.addAttribute("controlAnswerIsTakenOver", controlAnswerIsTakenOver);
+            if (assessment.getOrgServices() != null) {
+                for (OrgService orgService : assessment.getOrgServices()) {
+                    List<OrgServiceAssessment> osaList = orgServiceAssessmentRepository
+                            .findByOrgServiceId(orgService.getId());
+                    if (osaList != null) {
+                        for (OrgServiceAssessment osa : osaList) {
+                            if (osa.getControls() != null) {
+                                for (OrgServiceAssessmentControl osac : osa.getControls()) {
+                                    Long ctrlId = osac.getSecurityControl().getId();
+                                    if (!answeredControls.contains(ctrlId) && osac.isApplicable()
+                                            && osac.getPercent() > 0) {
+                                        String mappedAnswer = percentToAnswer.get(osac.getPercent());
+                                        if (mappedAnswer != null) {
+                                            controlAnswers.put(ctrlId, mappedAnswer);
+                                            controlAnswerIsTakenOver.put(ctrlId, Boolean.TRUE);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
             model.addAttribute("answers", answers);
             model.addAttribute("controlAnswers", controlAnswers);
+            if (controlAnswerIsTakenOver == null) {
+                controlAnswerIsTakenOver = new HashMap<>();
+            }
+            model.addAttribute("controlAnswerIsTakenOver", controlAnswerIsTakenOver);
 
             // Summary table by answer type
             model.addAttribute("answerSummary", assessmentDetailsService.computeAnswerSummary(details));
@@ -247,15 +332,6 @@ public class AssessmentController {
                 controls.sort(Comparator.comparing(SecurityControl::getName, Comparator.nullsLast(String::compareTo)));
             }
             model.addAttribute("controls", controls);
-
-            // Pass the correct answers from the associated maturity model only
-            // Sorted maturity answers
-            List<MaturityAnswer> maturityAnswers = new ArrayList<>();
-            if (assessment.getSecurityCatalog() != null && assessment.getSecurityCatalog().getMaturityModel() != null) {
-                maturityAnswers.addAll(assessment.getSecurityCatalog().getMaturityModel().getMaturityAnswers());
-                maturityAnswers
-                        .sort(Comparator.comparing(MaturityAnswer::getAnswer, Comparator.nullsLast(String::compareTo)));
-            }
             model.addAttribute("maturityAnswers", maturityAnswers);
 
             // --- Pass securityControlDomains: all unique domains of controls in this
@@ -266,10 +342,8 @@ public class AssessmentController {
                     .distinct()
                     .collect(Collectors.toList());
             model.addAttribute("securityControlDomains", securityControlDomains);
-
             // Also pass orgServices for details view
             model.addAttribute("orgServices", assessment.getOrgServices());
-
             return "assessment-details";
         } else {
             return "assessment-not-found";
