@@ -28,31 +28,56 @@
           .dropdown-content {
             display: none;
             position: absolute;
-            background-color: #f9f9f9;
-            min-width: 230px;
-            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.1);
+            background-color: #eaf3fa;
+            min-width: 320px;
+            box-shadow: 0px 8px 16px 0px rgba(34,116,165,0.08);
             z-index: 1;
             border-radius: 4px;
             padding: 0.4em 0;
+            border: 1px solid #b7d7ef;
           }
           .dropdown-content a, .dropdown-content form {
-            color: #333;
-            padding: 8px 18px;
+            color: #2274A5;
+            padding: 9px 24px;
             text-decoration: none;
             display: block;
-            background: none;
+            background: #eaf3fa;
             border: none;
             width: 100%;
             text-align: left;
             font-size: 1em;
+            border-radius: 3px;
+            margin: 2px 0;
+            box-sizing: border-box;
+            font-family: inherit;
           }
           .dropdown:hover .dropdown-content {
             display: block;
             position: fixed;
           }
           .dropdown-content a:hover, .dropdown-content form:hover {
-            background-color: #eaf3fa;
+            background-color: #d2e6fa;
             color: #2274A5;
+          }
+          .dropdown > button, .dropdown > button:focus, .dropdown > button:active {
+            background: #eaf3fa;
+            color: #2274A5;
+            border: 1px solid #b7d7ef;
+            border-radius: 3px;
+            padding: 9px 24px;
+            box-sizing: border-box;
+            font-size: 1em;
+            font-family: inherit;
+            margin: 0 2px;
+            box-shadow: none;
+            outline: none;
+          }
+          .dropdown.nav-entry {
+            margin-right: 0.2em;
+          }
+          .dropdown .entry-icon {
+            display: inline-block;
+            margin-right: 0.4em;
           }
         </style>
         <div class="nav-row" style="display:flex;flex-direction:row;align-items:center;gap:1.2em;">

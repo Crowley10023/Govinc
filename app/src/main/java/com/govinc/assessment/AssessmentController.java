@@ -219,8 +219,11 @@ public class AssessmentController {
     }
 
     private static MaturityAnswer findClosestMaturityAnswer(List<MaturityAnswer> answers, int percent) {
-        MaturityAnswer closest = null;
-        int minDiff = Integer.MAX_VALUE;
+        if (answers == null || answers.isEmpty()) {
+            throw new IllegalArgumentException("No maturity answers provided");
+        }
+        MaturityAnswer closest = answers.get(0); // Always fallback to the first
+        int minDiff = Math.abs(closest.getRating() - percent);
         for (MaturityAnswer ans : answers) {
             int diff = Math.abs(ans.getRating() - percent);
             if (diff < minDiff) {
@@ -271,14 +274,18 @@ public class AssessmentController {
             // Try to fill answers from Org Service for all controls not answered locally
             if (assessment.getOrgServices() != null) {
                 for (OrgService orgService : assessment.getOrgServices()) {
-                    List<OrgServiceAssessment> osaList = orgServiceAssessmentRepository.findByOrgServiceId(orgService.getId());
+                    System.out.println("\n\nAssigned org service: " + orgService.getName());
+                    List<OrgServiceAssessment> osaList = orgServiceAssessmentRepository
+                            .findByOrgServiceId(orgService.getId());
                     if (osaList != null) {
                         for (OrgServiceAssessment osa : osaList) {
-                            if (osa.getControls() != null) {
+                            if (osa.getControls() != null) {                                
                                 for (OrgServiceAssessmentControl osac : osa.getControls()) {
+                                    System.out.println(" ... checking control: " + osac.getSecurityControl().getName());
                                     Long ctrlId = osac.getSecurityControl().getId();
-                                    if (!answeredControls.contains(ctrlId) && osac.isApplicable() && osac.getPercent() > 0) {
-                                        MaturityAnswer closest = findClosestMaturityAnswer(maturityAnswers, osac.getPercent());
+                                    if (answeredControls.contains(ctrlId) && osac.isApplicable()) {
+                                        MaturityAnswer closest = findClosestMaturityAnswer(maturityAnswers,
+                                                osac.getPercent());
                                         if (closest != null) {
                                             controlAnswers.put(ctrlId, closest.getAnswer());
                                             controlAnswerIsTakenOver.put(ctrlId, Boolean.TRUE);
