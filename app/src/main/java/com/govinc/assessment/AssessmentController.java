@@ -256,6 +256,7 @@ public class AssessmentController {
             }
             // Prepare taken-over map and supply prefilled answers for inherited responses
             Map<Long, Boolean> controlAnswerIsTakenOver = new HashMap<>();
+            Map<Long, String> controlTakenOverOrgServiceName = new HashMap<>();
             Map<Integer, String> percentToAnswer = new HashMap<>();
             List<MaturityAnswer> maturityAnswers = new ArrayList<>();
             if (assessment.getSecurityCatalog() != null && assessment.getSecurityCatalog().getMaturityModel() != null) {
@@ -267,26 +268,21 @@ public class AssessmentController {
                     System.out.println("...." + ma.getRating() + "  <--->   " + ma.getAnswer());
                 }
             }
+            // Try to fill answers from Org Service for all controls not answered locally
             if (assessment.getOrgServices() != null) {
                 for (OrgService orgService : assessment.getOrgServices()) {
-                    List<OrgServiceAssessment> osaList = orgServiceAssessmentRepository
-                            .findByOrgServiceId(orgService.getId());
-                    
+                    List<OrgServiceAssessment> osaList = orgServiceAssessmentRepository.findByOrgServiceId(orgService.getId());
                     if (osaList != null) {
                         for (OrgServiceAssessment osa : osaList) {
-                            System.out.println("Assessment: " + osa.getControls());
                             if (osa.getControls() != null) {
                                 for (OrgServiceAssessmentControl osac : osa.getControls()) {
                                     Long ctrlId = osac.getSecurityControl().getId();
-                                    System.out.println(" -- Control ID:" + osac.getSecurityControl().getName());
-                                    // Only if not already answered directly, is applicable
-                                    if (answeredControls.contains(ctrlId) && osac.isApplicable()) {
-                                        String mappedAnswer = percentToAnswer.get(osac.getPercent());
-                                        System.out.println("   -- " + mappedAnswer);
+                                    if (!answeredControls.contains(ctrlId) && osac.isApplicable() && osac.getPercent() > 0) {
                                         MaturityAnswer closest = findClosestMaturityAnswer(maturityAnswers, osac.getPercent());
                                         if (closest != null) {
                                             controlAnswers.put(ctrlId, closest.getAnswer());
                                             controlAnswerIsTakenOver.put(ctrlId, Boolean.TRUE);
+                                            controlTakenOverOrgServiceName.put(ctrlId, orgService.getName());
                                         }
                                     }
                                 }
@@ -305,35 +301,15 @@ public class AssessmentController {
                 controlAnswerIsTakenOver = new HashMap<>();
             }
             model.addAttribute("controlAnswerIsTakenOver", controlAnswerIsTakenOver);
-            if (assessment.getOrgServices() != null) {
-                for (OrgService orgService : assessment.getOrgServices()) {
-                    List<OrgServiceAssessment> osaList = orgServiceAssessmentRepository
-                            .findByOrgServiceId(orgService.getId());
-                    if (osaList != null) {
-                        for (OrgServiceAssessment osa : osaList) {
-                            if (osa.getControls() != null) {
-                                for (OrgServiceAssessmentControl osac : osa.getControls()) {
-                                    Long ctrlId = osac.getSecurityControl().getId();
-                                    if (!answeredControls.contains(ctrlId) && osac.isApplicable()
-                                            && osac.getPercent() > 0) {
-                                        String mappedAnswer = percentToAnswer.get(osac.getPercent());
-                                        if (mappedAnswer != null) {
-                                            controlAnswers.put(ctrlId, mappedAnswer);
-                                            controlAnswerIsTakenOver.put(ctrlId, Boolean.TRUE);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            model.addAttribute("controlTakenOverOrgServiceName", controlTakenOverOrgServiceName);
+
             model.addAttribute("answers", answers);
             model.addAttribute("controlAnswers", controlAnswers);
             if (controlAnswerIsTakenOver == null) {
                 controlAnswerIsTakenOver = new HashMap<>();
             }
             model.addAttribute("controlAnswerIsTakenOver", controlAnswerIsTakenOver);
+            model.addAttribute("controlTakenOverOrgServiceName", controlTakenOverOrgServiceName);
 
             // Summary table by answer type
             model.addAttribute("answerSummary", assessmentDetailsService.computeAnswerSummary(details));

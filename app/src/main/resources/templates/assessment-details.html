@@ -302,7 +302,7 @@
                                             <span class="answer-feedback"></span>
                                             <span th:if="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])}"
                                                   class="taken-over-label" title="Answer is taken from an Org Service">
-                                                (taken over from Org Service)
+                                                <span th:text="${controlTakenOverOrgServiceName[ctrl.id]}">Org Service</span>
                                             </span>
                                         </span>
                                     </td>
