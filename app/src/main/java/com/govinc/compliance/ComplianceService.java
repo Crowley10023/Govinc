@@ -314,7 +314,7 @@ public class ComplianceService {
 
             // Add a dedicated status string for UI to use in status column
             String statusString = compliant ? "Compliant" : "Non-compliant";
-            result.thresholdsDetails.put("status", statusString);
+            //result.thresholdsDetails.put("status", statusString);
 
             childComplianceMap.put(unit, compliant);
             childAveragePercentMap.put(unit, averagePercent);

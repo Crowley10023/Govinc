@@ -76,7 +76,6 @@
                 <tr>
                     <th>Org Unit</th>
                     <th>Status</th>
-                    <th>Coverage (Answered/Total Controls)</th>
                     <th>Coverage (%)</th>
                     <th>Average Score (%)</th>
                 </tr>
@@ -86,16 +85,11 @@
                         <span th:if="${entry.value.compliant}" style="color:green;font-weight:bold;">COMPLIANT</span>
                         <span th:if="${!entry.value.compliant}" style="color:red;font-weight:bold;">NOT COMPLIANT</span>
                     </td>
-                    <td>
-                        <span th:text="${entry.value.controlsAnswered}"></span> /
-                        <span th:text="${entry.value.controlsTotal}"></span>
-                    </td>
                     <td th:text="${entry.value.coveragePercent} + ' %'"></td>
                     <td th:text="${entry.value.averagePercent} + ' %'"></td>
                 </tr>
                 <tr style="font-weight:bold;background:#eef;">
                     <td>Total</td>
-                    <td></td>
                     <td></td>
                     <td th:text="${totalCoveragePercent} + ' %'"></td>
                     <td th:text="${totalAveragePercent} + ' %'"></td>
