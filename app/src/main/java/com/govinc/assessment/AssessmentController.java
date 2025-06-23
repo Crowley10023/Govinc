@@ -268,20 +268,17 @@ public class AssessmentController {
                         .sort(Comparator.comparing(MaturityAnswer::getAnswer, Comparator.nullsLast(String::compareTo)));
                 for (MaturityAnswer ma : maturityAnswers) {
                     percentToAnswer.put(ma.getRating(), ma.getAnswer());
-                    System.out.println("...." + ma.getRating() + "  <--->   " + ma.getAnswer());
                 }
             }
             // Try to fill answers from Org Service for all controls not answered locally
             if (assessment.getOrgServices() != null) {
                 for (OrgService orgService : assessment.getOrgServices()) {
-                    System.out.println("\n\nAssigned org service: " + orgService.getName());
                     List<OrgServiceAssessment> osaList = orgServiceAssessmentRepository
                             .findByOrgServiceId(orgService.getId());
                     if (osaList != null) {
                         for (OrgServiceAssessment osa : osaList) {
                             if (osa.getControls() != null) {                                
                                 for (OrgServiceAssessmentControl osac : osa.getControls()) {
-                                    System.out.println(" ... checking control: " + osac.getSecurityControl().getName());
                                     Long ctrlId = osac.getSecurityControl().getId();
                                     if (answeredControls.contains(ctrlId) && osac.isApplicable()) {
                                         MaturityAnswer closest = findClosestMaturityAnswer(maturityAnswers,
@@ -298,10 +295,6 @@ public class AssessmentController {
                     }
                 }
             }
-
-            // DEBUG: print mappings
-            System.out.println("DEBUG controlAnswers: " + controlAnswers);
-            System.out.println("DEBUG controlAnswerIsTakenOver: " + controlAnswerIsTakenOver);
 
             // Defensive: always set even if empty
             if (controlAnswerIsTakenOver == null) {
