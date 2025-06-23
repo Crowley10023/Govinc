@@ -7,23 +7,37 @@
 </head>
 <body>
     <div th:replace="~{navigation :: mainNav}"></div>
-    <h1 th:text="${orgService.id != null} ? 'Edit Org Service' : 'Create Org Service'"></h1>
-    <form th:action="@{'/orgservices/save'}" method="post">
+    <main class="entity-edit-frame">
+      <h1 th:text="${orgService.id != null} ? 'Edit Org Service' : 'Create Org Service'"></h1>
+      <form th:action="@{'/orgservices/save'}" method="post" style="margin-bottom:1.2em;">
         <input type="hidden" name="id" th:value="${orgService.id}"/>
-        <label for="name">Name:</label>
-        <input type="text" id="name" name="name" th:value="${orgService.name}" required />
-        <br/>
-        <label for="description">Description:</label>
-        <textarea id="description" name="description" rows="3" cols="40" th:text="${orgService.description}"></textarea>
-        <br/>
-        <label for="orgUnitIds">Org Units:</label>
-        <select id="orgUnitIds" name="orgUnitIds" multiple size="6">
-            <option th:each="ou : ${allOrgUnits}" th:value="${ou.id}" th:text="${ou.name}"
+        <div class="form-row" style="display: flex; flex-wrap: wrap; align-items: center; margin-bottom: 1em;">
+          <div style="flex: 0 0 140px; font-weight:600;">Name:</div>
+          <div style="flex: 1 1 200px;">
+            <input type="text" id="name" name="name" th:value="${orgService.name}" required style="width: 100%;" />
+          </div>
+        </div>
+        <div class="form-row" style="display: flex; flex-wrap: wrap; align-items: flex-start; margin-bottom: 1em;">
+          <div style="flex: 0 0 140px; font-weight:600;">Description:</div>
+          <div style="flex: 1 1 200px;">
+            <textarea id="description" name="description" rows="3" style="width: 100%;" th:text="${orgService.description}"></textarea>
+          </div>
+        </div>
+        <div class="form-row" style="display: flex; flex-wrap: wrap; align-items: flex-start; margin-bottom: 1em;">
+          <div style="flex: 0 0 140px; font-weight:600;">Org Units:</div>
+          <div style="flex: 1 1 200px;">
+            <select id="orgUnitIds" name="orgUnitIds" multiple size="6" style="width: 100%;">
+              <option th:each="ou : ${allOrgUnits}" th:value="${ou.id}" th:text="${ou.name}"
                 th:selected="${orgService.orgUnits != null} ? ${orgService.orgUnits.contains(ou)} : false"></option>
-        </select>
-        <br/>
-        <button type="submit">Save</button>
-    </form>
-    <a th:href="@{'/orgservices/list'}">Back to list</a>
+            </select>
+          </div>
+        </div>
+        <div class="action-buttons-flex" style="margin:1.1em 0 0.3em 0;">
+          <button type="submit" class="btn">Save</button>
+          <a th:href="@{|/orgservice-assessment/edit/${orgService.id}|}" class="btn" style="background:#FF9505">Assess</a>
+          <a th:href="@{'/orgservices/list'}" class="btn" style="background:#eee; color:#164666;">Back to list</a>
+        </div>
+      </form>
+    </main>
 </body>
 </html>

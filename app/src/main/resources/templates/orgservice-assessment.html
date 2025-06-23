@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Org Service Assessment</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div th:replace="~{navigation :: mainNav}"></div>
+<h1>Org Service Assessment for <span th:text="${assessment.orgService.name}"></span></h1>
+<form th:action="@{/orgservice-assessment/save}" method="post">
+    <input type="hidden" name="id" th:value="${assessment.id}" />
+    <input type="hidden" name="orgService.id" th:value="${assessment.orgService.id}" />
+    <input type="hidden" name="assessmentDate" th:value="${assessment.assessmentDate}" />
+
+    <table>
+        <thead>
+            <tr>
+                <th>Security Control</th>
+                <th>Applicable</th>
+                <th>Percent</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="control,stat : ${controls}">
+                <td th:text="${control.securityControl.name}"></td>
+                <td>
+                    <input type="checkbox"
+                           th:name="'controls[' + ${stat.index} + '].applicable'"
+                           th:checked="${control.applicable}" />
+                    <input type="hidden"
+                           th:name="'controls[' + ${stat.index} + '].securityControl.id'"
+                           th:value="${control.securityControl.id}" />
+                    <input type="hidden"
+                           th:name="'controls[' + ${stat.index} + '].id'"
+                           th:value="${control.id}" />
+                </td>
+                <td>
+                    <input type="number"
+                           min="0" max="100"
+                           th:name="'controls[' + ${stat.index} + '].percent'"
+                           th:value="${control.percent}" required />
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <button type="submit">Save Assessment</button>
+</form>
+<a th:href="@{|/orgservices/edit/${assessment.orgService.id}|}">Back to Org Service</a>
+</body>
+</html>
