@@ -132,6 +132,40 @@
         <button id="choose-orgunit-btn" type="button">Choose Org Unit</button>
         <!-- User Selection Button -->
         <button id="choose-users-btn" type="button" style="margin-bottom: 1em;">Choose Users</button>
+<!-- OrgService Selection Button -->
+<button id="choose-orgservices-btn" type="button" style="margin-bottom: 1em;">Choose Org Services</button>
+
+<!-- OrgService Selection Modal -->
+<!-- DEBUG: Show what is in the orgServicesAll model attribute -->
+<p>DEBUG: OrgServicesAll size: <span th:text="${orgServicesAll != null ? #lists.size(orgServicesAll) : 0}">n/a</span></p>
+<pre th:text="${orgServicesAll != null ? orgServicesAll : 'null'}">NO SERVICES</pre>
+<div id="orgservice-modal" class="modal" style="display:none;">
+    <div class="modal-backdrop" style="position:fixed;left:0;top:0;width:100vw;height:100vh;background:#0008;z-index:50;"></div>
+    <div class="modal-content" style="z-index: 55; position: relative; max-width: 400px; margin: 10% auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 20px #0003;">
+        <h2>Choose Applicable Org Services</h2>
+        <form id="orgservice-form">
+            <div id="orgservice-list">
+                <div th:if="${orgServicesAll == null or #lists.isEmpty(orgServicesAll)}">
+                    <em>No Org Services available.</em>
+                </div>
+                <div th:each="orgService : ${orgServicesAll}">
+                    <label style="display:block;margin-bottom:3px;">
+                        <input type="checkbox" name="orgServiceIds"
+                            th:value="${orgService.id}"
+                            th:checked="${selectedOrgServiceIds != null and selectedOrgServiceIds.contains(orgService.id)}">
+                        <span th:text="${orgService.name}">Org Service Name</span>
+                    </label>
+                </div>
+            </div>
+            <div style="margin-top: 1em;">
+                <button type="button" id="orgservice-modal-cancel">Cancel</button>
+                <button type="submit" id="orgservice-modal-save" style="margin-left: 1em;">Save</button>
+            </div>
+        </form>
+    </div>
+    <div class="modal-backdrop" style="position:fixed;left:0;top:0;width:100vw;height:100vh;background:#0008;z-index:50;"></div>
+</div>
+
 
         <section>
             <h2 th:text="${assessment.name}"></h2>
@@ -561,6 +595,133 @@
             }
         });
     </script>
+<script th:inline="javascript">
+/*<![CDATA[*/
+    var selectedOrgServiceIds = [[${selectedOrgServiceIds}]];
+    var assessmentId = /*[[${assessment.id}]]*/ 0;
+    console.log('selectedOrgServiceIds final:', selectedOrgServiceIds);
+    console.log('assessmentId:', assessmentId);
+/*]]>*/
+</script>
+<script>
+$(document).ready(function () {
+    // Open OrgService modal
+    $('#choose-orgservices-btn').click(function () {
+        $('#orgservice-modal').show();
+        $('#orgservice-list').html('<em>Loading...</em>');
+        var assessmentId = /*[[${assessment.id}]]*/ 0;
+        // Fetch all org services and assigned IDs, then render checkboxes
+        $.getJSON('/orgservices/all', function (allServices) {
+            $.getJSON('/assessment/' + assessmentId + '/orgservice-ids', function (assignedIds) {
+                var html = '';
+                if (Array.isArray(allServices) && allServices.length > 0) {
+                    allServices.forEach(function (os) {
+                        var checked = Array.isArray(assignedIds) && assignedIds.map(String).indexOf(String(os.id)) !== -1 ? 'checked' : '';
+                        html += '<label style="display:block;margin-bottom:3px;">' +
+                            '<input type="checkbox" name="orgServiceIds" value="' + os.id + '" ' + checked + '> ' +
+                            $('<span/>').text(os.name).prop('outerHTML') +
+                            '</label>';
+                    });
+                } else {
+                    html = '<em>No Org Services available.</em>';
+                }
+                $('#orgservice-list').html(html);
+            }).fail(function() {
+                $('#orgservice-list').html('<span style="color:#c22">Could not load assigned Org Services.</span>');
+            });
+        }).fail(function() {
+            $('#orgservice-list').html('<span style="color:#c22">Could not load Org Services.</span>');
+        });
+    });
+
+    // Modal Cancel button
+    $('#orgservice-modal-cancel, #orgservice-modal .modal-backdrop').click(function () {
+        $('#orgservice-modal').hide();
+    });
+
+    // Modal Save
+    $('#orgservice-form').submit(function (event) {
+        event.preventDefault();
+        var assessmentId = /*[[${assessment.id}]]*/ 0;
+        var selected = [];
+        $('#orgservice-list input[name="orgServiceIds"]:checked').each(function () {
+            selected.push(Number($(this).val()));
+        });
+        $('#orgservice-modal-save').prop('disabled', true);
+        $.ajax({
+            url: '/assessment/' + assessmentId + '/orgservices',
+            type: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify(selected),
+            success: function () {
+                location.reload();
+            },
+            error: function (xhr, status, error) {
+                alert('Could not update Org Services!');
+                $('#orgservice-modal-save').prop('disabled', false);
+            }
+        });
+    });
+});
+</script>
+<script th:inline="javascript">
+/*<![CDATA[*/
+$(document).ready(function () {
+    // Open modal and fetch org services and assignments
+    $('#choose-orgservices-btn').click(function () {
+        $('#orgservice-modal').show();
+        $('#orgservice-list').html('<em>Loading...</em>');
+        var assessmentId = /*[[${assessment.id}]]*/ 0;
+        $.getJSON('/orgservices/all', function (allServices) {
+            $.getJSON('/assessment/' + assessmentId + '/orgservice-ids', function (assignedIds) {
+                var html = '';
+                if (Array.isArray(allServices) && allServices.length > 0) {
+                    allServices.forEach(function (os) {
+                        var checked = Array.isArray(assignedIds) && assignedIds.includes(os.id) ? 'checked' : '';
+                        html += '<label style="display:block;margin-bottom:3px;">' +
+                                  '<input type="checkbox" name="orgServiceIds" value="' + os.id + '" ' + checked + '> ' +
+                                  $('<span/>').text(os.name).prop('outerHTML') +
+                                '</label>';
+                    });
+                } else {
+                    html = '<em>No Org Services available.</em>';
+                }
+                $('#orgservice-list').html(html);
+            });
+        });
+    });
+
+    // Cancel modal
+    $('#orgservice-modal-cancel, #orgservice-modal .modal-backdrop').click(function () {
+        $('#orgservice-modal').hide();
+    });
+
+    // Save assignment via AJAX
+    $('#orgservice-form').submit(function (event) {
+        event.preventDefault();
+        var assessmentId = /*[[${assessment.id}]]*/ 0;
+        var selected = [];
+        $('#orgservice-list input[name="orgServiceIds"]:checked').each(function () {
+            selected.push(Number($(this).val()));
+        });
+        $('#orgservice-modal-save').prop('disabled', true);
+        $.ajax({
+            url: '/assessment/' + assessmentId + '/orgservices',
+            type: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify(selected),
+            success: function () {
+                location.reload();
+            },
+            error: function () {
+                alert('Could not update Org Services!');
+                $('#orgservice-modal-save').prop('disabled', false);
+            }
+        });
+    });
+});
+/*]]>*/
+</script>
 </body>
 
 </html>

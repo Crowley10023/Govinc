@@ -221,6 +221,7 @@ public class AssessmentController {
             model.addAttribute("assessment", assessment);
 
             // Control answers are always retrieved from AssessmentDetails
+            // --- ADDED: Org Service inheritance logic START ---
             Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
             AssessmentDetails details = detailsOpt.orElse(null);
             List<AssessmentControlAnswer> answers = new ArrayList<>();

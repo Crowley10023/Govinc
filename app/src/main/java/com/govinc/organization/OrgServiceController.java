@@ -13,6 +13,13 @@ import java.util.stream.Collectors;
 @Controller
 @RequestMapping("/orgservices")
 public class OrgServiceController {
+    // JSON endpoint for all OrgServices used by OrgService selector modal
+    @ResponseBody
+    @GetMapping("/all")
+    public List<OrgService> getAllOrgServicesApi() {
+        return orgServiceService.getAllOrgServices();
+    }
+
     @Autowired
     private OrgServiceService orgServiceService;
     @Autowired

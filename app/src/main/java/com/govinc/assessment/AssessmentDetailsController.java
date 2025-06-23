@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import com.govinc.user.UserRepository; // <-- add import for UserRepository
 import com.govinc.organization.OrgUnitService; // <-- add import
 import com.govinc.organization.OrgUnit; // <-- add import
+import com.govinc.organization.OrgServiceService;
 
 @Controller
 @RequestMapping("/assessmentdetails")
@@ -30,6 +31,8 @@ public class AssessmentDetailsController {
     private UserRepository userRepository; // <-- Inject UserRepository
     @Autowired
     private OrgUnitService orgUnitService; // <-- Inject OrgUnitService
+    @Autowired
+    private OrgServiceService orgServiceService;
 
     @GetMapping("/list")
     public String list(Model model) {
@@ -51,13 +54,24 @@ public class AssessmentDetailsController {
             }
             if (assessment != null) {
                 model.addAttribute("assessment", assessment);
+                // Provide selectedOrgServiceIds for modal pre-check
+                List<Long> selectedOrgServiceIds = (assessment.getOrgServices() != null)
+                        ? assessment.getOrgServices().stream().map(orgService -> orgService.getId())
+                            .collect(java.util.stream.Collectors.toList())
+                        : java.util.Collections.emptyList();
+                model.addAttribute("selectedOrgServiceIds", selectedOrgServiceIds);
             } else {
                 // Fallback: just show details as before
                 model.addAttribute("assessment", ad);
+                model.addAttribute("selectedOrgServiceIds", java.util.Collections.emptyList());
             }
             model.addAttribute("answerSummary", answerSummary);
             model.addAttribute("users", userRepository.findAll()); // <-- Add all users to the model
             model.addAttribute("orgUnits", orgUnitService.getAllOrgUnits()); // Add org units for popup dropdown
+            // DEBUG: Log to make sure we have org services:
+            java.util.List<com.govinc.organization.OrgService> allOrgSvcs = orgServiceService.getAllOrgServices();
+            System.out.println("OrgServicesAll for modal: size=" + allOrgSvcs.size() + " contents=" + allOrgSvcs);
+            model.addAttribute("orgServicesAll", allOrgSvcs); // Add org services for modal
             return "assessment-details";
         } else {
             return "redirect:/assessmentdetails/list";

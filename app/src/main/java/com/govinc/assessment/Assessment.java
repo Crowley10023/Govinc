@@ -27,7 +27,7 @@ public class Assessment {
     // ------------------------------------------------
 
     private LocalDate date;
-    
+
     private String name;
 
     @Enumerated(EnumType.STRING)
@@ -37,24 +37,15 @@ public class Assessment {
 
     @OneToOne(mappedBy = "assessment", cascade = CascadeType.ALL)
     private AssessmentUrls assessmentUrls;
-    
+
     // NEW: Predecessor assessment reference
     @ManyToOne
     @JoinColumn(name = "predecessor_id")
     private Assessment predecessor;
 
-    // NEW: OrgService relationship (many-to-many)
-    @ManyToMany
-    @JoinTable(
-        name = "assessment_orgservice",
-        joinColumns = @JoinColumn(name = "assessment_id"),
-        inverseJoinColumns = @JoinColumn(name = "orgservice_id")
-    )
+    @ManyToMany(cascade = { CascadeType.MERGE })
+    @JoinTable(name = "assessment_orgservice", joinColumns = @JoinColumn(name = "assessment_id"), inverseJoinColumns = @JoinColumn(name = "orgservice_id"))
     private Set<OrgService> orgServices = new HashSet<>();
-
-    public Set<OrgService> getOrgServices() {
-        return orgServices;
-    }
 
     public void setOrgServices(Set<OrgService> orgServices) {
         this.orgServices = orgServices;
@@ -91,6 +82,7 @@ public class Assessment {
     public OrgUnit getOrgUnit() {
         return orgUnit;
     }
+
     public void setOrgUnit(OrgUnit orgUnit) {
         this.orgUnit = orgUnit;
     }
@@ -130,9 +122,9 @@ public class Assessment {
     public boolean isOpen() {
         return AssessmentStatus.OPEN.equals(this.status);
     }
-    
+
     // Removed getAssessmentUrl and setAssessmentUrl methods
-    
+
     public AssessmentUrls getAssessmentUrls() {
         return assessmentUrls;
     }
@@ -142,11 +134,7 @@ public class Assessment {
     }
 
     @ManyToMany
-    @JoinTable(
-        name = "assessment_users",
-        joinColumns = @JoinColumn(name = "assessment_id"),
-        inverseJoinColumns = @JoinColumn(name = "user_id")
-    )
+    @JoinTable(name = "assessment_users", joinColumns = @JoinColumn(name = "assessment_id"), inverseJoinColumns = @JoinColumn(name = "user_id"))
     private Set<User> users = new HashSet<>();
 
     public Set<User> getUsers() {
@@ -165,4 +153,9 @@ public class Assessment {
     public void setPredecessor(Assessment predecessor) {
         this.predecessor = predecessor;
     }
+
+    public Set<OrgService> getOrgServices() {
+        return orgServices;
+    }
+
 }
