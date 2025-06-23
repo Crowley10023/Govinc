@@ -218,6 +218,19 @@ public class AssessmentController {
         return "redirect:/assessment/" + id;
     }
 
+    private static MaturityAnswer findClosestMaturityAnswer(List<MaturityAnswer> answers, int percent) {
+        MaturityAnswer closest = null;
+        int minDiff = Integer.MAX_VALUE;
+        for (MaturityAnswer ans : answers) {
+            int diff = Math.abs(ans.getRating() - percent);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closest = ans;
+            }
+        }
+        return closest;
+    }
+
     @GetMapping("/{id}")
     public String getAssessmentById(@PathVariable Long id, Model model) {
         Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
@@ -270,8 +283,9 @@ public class AssessmentController {
                                     if (answeredControls.contains(ctrlId) && osac.isApplicable()) {
                                         String mappedAnswer = percentToAnswer.get(osac.getPercent());
                                         System.out.println("   -- " + mappedAnswer);
-                                        if (mappedAnswer != null) {
-                                            controlAnswers.put(ctrlId, mappedAnswer);
+                                        MaturityAnswer closest = findClosestMaturityAnswer(maturityAnswers, osac.getPercent());
+                                        if (closest != null) {
+                                            controlAnswers.put(ctrlId, closest.getAnswer());
                                             controlAnswerIsTakenOver.put(ctrlId, Boolean.TRUE);
                                         }
                                     }
