@@ -6,6 +6,8 @@
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
+<div th:replace="~{navigation :: mainNav}"></div>
+<div class="container">
     <div th:replace="~{navigation :: mainNav}"></div>
     <h1 th:text="${orgUnit.id != null} ? 'Edit Organization Unit' : 'Create Organization Unit'"></h1>
     <form th:action="@{'/orgunits/save'}" method="post">
@@ -29,5 +31,6 @@
         <button type="submit">Save</button>
     </form>
     <a th:href="@{'/orgunits/list'}">Back to list</a>
+</div>
 </body>
 </html>

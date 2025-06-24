@@ -32,6 +32,8 @@
     </style>
 </head>
 <body>
+<div th:replace="~{navigation :: mainNav}"></div>
+<div class="container">
     <h1>Edit Security Catalog</h1>
     <div class="entity-edit-frame">
         <form th:action="@{/security-catalog/edit}" th:object="${securityCatalog}" method="post">
@@ -88,5 +90,6 @@
         </div>
         <a href="/security-catalog/list">Back to catalog list</a>
     </div>
+</div>
 </body>
 </html>

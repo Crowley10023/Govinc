@@ -11,7 +11,7 @@
 </head>
 <body>
 <div th:replace="~{navigation :: mainNav}"></div>
-<main class="container">
+<div class="container">
     <h1 th:text="${#strings.isEmpty(check.id) ? 'Create' : 'Edit'} + ' Compliance Check'"></h1>
     <form th:action="@{/compliance/save}" method="post">
         <input type="hidden" name="id" th:value="${check.id}" />
@@ -47,7 +47,7 @@
         <button type="submit">Save</button>
         <a href="/compliance/checks"><button type="button">Cancel</button></a>
     </form>
-</main>
+</div>
 <script>
 function addThreshold() {
     const container = document.getElementById('thresholds-list');

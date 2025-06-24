@@ -9,7 +9,7 @@
 </head>
 
 <body>
-    <main class="container">
+    <div class="container">
         <div th:if="${assessment.status == 'CLOSED'}">
             <h1>SORRY NOT LONGER AVAILABLE</h1>
         </div>
@@ -166,7 +166,7 @@
         </script>
         </section>
         </div> <!-- end not CLOSED div -->
-    </main>
+    </div>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
         $(document).ready(function () {

@@ -8,7 +8,7 @@
 </head>
 <body>
     <div th:replace="~{navigation :: mainNav}"></div>
-    <main class="container">
+    <div class="container">
         <h1 th:text="'Assessment: ' + ${assessment.name}"></h1>
         <section>
             <form th:action="@{'/assessment/' + ${assessment.id} + '/controls'}" method="post">
@@ -42,6 +42,6 @@
         <div class="nav-back">
             <a href="/assessment/list">&larr; Back to list</a>
         </div>
-    </main>
+    </div>
 </body>
 </html>

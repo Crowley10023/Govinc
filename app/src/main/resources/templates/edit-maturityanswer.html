@@ -8,7 +8,7 @@
 </head>
 <body>
     <div th:replace="~{navigation :: mainNav}"></div>
-    <main class="container">
+    <div class="container">
         <h1>Edit Maturity Answer</h1>
         <section class="card">
             <form th:action="@{'/maturityanswer/edit'}" method="post">
@@ -32,6 +32,6 @@
                 </div>
             </form>
         </section>
-    </main>
+    </div>
 </body>
 </html>

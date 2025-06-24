@@ -6,6 +6,8 @@
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
+<div th:replace="~{navigation :: mainNav}"></div>
+<div class="container">
     <div th:replace="~{navigation :: mainNav}"></div>
     <h1>Organization Units</h1>
     <a th:href="@{'/orgunits/create'}" class="btn-create" style="display:inline-block; margin-bottom:15px; padding:10px 20px; background:#007bff; color:#fff; text-decoration:none; border-radius:4px;">Create New Org Unit</a>
@@ -28,5 +30,6 @@
             </tr>
         </tbody>
     </table>
+</div>
 </body>
 </html>

@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
+<div th:replace="~{navigation :: mainNav}"></div>
+<div class="container">
     <div th:replace="~{navigation :: mainNav}"></div>
     <h1>Security Controls</h1>
     <a href="/security-control/create">Create New Security Control</a>
@@ -47,5 +49,6 @@
         </tbody>
     </table>
     <a href="/">Back to main</a>
+</div>
 </body>
 </html>

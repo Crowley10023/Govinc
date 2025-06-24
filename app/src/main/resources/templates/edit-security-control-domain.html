@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
+<div th:replace="~{navigation :: mainNav}"></div>
+<div class="container">
     <h1 th:text="${domain.id != null} ? 'Edit Security Control Domain' : 'Create Security Control Domain'"></h1>
     <div class="entity-edit-frame">
         <form th:action="@{/security-control-domain/edit}" th:object="${domain}" method="post">
@@ -23,5 +25,6 @@
             <a th:href="@{/security-control-domain/list}" class="button">Cancel</a>
         </form>
     </div>
+</div>
 </body>
 </html>

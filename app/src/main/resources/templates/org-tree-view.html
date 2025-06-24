@@ -44,6 +44,8 @@
 </head>
 
 <body>
+<div th:replace="~{navigation :: mainNav}"></div>
+<div class="container">
     <div th:replace="~{navigation :: mainNav}"></div>
     <h1>Org Unit Tree View</h1>
     <div th:if="${orgUnit == null}">
@@ -205,6 +207,7 @@
             });
         }
     </script>
+</div>
 </body>
 
 </html>

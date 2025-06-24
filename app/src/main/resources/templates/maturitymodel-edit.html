@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
+<div th:replace="~{navigation :: mainNav}"></div>
+<div class="container">
     <h1 th:text="${maturityModel.id != null && maturityModel.id > 0 ? 'Edit Maturity Model' : 'Create Maturity Model'}"></h1>
     <div class="entity-edit-frame">
         <form th:object="${maturityModel}" action="/maturitymodel/save" method="post">
@@ -28,5 +30,6 @@
             <a href="/maturitymodel/list">Cancel</a>
         </form>
     </div>
+</div>
 </body>
 </html>

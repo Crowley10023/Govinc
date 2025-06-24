@@ -6,6 +6,8 @@
 </head>
 <body>
 <div th:replace="~{navigation :: mainNav}"></div>
+<div class="container">
+<div th:replace="~{navigation :: mainNav}"></div>
 <h1>Org Service Assessment for <span th:text="${assessment.orgService.name}"></span></h1>
 <p class="caption-info">Number of applicable maturity answers: <span th:text="${applicableCount}"></span></p>
 <form th:action="@{/orgservice-assessment/save}" method="post">
@@ -47,5 +49,6 @@
     <button type="submit">Save Assessment</button>
 </form>
 <a th:href="@{|/orgservices/edit/${assessment.orgService.id}|}">Back to Org Service</a>
+</div>
 </body>
 </html>

@@ -7,7 +7,7 @@
 </head>
 <body>
     <div th:replace="~{navigation :: mainNav}"></div>
-    <main class="entity-edit-frame">
+    <div class="container"><div class="entity-edit-frame">
       <h1 th:text="${orgService.id != null} ? 'Edit Org Service' : 'Create Org Service'"></h1>
       <form th:action="@{'/orgservices/save'}" method="post" style="margin-bottom:1.2em;">
         <input type="hidden" name="id" th:value="${orgService.id}"/>
@@ -38,6 +38,6 @@
           <a th:href="@{'/orgservices/list'}" class="btn" style="background:#eee; color:#164666;">Back to list</a>
         </div>
       </form>
-    </main>
+    </div></div>
 </body>
 </html>

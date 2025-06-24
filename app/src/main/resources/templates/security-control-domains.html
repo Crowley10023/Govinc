@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
+<div th:replace="~{navigation :: mainNav}"></div>
+<div class="container">
     <div th:replace="~{navigation :: mainNav}"></div>
     <h1>Security Control Domains</h1>
     <a href="/security-control-domain/create">Create New Security Control Domain</a>
@@ -35,5 +37,6 @@
         </tbody>
     </table>
     <a href="/">Back to main</a>
+</div>
 </body>
 </html>
