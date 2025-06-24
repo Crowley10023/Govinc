@@ -8,30 +8,32 @@
 </head>
 <body>
     <div th:replace="~{navigation :: mainNav}"></div>
-    <h1>Maturity Models</h1>
-    <a href="/maturitymodel/edit">Create New Maturity Model</a>
-    <div class="entity-edit-frame maturity-model-table-frame" style="max-width:1000px;margin:2rem auto 2rem auto;">
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Description</th>
-                    <th>Security Catalog</th>
-                    <th>Edit</th>
-                    <th>Delete</th>
+    <div class="container">
+        <h1>Maturity Models</h1>
+        <a href="/maturitymodel/edit">Create New Maturity Model</a>
+        <div class="entity-edit-frame maturity-model-table-frame" style="max-width:1000px;margin:2rem auto 2rem auto;">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>Security Catalog</th>
+                        <th>Edit</th>
+                        <th>Delete</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <tr th:each="model : ${maturityModels}">
+                    <td th:text="${model.name}"></td>
+                    <td th:text="${model.description}"></td>
+                    <td th:text="${model.securityCatalog != null ? model.securityCatalog.name : '-'}"></td>
+                    <td><a th:href="@{'/maturitymodel/edit/' + ${model.id}}">Edit</a></td>
+                    <td><a th:href="@{'/maturitymodel/delete/' + ${model.id}}" onclick="return confirm('Are you sure?')">Delete</a></td>
                 </tr>
-            </thead>
-            <tbody>
-            <tr th:each="model : ${maturityModels}">
-                <td th:text="${model.name}"></td>
-                <td th:text="${model.description}"></td>
-                <td th:text="${model.securityCatalog != null ? model.securityCatalog.name : '-'}"></td>
-                <td><a th:href="@{'/maturitymodel/edit/' + ${model.id}}">Edit</a></td>
-                <td><a th:href="@{'/maturitymodel/delete/' + ${model.id}}" onclick="return confirm('Are you sure?')">Delete</a></td>
-            </tr>
-            </tbody>
-        </table>
+                </tbody>
+            </table>
+        </div>
+        <a href="/">Back to Landing Page</a>
     </div>
-    <a href="/">Back to Landing Page</a>
 </body>
 </html>

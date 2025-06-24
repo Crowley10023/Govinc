@@ -8,34 +8,36 @@
 </head>
 <body>
     <div th:replace="~{navigation :: mainNav}"></div>
-    <h1>Maturity Answers</h1>
-    <a href="/maturityanswer/create">Create New Maturity Answer</a>
-    <table border="1">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Answer</th>
-                <th>Description</th>
-                <th>Rating (%)</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr th:each="answerObj : ${answers}">
-                <td th:text="${answerObj.id}"></td>
-                <td th:text="${answerObj.answer}"></td>
-                <td th:text="${answerObj.description}"></td>
-                <td th:text="${answerObj.rating}"></td>
-                <td>
-                    <a th:href="@{'/maturityanswer/edit'(id=${answerObj.id})}">Edit</a>
-                    <form th:action="@{/maturityanswer/delete}" method="post" style="display:inline">
-                        <input type="hidden" name="id" th:value="${answerObj.id}" />
-                        <button type="submit" onclick="return confirm('Are you sure?')">Delete</button>
-                    </form>
-                </td>
-            </tr>
-        </tbody>
-    </table>
-    <a href="/">Back to main</a>
+    <div class="container">
+        <h1>Maturity Answers</h1>
+        <a href="/maturityanswer/create">Create New Maturity Answer</a>
+        <table border="1">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Answer</th>
+                    <th>Description</th>
+                    <th>Rating (%)</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="answerObj : ${answers}">
+                    <td th:text="${answerObj.id}"></td>
+                    <td th:text="${answerObj.answer}"></td>
+                    <td th:text="${answerObj.description}"></td>
+                    <td th:text="${answerObj.rating}"></td>
+                    <td>
+                        <a th:href="@{'/maturityanswer/edit'(id=${answerObj.id})}">Edit</a>
+                        <form th:action="@{/maturityanswer/delete}" method="post" style="display:inline">
+                            <input type="hidden" name="id" th:value="${answerObj.id}" />
+                            <button type="submit" onclick="return confirm('Are you sure?')">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <a href="/">Back to main</a>
+    </div>
 </body>
 </html>
