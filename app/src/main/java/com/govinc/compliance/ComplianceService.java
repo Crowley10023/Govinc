@@ -291,16 +291,21 @@ public class ComplianceService {
             // Evaluate thresholds for this org unit, using only its own assessment
             boolean compliant = true;
             Map<String, Object> thresholdDetails = new HashMap<>();
-            if (covered == 0) {
-                compliant = false;
-            } else if (check.getThresholds() != null) {
+            if (check.getThresholds() != null) {
                 for (ComplianceThreshold t : check.getThresholds()) {
-                    boolean passed = evaluateThreshold(t, controlAnswers);
+                    boolean passed = false;
+                    if (covered != 0) {
+                        passed = evaluateThreshold(t, controlAnswers);
+                    }
                     thresholdDetails.put(t.getRuleDescription() + " [" + t.getType() + " " + t.getValue() + "%]",
                             passed);
-                    if (!passed)
-                        compliant = false;
+                    if (!passed) compliant = false;
                 }
+                if (covered == 0) {
+                    compliant = false;
+                }
+            } else if (covered == 0) {
+                compliant = false;
             }
 
             double coveragePercent = (totalControls == 0) ? 0.0 : ((double) covered * 100.0) / (double) totalControls;
@@ -311,10 +316,6 @@ public class ComplianceService {
             result.setControlsTotal(totalControls);
             result.setCoveragePercent(round(coveragePercent, 2));
             result.setAveragePercent(round(averagePercent, 2));
-
-            // Add a dedicated status string for UI to use in status column
-            String statusString = compliant ? "Compliant" : "Non-compliant";
-            //result.thresholdsDetails.put("status", statusString);
 
             childComplianceMap.put(unit, compliant);
             childAveragePercentMap.put(unit, averagePercent);
