@@ -8,12 +8,14 @@
 </head>
 <body>
 <div th:replace="~{navigation :: mainNav}"></div>
-<h1>An error occurred</h1>
-<p th:text="${message}"></p>
-<div th:if="${showDetails}">
-    <h2>Error Details</h2>
-    <pre th:text="${details}"></pre>
+<div class="container">
+    <h1>An error occurred</h1>
+    <p th:text="${message}"></p>
+    <div th:if="${showDetails}">
+        <h2>Error Details</h2>
+        <pre th:text="${details}"></pre>
+    </div>
+    <a href="/">Back to Landing Page</a>
 </div>
-<a href="/">Back to Landing Page</a>
 </body>
 </html>

@@ -8,65 +8,67 @@
 </head>
 <body>
     <div th:replace="~{navigation :: mainNav}"></div>
-    <h1>Create Assessment</h1>
-    <form th:action="@{/assessment/create}" method="post">
-        <table class="table" style="width:auto; margin: 0 auto;">
-            <tr>
-                <td><label for="name">Assessment Name:</label></td>
-                <td><input type="text" id="name" name="name" required /></td>
-            </tr>
-            <tr>
-                <td><label for="catalog">Select Security Catalog:</label></td>
-                <td>
-                    <select id="catalog" name="catalogId" required>
-                        <option th:each="catalog: ${catalogs}" 
-                                th:value="${catalog.id}" 
-                                th:text="${catalog.name}"></option>
-                    </select>
-                </td>
-            </tr>
-            <!-- Org Unit Choice Row start -->
-            <tr>
-                <td><label for="orgUnit">Select Org Unit:</label></td>
-                <td>
-                    <select id="orgUnit" name="orgUnitId" required>
-                        <option value="" disabled selected>-- Select Org Unit --</option>
-                        <option th:each="orgUnit : ${orgUnits}"
-                                th:value="${orgUnit.id}"
-                                th:text="${orgUnit.name}"></option>
-                    </select>
-                </td>
-            </tr>
-            <!-- Org Unit Choice Row end -->
-            <!-- Org Service Choice Row start -->
-            <tr>
-                <td><label for="orgService">Assign Org Services:</label></td>
-                <td>
-                    <select name="orgServiceIds" id="orgService" multiple>
-                        <option th:each="orgService : ${orgServices}"
-                                th:value="${orgService.id}"
-                                th:text="${orgService.name}"></option>
-                    </select><br/>
-                    <span style="font-size: 0.86em; color: #757575;">(Hold Ctrl or Cmd to select multiple)</span>
-                </td>
-            </tr>
-            <!-- Org Service Choice Row end -->
-            <tr>
-                <td><label for="users">Assign Users:</label></td>
-                <td>
-                    <select name="userIds" id="users" multiple>
-                        <option th:each="user : ${users}"
-                                th:value="${user.id}"
-                                th:text="${user.name + ' (' + user.email + ')'}"></option>
-                    </select>
-                </td>
-            </tr>
-            <tr>
-                <td colspan="2" style="text-align: center;">
-                    <button type="submit">Create Assessment</button>
-                </td>
-            </tr>
-        </table>
-    </form>
+    <div class="container">
+        <h1>Create Assessment</h1>
+        <form th:action="@{/assessment/create}" method="post">
+            <table class="table" style="width:auto; margin: 0 auto;">
+                <tr>
+                    <td><label for="name">Assessment Name:</label></td>
+                    <td><input type="text" id="name" name="name" required /></td>
+                </tr>
+                <tr>
+                    <td><label for="catalog">Select Security Catalog:</label></td>
+                    <td>
+                        <select id="catalog" name="catalogId" required>
+                            <option th:each="catalog: ${catalogs}" 
+                                    th:value="${catalog.id}" 
+                                    th:text="${catalog.name}"></option>
+                        </select>
+                    </td>
+                </tr>
+                <!-- Org Unit Choice Row start -->
+                <tr>
+                    <td><label for="orgUnit">Select Org Unit:</label></td>
+                    <td>
+                        <select id="orgUnit" name="orgUnitId" required>
+                            <option value="" disabled selected>-- Select Org Unit --</option>
+                            <option th:each="orgUnit : ${orgUnits}"
+                                    th:value="${orgUnit.id}"
+                                    th:text="${orgUnit.name}"></option>
+                        </select>
+                    </td>
+                </tr>
+                <!-- Org Unit Choice Row end -->
+                <!-- Org Service Choice Row start -->
+                <tr>
+                    <td><label for="orgService">Assign Org Services:</label></td>
+                    <td>
+                        <select name="orgServiceIds" id="orgService" multiple>
+                            <option th:each="orgService : ${orgServices}"
+                                    th:value="${orgService.id}"
+                                    th:text="${orgService.name}"></option>
+                        </select><br/>
+                        <span style="font-size: 0.86em; color: #757575;">(Hold Ctrl or Cmd to select multiple)</span>
+                    </td>
+                </tr>
+                <!-- Org Service Choice Row end -->
+                <tr>
+                    <td><label for="users">Assign Users:</label></td>
+                    <td>
+                        <select name="userIds" id="users" multiple>
+                            <option th:each="user : ${users}"
+                                    th:value="${user.id}"
+                                    th:text="${user.name + ' (' + user.email + ')'}"></option>
+                        </select>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="2" style="text-align: center;">
+                        <button type="submit">Create Assessment</button>
+                    </td>
+                </tr>
+            </table>
+        </form>
+    </div>
 </body>
 </html>

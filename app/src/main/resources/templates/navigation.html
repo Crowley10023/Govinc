@@ -1,87 +1,4 @@
 <div th:fragment="mainNav">
-  <style>
-    .dropdown {
-      position: relative;
-    }
-    .dropdown-button {
-      min-width: 170px;
-      min-height: 36px;
-      width: 170px;
-      height: 36px;
-      background: #eaf3fa;
-      border: 1px solid #2274A5;
-      color: #2274A5;
-      cursor: pointer;
-      font-size: 1em;
-      border-radius: 5px;
-      margin: 0;
-      padding: 5px 0px;
-      transition: background 0.15s;
-    }
-    .dropdown-button:hover {
-      background: #d1e7f8;
-    }
-    .dropdown-content {
-      display: none;
-      flex-direction: column;
-      position: absolute;
-      left: 0;
-      top: 100%;
-      background-color: #fff;
-      box-shadow: 0 2px 8px rgba(34,116,165,0.20);
-      z-index: 2000;
-      min-width: 180px;
-      border-radius: 5px;
-      padding: 5px 0;
-      margin-top: 5px;
-    }
-
-    .dropdown:hover .dropdown-content, .dropdown:focus-within .dropdown-content {
-      display: flex;
-    }
-
-    .nav-row, .main-navigation, .landing-main {
-      overflow: visible !important;
-    }
-    .dropdown-content a button {
-      width: 160px;
-      height: 36px;
-      margin: 2px 10px;
-      border-radius: 3px;
-      background: #f6faff;
-      border: 1px solid #eeeeee;
-      color: #2274A5;
-      transition: background .15s;
-      font-size: 1em;
-      cursor: pointer;
-      text-align: left;
-      padding-left: 10px;
-    }
-    .dropdown-content a button:hover {
-      background: #d1e7f8;
-      color: #185a89;
-    }
-    .nav-row .nav-entry > .entry-link > button,
-    .nav-row .nav-entry > form > button {
-      min-width: 170px;
-      min-height: 36px;
-      width: 170px;
-      height: 36px;
-      background: #eaf3fa;
-      border: 1px solid #2274A5;
-      color: #2274A5;
-      cursor: pointer;
-      font-size: 1em;
-      border-radius: 5px;
-      margin: 0;
-      padding: 5px 0px;
-      transition: background 0.15s;
-    }
-    .nav-row .nav-entry > .entry-link > button:hover,
-    .nav-row .nav-entry > form > button:hover {
-      background: #d1e7f8;
-    }
-  </style>
   <div class="main-navigation">
     <div class="landing-main">
       <div class="landing-image">
@@ -92,7 +9,7 @@
             th:text="${userName != null} ? ${userName} : (${userId != null} ? ${userId} : 'no user')"></span></div>
         <div style="margin-bottom:0.5em;display:flex;align-items:center;">
           <span class="ci-headline">compliance incubator</span>
-          <a href="/" style="margin-left:1.25em;text-decoration:none;"><button type="button">Home</button></a>
+          <a href="/" style="margin-left:1.25em;text-decoration:none;"><button type="button" class="btn-nav">Home</button></a>
           <!-- Select User Dropdown -->
           <form method="post" action="/users/set-session-user" style="margin-left:2em;">
             <label for="select-user">Select User:</label>
@@ -106,40 +23,40 @@
         <div class="nav-row" style="display:flex;flex-direction:row;align-items:center;gap:1.2em;">
           <!-- Security Framework Dropdown -->
           <div class="nav-entry dropdown" style="display:flex;align-items:center;gap:0.4em;">
-            <button type="button" class="dropdown-button">Security Framework</button>
+            <button type="button" class="dropdown-button btn-nav">Security Framework</button>
             <div class="dropdown-content">
-              <a href="/security-control/list"><button type="button">Security Controls</button></a>
-              <a href="/security-catalog/list"><button type="button">Security Catalogs</button></a>
-              <a href="/security-control-domain/list"><button type="button">Security Control Domains</button></a>
-              <a href="/maturitymodel/list"><button type="button">Maturity Models</button></a>
-              <a href="/maturityanswer/list"><button type="button">Maturity Model Answers</button></a>
+              <a href="/security-control/list"><button type="button" class="dropdown-menu-btn">Security Controls</button></a>
+              <a href="/security-catalog/list"><button type="button" class="dropdown-menu-btn">Security Catalogs</button></a>
+              <a href="/security-control-domain/list"><button type="button" class="dropdown-menu-btn">Security Control Domains</button></a>
+              <a href="/maturitymodel/list"><button type="button" class="dropdown-menu-btn">Maturity Models</button></a>
+              <a href="/maturityanswer/list"><button type="button" class="dropdown-menu-btn">Maturity Model Answers</button></a>
             </div>
           </div>
           <!-- Organization Dropdown -->
           <div class="nav-entry dropdown" style="display:flex;align-items:center;gap:0.4em;">
-            <button type="button" class="dropdown-button">Organization</button>
+            <button type="button" class="dropdown-button btn-nav">Organization</button>
             <div class="dropdown-content">
-              <a href="/users"><button type="button">Users</button></a>
-              <a href="/orgunits/list"><button type="button">Org Units</button></a>
-              <a href="/orgservices/list"><button type="button">Org Services</button></a>
+              <a href="/users"><button type="button" class="dropdown-menu-btn">Users</button></a>
+              <a href="/orgunits/list"><button type="button" class="dropdown-menu-btn">Org Units</button></a>
+              <a href="/orgservices/list"><button type="button" class="dropdown-menu-btn">Org Services</button></a>
             </div>
           </div>
           <div class="nav-entry" style="display:flex;align-items:center;gap:0.4em;">
-            <a href="/assessment-urls-list" class="entry-link"><button type="button">Assessment URLs</button></a>
+            <a href="/assessment-urls-list" class="entry-link"><button type="button" class="nav-btn">Assessment URLs</button></a>
           </div>
           <div class="nav-entry" style="display:flex;align-items:center;gap:0.4em;">
             <form action="/assessment/create" method="get" class="entry-form" style="margin:0;">
-              <button type="submit">Create Assessment</button>
+              <button type="submit" class="nav-btn">Create Assessment</button>
             </form>
           </div>
           <div class="nav-entry" style="display:flex;align-items:center;gap:0.4em;">
-            <a href="/assessment/list" class="entry-link"><button type="button">Assessments</button></a>
+            <a href="/assessment/list" class="entry-link"><button type="button" class="nav-btn">Assessments</button></a>
           </div>
           <div class="nav-entry" style="display:flex;align-items:center;gap:0.4em;">
-            <a href="/compliance/view" class="entry-link"><button type="button">Compliance Check</button></a>
+            <a href="/compliance/view" class="entry-link"><button type="button" class="nav-btn">Compliance Check</button></a>
           </div>
           <div class="nav-entry" style="display:flex;align-items:center;gap:0.4em;">
-            <a href="/statistics" class="entry-link"><button type="button">Statistics</button></a>
+            <a href="/statistics" class="entry-link"><button type="button" class="nav-btn">Statistics</button></a>
           </div>
         </div>
       </div>
