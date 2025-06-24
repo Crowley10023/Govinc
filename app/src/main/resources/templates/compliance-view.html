@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <meta charset="UTF-8">
+    <title>Compliance View</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+
+<body>
+    <div th:replace="~{navigation :: mainNav}"></div>
+    <main class="container">
+        <div style="margin-bottom: 16px;">
+            <a href="/compliance/checks" class="btn btn-secondary">
+                <i class="fa fa-list"></i> Compliance Checks List
+            </a>
+        
+            <a href="/compliance/checks/create" class="btn btn-primary">
+                <i class="fa fa-plus"></i> Create Compliance Check
+            </a>
+        </div>
+        <h1>Compliance View</h1>
+        <form method="get" action="/compliance/view" style="margin-bottom:2em;display:flex;gap:2em;align-items:end;">
+            <div>
+                <label for="orgUnitId">Org Unit:</label>
+                <select name="orgUnitId" id="orgUnitId">
+                    <option th:each="org : ${orgUnits}" th:value="${org.id}" th:text="${org.name}"
+                        th:selected="${org.id == selectedOrg?.id}">
+                    </option>
+                </select>
+            </div>
+            <div>
+                <label for="checkId">Compliance Check:</label>
+                <select name="checkId" id="checkId">
+                    <option th:each="chk : ${checks}" th:value="${chk.id}" th:text="${chk.name}"
+                        th:selected="${chk.id == selectedCheck?.id}"></option>
+                </select>
+            </div>
+            <div>
+                <button type="submit">Check Compliance</button>
+            </div>
+        </form>
+
+        <div th:if="${selectedOrg != null && selectedCheck != null}">
+            <h2 th:text="'Results for Org Unit: ' + ${selectedOrg.name} + ' / ' + ${selectedCheck.name}"></h2>
+            <div th:if="${result != null}">
+                <div style="margin-bottom:1em;">
+                    <span th:if="${result.compliant}" style="color:green;font-weight:bold;">COMPLIANT</span>
+                    <span th:if="${!result.compliant}" style="color:red;font-weight:bold;">NOT COMPLIANT</span>
+                </div>
+                <h3>Threshold Evaluations</h3>
+                <th:block th:if="${result.thresholdsDetails instanceof T(java.util.Map)}"
+                    th:with="details=${result.thresholdsDetails}">
+                    <table border="1" class="card">
+                        <tr>
+                            <th>Rule Description</th>
+                            <th>Passed?</th>
+                        </tr>
+                        <tr th:each="rule : ${details}">
+                            <td th:text="${rule.key}"></td>
+                            <td th:text="${rule.value} ? 'Yes' : 'No'"
+                                th:style="${rule.value} ? 'color:green;' : 'color:red;'"></td>
+                        </tr>
+                    </table>
+                </th:block>
+                <th:block th:unless="${result.thresholdsDetails instanceof T(java.util.Map)}">
+                    <p>No compliance rules evaluated.</p>
+                </th:block>
+                <p><b>Total Assessments Checked:</b> <span th:text="${result.checkedAssessments}"></span></p>
+            </div>
+            <div th:if="${result == null}">
+                <p>No Assessments found for this Org Unit and Compliance Check.</p>
+            </div>
+        </div>
+
+        <div th:if="${resultsForChildren != null}">
+            <h2>Compliance Results for All Children</h2>
+            <table border="1" class="card">
+                <tr>
+                    <th>Org Unit</th>
+                    <th>Status</th>
+                    <th>Coverage (%)</th>
+                    <th>Average Score (%)</th>
+                </tr>
+                <tr th:each="entry : ${resultsForChildren}">
+                    <td th:text="${entry.key.name}"></td>
+                    <td>
+                        <span th:if="${entry.value.compliant}" style="color:green;font-weight:bold;">COMPLIANT</span>
+                        <span th:if="${!entry.value.compliant}" style="color:red;font-weight:bold;">NOT COMPLIANT</span>
+                    </td>
+                    <td th:text="${entry.value.coveragePercent} + ' %'"></td>
+                    <td th:text="${entry.value.averagePercent} + ' %'"></td>
+                </tr>
+                <tr style="font-weight:bold;background:#eef;">
+                    <td>Total</td>
+                    <td></td>
+                    <td th:text="${totalCoveragePercent} + ' %'"></td>
+                    <td th:text="${totalAveragePercent} + ' %'"></td>
+                </tr>
+            </table>
+        </div>
+
+    </main>
+</body>
+
+</html>

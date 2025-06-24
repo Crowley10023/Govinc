@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="${#strings.isEmpty(check.id) ? 'Create' : 'Edit'} + ' Compliance Check'"></title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .threshold-entry { margin-bottom: 0.6em; }
+        .threshold-entry input, .threshold-entry select { margin-right: 0.4em; }
+    </style>
+</head>
+<body>
+<div th:replace="~{navigation :: mainNav}"></div>
+<main class="container">
+    <h1 th:text="${#strings.isEmpty(check.id) ? 'Create' : 'Edit'} + ' Compliance Check'"></h1>
+    <form th:action="@{/compliance/save}" method="post">
+        <input type="hidden" name="id" th:value="${check.id}" />
+        <div>
+            <label>Name:</label>
+            <input type="text" name="name" th:value="${check.name}" required/>
+        </div>
+        <div>
+            <label>Description:</label>
+            <input type="text" name="description" th:value="${check.description}" />
+        </div>
+        <div>
+            <label>Security Catalog:</label>
+            <select name="securityCatalogId" required>
+                <option th:each="cat : ${catalogs}" th:value="${cat.id}" th:text="${cat.name}" th:selected="${cat.id == check.securityCatalog?.id}"></option>
+            </select>
+        </div>
+        <hr/>
+        <h3>Thresholds</h3>
+        <div id="thresholds-list">
+            <div th:each="thresh,iter : ${check.thresholds}" class="threshold-entry">
+                <select th:name="'thresholds[' + ${iter.index} + '].type'">
+                    <option th:selected="${thresh.type == 'ALL_ABOVE'}" value="ALL_ABOVE">All maturity answers above</option>
+                    <option th:selected="${thresh.type == 'AVERAGE_ABOVE'}" value="AVERAGE_ABOVE">Average maturity answer above</option>
+                </select>
+                <input type="number" th:name="'thresholds[' + ${iter.index} + '].value'" th:value="${thresh.value}" style="width:60px;" min="0" max="100" required/>%
+                <input type="text" th:name="'thresholds[' + ${iter.index} + '].ruleDescription'" th:value="${thresh.ruleDescription}" placeholder="Rule Description" required/>
+                <button type="button" onclick="this.parentElement.remove();">Remove</button>
+            </div>
+        </div>
+        <button type="button" onclick="addThreshold();">Add Threshold</button>
+        <hr/>
+        <button type="submit">Save</button>
+        <a href="/compliance/checks"><button type="button">Cancel</button></a>
+    </form>
+</main>
+<script>
+function addThreshold() {
+    const container = document.getElementById('thresholds-list');
+    let idx = container.children.length;
+    let entry = document.createElement('div');
+    entry.classList.add('threshold-entry');
+    entry.innerHTML = `<select name="thresholds[${idx}].type">
+                    <option value="ALL_ABOVE">All maturity answers above</option>
+                    <option value="AVERAGE_ABOVE">Average maturity answer above</option>
+                </select>
+                <input type="number" name="thresholds[${idx}].value" style="width:60px;" min="0" max="100" value="50" required/>%
+                <input type="text" name="thresholds[${idx}].ruleDescription" placeholder="Rule Description" required/>
+                <button type="button" onclick="this.parentElement.remove();">Remove</button>`;
+    container.appendChild(entry);
+}
+</script>
+</body>
+</html>

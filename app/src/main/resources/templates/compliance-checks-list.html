@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Compliance Checks Management</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div th:replace="~{navigation :: mainNav}"></div>
+<main class="container">
+    <h1>Compliance Checks</h1>
+    <div style="margin-bottom:2em;">
+        <a href="/compliance/create"><button type="button">Create New Compliance Check</button></a>
+    </div>
+    <table border="1" class="card">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Catalog</th>
+                <th>Description</th>
+                <th>Thresholds</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="check : ${checks}">
+                <td th:text="${check.name}"></td>
+                <td th:text="${check.securityCatalog?.name}"></td>
+                <td th:text="${check.description}"></td>
+                <td>
+                    <ul>
+                        <li th:each="threshold : ${check.thresholds}" th:text="${threshold.ruleDescription} + ' (' + threshold.type + ' ' + threshold.value + ')'">
+                        </li>
+                    </ul>
+                </td>
+                <td>
+                    <a th:href="@{'/compliance/edit/' + ${check.id}}"><button>Edit</button></a>
+                    <form th:action="@{'/compliance/delete/' + ${check.id}}" method="post" style="display:inline;">
+                        <button type="submit" onclick="return confirm('Delete this compliance check?')">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</main>
+</body>
+</html>
