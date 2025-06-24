@@ -9,10 +9,13 @@
 <body>
     <div th:replace="~{navigation :: mainNav}"></div>
     <div class="container">
-        <h1>Assessments</h1>
-        <div class="actions-row">
-            <a href="/assessment/create" class="btn">Create New Assessment</a>
-        </div>
+        <h1 class="page-title">Assessments</h1>
+        <nav class="secondary-nav">
+            <a href="/assessment/create" class="btn-nav btn-secondary">Create New Assessment</a>
+        </nav>
+        
+            
+        
         <section>
             <table class="table card">
                 <thead>
@@ -38,5 +41,6 @@
             </table>
         </section>
     </div>
+    
 </body>
 </html>
