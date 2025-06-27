@@ -181,8 +181,35 @@
 
         // User modal logic
         $('#choose-users-btn').click(function () {
-            $('#users-modal-bg').css('display', 'flex');
-            $('#users-modal-error').hide();
+            var $modal = $('#users-modal-bg');
+            var $error = $('#users-modal-error');
+            $error.hide();
+            $modal.css('display', 'flex');
+
+            // Load users via AJAX
+            var $select = $('#users-multiselect');
+            $select.prop('disabled', true);
+            $select.html('<option>Loading...</option>');
+
+            // Get assigned user IDs from Thymeleaf/JS variable
+            var assignedUserIds = window.assessmentAssignedUserIds || [];
+            $.getJSON('/users/api', function(users) {
+                $select.empty();
+                if (!$.isArray(users) || users.length === 0) {
+                    $select.append($('<option>').val('').text('(No users found)'));
+                } else {
+                    users.forEach(function (user) {
+                        var $opt = $('<option>').val(user.id).text(user.name + ' (' + user.email + ')');
+                        if (assignedUserIds.includes(user.id) || assignedUserIds.includes(user.id.toString())) {
+                            $opt.prop('selected', true);
+                        }
+                        $select.append($opt);
+                    });
+                }
+                $select.prop('disabled', false);
+            }).fail(function() {
+                $select.html('<option value="">(Could not load users)</option>');
+            });
         });
         $('#users-modal-cancel-btn').click(function () {
             $('#users-modal-bg').hide();
@@ -392,6 +419,8 @@
         // Expose assessmentId and currentOrgUnitId globally for modal JS usage
         window.assessmentId = /*[[${assessment.id}]]*/ 0;
         window.currentOrgUnitId = /*[[${assessment.orgUnit != null ? assessment.orgUnit.id : ''}]]*/ '';
+        // Assigned users list for selection state
+        window.assessmentAssignedUserIds = /*[[${assessment.users != null ? assessment.users.![id] : {}}]]*/ [];
         /*]]>*/
     </script>
 </body>

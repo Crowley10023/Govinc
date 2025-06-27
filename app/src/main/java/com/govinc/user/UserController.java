@@ -69,4 +69,12 @@ public class UserController {
         }
         return "redirect:/";
     }
+
+    // Endpoint for API to get all users as JSON
+    @GetMapping("/api")
+    @ResponseBody
+    public List<User> apiGetAllUsers() {
+        return userRepository.findAll();
+    }
 }
+

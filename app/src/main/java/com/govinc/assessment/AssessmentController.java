@@ -496,4 +496,20 @@ public class AssessmentController {
         }
         return "redirect:/assessment/" + id;
     }
+
+    // --- Assign Users to Assessment via API ---
+    @PutMapping("/{id}/users")
+    @ResponseBody
+    public List<User> updateAssessmentUsers(@PathVariable Long id, @RequestBody List<Long> userIds) {
+        Optional<Assessment> opt = assessmentRepository.findById(id);
+        if (opt.isEmpty()) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND);
+        Assessment assessment = opt.get();
+        Set<User> users = userIds.stream()
+            .map(uid -> userRepository.findById(uid).orElse(null))
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+        assessment.setUsers(users);
+        assessment = assessmentRepository.save(assessment);
+        return new ArrayList<>(users);
+    }
 }
