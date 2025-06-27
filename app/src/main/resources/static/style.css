@@ -644,6 +644,16 @@ input:focus, textarea:focus, select:focus {
     min-width: 90%;
 }
 
+.domain-header {
+  cursor: pointer;
+  font-weight: bold;
+  margin-top: 1.5em;
+  padding: 0.5em 0;
+  background: #0091f4;
+  border-radius: 6px;
+  padding: 1.2em;
+}
+
 /* ——— Styled Actions Panel for Assessment Details ——— */
 .actions-panel {
     border: 2px solid var(--primary-blue);
