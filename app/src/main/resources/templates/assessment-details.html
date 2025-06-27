@@ -1,162 +1,27 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
-
 <head>
     <meta charset="UTF-8">
     <title>Assessment Details</title>
     <link rel="stylesheet" href="/style.css">
-    
-        .answer-feedback {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            vertical-align: middle;
-            margin-left: 5px;
-        }
-
-        .answer-feedback svg {
-            width: 18px;
-            height: 18px;
-        }
-
-        .answer-success {
-            color: #33aa33;
-        }
-
-        .answer-error {
-            color: #cc2222;
-        }
-
-        .ctrl-desc-btn {
-            background: none;
-            border: none;
-            padding: 0 2px;
-            cursor: pointer;
-            vertical-align: middle;
-        }
-
-        .ctrl-desc-btn svg {
-            width: 18px;
-            height: 18px;
-            fill: #2274A5;
-            filter: drop-shadow(0 0 4px rgba(34, 116, 165, 0.22));
-            transition: fill 0.2s;
-        }
-
-        .ctrl-desc-btn:hover svg {
-            fill: #FF9505;
-        }
-
-        .ctrl-desc-tooltip {
-            display: none;
-            position: absolute;
-            left: 44px;
-            z-index: 20;
-            max-width: 320px;
-            background: linear-gradient(94deg, #fffbe7 90%, #ffe6d1 100%);
-            color: #333;
-            border: 1.5px solid #ffe3ad;
-            box-shadow: 0 6px 24px rgba(255, 205, 58, 0.25), 0 1.5px 0px 1.5px #ffd995;
-            padding: 0.7em 1em;
-            border-radius: 10px;
-            font-size: 0.96em;
-            margin-top: 0.25em;
-            animation: fadeInDesc 0.23s;
-        }
-
-        @keyframes fadeInDesc {
-            from {
-                opacity: 0;
-                transform: translateY(-8px);
-            }
-
-            to {
-                opacity: 1;
-                transform: none;
-            }
-        }
-
-        .ctrl-desc-wrap {
-            position: relative;
-            display: inline-block;
-            width: 100%;
-        }
-
-        /* Modal styles */
-        .modal-bg {
-            display: none;
-            position: fixed;
-            z-index: 105;
-            left: 0;
-            top: 0;
-            width: 100vw;
-            height: 100vh;
-            background: rgba(0, 0, 0, 0.25);
-            justify-content: center;
-            align-items: center;
-        }
-
-        .modal-popup {
-            background: #fffbe7;
-            border-radius: 10px;
-            box-shadow: 0 1.5px 14px rgba(0, 0, 0, 0.15);
-            padding: 2em 2em 1.2em 2em;
-            min-width: 320px;
-            max-width: 95vw;
-            text-align: center;
-            position: relative;
-        }
-
-        .modal-popup h3 {
-            margin-top: 0;
-        }
-
-        .modal-popup select {
-            width: 90%;
-            margin-bottom: 1em;
-        }
-
-        .modal-btn-row {
-            display: flex;
-            gap: 1.5em;
-            justify-content: center;
-            margin-top: 1em;
-        }
-
-        .taken-over {
-            background: #eee !important;
-            color: #888 !important;
-        }
-
-        .taken-over-label {
-            color: #ab6f00;
-            font-size: 0.92em;
-            margin-left: 8px;
-        }
-    
+    <!-- All moved styles are now in style.css -->
 </head>
-
 <body>
     <div th:replace="~{navigation :: mainNav}"></div>
     <div class="container">
         <h1>Assessment Details</h1>
-        <button id="choose-orgunit-btn" type="button">Choose Org Unit</button>
-        <!-- User Selection Button -->
-        <button id="choose-users-btn" type="button" style="margin-bottom: 1em;">Choose Users</button>
-        <!-- OrgService Selection Button -->
-        <button id="choose-orgservices-btn" type="button" style="margin-bottom: 1em;">Choose Org Services</button>
-
-        <!-- OrgService Selection Modal -->
-        <!-- DEBUG: Show what is in the orgServicesAll model attribute -->
-        <p>DEBUG: OrgServicesAll size: <span
-                th:text="${orgServicesAll != null ? #lists.size(orgServicesAll) : 0}">n/a</span></p>
+        <div class="choose-buttons-row">
+            <button id="choose-orgunit-btn" type="button" class="modal-launch-btn">Choose Org Unit</button>
+            <button id="choose-users-btn" type="button" class="modal-launch-btn">Choose Users</button>
+            <button id="choose-orgservices-btn" type="button" class="modal-launch-btn">Choose Org Services</button>
+        </div>
+        <!-- OrgService Selection Modal with unified modal style -->
+        <!-- DEBUG: Show what is in the orgServicesAll model attribute (remove for production) -->
+        <p>DEBUG: OrgServicesAll size: <span th:text="${orgServicesAll != null ? #lists.size(orgServicesAll) : 0}">n/a</span></p>
         <pre th:text="${orgServicesAll != null ? orgServicesAll : 'null'}">NO SERVICES</pre>
-        <div id="orgservice-modal" class="modal" style="display:none;">
-            <div class="modal-backdrop"
-                style="position:fixed;left:0;top:0;width:100vw;height:100vh;background:#0008;z-index:50;"></div>
-            <div class="modal-content"
-                style="z-index: 55; position: relative; max-width: 400px; margin: 10% auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 20px #0003;">
-                <h2>Choose Applicable Org Services</h2>
+        <div id="orgservice-modal" class="modal-bg">
+            <div class="modal-popup">
+                <h3>Choose Applicable Org Services</h3>
                 <form id="orgservice-form">
                     <div id="orgservice-list">
                         <div th:if="${orgServicesAll == null or #lists.isEmpty(orgServicesAll)}">
@@ -170,198 +35,50 @@
                             </label>
                         </div>
                     </div>
-                    <div style="margin-top: 1em;">
+                    <div class="modal-btn-row">
                         <button type="button" id="orgservice-modal-cancel">Cancel</button>
-                        <button type="submit" id="orgservice-modal-save" style="margin-left: 1em;">Save</button>
+                        <button type="submit" id="orgservice-modal-save">Save</button>
                     </div>
                 </form>
             </div>
-            <div class="modal-backdrop"
-                style="position:fixed;left:0;top:0;width:100vw;height:100vh;background:#0008;z-index:50;"></div>
         </div>
-
-
+        <!-- End OrgService Selection Modal -->
         <section>
             <h2 th:text="${assessment.name}"></h2>
             <table class="table card">
-                <tr>
-                    <th>Date</th>
-                    <td th:text="${assessment.date}"></td>
-                </tr>
-                <tr>
-                    <th>Organization Unit</th>
-                    <td th:text="${assessment.orgUnit != null ? assessment.orgUnit.name : 'None'}"></td>
-                </tr>
-                <tr>
-                    <th>Security Catalog</th>
-                    <td th:text="${assessment.securityCatalog.name}"></td>
-                </tr>
-                <tr>
-                    <th>Status</th>
-                    <td th:text="${assessment.status}"></td>
-                </tr>
-                <tr th:if="${orgServices != null}">
-                    <th>Org Services</th>
-                    <td>
-                        <ul>
-                            <li th:each="orgService : ${orgServices}" th:text="${orgService.name}"></li>
-                        </ul>
-                    </td>
-                </tr>
-                <tr>
-                    <th>Assessment URL</th>
-                    <td>
-                        <span th:if="${assessment.assessmentUrls != null && assessment.assessmentUrls.url != null}">
-                            <a th:href="@{'/assessment-direct/' + ${assessment.assessmentUrls.url}}"
-                                th:text="${assessment.name}" target="_blank"></a>
-                        </span>
-                        <span th:if="${assessment.assessmentUrls == null || assessment.assessmentUrls.url == null}">Not
-                            set</span>
-                    </td>
-                </tr>
-                <tr>
-                    <th>Users</th>
-                    <td id="assessment-users-cell">
-                        <span th:if="${assessment.users == null || #lists.isEmpty(assessment.users)}">None</span>
-                        <span th:each="user,iterStat : ${assessment.users}">
-                            <span th:text="${user.name + ' (' + user.email + ')'}"></span><span
-                                th:if="${!iterStat.last}">, </span>
-                        </span>
-                    </td>
-                </tr>
+                <tr><th>Date</th><td th:text="${assessment.date}"></td></tr>
+                <tr><th>Organization Unit</th><td th:text="${assessment.orgUnit != null ? assessment.orgUnit.name : 'None'}"></td></tr>
+                <tr><th>Security Catalog</th><td th:text="${assessment.securityCatalog.name}"></td></tr>
+                <tr><th>Status</th><td th:text="${assessment.status}"></td></tr>
+                <tr th:if="${orgServices != null}"><th>Org Services</th><td><ul><li th:each="orgService : ${orgServices}" th:text="${orgService.name}"></li></ul></td></tr>
+                <tr><th>Assessment URL</th><td><span th:if="${assessment.assessmentUrls != null && assessment.assessmentUrls.url != null}"><a th:href="@{'/assessment-direct/' + ${assessment.assessmentUrls.url}}" th:text="${assessment.name}" target="_blank"></a></span><span th:if="${assessment.assessmentUrls == null || assessment.assessmentUrls.url == null}">Not set</span></td></tr>
+                <tr><th>Users</th><td id="assessment-users-cell"><span th:if="${assessment.users == null || #lists.isEmpty(assessment.users)}">None</span><span th:each="user,iterStat : ${assessment.users}"><span th:text="${user.name + ' (' + user.email + ')'}"></span><span th:if="${!iterStat.last}">, </span></span></td></tr>
             </table>
-
         </section>
         <section>
             <h2>Summary of Answers</h2>
             <table class="table card" style="margin-bottom: 2em;">
-                <thead>
-                    <tr>
-                        <th>Answer Category</th>
-                        <th>Count</th>
-                        <th>Percent (%)</th>
-                    </tr>
-                </thead>
+                <thead><tr><th>Answer Category</th><th>Count</th><th>Percent (%)</th></tr></thead>
                 <tbody>
-                    <tr th:if="${answerSummary == null || answerSummary.isEmpty()}">
-                        <td colspan="3">No answers yet</td>
-                    </tr>
-                    <tr th:each="entry : ${answerSummary}">
-                        <td th:text="${entry.key}"></td>
-                        <td th:text="${entry.value.count}"></td>
-                        <td th:text="${#numbers.formatDecimal(entry.value.percent, 0, 2)}"></td>
-                    </tr>
+                <tr th:if="${answerSummary == null || answerSummary.isEmpty()}"><td colspan="3">No answers yet</td></tr>
+                <tr th:each="entry : ${answerSummary}"><td th:text="${entry.key}"></td><td th:text="${entry.value.count}"></td><td th:text="${#numbers.formatDecimal(entry.value.percent, 0, 2)}"></td></tr>
                 </tbody>
             </table>
-
             <h2>Controls &amp; Answers</h2>
             <!-- START Group by SecurityControlDomain, make collapsible -->
             <div th:text="'Domains size: ' + ${#lists.size(securityControlDomains)}"></div>
             <div th:each="domain : ${securityControlDomains}">
-                <div class="domain-header" onclick="toggleDomain(this)"
-                    style="cursor:pointer;font-weight:bold;margin-top:1.5em;padding:0.5em 0;background:#daf0ff;border-radius:6px;">
+                <div class="domain-header" onclick="toggleDomain(this)" style="cursor:pointer;font-weight:bold;margin-top:1.5em;padding:0.5em 0;background:#daf0ff;border-radius:6px;">
                     <span th:text="${domain != null ? domain.name : 'No Domain'}"></span>
-                    <span style="font-weight:normal;padding-left:14px;color:#777;"
-                        th:text="${domain != null ? domain.description : ''}"></span>
+                    <span style="font-weight:normal;padding-left:14px;color:#777;" th:text="${domain != null ? domain.description : ''}"></span>
                     <span style="float:right;">[<span>Show/Hide</span>]</span>
                 </div>
                 <div class="domain-controls" style="display:none;">
                     <div th:if="${assessment.isOpen}">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>Control</th>
-                                    <th>Answer</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr th:each="ctrl : ${assessment.securityCatalog.securityControls}">
-                                    <th:block
-                                        th:if="${ctrl.securityControlDomain != null && domain != null && ctrl.securityControlDomain.id == domain.id}">
-                                        <td>
-                                            <div class="ctrl-desc-wrap">
-                                                <span th:text="${ctrl.name}"></span>
-                                                <button type="button" class="ctrl-desc-btn" tabindex="0"
-                                                    title="Show description" onclick="toggleDesc(this)">
-                                                    <svg viewBox="0 0 24 24">
-                                                        <circle cx="12" cy="12" r="10" fill="#fff" stroke="#2274A5"
-                                                            stroke-width="2" /><text x="12" y="17" text-anchor="middle"
-                                                            font-family="Arial,Helvetica,sans-serif" font-size="15"
-                                                            dy="-2" fill="#2274A5">?</text>
-                                                    </svg>
-                                                </button>
-                                                <div class="ctrl-desc-tooltip">
-                                                    <b>Description:</b>
-                                                    <div th:utext="${#strings.escapeXml(ctrl.detail) ?: 'No detail'}">
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <span style="white-space:nowrap;">
-                                                <select th:name="${'control_' + ctrl.id}"
-                                                    th:data-control-id="${ctrl.id}" class="answer-select"
-                                                    th:disabled="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])}"
-                                                    th:classappend="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])} ? 'taken-over' : ''">
-                                                    <option value="">-- select an answer --</option>
-                                                    <option th:each="ans : ${maturityAnswers}" th:value="${ans.id}"
-                                                        th:selected="${controlAnswers != null and controlAnswers[ctrl.id] != null} ? ${ans.answer} == ${controlAnswers[ctrl.id]} : false"
-                                                        th:text="${ans.answer}"></option>
-                                                </select>
-                                                <span class="answer-feedback"></span>
-                                                <span
-                                                    th:if="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])}"
-                                                    class="taken-over-label"
-                                                    title="Answer is taken from an Org Service">
-                                                    <span th:text="${controlTakenOverOrgServiceName[ctrl.id]}">Org
-                                                        Service</span>
-                                                </span>
-                                            </span>
-                                        </td>
-                                    </th:block>
-                                </tr>
-                            </tbody>
-                        </table>
+                        <table class="table"><thead><tr><th>Control</th><th>Answer</th></tr></thead><tbody><tr th:each="ctrl : ${assessment.securityCatalog.securityControls}"><th:block th:if="${ctrl.securityControlDomain != null && domain != null && ctrl.securityControlDomain.id == domain.id}"><td><div class="ctrl-desc-wrap"><span th:text="${ctrl.name}"></span><button type="button" class="ctrl-desc-btn" tabindex="0" title="Show description" onclick="toggleDesc(this)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#fff" stroke="#2274A5" stroke-width="2" /><text x="12" y="17" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="15" dy="-2" fill="#2274A5">?</text></svg></button><div class="ctrl-desc-tooltip"><b>Description:</b><div th:utext="${#strings.escapeXml(ctrl.detail) ?: 'No detail'}"></div></div></div></td><td><span style="white-space:nowrap;"><select th:name="${'control_' + ctrl.id}" th:data-control-id="${ctrl.id}" class="answer-select" th:disabled="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])}" th:classappend="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])} ? 'taken-over' : ''"><option value="">-- select an answer --</option><option th:each="ans : ${maturityAnswers}" th:value="${ans.id}" th:selected="${controlAnswers != null and controlAnswers[ctrl.id] != null} ? ${ans.answer} == ${controlAnswers[ctrl.id]} : false" th:text="${ans.answer}"></option></select><span class="answer-feedback"></span><span th:if="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])}" class="taken-over-label" title="Answer is taken from an Org Service"><span th:text="${controlTakenOverOrgServiceName[ctrl.id]}">Org Service</span></span></span></td></th:block></tr></tbody></table>
                     </div>
                     <div th:if="${!assessment.isOpen}">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>Control</th>
-                                    <th>Answer</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr th:each="ctrl : ${assessment.securityCatalog.securityControls}">
-                                    <th:block
-                                        th:if="${ctrl.securityControlDomain != null && domain != null && ctrl.securityControlDomain.id == domain.id}">
-                                        <td>
-                                            <div class="ctrl-desc-wrap">
-                                                <span th:text="${ctrl.name}"></span>
-                                                <button type="button" class="ctrl-desc-btn" tabindex="0"
-                                                    title="Show description" onclick="toggleDesc(this)">
-                                                    <svg viewBox="0 0 24 24">
-                                                        <circle cx="12" cy="12" r="10" fill="#fff" stroke="#2274A5"
-                                                            stroke-width="2" /><text x="12" y="17" text-anchor="middle"
-                                                            font-family="Arial,Helvetica,sans-serif" font-size="15"
-                                                            dy="-2" fill="#2274A5">?</text>
-                                                    </svg>
-                                                </button>
-                                                <div class="ctrl-desc-tooltip">
-                                                    <b>Description:</b>
-                                                    <div th:utext="${#strings.escapeXml(ctrl.detail) ?: 'No detail'}">
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <span
-                                                th:text="${controlAnswers != null and controlAnswers[ctrl.id] != null ? controlAnswers[ctrl.id] : 'No answer'}"></span>
-                                        </td>
-                                    </th:block>
-                                </tr>
-                            </tbody>
-                        </table>
+                        <table class="table"><thead><tr><th>Control</th><th>Answer</th></tr></thead><tbody><tr th:each="ctrl : ${assessment.securityCatalog.securityControls}"><th:block th:if="${ctrl.securityControlDomain != null && domain != null && ctrl.securityControlDomain.id == domain.id}"><td><div class="ctrl-desc-wrap"><span th:text="${ctrl.name}"></span><button type="button" class="ctrl-desc-btn" tabindex="0" title="Show description" onclick="toggleDesc(this)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#fff" stroke="#2274A5" stroke-width="2" /><text x="12" y="17" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="15" dy="-2" fill="#2274A5">?</text></svg></button><div class="ctrl-desc-tooltip"><b>Description:</b><div th:utext="${#strings.escapeXml(ctrl.detail) ?: 'No detail'}"></div></div></div></td><td><span th:text="${controlAnswers != null and controlAnswers[ctrl.id] != null ? controlAnswers[ctrl.id] : 'No answer'}"></span></td></th:block></tr></tbody></table>
                     </div>
                 </div>
             </div>
@@ -379,13 +96,11 @@
         <section class="actions-row action-buttons-flex">
             <div th:if="${assessment.isOpen}">
                 <form th:action="@{'/assessment/' + ${assessment.id} + '/finalize'}" method="post">
-                    <button type="submit"
-                        onclick="return confirm('Are you sure you want to finalize this assessment? All edits will be locked.')">Finalize</button>
+                    <button type="submit" onclick="return confirm('Are you sure you want to finalize this assessment? All edits will be locked.')">Finalize</button>
                 </form>
             </div>
             <form th:action="@{'/assessment/' + ${assessment.id} + '/delete'}" method="post">
-                <button type="submit"
-                    onclick="return confirm('Are you sure you want to delete this assessment?')">Delete</button>
+                <button type="submit" onclick="return confirm('Are you sure you want to delete this assessment?')">Delete</button>
             </form>
             <form th:action="@{'/assessment/' + ${assessment.id} + '/report'}" method="get">
                 <button type="submit">Create Report (PDF)</button>
@@ -405,7 +120,6 @@
         <div class="nav-back">
             <a href="/assessment/list">&larr; Back to list</a>
         </div>
-
         <!-- Org Unit Selection Modal -->
         <div class="modal-bg" id="orgunit-modal-bg">
             <div class="modal-popup">
@@ -422,17 +136,13 @@
                 </form>
             </div>
         </div>
-
         <!-- User Selection Modal -->
         <div class="modal-bg" id="users-modal-bg">
             <div class="modal-popup">
                 <h3>Choose Users for Assessment</h3>
                 <form id="users-modal-form">
-                    <select id="users-multiselect" name="userIds" multiple size="8"
-                        style="min-width:220px;max-width:400px;">
-                        <option th:each="user : ${users}" th:value="${user.id}"
-                            th:selected="${assessment.users != null and assessment.users.contains(user)}"
-                            th:text="${user.name + ' (' + user.email + ')'}"></option>
+                    <select id="users-multiselect" name="userIds" multiple size="8" style="min-width:220px;max-width:400px;">
+                        <option th:each="user : ${users}" th:value="${user.id}" th:selected="${assessment.users != null and assessment.users.contains(user)}" th:text="${user.name + ' (' + user.email + ')'}"></option>
                     </select>
                     <div class="modal-btn-row">
                         <button id="users-modal-save-btn" type="submit">Save</button>
@@ -443,314 +153,245 @@
             </div>
         </div>
     </div>
+    <!-- ============================ JavaScript Section =============================== -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
-        $(document).ready(function () {
-            // Modal logic
-            $('#choose-orgunit-btn').click(function () {
-                // Fetch org units dynamically
-                const $select = $('#orgunit-select');
-                $select.prop('disabled', true);
-                $select.html('<option>Loading...</option>');
-                // Assessment org unit id for preselect (from Thymeleaf)
-                var currentOrgUnitId = /*[[${assessment.orgUnit != null ? assessment.orgUnit.id : ''}]]*/ '';
-                $.getJSON('/assessmentdetails/orgunits', function (units) {
-                    $select.empty();
-                    $select.append($('<option>').val('').text('-- Please choose an organization unit --'));
-                    units.forEach(function (unit) {
-                        let $opt = $('<option>').val(unit.id).text(unit.name);
-                        if (currentOrgUnitId && String(unit.id) === String(currentOrgUnitId)) {
-                            $opt.prop('selected', true);
-                        }
-                        $select.append($opt);
-                    });
-                    $select.prop('disabled', false);
-                });
-                $('#orgunit-modal-bg').css('display', 'flex');
-            });
-
-            // User Modal logic
-            $('#choose-users-btn').click(function () {
-                $('#users-modal-bg').css('display', 'flex');
-                $('#users-modal-error').hide();
-            });
-            $('#users-modal-cancel-btn').click(function () {
-                $('#users-modal-bg').hide();
-            });
-            $('#users-modal-bg').on('mousedown', function (event) {
-                if (event.target === this) { $('#users-modal-bg').hide(); }
-            });
-            // AJAX Save users selection
-            $('#users-modal-form').submit(function (event) {
-                event.preventDefault();
-                var $select = $('#users-multiselect');
-                var selected = $select.val() || [];
-                var assessmentId = /*[[${assessment.id}]]*/[[${ assessment.id }]];
-                $('#users-modal-save-btn').prop('disabled', true);
-                $('#users-modal-error').hide();
-                $.ajax({
-                    url: '/assessment/' + assessmentId + '/users',
-                    type: 'PUT',
-                    contentType: 'application/json',
-                    data: JSON.stringify(selected),
-                    success: function (updatedUsers) {
-                        // Update users text in the table
-                        if (updatedUsers && Array.isArray(updatedUsers)) {
-                            var html = '';
-                            if (updatedUsers.length === 0) {
-                                html = 'None';
-                            } else {
-                                for (let i = 0; i < updatedUsers.length; i++) {
-                                    const u = updatedUsers[i];
-                                    html += $('<span/>').text(u.name + ' (' + u.email + ')').prop('outerHTML');
-                                    if (i !== updatedUsers.length - 1) html += ', ';
-                                }
-                            }
-                            $('#assessment-users-cell').html(html);
-                        }
-                        $('#users-modal-bg').hide();
-                        $('#users-modal-save-btn').prop('disabled', false);
-                        $('#users-modal-error').hide();
-                    },
-                    error: function (xhr) {
-                        let msg = "Could not update users.";
-                        if (xhr.responseJSON && xhr.responseJSON.message) msg += " " + xhr.responseJSON.message;
-                        $('#users-modal-error').show().text(msg);
-                        $('#users-modal-save-btn').prop('disabled', false);
+    // =================== Modal logic and dynamic content loading ===================
+    $(document).ready(function () {
+        // Org Unit modal logic
+        $('#choose-orgunit-btn').click(function () {
+            const $select = $('#orgunit-select');
+            $select.prop('disabled', true);
+            $select.html('<option>Loading...</option>');
+            var currentOrgUnitId = /*[[${assessment.orgUnit != null ? assessment.orgUnit.id : ''}]]*/ '';
+            $.getJSON('/assessmentdetails/orgunits', function (units) {
+                $select.empty();
+                $select.append($('<option>').val('').text('-- Please choose an organization unit --'));
+                units.forEach(function (unit) {
+                    let $opt = $('<option>').val(unit.id).text(unit.name);
+                    if (currentOrgUnitId && String(unit.id) === String(currentOrgUnitId)) {
+                        $opt.prop('selected', true);
                     }
+                    $select.append($opt);
                 });
+                $select.prop('disabled', false);
             });
-        });
-        function closeOrgUnitModal() {
-            $('#orgunit-modal-bg').hide();
-        }
-
-        // Existing JS remains here
-        $(document).ready(function () {
-            // Create URL button logic
-            $("#create-url-btn").click(function () {
-                let assessmentId = /*[[${assessment.id}]]*/[[${ assessment.id }]];
-                $("#create-url-btn").prop('disabled', true);
-                $("#create-url-feedback").text('Creating...');
-                $.ajax({
-                    url: '/assessment/' + assessmentId + '/create-url',
-                    type: 'POST',
-                    success: function (data) {
-                        $("#create-url-feedback").html('<span style="color: green;">Created!</span>');
-                        setTimeout(function () {
-                            $("#create-url-feedback").empty();
-                            $("#create-url-btn").prop('disabled', false);
-                        }, 1800);
-
-                        if (data && data.directUrl) {
-                            $("#direct-url-link").attr('href', data.directUrl);
-                            $("#direct-url-link").text(window.location.origin + data.directUrl);
-                            $("#direct-url-row").show();
-
-                            // Also update the Assessment URL row in the table
-                            var $urlTd = $("th:contains('Assessment URL')").next('td');
-                            if ($urlTd.length > 0) {
-                                var anchor = $urlTd.find('a');
-                                if (anchor.length > 0) {
-                                    anchor.attr('href', data.directUrl);
-                                    anchor.text(window.location.origin + data.directUrl);
-                                    anchor.parent().show();
-                                    anchor.parent().siblings('span').hide();
-                                } else {
-                                    // In case anchor didn't exist before (URL was not set initially)
-                                    $urlTd.html('<span><a href="' + data.directUrl + '" target="_blank">' + window.location.origin + data.directUrl + '</a></span>');
-                                }
-                            }
-                        }
-                    },
-                    error: function (err) {
-                        $("#create-url-feedback").html('<span style="color: red;">Error creating URL</span>');
-                        $("#create-url-btn").prop('disabled', false);
-                    }
-                });
-            });
-            let assessmentId = /*[[${assessment.id}]]*/[[${ assessment.id }]];
-            function showSuccessIcon(container) {
-                container.html('<span class="answer-success" title="Saved"><svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="#d8ffd8" stroke="#33aa33" stroke-width="2"/><path d="M5 9l3 3 5-5" fill="none" stroke="#33aa33" stroke-width="2"/></svg></span>');
-            }
-            function showErrorIcon(container) {
-                container.html('<span class="answer-error" title="Error saving"><svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="#ffd8d8" stroke="#cc2222" stroke-width="2"/><path d="M6 6l6 6M12 6l-6 6" fill="none" stroke="#cc2222" stroke-width="2"/></svg></span>');
-            }
-            function clearIcon(container) {
-                container.empty();
-            }
-            $('.answer-select').on('change', function () {
-                var select = $(this);
-                var controlId = select.data('control-id');
-                var answerId = select.val();
-                var feedbackIcon = select.closest('span').find('.answer-feedback');
-                select.css('background', ''); // reset
-                clearIcon(feedbackIcon);
-                if (!answerId) {
-                    clearIcon(feedbackIcon);
-                    return;
-                }
-                if (assessmentId && controlId) {
-                    $.post({
-                        url: '/assessment/' + assessmentId + '/answer',
-                        data: {
-                            controlId: controlId,
-                            answerId: answerId
-                        },
-                        success: function (response) {
-                            select.css('background', '#d8ffd8');
-                            showSuccessIcon(feedbackIcon);
-                            setTimeout(function () { clearIcon(feedbackIcon); select.css('background', ''); }, 1500);
-                        },
-                        error: function (xhr) {
-                            select.css('background', '#ffd8d8');
-                            showErrorIcon(feedbackIcon);
-                        }
-                    });
-                }
-            });
+            $('#orgunit-modal-bg').css('display', 'flex');
         });
 
-        function toggleDesc(btn) {
-            var $tooltip = $(btn).siblings('.ctrl-desc-tooltip');
-            // Hide any other visible tooltips first
-            $('.ctrl-desc-tooltip').not($tooltip).fadeOut(120);
-            $tooltip.fadeToggle(120);
-        }
-        // Hide tooltip when clicking outside
-        $(document).on('mousedown keydown', function (e) {
-            if (!$(e.target).closest('.ctrl-desc-wrap').length) {
-                $('.ctrl-desc-tooltip').fadeOut(120);
-            }
+        // User modal logic
+        $('#choose-users-btn').click(function () {
+            $('#users-modal-bg').css('display', 'flex');
+            $('#users-modal-error').hide();
         });
-    </script>
-    <script th:inline="javascript">
-        /*<![CDATA[*/
-        var selectedOrgServiceIds = [[${ selectedOrgServiceIds }]];
-        var assessmentId = /*[[${assessment.id}]]*/ 0;
-        console.log('selectedOrgServiceIds final:', selectedOrgServiceIds);
-        console.log('assessmentId:', assessmentId);
-        /*]]>*/
-    </script>
-    <script>
-        $(document).ready(function () {
-            // Open OrgService modal
-            $('#choose-orgservices-btn').click(function () {
-                $('#orgservice-modal').show();
-                $('#orgservice-list').html('<em>Loading...</em>');
-                var assessmentId = /*[[${assessment.id}]]*/ 0;
-                // Fetch all org services and assigned IDs, then render checkboxes
-                $.getJSON('/orgservices/all', function (allServices) {
-                    $.getJSON('/assessment/' + assessmentId + '/orgservice-ids', function (assignedIds) {
+        $('#users-modal-cancel-btn').click(function () {
+            $('#users-modal-bg').hide();
+        });
+        $('#users-modal-bg').on('mousedown', function (event) {
+            if (event.target === this) { $('#users-modal-bg').hide(); }
+        });
+        // AJAX Save users selection
+        $('#users-modal-form').submit(function (event) {
+            event.preventDefault();
+            var $select = $('#users-multiselect');
+            var selected = $select.val() || [];
+            var assessmentId = /*[[${assessment.id}]]*/[[${ assessment.id }]];
+            $('#users-modal-save-btn').prop('disabled', true);
+            $('#users-modal-error').hide();
+            $.ajax({
+                url: '/assessment/' + assessmentId + '/users',
+                type: 'PUT',
+                contentType: 'application/json',
+                data: JSON.stringify(selected),
+                success: function (updatedUsers) {
+                    // Update users in the table
+                    if (updatedUsers && Array.isArray(updatedUsers)) {
                         var html = '';
-                        if (Array.isArray(allServices) && allServices.length > 0) {
-                            allServices.forEach(function (os) {
-                                var checked = Array.isArray(assignedIds) && assignedIds.map(String).indexOf(String(os.id)) !== -1 ? 'checked' : '';
-                                html += '<label style="display:block;margin-bottom:3px;">' +
-                                    '<input type="checkbox" name="orgServiceIds" value="' + os.id + '" ' + checked + '> ' +
-                                    $('<span/>').text(os.name).prop('outerHTML') +
-                                    '</label>';
-                            });
+                        if (updatedUsers.length === 0) {
+                            html = 'None';
                         } else {
-                            html = '<em>No Org Services available.</em>';
+                            for (let i = 0; i < updatedUsers.length; i++) {
+                                const u = updatedUsers[i];
+                                html += $('<span/>').text(u.name + ' (' + u.email + ')').prop('outerHTML');
+                                if (i !== updatedUsers.length - 1) html += ', ';
+                            }
                         }
-                        $('#orgservice-list').html(html);
-                    }).fail(function () {
-                        $('#orgservice-list').html('<span style="color:#c22">Could not load assigned Org Services.</span>');
-                    });
+                        $('#assessment-users-cell').html(html);
+                    }
+                    $('#users-modal-bg').hide();
+                    $('#users-modal-save-btn').prop('disabled', false);
+                    $('#users-modal-error').hide();
+                },
+                error: function (xhr) {
+                    let msg = "Could not update users.";
+                    if (xhr.responseJSON && xhr.responseJSON.message) msg += " " + xhr.responseJSON.message;
+                    $('#users-modal-error').show().text(msg);
+                    $('#users-modal-save-btn').prop('disabled', false);
+                }
+            });
+        });
+
+        // Org Service modal logic - open, fetch, display
+        $('#choose-orgservices-btn').click(function () {
+            // Get assessment ID from global Thymeleaf JS var safely injected on page
+            var assessmentId = window.assessmentId || (typeof assessmentId !== 'undefined' ? assessmentId : 0);
+            $('#orgservice-modal').css('display', 'flex');
+            $('#orgservice-list').html('<em>Loading...</em>');
+            // Fetch all org services, then assigned IDs, build the checkbox list
+            $.getJSON('/orgservices/all', function (allServices) {
+                $.getJSON('/assessment/' + assessmentId + '/orgservice-ids', function (assignedIds) {
+                    var html = '';
+                    if (Array.isArray(allServices) && allServices.length > 0) {
+                        allServices.forEach(function (os) {
+                            var checked = Array.isArray(assignedIds) && assignedIds.map(String).indexOf(String(os.id)) !== -1 ? 'checked' : '';
+                            html += '<label style="display:block;margin-bottom:3px;">' +
+                                '<input type="checkbox" name="orgServiceIds" value="' + os.id + '" ' + checked + '> ' +
+                                $('<span/>').text(os.name).prop('outerHTML') +
+                                '</label>';
+                        });
+                    } else {
+                        html = '<em>No Org Services available.</em>';
+                    }
+                    $('#orgservice-list').html(html);
                 }).fail(function () {
-                    $('#orgservice-list').html('<span style="color:#c22">Could not load Org Services.</span>');
+                    $('#orgservice-list').html('<span style="color:#c22">Could not load assigned Org Services.</span>');
                 });
-            });
-
-            // Modal Cancel button
-            $('#orgservice-modal-cancel, #orgservice-modal .modal-backdrop').click(function () {
-                $('#orgservice-modal').hide();
-            });
-
-            // Modal Save
-            $('#orgservice-form').submit(function (event) {
-                event.preventDefault();
-                var assessmentId = /*[[${assessment.id}]]*/ 0;
-                var selected = [];
-                $('#orgservice-list input[name="orgServiceIds"]:checked').each(function () {
-                    selected.push(Number($(this).val()));
-                });
-                $('#orgservice-modal-save').prop('disabled', true);
-                $.ajax({
-                    url: '/assessment/' + assessmentId + '/orgservices',
-                    type: 'PUT',
-                    contentType: 'application/json',
-                    data: JSON.stringify(selected),
-                    success: function () {
-                        location.reload();
-                    },
-                    error: function (xhr, status, error) {
-                        alert('Could not update Org Services!');
-                        $('#orgservice-modal-save').prop('disabled', false);
-                    }
-                });
+            }).fail(function () {
+                $('#orgservice-list').html('<span style="color:#c22">Could not load Org Services.</span>');
             });
         });
-    </script>
-    <script th:inline="javascript">
-        /*<![CDATA[*/
-        $(document).ready(function () {
-            // Open modal and fetch org services and assignments
-            $('#choose-orgservices-btn').click(function () {
-                $('#orgservice-modal').show();
-                $('#orgservice-list').html('<em>Loading...</em>');
-                var assessmentId = /*[[${assessment.id}]]*/ 0;
-                $.getJSON('/orgservices/all', function (allServices) {
-                    $.getJSON('/assessment/' + assessmentId + '/orgservice-ids', function (assignedIds) {
-                        var html = '';
-                        if (Array.isArray(allServices) && allServices.length > 0) {
-                            allServices.forEach(function (os) {
-                                var checked = Array.isArray(assignedIds) && assignedIds.includes(os.id) ? 'checked' : '';
-                                html += '<label style="display:block;margin-bottom:3px;">' +
-                                    '<input type="checkbox" name="orgServiceIds" value="' + os.id + '" ' + checked + '> ' +
-                                    $('<span/>').text(os.name).prop('outerHTML') +
-                                    '</label>';
-                            });
-                        } else {
-                            html = '<em>No Org Services available.</em>';
+        // Modal Cancel for Org Service
+        $('#orgservice-modal-cancel').click(function () {
+            $('#orgservice-modal').hide();
+        });
+        $('#orgservice-modal').on('mousedown', function (event) {
+            if (event.target === this) $('#orgservice-modal').hide();
+        });
+        // Modal Save for Org Service
+        $('#orgservice-form').submit(function (event) {
+            event.preventDefault();
+            // Use the correct assessmentId on save
+            var assessmentId = window.assessmentId || (typeof assessmentId !== 'undefined' ? assessmentId : 0);
+            var selected = [];
+            $('#orgservice-list input[name="orgServiceIds"]:checked').each(function () {
+                selected.push(Number($(this).val()));
+            });
+            $('#orgservice-modal-save').prop('disabled', true);
+            $.ajax({
+                url: '/assessment/' + assessmentId + '/orgservices',
+                type: 'PUT',
+                contentType: 'application/json',
+                data: JSON.stringify(selected),
+                success: function () {
+                    // Optionally update UI without reload, but safest approach is full reload
+                    location.reload();
+                },
+                error: function () {
+                    alert('Could not update Org Services!');
+                    $('#orgservice-modal-save').prop('disabled', false);
+                }
+            });
+        });
+    });
+    // =================== End modal handling section ===================
+
+    function closeOrgUnitModal() {
+        $('#orgunit-modal-bg').hide();
+    }
+
+    // =================== Create URL and Answer Save Logic ===================
+    $(document).ready(function () {
+        // Create direct URL for assessment
+        $("#create-url-btn").click(function () {
+            let assessmentId = /*[[${assessment.id}]]*/[[${ assessment.id }]];
+            $("#create-url-btn").prop('disabled', true);
+            $("#create-url-feedback").text('Creating...');
+            $.ajax({
+                url: '/assessment/' + assessmentId + '/create-url',
+                type: 'POST',
+                success: function (data) {
+                    $("#create-url-feedback").html('<span style="color: green;">Created!</span>');
+                    setTimeout(function () {
+                        $("#create-url-feedback").empty();
+                        $("#create-url-btn").prop('disabled', false);
+                    }, 1800);
+                    if (data && data.directUrl) {
+                        $("#direct-url-link").attr('href', data.directUrl);
+                        $("#direct-url-link").text(window.location.origin + data.directUrl);
+                        $("#direct-url-row").show();
+                        // Also update the Assessment URL row in the table
+                        var $urlTd = $("th:contains('Assessment URL')").next('td');
+                        if ($urlTd.length > 0) {
+                            var anchor = $urlTd.find('a');
+                            if (anchor.length > 0) {
+                                anchor.attr('href', data.directUrl);
+                                anchor.text(window.location.origin + data.directUrl);
+                                anchor.parent().show();
+                                anchor.parent().siblings('span').hide();
+                            } else {
+                                $urlTd.html('<span><a href="' + data.directUrl + '" target="_blank">' + window.location.origin + data.directUrl + '</a></span>');
+                            }
                         }
-                        $('#orgservice-list').html(html);
-                    });
-                });
+                    }
+                },
+                error: function (err) {
+                    $("#create-url-feedback").html('<span style="color: red;">Error creating URL</span>');
+                    $("#create-url-btn").prop('disabled', false);
+                }
             });
-
-            // Cancel modal
-            $('#orgservice-modal-cancel, #orgservice-modal .modal-backdrop').click(function () {
-                $('#orgservice-modal').hide();
-            });
-
-            // Save assignment via AJAX
-            $('#orgservice-form').submit(function (event) {
-                event.preventDefault();
-                var assessmentId = /*[[${assessment.id}]]*/ 0;
-                var selected = [];
-                $('#orgservice-list input[name="orgServiceIds"]:checked').each(function () {
-                    selected.push(Number($(this).val()));
-                });
-                $('#orgservice-modal-save').prop('disabled', true);
-                $.ajax({
-                    url: '/assessment/' + assessmentId + '/orgservices',
-                    type: 'PUT',
-                    contentType: 'application/json',
-                    data: JSON.stringify(selected),
+        });
+        let assessmentId = /*[[${assessment.id}]]*/[[${ assessment.id }]];
+        // Save answer on dropdown change
+        $('.answer-select').on('change', function () {
+            var select = $(this);
+            var controlId = select.data('control-id');
+            var answerId = select.val();
+            var feedbackIcon = select.closest('span').find('.answer-feedback');
+            select.css('background', '');
+            feedbackIcon.empty();
+            if (!answerId) {
+                feedbackIcon.empty();
+                return;
+            }
+            if (assessmentId && controlId) {
+                $.post({
+                    url: '/assessment/' + assessmentId + '/answer',
+                    data: { controlId: controlId, answerId: answerId },
                     success: function () {
-                        location.reload();
+                        select.css('background', '#d8ffd8');
+                        feedbackIcon.html('<span class="answer-success" title="Saved"><svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="#d8ffd8" stroke="#33aa33" stroke-width="2"/><path d="M5 9l3 3 5-5" fill="none" stroke="#33aa33" stroke-width="2"/></svg></span>');
+                        setTimeout(function () {
+                            feedbackIcon.empty();
+                            select.css('background', '');
+                        }, 1500);
                     },
                     error: function () {
-                        alert('Could not update Org Services!');
-                        $('#orgservice-modal-save').prop('disabled', false);
+                        select.css('background', '#ffd8d8');
+                        feedbackIcon.html('<span class="answer-error" title="Error saving"><svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="#ffd8d8" stroke="#cc2222" stroke-width="2"/><path d="M6 6l6 6M12 6l-6 6" fill="none" stroke="#cc2222" stroke-width="2"/></svg></span>');
                     }
                 });
-            });
+            }
         });
+    });
+
+    // =================== Tooltip Handling Section ===================
+    function toggleDesc(btn) {
+        var $tooltip = $(btn).siblings('.ctrl-desc-tooltip');
+        $('.ctrl-desc-tooltip').not($tooltip).fadeOut(120);
+        $tooltip.fadeToggle(120);
+    }
+    // Hide tooltip when clicking outside
+    $(document).on('mousedown keydown', function (e) {
+        if (!$(e.target).closest('.ctrl-desc-wrap').length) {
+            $('.ctrl-desc-tooltip').fadeOut(120);
+        }
+    });
+    </script>
+    <script th:inline="javascript">
+        /*<![CDATA[*/
+        // Expose assessmentId globally for modal JS usage
+        window.assessmentId = /*[[${assessment.id}]]*/ 0;
         /*]]>*/
     </script>
 </body>
-
 </html>
