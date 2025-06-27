@@ -223,29 +223,41 @@
                     <button type="submit" class="btn-nav"
                         onclick="return confirm('Are you sure you want to finalize this assessment? All edits will be locked.')">Finalize</button>
                 </form>
+            </div>
+            <div>
                 <form th:action="@{'/assessment/' + ${assessment.id} + '/delete'}" method="post">
                     <button type="submit" class="btn-nav"
                         onclick="return confirm('Are you sure you want to delete this assessment?')">Delete</button>
                 </form>
+            </div>
+            <div>
                 <form th:action="@{'/assessment/' + ${assessment.id} + '/report'}" method="get">
                     <button type="submit" class="btn-nav">Create Report (PDF)</button>
                 </form>
+            </div>
+            <div>
                 <form th:action="@{'/assessment/' + ${assessment.id} + '/excel'}" method="get">
                     <button type="submit" class="btn-nav">Export to Excel</button>
                 </form>
+            </div>
+            <div>
                 <form>
                     <button id="create-url-btn" type="button" class="btn-nav">Create
                         URL</button>
                 </form>
+            </div>
+            <div>
                 <span id="create-url-feedback"></span>
                 <div id="direct-url-row" style="margin-top:8px; display:none;">
                     <strong>Direct assessment link:</strong> <a id="direct-url-link" href="#" target="_blank"></a>
                 </div>
-
+            </div>
+            <div>
                 <!-- nav-back replaced with a button -->
                 <form action="/assessment/list" method="get" style="display:inline;">
                     <button type="submit" class="btn-nav">&larr; Back to list</button>
                 </form>
+            </div>
         </section>
 
 
