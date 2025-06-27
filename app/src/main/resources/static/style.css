@@ -189,6 +189,10 @@
 }
 /* ----- END: Collapsible/Domain/Card Styles ---- */
 
+.domain-checkmark svg {
+  vertical-align: middle;
+}
+
 /* Base colors */
 :root {
   --primary-blue: #2274A5;
