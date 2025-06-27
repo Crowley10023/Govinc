@@ -53,121 +53,154 @@
                         </tr>
                     </tbody>
                 </table>
-        </div>
-        <h2>Controls &amp; Answers</h2>
-        <!-- START Group by SecurityControlDomain, make collapsible -->
-        <div th:text="'Domains size: ' + ${#lists.size(securityControlDomains)}"></div>
-        <div th:each="domain : ${securityControlDomains}">
-            <div class="domain-header" onclick="toggleDomain(this)"
-                style="cursor:pointer;font-weight:bold;margin-top:1.5em;padding:0.5em 0;background:#daf0ff;border-radius:6px;">
-                <span th:text="${domain != null ? domain.name : 'No Domain'}"></span>
-                <span style="font-weight:normal;padding-left:14px;color:#777;"
-                    th:text="${domain != null ? domain.description : ''}"></span>
-                <span style="float:right;">[<span>Show/Hide</span>]</span>
-            </div>
-            <div class="domain-controls" style="display:none;">
-                <div th:if="${assessment.isOpen}">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Control</th>
-                                <th>Answer</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr th:each="ctrl : ${assessment.securityCatalog.securityControls}">
-                                <th:block
-                                    th:if="${ctrl.securityControlDomain != null && domain != null && ctrl.securityControlDomain.id == domain.id}">
-                                    <td>
-                                        <div class="ctrl-desc-wrap">
-                                            <span th:text="${ctrl.name}"></span>
-                                            <button type="button" class="ctrl-desc-btn" tabindex="0"
-                                                title="Show description" onclick="toggleDesc(this)">
-                                                <svg viewBox="0 0 24 24">
-                                                    <circle cx="12" cy="12" r="10" fill="#fff" stroke="#2274A5"
-                                                        stroke-width="2" /><text x="12" y="17" text-anchor="middle"
-                                                        font-family="Arial,Helvetica,sans-serif" font-size="15" dy="-2"
-                                                        fill="#2274A5">?</text>
-                                                </svg>
-                                            </button>
-                                            <div class="ctrl-desc-tooltip">
-                                                <b>Description:</b>
-                                                <div th:utext="${#strings.escapeXml(ctrl.detail) ?: 'No detail'}"></div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span style="white-space:nowrap;">
-                                            <select th:name="${'control_' + ctrl.id}" th:data-control-id="${ctrl.id}"
-                                                class="answer-select">
-                                                <option value="">-- select an answer --</option>
-                                                <option th:each="ans : ${maturityAnswers}" th:value="${ans.id}"
-                                                    th:selected="${controlAnswers != null and controlAnswers[ctrl.id] != null} ? ${ans.answer} == ${controlAnswers[ctrl.id]} : false"
-                                                    th:text="${ans.answer}"></option>
-                                            </select>
-                                            <span class="answer-feedback"></span>
-                                        </span>
-                                    </td>
-                                </th:block>
-                            </tr>
-                        </tbody>
-                    </table>
+            </section>
+            <!-- Domain Grouped Controls - Enhanced Markup like details -->
+            <h2>Controls &amp; Answers</h2>
+            <div th:each="domain : ${securityControlDomains}" class="domain-outline card domain-collapsible"
+                style="margin-bottom:2.5em; padding: 0em; border: 2px solid #2274A5; border-radius: 9px;">
+                <div class="domain-header" onclick="toggleDomain(this)"
+                    style="display: flex; align-items: center; justify-content: space-between; cursor:pointer;">
+                    <div style="flex:1;">
+                        <span class="domain-title" th:text="${domain != null ? domain.name : 'No Domain'}"
+                            style="display:block;"></span>
+                        <span class="domain-desc"
+                            style="display:block; font-weight:normal; color:#888; font-size:0.88em; margin-top:2px;"
+                            th:text="${domain != null ? domain.description : ''}"></span>
+                    </div>
+                    <span class="domain-checkmark" th:attr="data-domain-id=${domain.id}" style="margin-left:.5em;"></span>
+                    <span style="display:inline-flex; align-items:center; margin-left:.5em; cursor:pointer;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" style="vertical-align:middle;">
+                            <polyline points="4,7 9,12 14,7" fill="none" stroke="#2274A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                    </span>
                 </div>
-                <div th:if="${!assessment.isOpen}">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Control</th>
-                                <th>Answer</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr th:each="ctrl : ${assessment.securityCatalog.securityControls}">
-                                <th:block
-                                    th:if="${ctrl.securityControlDomain != null && domain != null && ctrl.securityControlDomain.id == domain.id}">
-                                    <td>
-                                        <div class="ctrl-desc-wrap">
-                                            <span th:text="${ctrl.name}"></span>
-                                            <button type="button" class="ctrl-desc-btn" tabindex="0"
-                                                title="Show description" onclick="toggleDesc(this)">
-                                                <svg viewBox="0 0 24 24">
-                                                    <circle cx="12" cy="12" r="10" fill="#fff" stroke="#2274A5"
-                                                        stroke-width="2" /><text x="12" y="17" text-anchor="middle"
-                                                        font-family="Arial,Helvetica,sans-serif" font-size="15" dy="-2"
-                                                        fill="#2274A5">?</text>
-                                                </svg>
-                                            </button>
-                                            <div class="ctrl-desc-tooltip">
-                                                <b>Description:</b>
-                                                <div th:utext="${#strings.escapeXml(ctrl.detail) ?: 'No detail'}"></div>
+                <div class="domain-controls" style="display:none;padding:1.1em 1.2em 0 1.2em;">
+                    <div th:if="${assessment.isOpen}">
+                        <table class="table card controls-table">
+                            <thead>
+                                <tr>
+                                    <th style="width:350px;">Control</th>
+                                    <th>Answer</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="ctrl : ${assessment.securityCatalog.securityControls}">
+                                    <th:block th:if="${ctrl.securityControlDomain != null && domain != null && ctrl.securityControlDomain.id == domain.id}">
+                                        <td class="ctrl-name-col">
+                                            <div class="ctrl-desc-wrap">
+                                                <span th:text="${ctrl.name}"></span>
+                                                <button type="button" class="ctrl-desc-btn" tabindex="0" title="Show description" onclick="toggleDesc(this)">
+                                                    <svg viewBox="0 0 24 24">
+                                                        <circle cx="12" cy="12" r="10" fill="#fff" stroke="#2274A5" stroke-width="2" />
+                                                        <text x="12" y="17" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="15" dy="-2" fill="#2274A5">?</text>
+                                                    </svg>
+                                                </button>
+                                                <div class="ctrl-desc-tooltip">
+                                                    <b>Description:</b>
+                                                    <div th:utext="${#strings.escapeXml(ctrl.detail) ?: 'No detail'}"></div>
+                                                </div>
                                             </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span
-                                            th:text="${controlAnswers != null and controlAnswers[ctrl.id] != null ? controlAnswers[ctrl.id] : 'No answer'}"></span>
-                                    </td>
-                                </th:block>
-                            </tr>
-                        </tbody>
-                    </table>
+                                        </td>
+                                        <td>
+                                            <span style="white-space:nowrap;">
+                                                <select th:name="${'control_' + ctrl.id}" th:data-control-id="${ctrl.id}" th:data-domain-id="${domain.id}" class="answer-select">
+                                                    <option value="">-- select an answer --</option>
+                                                    <option th:each="ans : ${maturityAnswers}" th:value="${ans.id}"
+                                                        th:selected="${controlAnswers != null and controlAnswers[ctrl.id] != null} ? ${ans.answer} == ${controlAnswers[ctrl.id]} : false"
+                                                        th:text="${ans.answer}"></option>
+                                                </select>
+                                                <span class="answer-feedback"></span>
+                                            </span>
+                                        </td>
+                                    </th:block>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div th:if="${!assessment.isOpen}">
+                        <table class="table card controls-table">
+                            <thead>
+                                <tr>
+                                    <th style="width:350px;">Control</th>
+                                    <th>Answer</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="ctrl : ${assessment.securityCatalog.securityControls}">
+                                    <th:block th:if="${ctrl.securityControlDomain != null && domain != null && ctrl.securityControlDomain.id == domain.id}">
+                                        <td class="ctrl-name-col">
+                                            <div class="ctrl-desc-wrap">
+                                                <span th:text="${ctrl.name}"></span>
+                                                <button type="button" class="ctrl-desc-btn" tabindex="0" title="Show description" onclick="toggleDesc(this)">
+                                                    <svg viewBox="0 0 24 24">
+                                                        <circle cx="12" cy="12" r="10" fill="#fff" stroke="#2274A5" stroke-width="2" />
+                                                        <text x="12" y="17" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="15" dy="-2" fill="#2274A5">?</text>
+                                                    </svg>
+                                                </button>
+                                                <div class="ctrl-desc-tooltip">
+                                                    <b>Description:</b>
+                                                    <div th:utext="${#strings.escapeXml(ctrl.detail) ?: 'No detail'}"></div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span th:text="${controlAnswers != null and controlAnswers[ctrl.id] != null ? controlAnswers[ctrl.id] : 'No answer'}"></span>
+                                        </td>
+                                    </th:block>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
+            <!-- End Enhanced Domain/Control Table Blocks -->
         </div>
-        <script>
-            function toggleDomain(header) {
-                var controlsDiv = header.nextElementSibling;
-                if (controlsDiv.style.display === 'none' || controlsDiv.style.display === '') {
-                    controlsDiv.style.display = 'block';
-                } else {
-                    controlsDiv.style.display = 'none';
-                }
-            }
-        </script>
-        </section>
         </div> <!-- end not CLOSED div -->
     </div>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        // Enhanced Collapsible and Tooltip JS copied/inspired from assessment-details
+        function toggleDomain(header) {
+            var controlsDiv = header.nextElementSibling;
+            if (controlsDiv.style.display === 'none' || controlsDiv.style.display === '') {
+                controlsDiv.style.display = 'block';
+            } else {
+                controlsDiv.style.display = 'none';
+            }
+        }
+        function toggleDesc(btn) {
+            var $tooltip = $(btn).siblings('.ctrl-desc-tooltip');
+            $('.ctrl-desc-tooltip').not($tooltip).fadeOut(120);
+            $tooltip.fadeToggle(120);
+        }
+        $(document).on('mousedown keydown', function (e) {
+            if (!$(e.target).closest('.ctrl-desc-wrap').length) {
+                $('.ctrl-desc-tooltip').fadeOut(120);
+            }
+        });
+        // SVG for a checkmark
+        const CHECKMARK_SVG = `<svg width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" stroke="#22b573" stroke-width="2" fill="#fff"/><polyline points="6,12 10,16 16,7" stroke="#22b573" stroke-width="2.5" fill="none"/></svg>`;
+        function checkDomainCompleteness() {
+            document.querySelectorAll(".domain-checkmark").forEach(function (checkmarkSpan) {
+                const domainId = checkmarkSpan.getAttribute("data-domain-id");
+                const selects = document.querySelectorAll(`.answer-select[data-domain-id='${domainId}']`);
+                let allAnswered = true;
+                if (selects.length === 0) allAnswered = false;
+                selects.forEach(select => {
+                    if (!select.value) allAnswered = false;
+                });
+                checkmarkSpan.innerHTML = allAnswered ? CHECKMARK_SVG : "";
+            });
+        }
+        document.addEventListener("DOMContentLoaded", function () {
+            checkDomainCompleteness();
+            document.body.addEventListener("change", function (e) {
+                if (e.target.classList.contains("answer-select")) {
+                    checkDomainCompleteness();
+                }
+            });
+        });
+    </script>
     <script>
         $(document).ready(function () {
             let assessmentId = /*[[${assessment.id}]]*/[[${ assessment.id }]];
@@ -193,7 +226,7 @@
                 }
                 if (assessmentId && controlId) {
                     $.post({
-                        url: '/assessment/' + assessmentId + '/answer',
+                        url: '/assessment/' + assessmentId + '/answer', // <-- Respect existing backend logic
                         data: {
                             controlId: controlId,
                             answerId: answerId
@@ -212,7 +245,6 @@
             });
         });
     </script>
-
     <style>
         .answer-feedback {
             display: inline-block;
@@ -221,34 +253,26 @@
             vertical-align: middle;
             margin-left: 5px;
         }
-
         .answer-feedback svg {
             width: 18px;
             height: 18px;
         }
-
         .answer-success {
             color: #33aa33;
         }
-
         .answer-error {
             color: #cc2222;
         }
-    </style>
-    <style>
         .ctrl-desc-tooltip-icon {
             display: inline-block;
             position: relative;
             cursor: pointer;
         }
-
         .ctrl-desc-tooltip-icon svg {
             vertical-align: middle;
         }
-
         .ctrl-desc-tooltip {
-            visibility: hidden;
-            opacity: 0;
+            display: none;
             background: #fffbe8;
             color: #333;
             border: 1px solid #d4cead;
@@ -261,20 +285,13 @@
             top: -10px;
             z-index: 99;
             box-shadow: 0 0 10px 2px #0001;
-            transition: opacity 0.24s, visibility 0.24s;
             font-size: 0.95em;
             line-height: 1.3em;
             text-align: left;
             white-space: normal;
         }
+        
 
-        /* Show the tooltip on hover or focus */
-        .ctrl-desc-tooltip-icon:hover .ctrl-desc-tooltip,
-        .ctrl-desc-tooltip-icon:focus .ctrl-desc-tooltip,
-        .ctrl-desc-tooltip-icon:focus-within .ctrl-desc-tooltip {
-            visibility: visible;
-            opacity: 1;
-        }
     </style>
 </body>
 
