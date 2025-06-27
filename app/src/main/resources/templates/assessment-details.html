@@ -163,7 +163,7 @@
             const $select = $('#orgunit-select');
             $select.prop('disabled', true);
             $select.html('<option>Loading...</option>');
-            var currentOrgUnitId = /*[[${assessment.orgUnit != null ? assessment.orgUnit.id : ''}]]*/ '';
+            var currentOrgUnitId = window.currentOrgUnitId || '';
             $.getJSON('/assessmentdetails/orgunits', function (units) {
                 $select.empty();
                 $select.append($('<option>').val('').text('-- Please choose an organization unit --'));
@@ -389,8 +389,9 @@
     </script>
     <script th:inline="javascript">
         /*<![CDATA[*/
-        // Expose assessmentId globally for modal JS usage
+        // Expose assessmentId and currentOrgUnitId globally for modal JS usage
         window.assessmentId = /*[[${assessment.id}]]*/ 0;
+        window.currentOrgUnitId = /*[[${assessment.orgUnit != null ? assessment.orgUnit.id : ''}]]*/ '';
         /*]]>*/
     </script>
 </body>
