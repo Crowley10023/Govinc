@@ -174,7 +174,11 @@ public class AssessmentReporter {
             // Gather all control answers, including per-service
             java.util.List<SecurityControl> allControls = assessment.getSecurityCatalog().getSecurityControls();
             java.util.Map<Long, AssessmentControlAnswer> answerMap = answers.stream()
-                    .collect(Collectors.toMap(a -> a.getSecurityControl().getId(), a -> a));
+                    .collect(Collectors.toMap(
+                        a -> a.getSecurityControl().getId(),
+                        a -> a,
+                        (a1, a2) -> a1 // If duplicate, keep the first
+                    ));
             java.util.List<OrgUnit> allUnits = new java.util.ArrayList<>();
             if (orgUnit != null)
                 allUnits.add(orgUnit);
@@ -476,7 +480,11 @@ public class AssessmentReporter {
             // Gather all controls, answers, and scoring (same as in PDF report)
             java.util.List<SecurityControl> allControls = assessment.getSecurityCatalog().getSecurityControls();
             java.util.Map<Long, AssessmentControlAnswer> answerMap = answers.stream()
-                    .collect(java.util.stream.Collectors.toMap(a -> a.getSecurityControl().getId(), a -> a));
+                    .collect(java.util.stream.Collectors.toMap(
+                        a -> a.getSecurityControl().getId(),
+                        a -> a,
+                        (a1, a2) -> a1 // If duplicate, keep the first
+                    ));
 
             // --- 1. General Info ---
             org.apache.poi.xwpf.usermodel.XWPFParagraph genInfoHeader = doc.createParagraph();

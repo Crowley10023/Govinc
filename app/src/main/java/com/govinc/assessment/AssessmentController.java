@@ -340,14 +340,17 @@ public class AssessmentController {
                                             if (osac.isApplicable() && osac.getSecurityControl() != null
                                                     && osac.getSecurityControl().getId().equals(ctrlId)) {
                                                 inheritedPercent = osac.getPercent();
-                                                MaturityAnswer closest = findClosestMaturityAnswer(assessment.getSecurityCatalog().getMaturityModel(), inheritedPercent);
-    if (closest != null) {
-        AssessmentControlAnswer aca = new AssessmentControlAnswer(control, closest);
-        aca = assessmentControlAnswerRepository.save(aca);
-        detailsAnswers.add(aca);
-        answersPersisted = true;
-        localControlAnswers.put(ctrlId, aca);
-    }
+                                                MaturityAnswer closest = findClosestMaturityAnswer(
+                                                        assessment.getSecurityCatalog().getMaturityModel(),
+                                                        inheritedPercent);
+                                                if (closest != null) {
+                                                    AssessmentControlAnswer aca = new AssessmentControlAnswer(control,
+                                                            closest);
+                                                    aca = assessmentControlAnswerRepository.save(aca);
+                                                    detailsAnswers.add(aca);
+                                                    answersPersisted = true;
+                                                    localControlAnswers.put(ctrlId, aca);
+                                                }
                                                 break;
                                             }
                                         }
@@ -492,12 +495,13 @@ public class AssessmentController {
         return "redirect:/assessment/list";
     }
 
-    // Download Word report using Apache POI (via AssessmentReporter)
     @GetMapping("/{id}/word-report")
     public ResponseEntity<byte[]> downloadWordReport(@PathVariable Long id) {
+        System.out.println("Requested word report for assessment " + id);
         Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
         Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
         if (assessmentOpt.isEmpty() || detailsOpt.isEmpty()) {
+            System.out.println("Assessment or details not found for ID: " + id);
             return ResponseEntity.notFound().build();
         }
         Assessment assessment = assessmentOpt.get();
@@ -515,6 +519,7 @@ public class AssessmentController {
                             .parseMediaType("application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
                     .body(wordBytes);
         } catch (Exception e) {
+            e.printStackTrace(); // <-- Add this line
             byte[] failBytes = ("Error creating Word document: " + e.getMessage()).getBytes(StandardCharsets.UTF_8);
             return ResponseEntity.internalServerError()
                     .contentType(MediaType.APPLICATION_OCTET_STREAM)
