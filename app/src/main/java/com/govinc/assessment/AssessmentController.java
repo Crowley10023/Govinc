@@ -422,6 +422,35 @@ public class AssessmentController {
         return "redirect:/assessment/list";
     }
 
+    // Download Word report using Apache POI (via AssessmentReporter)
+    @GetMapping("/{id}/word-report")
+    public ResponseEntity<byte[]> downloadWordReport(@PathVariable Long id) {
+        Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
+        if (assessmentOpt.isEmpty() || detailsOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        Assessment assessment = assessmentOpt.get();
+        AssessmentDetails details = detailsOpt.get();
+        List<User> users = assessment.getUsers() != null ? new ArrayList<>(assessment.getUsers()) : new ArrayList<>();
+        OrgUnit orgUnit = assessment.getOrgUnit();
+        List<AssessmentControlAnswer> answers = (details.getControlAnswers() != null)
+                ? new ArrayList<>(details.getControlAnswers())
+                : new ArrayList<>();
+        try {
+            byte[] wordBytes = assessmentReporter.createWordReport(assessment, details, users, orgUnit, answers);
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=assessment_" + id + ".docx")
+                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+                    .body(wordBytes);
+        } catch (Exception e) {
+            byte[] failBytes = ("Error creating Word document: " + e.getMessage()).getBytes(StandardCharsets.UTF_8);
+            return ResponseEntity.internalServerError()
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .body(failBytes);
+        }
+    }
+
     // Download PDF using iText (via AssessmentReporter)
     @GetMapping("/{id}/report")
     public ResponseEntity<byte[]> downloadReport(@PathVariable Long id) {

@@ -296,6 +296,14 @@
         <form th:action="@{'/assessment/' + ${assessment.id} + '/report'}" method="get" style="margin: 0;">
             <button type="submit" class="btn-nav">Create Report (PDF)</button>
         </form>
+        <form th:action="@{'/assessment/' + ${assessment.id} + '/word-report'}" method="get" style="margin: 0;">
+            <button type="submit" class="btn-nav">Create Report (Word)</button>
+        </form>
+        <!-- keep PDF button as primary, Word as next -->
+        <!-- The original PDF export button -->
+        <form th:action="@{'/assessment/' + ${assessment.id} + '/report'}" method="get" style="display:none;">
+            <button type="submit" class="btn-nav">Create Report (PDF)</button>
+        </form>
         <form th:action="@{'/assessment/' + ${assessment.id} + '/excel'}" method="get" style="margin: 0;">
             <button type="submit" class="btn-nav">Export to Excel</button>
         </form>
