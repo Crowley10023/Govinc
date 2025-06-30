@@ -219,6 +219,7 @@ public class AssessmentController {
     }
 
     private static MaturityAnswer findClosestMaturityAnswer(List<MaturityAnswer> answers, int percent) {
+
         if (answers == null || answers.isEmpty()) {
             throw new IllegalArgumentException("No maturity answers provided");
         }
@@ -271,18 +272,25 @@ public class AssessmentController {
                 }
             }
             // Try to fill answers from Org Service for all controls not answered locally
+            System.out.println("\n\n......checking org services");
             if (assessment.getOrgServices() != null) {
+                System.out.println("......s1");
                 for (OrgService orgService : assessment.getOrgServices()) {
                     List<OrgServiceAssessment> osaList = orgServiceAssessmentRepository
                             .findByOrgServiceId(orgService.getId());
+                    
                     if (osaList != null) {
+                        System.out.println("......s2");
                         for (OrgServiceAssessment osa : osaList) {
                             if (osa.getControls() != null) {                                
+                                System.out.println("......s3");
                                 for (OrgServiceAssessmentControl osac : osa.getControls()) {
                                     Long ctrlId = osac.getSecurityControl().getId();
                                     if (answeredControls.contains(ctrlId) && osac.isApplicable()) {
+                                        System.out.println(" applicable: " + osac.getSecurityControl().getName());
                                         MaturityAnswer closest = findClosestMaturityAnswer(maturityAnswers,
                                                 osac.getPercent());
+                                        System.out.println("  closest: " + closest);
                                         if (closest != null) {
                                             controlAnswers.put(ctrlId, closest.getAnswer());
                                             controlAnswerIsTakenOver.put(ctrlId, Boolean.TRUE);

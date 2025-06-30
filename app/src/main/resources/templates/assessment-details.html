@@ -170,15 +170,16 @@
                                             <td>
                                                 <span style="white-space:nowrap;">
                                                     <select th:name="${'control_' + ctrl.id}"
-                                                        th:data-control-id="${ctrl.id}" th:data-domain-id="${domain.id}"
-                                                        class="answer-select"
-                                                        th:disabled="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])}"
-                                                        th:classappend="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])} ? 'taken-over' : ''">
-                                                        <option value="">-- select an answer --</option>
-                                                        <option th:each="ans : ${maturityAnswers}" th:value="${ans.id}"
-                                                            th:selected="${controlAnswers != null and controlAnswers[ctrl.id] != null} ? ${ans.answer} == ${controlAnswers[ctrl.id]} : false"
-                                                            th:text="${ans.answer}"></option>
-                                                    </select>
+                                                    th:data-control-id="${ctrl.id}" th:data-domain-id="${domain.id}"
+                                                    class="answer-select"
+                                                    th:disabled="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])}"
+                                                    th:classappend="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])} ? 'taken-over' : ''">
+                                                    <option value="">-- select an answer --</option>
+                                                    <option th:each="ans : ${maturityAnswers}" th:value="${ans.id}"
+                                                        th:selected="${controlDisplayAnswers != null and controlDisplayAnswers[ctrl.id] != null} ? ${ans.id.toString()} == ${controlDisplayAnswers[ctrl.id].toString()} : false"
+                                                        th:text="${ans.answer}"></option>
+                                                </select>
+                                                <!-- DEBUG: ctrl.id=${ctrl.id}, takenOver=${controlAnswerIsTakenOver[ctrl.id]}, displayAnswer=${controlDisplayAnswers[ctrl.id]} -->
                                                     <span class="answer-feedback"></span>
                                                     <span
                                                         th:if="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])}"
