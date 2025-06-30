@@ -394,9 +394,7 @@ public class AssessmentController {
             // Also pass orgServices for details view
             model.addAttribute("orgServices", assessment.getOrgServices());
             return "assessment-details";
-        } else
-
-        {
+        } else {
             return "assessment-not-found";
         }
     }
