@@ -87,7 +87,6 @@ public class AssessmentController {
     // POST handler for create-assessment
     @PostMapping("/create")
     public String createAssessment(
-            @RequestParam("name") String name,
             @RequestParam("catalogId") Long catalogId,
             @RequestParam(value = "orgUnitId", required = false) Long orgUnitId,
             @RequestParam(value = "userIds", required = false) List<Long> userIds,
@@ -98,7 +97,16 @@ public class AssessmentController {
             return "redirect:/assessment/list";
         }
         Assessment assessment = new Assessment();
-        assessment.setName(name);
+        // Generate assessment name as OrgUnitName_YYYY-MM-DD
+        String generatedName = "Assessment_" + java.time.LocalDate.now();
+        if (orgUnitId != null) {
+            OrgUnit orgUnit = orgUnitService.getOrgUnit(orgUnitId).orElse(null);
+            if (orgUnit != null) {
+                generatedName = orgUnit.getName().replaceAll("[^a-zA-Z0-9]+", "_") + "_" + java.time.LocalDate.now();
+                assessment.setOrgUnit(orgUnit);
+            }
+        }
+        assessment.setName(generatedName);
         assessment.setSecurityCatalog(catalog);
         assessment.setDate(LocalDate.now());
         // Persist org unit if set
@@ -125,7 +133,7 @@ public class AssessmentController {
             assessment.setOrgServices(orgServices);
         }
         assessment = assessmentRepository.save(assessment);
-        return "redirect:/assessment/" + assessment.getId() + "/controls";
+        return "redirect:/assessment/" + assessment.getId(); // Jump directly to details
     }
 
     @GetMapping("/list")
