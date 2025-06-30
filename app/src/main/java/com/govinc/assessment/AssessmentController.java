@@ -218,12 +218,14 @@ public class AssessmentController {
         return "redirect:/assessment/" + id;
     }
 
-    private static MaturityAnswer findClosestMaturityAnswer(List<MaturityAnswer> answers, int percent) {
-
-        if (answers == null || answers.isEmpty()) {
+    private static MaturityAnswer findClosestMaturityAnswer(com.govinc.maturity.MaturityModel maturityModel,
+            int percent) {
+        if (maturityModel == null || maturityModel.getMaturityAnswers() == null
+                || maturityModel.getMaturityAnswers().isEmpty()) {
             throw new IllegalArgumentException("No maturity answers provided");
         }
-        MaturityAnswer closest = answers.get(0); // Always fallback to the first
+        List<MaturityAnswer> answers = new ArrayList<>(maturityModel.getMaturityAnswers());
+        MaturityAnswer closest = answers.get(0);
         int minDiff = Math.abs(closest.getRating() - percent);
         for (MaturityAnswer ans : answers) {
             int diff = Math.abs(ans.getRating() - percent);
@@ -242,27 +244,17 @@ public class AssessmentController {
             Assessment assessment = assessmentOpt.get();
             model.addAttribute("assessment", assessment);
 
-            // Control answers are always retrieved from AssessmentDetails
-            // --- ADDED: Org Service inheritance logic START ---
-            Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
-            AssessmentDetails details = detailsOpt.orElse(null);
-            List<AssessmentControlAnswer> answers = new ArrayList<>();
-            Map<Long, String> controlAnswers = new HashMap<>();
-            Set<Long> answeredControls = new HashSet<>();
-            if (details != null && details.getControlAnswers() != null) {
-                answers.addAll(details.getControlAnswers());
-                for (AssessmentControlAnswer aca : details.getControlAnswers()) {
-                    if (aca.getSecurityControl() != null && aca.getMaturityAnswer() != null) {
-                        controlAnswers.put(aca.getSecurityControl().getId(), aca.getMaturityAnswer().getAnswer());
-                        answeredControls.add(aca.getSecurityControl().getId());
-                    }
-                }
+            // All security controls from the assessment's security catalog
+            List<SecurityControl> controls = new ArrayList<>();
+            if (assessment.getSecurityCatalog() != null) {
+                controls.addAll(assessment.getSecurityCatalog().getSecurityControls());
+                controls.sort(Comparator.comparing(SecurityControl::getName, Comparator.nullsLast(String::compareTo)));
             }
-            // Prepare taken-over map and supply prefilled answers for inherited responses
-            Map<Long, Boolean> controlAnswerIsTakenOver = new HashMap<>();
-            Map<Long, String> controlTakenOverOrgServiceName = new HashMap<>();
-            Map<Integer, String> percentToAnswer = new HashMap<>();
+            model.addAttribute("controls", controls);
+
+            // Prepare maturity answers/answers by percent
             List<MaturityAnswer> maturityAnswers = new ArrayList<>();
+            Map<Integer, String> percentToAnswer = new HashMap<>();
             if (assessment.getSecurityCatalog() != null && assessment.getSecurityCatalog().getMaturityModel() != null) {
                 maturityAnswers.addAll(assessment.getSecurityCatalog().getMaturityModel().getMaturityAnswers());
                 maturityAnswers
@@ -271,30 +263,48 @@ public class AssessmentController {
                     percentToAnswer.put(ma.getRating(), ma.getAnswer());
                 }
             }
-            // Try to fill answers from Org Service for all controls not answered locally
-            System.out.println("\n\n......checking org services");
+            model.addAttribute("maturityAnswers", maturityAnswers);
+
+            // Retrieve existing details/answers
+            Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
+            AssessmentDetails details = detailsOpt.orElse(null);
+            Map<Long, AssessmentControlAnswer> localControlAnswers = new HashMap<>();
+            if (details != null && details.getControlAnswers() != null) {
+                for (AssessmentControlAnswer aca : details.getControlAnswers()) {
+                    if (aca.getSecurityControl() != null && aca.getMaturityAnswer() != null) {
+                        localControlAnswers.put(aca.getSecurityControl().getId(), aca);
+                    }
+                }
+            }
+
+            // Prepare output maps
+            Map<Long, String> controlAnswers = new HashMap<>();
+            Map<Long, Boolean> controlAnswerIsTakenOver = new HashMap<>();
+            Map<Long, String> controlTakenOverOrgServiceName = new HashMap<>();
+            List<AssessmentControlAnswer> answers = new ArrayList<>();
+
+            // Prepare Org Service answers for controls
+            Map<Long, OrgServiceInfo> bestOrgServiceAnswer = new HashMap<>();
             if (assessment.getOrgServices() != null) {
-                System.out.println("......s1");
                 for (OrgService orgService : assessment.getOrgServices()) {
                     List<OrgServiceAssessment> osaList = orgServiceAssessmentRepository
                             .findByOrgServiceId(orgService.getId());
-                    
                     if (osaList != null) {
-                        System.out.println("......s2");
                         for (OrgServiceAssessment osa : osaList) {
-                            if (osa.getControls() != null) {                                
-                                System.out.println("......s3");
+                            if (osa.getControls() != null) {
                                 for (OrgServiceAssessmentControl osac : osa.getControls()) {
-                                    Long ctrlId = osac.getSecurityControl().getId();
-                                    if (answeredControls.contains(ctrlId) && osac.isApplicable()) {
-                                        System.out.println(" applicable: " + osac.getSecurityControl().getName());
-                                        MaturityAnswer closest = findClosestMaturityAnswer(maturityAnswers,
-                                                osac.getPercent());
-                                        System.out.println("  closest: " + closest);
-                                        if (closest != null) {
-                                            controlAnswers.put(ctrlId, closest.getAnswer());
-                                            controlAnswerIsTakenOver.put(ctrlId, Boolean.TRUE);
-                                            controlTakenOverOrgServiceName.put(ctrlId, orgService.getName());
+                                    if (osac.isApplicable() && osac.getSecurityControl() != null) {
+                                        Long ctrlId = osac.getSecurityControl().getId();
+                                        // Prefer first found inherited answer; if multiple org services answer for the
+                                        // same control, keep first
+                                        if (!bestOrgServiceAnswer.containsKey(ctrlId)) {
+                                            MaturityAnswer closest = findClosestMaturityAnswer(
+                                                    assessment.getSecurityCatalog().getMaturityModel(),
+                                                    osac.getPercent());
+                                            if (closest != null) {
+                                                bestOrgServiceAnswer.put(ctrlId,
+                                                        new OrgServiceInfo(closest, orgService.getName()));
+                                            }
                                         }
                                     }
                                 }
@@ -304,33 +314,74 @@ public class AssessmentController {
                 }
             }
 
-            // Defensive: always set even if empty
-            if (controlAnswerIsTakenOver == null) {
-                controlAnswerIsTakenOver = new HashMap<>();
+            // Main logic: iterate all controls, set answer with orgService inherited
+            // PRECEDENCE
+            boolean answersPersisted = false;
+            Set<AssessmentControlAnswer> detailsAnswers = (details != null && details.getControlAnswers() != null)
+                    ? new HashSet<>(details.getControlAnswers())
+                    : new HashSet<>();
+            for (SecurityControl control : controls) {
+                Long ctrlId = control.getId();
+                if (bestOrgServiceAnswer.containsKey(ctrlId)) {
+                    OrgServiceInfo inh = bestOrgServiceAnswer.get(ctrlId);
+                    controlAnswers.put(ctrlId, inh.answer.getAnswer());
+                    controlAnswerIsTakenOver.put(ctrlId, Boolean.TRUE);
+                    controlTakenOverOrgServiceName.put(ctrlId, inh.orgServiceName);
+
+                    int inheritedPercent = -1;
+                    if (assessment.getOrgServices() != null) {
+                        for (OrgService orgService : assessment.getOrgServices()) {
+                            List<OrgServiceAssessment> osaList = orgServiceAssessmentRepository
+                                    .findByOrgServiceId(orgService.getId());
+                            if (osaList != null) {
+                                for (OrgServiceAssessment osa : osaList) {
+                                    if (osa.getControls() != null) {
+                                        for (OrgServiceAssessmentControl osac : osa.getControls()) {
+                                            if (osac.isApplicable() && osac.getSecurityControl() != null
+                                                    && osac.getSecurityControl().getId().equals(ctrlId)) {
+                                                inheritedPercent = osac.getPercent();
+                                                MaturityAnswer closest = findClosestMaturityAnswer(assessment.getSecurityCatalog().getMaturityModel(), inheritedPercent);
+    if (closest != null) {
+        AssessmentControlAnswer aca = new AssessmentControlAnswer(control, closest);
+        aca = assessmentControlAnswerRepository.save(aca);
+        detailsAnswers.add(aca);
+        answersPersisted = true;
+        localControlAnswers.put(ctrlId, aca);
+    }
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                } else if (localControlAnswers.containsKey(ctrlId)) {
+                    AssessmentControlAnswer aca = localControlAnswers.get(ctrlId);
+                    controlAnswers.put(ctrlId, aca.getMaturityAnswer().getAnswer());
+                    controlAnswerIsTakenOver.put(ctrlId, Boolean.FALSE);
+                } else {
+                    controlAnswers.put(ctrlId, null);
+                    controlAnswerIsTakenOver.put(ctrlId, Boolean.FALSE);
+                }
             }
-            model.addAttribute("controlAnswerIsTakenOver", controlAnswerIsTakenOver);
-            model.addAttribute("controlTakenOverOrgServiceName", controlTakenOverOrgServiceName);
+            // Save auto-assigned inherited answers if any were added
+            if (answersPersisted && details != null) {
+                details.setControlAnswers(detailsAnswers);
+                assessmentDetailsService.save(details);
+            }
+            // For backward compatibility in template, still give list of "answers" from
+            // local answers only
+            answers.addAll(localControlAnswers.values());
 
             model.addAttribute("answers", answers);
             model.addAttribute("controlAnswers", controlAnswers);
-            if (controlAnswerIsTakenOver == null) {
-                controlAnswerIsTakenOver = new HashMap<>();
-            }
             model.addAttribute("controlAnswerIsTakenOver", controlAnswerIsTakenOver);
             model.addAttribute("controlTakenOverOrgServiceName", controlTakenOverOrgServiceName);
 
             // Summary table by answer type
             model.addAttribute("answerSummary", assessmentDetailsService.computeAnswerSummary(details));
-
-            // Use only controls from the catalog assigned to this assessment
-            // Sorted controls by name
-            List<SecurityControl> controls = new ArrayList<>();
-            if (assessment.getSecurityCatalog() != null) {
-                controls.addAll(assessment.getSecurityCatalog().getSecurityControls());
-                controls.sort(Comparator.comparing(SecurityControl::getName, Comparator.nullsLast(String::compareTo)));
-            }
-            model.addAttribute("controls", controls);
-            model.addAttribute("maturityAnswers", maturityAnswers);
 
             // --- Pass securityControlDomains: all unique domains of controls in this
             // catalog ---
@@ -343,9 +394,22 @@ public class AssessmentController {
             // Also pass orgServices for details view
             model.addAttribute("orgServices", assessment.getOrgServices());
             return "assessment-details";
-        } else {
+        } else
+
+        {
             return "assessment-not-found";
         }
+    }
+
+    static class OrgServiceInfo {
+        final MaturityAnswer answer;
+        final String orgServiceName;
+
+        public OrgServiceInfo(MaturityAnswer a, String orgServiceName) {
+            this.answer = a;
+            this.orgServiceName = orgServiceName;
+        }
+
     }
 
     // Save/update answer for a single control (AJAX POST from UI)
@@ -449,7 +513,8 @@ public class AssessmentController {
             byte[] wordBytes = assessmentReporter.createWordReport(assessment, details, users, orgUnit, answers);
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=assessment_" + id + ".docx")
-                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+                    .contentType(MediaType
+                            .parseMediaType("application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
                     .body(wordBytes);
         } catch (Exception e) {
             byte[] failBytes = ("Error creating Word document: " + e.getMessage()).getBytes(StandardCharsets.UTF_8);
@@ -539,12 +604,14 @@ public class AssessmentController {
     @ResponseBody
     public List<User> updateAssessmentUsers(@PathVariable Long id, @RequestBody List<Long> userIds) {
         Optional<Assessment> opt = assessmentRepository.findById(id);
-        if (opt.isEmpty()) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND);
+        if (opt.isEmpty())
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.NOT_FOUND);
         Assessment assessment = opt.get();
         Set<User> users = userIds.stream()
-            .map(uid -> userRepository.findById(uid).orElse(null))
-            .filter(Objects::nonNull)
-            .collect(Collectors.toSet());
+                .map(uid -> userRepository.findById(uid).orElse(null))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
         assessment.setUsers(users);
         assessment = assessmentRepository.save(assessment);
         return new ArrayList<>(users);
