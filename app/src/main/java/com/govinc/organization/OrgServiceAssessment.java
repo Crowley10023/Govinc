@@ -22,19 +22,43 @@ public class OrgServiceAssessment {
     @OneToMany(mappedBy = "orgServiceAssessment", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrgServiceAssessmentControl> controls = new ArrayList<>();
 
-    public OrgServiceAssessment() {}
+    public OrgServiceAssessment() {
+    }
 
     public OrgServiceAssessment(OrgService orgService, LocalDate assessmentDate) {
         this.orgService = orgService;
         this.assessmentDate = assessmentDate;
     }
 
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public OrgService getOrgService() { return orgService; }
-    public void setOrgService(OrgService orgService) { this.orgService = orgService; }
-    public LocalDate getAssessmentDate() { return assessmentDate; }
-    public void setAssessmentDate(LocalDate assessmentDate) { this.assessmentDate = assessmentDate; }
-    public List<OrgServiceAssessmentControl> getControls() { return controls; }
-    public void setControls(List<OrgServiceAssessmentControl> controls) { this.controls = controls; }
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public OrgService getOrgService() {
+        return orgService;
+    }
+
+    public void setOrgService(OrgService orgService) {
+        this.orgService = orgService;
+    }
+
+    public LocalDate getAssessmentDate() {
+        return assessmentDate;
+    }
+
+    public void setAssessmentDate(LocalDate assessmentDate) {
+        this.assessmentDate = assessmentDate;
+    }
+
+    public List<OrgServiceAssessmentControl> getControls() {
+        return controls;
+    }
+
+    public void setControls(List<OrgServiceAssessmentControl> controls) {
+        this.controls = controls;
+    }
 }

@@ -314,13 +314,15 @@ public class AssessmentReporter {
                     src = "-";
                     foundServiceAnswer = false;
 
-                    if (assessment.getOrgServices() != null) {
+                    // Only use an org service answer if this control is actually covered (mapped) by this org service AND is applicable
+if (assessment.getOrgServices() != null) {
     for (com.govinc.organization.OrgService orgService : assessment.getOrgServices()) {
         com.govinc.organization.OrgServiceAssessment osa = orgServiceAssessmentService.findOrCreateAssessment(orgService.getId());
         if (osa != null && osa.getControls() != null) {
             for (com.govinc.organization.OrgServiceAssessmentControl osac : osa.getControls()) {
-                if (osac.getSecurityControl() != null && osac.getSecurityControl().getId().equals(ctrl.getId())) {
+                if (osac.getSecurityControl() != null && osac.getSecurityControl().getId().equals(ctrl.getId()) && osac.isApplicable()) {
                     Integer osPercent = osac.getPercent();
+                    // percent is always set (not Integer) in this model, but check logic preserved if model changes
                     if (osPercent != null) {
                         // Find the closest maturity answer
                         java.util.Set<com.govinc.maturity.MaturityAnswer> maturityAnswersSet =
@@ -343,6 +345,7 @@ public class AssessmentReporter {
         if (foundServiceAnswer) break;
     }
 }
+
 
                     // If no org service provided an answer, use assessment answer if available
                     if (!foundServiceAnswer && answerMap.containsKey(ctrl.getId())) {
