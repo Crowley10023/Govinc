@@ -1,22 +1,28 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
+
 <head>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <meta charset="UTF-8">
     <title>Assessment List</title>
     <link rel="stylesheet" href="/style.css">
 </head>
+
 <body>
     <div th:replace="~{navigation :: mainNav}"></div>
     <div class="container">
-        <h1 class="page-title">Assessments</h1>
-        <nav class="secondary-nav">
-            <a href="/assessment/create" class="btn-nav btn-secondary">Create New Assessment</a>
-        </nav>
-        
-            
-        
-        <section>
+         <section>
+            <div class="filters" style="margin-bottom: 1em; display: flex; align-items: center; gap: 1em;">
+                <button id="orgUnitFilterBtn" class="btn btn-secondary" type="button">Org Unit</button>
+                <span id="activeOrgUnitFilter" style="display:none; align-items: center;" class="badge">
+                    <span id="orgUnitFilterName"></span>
+                    <svg id="clearOrgUnitFilter" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16"
+                        height="16" style="margin-left:0.5em;cursor:pointer;">
+                        <circle cx="8" cy="8" r="8" fill="#ccc" />
+                        <path d="M5 5l6 6M11 5l-6 6" stroke="#333" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                </span>
+            </div>
             <table class="table card">
                 <thead>
                     <tr>
@@ -27,8 +33,9 @@
                         <th>Actions</th>
                     </tr>
                 </thead>
-                <tbody>
-                    <tr th:each="assessment : ${assessments}">
+                <tbody id="assessmentTbody">
+                    <tr th:each="assessment : ${assessments}"
+                        th:data-orgunitid="${assessment.orgUnit != null ? assessment.orgUnit.id : 0}">
                         <td th:text="${assessment.name}"></td>
                         <td th:text="${assessment.date}"></td>
                         <td th:text="${assessment.status}"></td>
@@ -39,8 +46,124 @@
                     </tr>
                 </tbody>
             </table>
+            <!-- Org Unit Selection Modal -->
+            <div id="orgUnitModal"
+                style="display:none; position: fixed; z-index: 1001; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.25);">
+                <div
+                    style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: #fff; width: 70vw; max-width: 600px; height: 70vh; overflow: auto; padding: 1.5em; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.2);">
+                    <h2>Select Org Unit</h2>
+                    <div id="orgUnitList" style="margin-bottom: 2em;"></div>
+                    <button id="orgUnitConfirmBtn" class="btn btn-primary" type="button">Confirm</button>
+                    <button id="orgUnitCancelBtn" class="btn btn-secondary" type="button"
+                        style="margin-left:1em;">Cancel</button>
+                </div>
+            </div>
+            <script>
+                let orgUnitsCache = null;
+                let selectedOrgUnit = null;
+
+                document.getElementById('orgUnitFilterBtn').addEventListener('click', function () {
+                    document.getElementById('orgUnitModal').style.display = 'block';
+                    if (!orgUnitsCache) {
+                        fetch('/orgunits')
+                            .then(res => res.json())
+                            .then(orgUnits => {
+                                orgUnitsCache = orgUnits;
+                                populateOrgUnitList(orgUnits);
+                            });
+                    } else {
+                        populateOrgUnitList(orgUnitsCache);
+                    }
+                });
+                document.getElementById('orgUnitCancelBtn').onclick = function () {
+                    document.getElementById('orgUnitModal').style.display = 'none';
+                };
+                function populateOrgUnitList(units) {
+                    let listDiv = document.getElementById('orgUnitList');
+                    listDiv.innerHTML = '';
+                    if (!units || units.length === 0) {
+                        listDiv.innerHTML = '<div>No org units available.</div>';
+                        return;
+                    }
+                    let selectedId = selectedOrgUnit ? selectedOrgUnit.id : null;
+                    units.forEach(ou => {
+                        let label = document.createElement('label');
+                        label.style.display = 'block';
+                        label.style.marginBottom = '0.5em';
+                        let radio = document.createElement('input');
+                        radio.type = 'radio';
+                        radio.name = 'orgUnitChoice';
+                        radio.value = ou.id;
+                        radio.style.marginRight = '0.5em';
+                        if (selectedId && ou.id === selectedId) radio.checked = true;
+                        label.appendChild(radio);
+                        label.appendChild(document.createTextNode(ou.name));
+                        listDiv.appendChild(label);
+                        radio.addEventListener('change', () => {
+                            selectedOrgUnit = ou;
+                        });
+                    });
+                }
+                document.getElementById('orgUnitConfirmBtn').onclick = function () {
+                    // Always get the checked radio on confirm
+                    const checkedRadio = document.querySelector('#orgUnitList input[type=radio]:checked');
+                    if (checkedRadio) {
+                        selectedOrgUnit = orgUnitsCache.find(u => u.id == checkedRadio.value);
+                    } else {
+                        selectedOrgUnit = null;
+                    }
+                    document.getElementById('orgUnitModal').style.display = 'none';
+                    applyOrgUnitFilter();
+                };
+
+                document.getElementById('clearOrgUnitFilter').onclick = function () {
+                    selectedOrgUnit = null;
+                    applyOrgUnitFilter();
+                };
+                function applyOrgUnitFilter() {
+                    const tbody = document.getElementById('assessmentTbody');
+                    let rows = tbody.querySelectorAll('tr');
+                    let filterActive = !!selectedOrgUnit;
+                    rows.forEach(row => {
+                        if (filterActive) {
+                            let ouid = row.getAttribute('data-orgunitid');
+                            if (parseInt(ouid, 10) === selectedOrgUnit.id) {
+                                row.style.display = '';
+                            } else {
+                                row.style.display = 'none';
+                            }
+                        } else {
+                            row.style.display = '';
+                        }
+                    });
+
+                    // Show/hide filter badge
+                    let badge = document.getElementById('activeOrgUnitFilter');
+                    let nameSpan = document.getElementById('orgUnitFilterName');
+                    if (filterActive) {
+                        badge.style.display = 'inline-flex';
+                        nameSpan.textContent = selectedOrgUnit.name;
+                    } else {
+                        badge.style.display = 'none';
+                        nameSpan.textContent = '';
+                    }
+                }
+                // Modal close on click outside
+                document.getElementById('orgUnitModal').addEventListener('click', function (e) {
+                    if (e.target === this) {
+                        this.style.display = 'none';
+                    }
+                });
+                // Modal close on ESC
+                document.addEventListener('keydown', function (e) {
+                    if (e.key === 'Escape') {
+                        document.getElementById('orgUnitModal').style.display = 'none';
+                    }
+                });
+            </script>
         </section>
     </div>
-    
+
 </body>
+
 </html>
