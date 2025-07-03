@@ -13,51 +13,21 @@ public class DatabaseConfig {
     private String ddlAuto; // for spring.jpa.hibernate.ddl-auto
     private boolean showSql; // for spring.jpa.show-sql
 
-    public String getUrl() {
-        return url;
-    }
+    public String getUrl() { return url; }
+    public void setUrl(String url) { this.url = url; }
 
-    public void setUrl(String url) {
-        this.url = url;
-    }
+    public String getUsername() { return username; }
+    public void setUsername(String username) { this.username = username; }
 
-    public String getUsername() {
-        return username;
-    }
+    public String getPassword() { return password; }
+    public void setPassword(String password) { this.password = password; }
 
-    public void setUsername(String username) {
-        this.username = username;
-    }
+    public String getDriverClassName() { return driverClassName; }
+    public void setDriverClassName(String driverClassName) { this.driverClassName = driverClassName; }
 
-    public String getPassword() {
-        return password;
-    }
+    public String getDdlAuto() { return ddlAuto; }
+    public void setDdlAuto(String ddlAuto) { this.ddlAuto = ddlAuto; }
 
-    public void setPassword(String password) {
-        this.password = password;
-    }
-
-    public String getDriverClassName() {
-        return driverClassName;
-    }
-
-    public void setDriverClassName(String driverClassName) {
-        this.driverClassName = driverClassName;
-    }
-
-    public String getDdlAuto() {
-        return ddlAuto;
-    }
-
-    public void setDdlAuto(String ddlAuto) {
-        this.ddlAuto = ddlAuto;
-    }
-
-    public boolean isShowSql() {
-        return showSql;
-    }
-
-    public void setShowSql(boolean showSql) {
-        this.showSql = showSql;
-    }
+    public boolean isShowSql() { return showSql; }
+    public void setShowSql(boolean showSql) { this.showSql = showSql; }
 }
