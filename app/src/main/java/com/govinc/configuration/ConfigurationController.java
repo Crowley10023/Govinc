@@ -18,6 +18,9 @@ public class ConfigurationController {
     private DatabaseConfig dbConfig;
 
     @Autowired
+    private IamConfig iamConfig;
+
+    @Autowired
     private ApplicationContext applicationContext;
 
     @GetMapping("/database")
@@ -60,7 +63,47 @@ public class ConfigurationController {
     }
 
     @GetMapping("/iam")
-    public String iamConfig(Model model) {
+    public String iamConfigPage(Model model) {
+        model.addAttribute("iamConfig", iamConfig);
+        return "configuration-iam";
+    }
+    
+    @PostMapping("/iam/save")
+    public String saveIamConfig(@ModelAttribute IamConfig updatedConfig, Model model) {
+        System.out.println("Entering /iam/save POST handler");
+    
+        // Set in-memory config
+        iamConfig.setProvider(updatedConfig.getProvider());
+        iamConfig.setAzureClientId(updatedConfig.getAzureClientId());
+        iamConfig.setAzureClientSecret(updatedConfig.getAzureClientSecret());
+        iamConfig.setAzureTenantId(updatedConfig.getAzureTenantId());
+        iamConfig.setKeycloakIssuerUrl(updatedConfig.getKeycloakIssuerUrl());
+        iamConfig.setKeycloakRealm(updatedConfig.getKeycloakRealm());
+        iamConfig.setKeycloakClientId(updatedConfig.getKeycloakClientId());
+        iamConfig.setKeycloakClientSecret(updatedConfig.getKeycloakClientSecret());
+    
+        // Show the updated config
+        System.out.println("Updated IAM config: " + iamConfig);
+    
+        // Print working directory
+        String workingDir = System.getProperty("user.dir");
+        System.out.println("Current working directory: " + workingDir);
+    
+        // Show the intended path to application.properties
+        String targetPath = "/build/resources/application.properties";
+        System.out.println("Attempting to save IAM config to: " + targetPath);
+    
+        try {
+            IamConfigFileUtil.saveToPropertiesFile(iamConfig, targetPath);
+            model.addAttribute("message", "Configuration saved. Full reload may require restart.");
+            System.out.println("Save appears successful.");
+        } catch (Exception e) {
+            model.addAttribute("message", "ERROR: " + e.getMessage());
+            System.out.println("ERROR: Exception while saving: " + e.getMessage());
+            e.printStackTrace(System.out);
+        }
+        model.addAttribute("iamConfig", iamConfig);
+        System.out.println("Returning view: configuration-iam");
         return "configuration-iam";
     }
 }

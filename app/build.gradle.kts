@@ -22,6 +22,10 @@ dependencies {
     implementation("com.itextpdf:itextpdf:5.5.13.3") // iText PDF library (classic open source)
     implementation("org.apache.poi:poi-ooxml:5.2.3") // Apache POI for Word/Excel processing
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    implementation("org.springframework.boot:spring-boot-starter-security")
+    implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
+
 }
 
 application {
