@@ -31,7 +31,8 @@ public class ConfigurationController {
 
     @PostMapping("/database/check")
     @org.springframework.web.bind.annotation.ResponseBody
-    public java.util.Map<String, Object> checkDbConnection(@org.springframework.web.bind.annotation.RequestBody java.util.Map<String, String> params) {
+    public java.util.Map<String, Object> checkDbConnection(
+            @org.springframework.web.bind.annotation.RequestBody java.util.Map<String, String> params) {
         java.util.Map<String, Object> response = new java.util.HashMap<>();
         try {
             String url = params.get("url");
@@ -56,9 +57,41 @@ public class ConfigurationController {
         dbConfig.setDriverClassName(dbConfigForm.getDriverClassName());
         dbConfig.setDdlAuto(dbConfigForm.getDdlAuto());
         dbConfig.setShowSql(dbConfigForm.isShowSql());
-        // Dynamic reloading is hacky and not fully supported. Here, just say config saved.
         model.addAttribute("dbConfig", dbConfig);
-        model.addAttribute("message", "Configuration saved. Full dynamic reload may require restart.");
+
+        // Candidate paths for application.properties
+        String[] candidates = {
+                "app/src/main/resources/application.properties",
+                "app/build/resources/main/application.properties",
+                "build/resources/main/application.properties",
+                "src/main/resources/application.properties",
+                "build/resources/application.properties",
+                "application.properties"
+        };
+
+        String targetPath = null;
+        for (String candidate : candidates) {
+            java.io.File f = new java.io.File(candidate);
+            System.out.println("Checking for file: " + f.getAbsolutePath() + " (exists: " + f.exists() + ")");
+            if (f.exists()) {
+                targetPath = candidate;
+                break;
+            }
+        }
+        if (targetPath == null) {
+            targetPath = candidates[0];
+        }
+        System.out.println("Attempting to save DB config to: " + targetPath);
+
+        try {
+            DatabaseConfigFileUtil.saveToPropertiesFile(dbConfig, targetPath);
+            model.addAttribute("message", "Configuration saved. Full dynamic reload may require restart.");
+            System.out.println("Save appears successful.");
+        } catch (Exception e) {
+            model.addAttribute("message", "ERROR: " + e.getMessage());
+            System.out.println("ERROR: Exception while saving: " + e.getMessage());
+            e.printStackTrace(System.out);
+        }
         return "configuration-database";
     }
 
@@ -67,11 +100,11 @@ public class ConfigurationController {
         model.addAttribute("iamConfig", iamConfig);
         return "configuration-iam";
     }
-    
+
     @PostMapping("/iam/save")
     public String saveIamConfig(@ModelAttribute IamConfig updatedConfig, Model model) {
         System.out.println("Entering /iam/save POST handler");
-    
+
         // Set in-memory config
         iamConfig.setProvider(updatedConfig.getProvider());
         iamConfig.setAzureClientId(updatedConfig.getAzureClientId());
@@ -81,18 +114,33 @@ public class ConfigurationController {
         iamConfig.setKeycloakRealm(updatedConfig.getKeycloakRealm());
         iamConfig.setKeycloakClientId(updatedConfig.getKeycloakClientId());
         iamConfig.setKeycloakClientSecret(updatedConfig.getKeycloakClientSecret());
-    
+
         // Show the updated config
         System.out.println("Updated IAM config: " + iamConfig);
-    
+
         // Print working directory
         String workingDir = System.getProperty("user.dir");
         System.out.println("Current working directory: " + workingDir);
-    
+
         // Show the intended path to application.properties
-        String targetPath = "/build/resources/application.properties";
+
+        // Candidate paths
+        String[] candidates = {
+                "app/src/main/resources/application.properties",
+                "app/build/resources/main/application.properties",
+                "build/resources/main/application.properties",
+                "src/main/resources/application.properties",
+                "build/resources/application.properties",
+                "application.properties"
+        };
+        for (String candidate : candidates) {
+            java.io.File f = new java.io.File(candidate);
+            System.out.println("Checking for file: " + f.getAbsolutePath() + " (exists: " + f.exists() + ")");
+        }
+
+        String targetPath = "build/resources/main/application.properties ";
         System.out.println("Attempting to save IAM config to: " + targetPath);
-    
+
         try {
             IamConfigFileUtil.saveToPropertiesFile(iamConfig, targetPath);
             model.addAttribute("message", "Configuration saved. Full reload may require restart.");
