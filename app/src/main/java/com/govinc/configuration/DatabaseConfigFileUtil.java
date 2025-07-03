@@ -6,6 +6,7 @@ import java.util.Properties;
 public class DatabaseConfigFileUtil {
     public static void saveToPropertiesFile(DatabaseConfig dbConfig, String filename) throws IOException {
         java.io.File f = new java.io.File(filename);
+        System.out.println("\n\n f......" + f.getAbsolutePath());
 
         FileInputStream in = new FileInputStream(f);
         Properties props = new Properties();
