@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Database Configuration</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div th:replace="~{navigation :: mainNav}"></div>
+<div class="container">
+    <h2>Database Configuration</h2>
+    <form id="database-config-form" method="post" th:action="@{/configuration/database/save}">
+        <div>
+            <label for="dbUrl">JDBC URL:</label>
+            <input type="text" id="dbUrl" name="url" th:value="${dbConfig.url}" required />
+        </div>
+        <div>
+            <label for="dbUsername">Username:</label>
+            <input type="text" id="dbUsername" name="username" th:value="${dbConfig.username}" required />
+        </div>
+        <div>
+            <label for="dbPassword">Password:</label>
+            <input type="password" id="dbPassword" name="password" th:value="${dbConfig.password}" required />
+        </div>
+        <div>
+            <label for="dbDriver">Driver Class Name:</label>
+            <input type="text" id="dbDriver" name="driverClassName" th:value="${dbConfig.driverClassName}" required />
+        </div>
+        <div>
+            <label for="jpaDdlAuto">JPA DDL Auto:</label>
+            <input type="text" id="jpaDdlAuto" name="ddlAuto" th:value="${dbConfig.ddlAuto}" required />
+        </div>
+        <div>
+            <label for="jpaShowSql">Show SQL:</label>
+            <select id="jpaShowSql" name="showSql">
+                <option th:selected="${dbConfig.showSql}" value="true">true</option>
+                <option th:selected="${!dbConfig.showSql}" value="false">false</option>
+            </select>
+        </div>
+        <div style="margin-top:1em;">
+            <button type="submit" class="btn btn-primary">Approve & Apply</button>
+        </div>
+    </form>
+    <div th:if="${message}" style="margin-top:1em; color: green;">
+        <span th:text="${message}"></span>
+    </div>
+</div>
+</body>
+</html>
