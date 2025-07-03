@@ -26,6 +26,25 @@ public class ConfigurationController {
         return "configuration-database";
     }
 
+    @PostMapping("/database/check")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public java.util.Map<String, Object> checkDbConnection(@org.springframework.web.bind.annotation.RequestBody java.util.Map<String, String> params) {
+        java.util.Map<String, Object> response = new java.util.HashMap<>();
+        try {
+            String url = params.get("url");
+            String username = params.get("username");
+            String password = params.get("password");
+            String driverClassName = params.get("driverClassName");
+            Class.forName(driverClassName);
+            try (java.sql.Connection conn = java.sql.DriverManager.getConnection(url, username, password)) {
+                response.put("success", conn != null && !conn.isClosed());
+            }
+        } catch (Exception e) {
+            response.put("success", false);
+        }
+        return response;
+    }
+
     @PostMapping("/database/save")
     public String saveDatabaseConfig(@ModelAttribute DatabaseConfig dbConfigForm, Model model) {
         dbConfig.setUrl(dbConfigForm.getUrl());
