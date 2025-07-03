@@ -76,5 +76,28 @@ public class UserController {
     public List<User> apiGetAllUsers() {
         return userRepository.findAll();
     }
-}
 
+    // Endpoint to get current logged-in user's name and email
+    @GetMapping("/me")
+    @ResponseBody
+    public java.util.Map<String, Object> getCurrentUser(org.springframework.security.core.Authentication authentication) {
+        java.util.Map<String, Object> result = new java.util.HashMap<>();
+        if (authentication == null) {
+            result.put("name", "anonymous");
+            return result;
+        }
+        result.put("name", authentication.getName());
+        // Try to extract email (for OIDC providers)
+        if (authentication.getPrincipal() instanceof org.springframework.security.oauth2.core.oidc.user.OidcUser oidcUser) {
+            String email = oidcUser.getEmail();
+            result.put("email", email);
+        } else if (authentication.getPrincipal() instanceof org.springframework.security.core.userdetails.User user) {
+            // Plain local user
+            result.put("email", authentication.getName() + "@local");
+        } else {
+            // Last resort: generic principal
+            result.put("email", null);
+        }
+        return result;
+    }
+}
