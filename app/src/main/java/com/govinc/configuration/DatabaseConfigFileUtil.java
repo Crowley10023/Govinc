@@ -20,7 +20,7 @@ public class DatabaseConfigFileUtil {
         props.setProperty("spring.jpa.hibernate.ddl-auto", dbConfig.getDdlAuto());
         props.setProperty("spring.jpa.show-sql", String.valueOf(dbConfig.isShowSql()));
 
-        FileOutputStream out = new FileOutputStream(filename);
+        FileOutputStream out = new FileOutputStream(f);
         props.store(out, null);
         out.close();
     }

@@ -27,7 +27,7 @@ public class IamConfigFileUtil {
         existing.keySet().removeIf(k -> k.toString().startsWith("iam."));
         // Put all iam.* back
         props.forEach((k, v) -> existing.setProperty((String)k, (String)v));
-        try (OutputStream out = new FileOutputStream(filename)) {
+        try (OutputStream out = new FileOutputStream(f)) {
             existing.store(out, "Updated IAM settings");
         }
     }
