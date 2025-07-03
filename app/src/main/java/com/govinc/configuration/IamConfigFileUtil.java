@@ -19,7 +19,8 @@ public class IamConfigFileUtil {
 
         // Load existing file to preserve non-iam keys
         Properties existing = new Properties();
-        try (InputStream in = new FileInputStream(filename)) {
+        java.io.File f = new java.io.File(filename);
+        try (InputStream in = new FileInputStream(f)) {
             existing.load(in);
         }
         // Remove old iam.*

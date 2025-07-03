@@ -5,7 +5,9 @@ import java.util.Properties;
 
 public class DatabaseConfigFileUtil {
     public static void saveToPropertiesFile(DatabaseConfig dbConfig, String filename) throws IOException {
-        FileInputStream in = new FileInputStream(filename);
+        java.io.File f = new java.io.File(filename);
+
+        FileInputStream in = new FileInputStream(f);
         Properties props = new Properties();
         props.load(in);
         in.close();
