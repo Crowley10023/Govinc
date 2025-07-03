@@ -81,7 +81,7 @@ public class ConfigurationController {
         if (targetPath == null) {
             targetPath = candidates[0];
         }
-        String targetPath = "build/resources/main/application.properties ";
+        targetPath = "build/resources/main/application.properties ";
         System.out.println("Attempting to save DB config to: " + targetPath);
 
 
