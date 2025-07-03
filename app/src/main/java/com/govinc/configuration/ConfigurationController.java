@@ -148,6 +148,8 @@ public class ConfigurationController {
             model.addAttribute("message", "Configuration saved. Full reload may require restart.");
             System.out.println("Save appears successful.");
         } catch (Exception e) {
+            java.io.File f = new java.io.File(targetPath);
+            System.out.println("\n\n: " + f.getAbsolutePath());
             model.addAttribute("message", "ERROR: " + e.getMessage());
             System.out.println("ERROR: Exception while saving: " + e.getMessage());
             e.printStackTrace(System.out);
