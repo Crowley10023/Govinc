@@ -84,7 +84,6 @@ public class ConfigurationController {
         targetPath = "build/resources/main/application.properties ";
         System.out.println("Attempting to save DB config to: " + targetPath);
 
-
         try {
             DatabaseConfigFileUtil.saveToPropertiesFile(dbConfig, targetPath);
             model.addAttribute("message", "Configuration saved. Full dynamic reload may require restart.");
@@ -157,5 +156,22 @@ public class ConfigurationController {
         model.addAttribute("iamConfig", iamConfig);
         System.out.println("Returning view: configuration-iam");
         return "configuration-iam";
+    }
+
+    @PostMapping("/restart")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public String restartApp() {
+        Thread thread = new Thread(() -> {
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException ignored) {
+            }
+            if (applicationContext instanceof org.springframework.context.ConfigurableApplicationContext ctx) {
+                ctx.close();
+            }
+        });
+        thread.setDaemon(false);
+        thread.start();
+        return "Restart signal sent. Please wait a few seconds...";
     }
 }

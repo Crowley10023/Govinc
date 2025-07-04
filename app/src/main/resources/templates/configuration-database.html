@@ -1,95 +1,143 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
+
 <head>
-    <title>Database Configuration</title>
-    <link rel="stylesheet" href="/style.css">
+  <title>Database Configuration</title>
+  <link rel="stylesheet" href="/style.css">
 </head>
+
 <body>
-<div th:replace="~{navigation :: mainNav}"></div>
-<div class="container">
+  <div th:replace="~{navigation :: mainNav}"></div>
+  <div class="container">
     <h2>Database Configuration</h2>
     <form id="database-config-form" method="post" th:action="@{/configuration/database/save}">
-        <table class="config-table">
-            <tr>
-                <th>Property</th><th>Value</th>
-            </tr>
-            <tr>
-                <td><label for="dbUrl">JDBC URL:</label></td>
-                <td><input type="text" id="dbUrl" name="url" th:value="${dbConfig.url}" required /></td>
-            </tr>
-            <tr>
-                <td><label for="dbUsername">Username:</label></td>
-                <td><input type="text" id="dbUsername" name="username" th:value="${dbConfig.username}" required /></td>
-            </tr>
-            <tr>
-                <td><label for="dbPassword">Password:</label></td>
-                <td><input type="password" id="dbPassword" name="password" th:value="${dbConfig.password}" required /></td>
-            </tr>
-            <tr>
-                <td><label for="dbDriver">Driver Class Name:</label></td>
-                <td><input type="text" id="dbDriver" name="driverClassName" th:value="${dbConfig.driverClassName}" required /></td>
-            </tr>
-            <tr>
-                <td><label for="jpaDdlAuto">JPA DDL Auto:</label></td>
-                <td>
-  <select id="jpaDdlAuto" name="ddlAuto">
-    <option th:selected="${dbConfig.ddlAuto == 'none'}" value="none">none</option>
-    <option th:selected="${dbConfig.ddlAuto == 'validate'}" value="validate">validate</option>
-    <option th:selected="${dbConfig.ddlAuto == 'update'}" value="update">update</option>
-    <option th:selected="${dbConfig.ddlAuto == 'create'}" value="create">create</option>
-    <option th:selected="${dbConfig.ddlAuto == 'create-drop'}" value="create-drop">create-drop</option>
-  </select>
-</td>
-            </tr>
-            <tr>
-                <td><label for="jpaShowSql">Show SQL:</label></td>
-                <td>
-                  <select id="jpaShowSql" name="showSql">
-                    <option th:selected="${dbConfig.showSql}" value="true">true</option>
-                    <option th:selected="${!dbConfig.showSql}" value="false">false</option>
-                  </select>
-                </td>
-            </tr>
-        </table>
-        <div style="margin-top:1em; display: flex; gap: 1em; align-items: center;">
-            <button type="submit" class="btn btn-primary">Approve & Apply</button>
-            <button type="button" id="check-connection-btn" class="btn btn-secondary" onclick="checkConnection()">Check Connection</button>
-            <span id="connection-result" style="vertical-align: middle;"></span>
-        </div>
+      <input type="hidden" name="_csrf" th:value="${_csrf.token}" th:if="${_csrf}" id="csrf-token-field">
+      <input type="hidden" id="csrf-header" th:value="${_csrf.headerName}" th:if="${_csrf}">
+      <input type="hidden" name="_csrf" th:value="${_csrf.token}" th:if="${_csrf}" id="csrf-token-field">
+      <input type="hidden" id="csrf-header" th:value="${_csrf.headerName}" th:if="${_csrf}">
+      <input type="hidden" name="_csrf" th:value="${_csrf.token}" th:if="${_csrf}" id="csrf-token-field">
+      <input type="hidden" id="csrf-header" th:value="${_csrf.headerName}" th:if="${_csrf}">
+      <table class="config-table">
+        <tr>
+          <th>Property</th>
+          <th>Value</th>
+        </tr>
+        <tr>
+          <td><label for="dbUrl">JDBC URL:</label></td>
+          <td><input type="text" id="dbUrl" name="url" th:value="${dbConfig.url}" required /></td>
+        </tr>
+        <tr>
+          <td><label for="dbUsername">Username:</label></td>
+          <td><input type="text" id="dbUsername" name="username" th:value="${dbConfig.username}" required /></td>
+        </tr>
+        <tr>
+          <td><label for="dbPassword">Password:</label></td>
+          <td><input type="password" id="dbPassword" name="password" th:value="${dbConfig.password}" required /></td>
+        </tr>
+        <tr>
+          <td><label for="dbDriver">Driver Class Name:</label></td>
+          <td><input type="text" id="dbDriver" name="driverClassName" th:value="${dbConfig.driverClassName}" required />
+          </td>
+        </tr>
+        <tr>
+          <td><label for="jpaDdlAuto">JPA DDL Auto:</label></td>
+          <td>
+            <select id="jpaDdlAuto" name="ddlAuto">
+              <option th:selected="${dbConfig.ddlAuto == 'none'}" value="none">none</option>
+              <option th:selected="${dbConfig.ddlAuto == 'validate'}" value="validate">validate</option>
+              <option th:selected="${dbConfig.ddlAuto == 'update'}" value="update">update</option>
+              <option th:selected="${dbConfig.ddlAuto == 'create'}" value="create">create</option>
+              <option th:selected="${dbConfig.ddlAuto == 'create-drop'}" value="create-drop">create-drop</option>
+            </select>
+          </td>
+        </tr>
+        <tr>
+          <td><label for="jpaShowSql">Show SQL:</label></td>
+          <td>
+            <select id="jpaShowSql" name="showSql">
+              <option th:selected="${dbConfig.showSql}" value="true">true</option>
+              <option th:selected="${!dbConfig.showSql}" value="false">false</option>
+            </select>
+          </td>
+        </tr>
+      </table>
+      <div style="margin-top:1em; display: flex; gap: 1em; align-items: center;">
+        <button type="submit" class="btn btn-primary">Approve & Apply</button>
+        <button type="button" id="check-connection-btn" class="btn btn-secondary" onclick="checkConnection()">Check
+          Connection</button>
+        <span id="connection-result" style="vertical-align: middle;"></span>
+      </div>
     </form>
+    <div style="margin-top:1em;">
+      <button id="restart-btn" class="btn btn-danger" onclick="restartApp()">Restart Application</button>
+      <span id="restart-status"></span>
+    </div>
     <script>
-    function checkConnection() {
-      document.getElementById('connection-result').innerHTML = '';
-      let form = document.getElementById('database-config-form');
-      let data = {
-        url: form.url.value,
-        username: form.username.value,
-        password: form.password.value,
-        driverClassName: form.driverClassName.value,
-      };
-      fetch('/configuration/database/check', {
-        method: 'POST',
-        headers: {
+      function restartApp() {
+        if (!confirm('Are you sure you want to restart the application?')) return;
+        const csrfToken = document.getElementById('csrf-token-field') ? document.getElementById('csrf-token-field').value : null;
+        const csrfHeader = document.getElementById('csrf-header') ? document.getElementById('csrf-header').value : null;
+        const headers = {
           'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      })
-      .then(resp => resp.json())
-      .then(r => {
-        if (r.success) {
-          document.getElementById('connection-result').innerHTML = `<svg width='20' height='20' viewBox='0 0 32 32'><circle cx='16' cy='16' r='16' fill='#45ba5c'/><path d='M10 17 l5 5 l7 -9' stroke='white' stroke-width='3' fill='none' /></svg>`;
-        } else {
-          document.getElementById('connection-result').innerHTML = '<span style="color:red;">Not connected</span>';
+        };
+        if (csrfToken && csrfHeader) {
+          headers[csrfHeader] = csrfToken;
         }
-      })
-      .catch(()=>{
-        document.getElementById('connection-result').innerHTML = '<span style="color:red;">Error</span>';
-      });
-    }
+        document.getElementById('restart-btn').disabled = true;
+        document.getElementById('restart-status').innerText = 'Restarting...';
+        fetch('/configuration/restart', {
+          method: 'POST',
+          headers: headers
+        })
+        .then(r => r.text())
+        .then(msg => {
+          document.getElementById('restart-status').innerText = msg;
+        }).catch(() => {
+          document.getElementById('restart-status').innerText = 'Failed to restart.';
+        });
+      }
+    </script>
+    <script>
+      function checkConnection() {
+        document.getElementById('connection-result').innerHTML = '';
+        let form = document.getElementById('database-config-form');
+        let data = {
+          url: form.url.value,
+          username: form.username.value,
+          password: form.password.value,
+          driverClassName: form.driverClassName.value,
+        };
+        // Get CSRF token/header
+        const csrfToken = document.getElementById('csrf-token-field') ? document.getElementById('csrf-token-field').value : null;
+        const csrfHeader = document.getElementById('csrf-header') ? document.getElementById('csrf-header').value : null;
+        const headers = {
+          'Content-Type': 'application/json',
+        };
+        if (csrfToken && csrfHeader) {
+          headers[csrfHeader] = csrfToken;
+        }
+        fetch('/configuration/database/check', {
+          method: 'POST',
+          headers: headers,
+          body: JSON.stringify(data),
+        })
+          .then(resp => resp.json())
+          .then(r => {
+            if (r.success) {
+              document.getElementById('connection-result').innerHTML = `<svg width='20' height='20' viewBox='0 0 32 32'><circle cx='16' cy='16' r='16' fill='#45ba5c'/><path d='M10 17 l5 5 l7 -9' stroke='white' stroke-width='3' fill='none' /></svg>`;
+            } else {
+              document.getElementById('connection-result').innerHTML = '<span style="color:red;">Not connected</span>';
+            }
+          })
+          .catch(() => {
+            document.getElementById('connection-result').innerHTML = '<span style="color:red;">Error</span>';
+          });
+      }
     </script>
     <div th:if="${message}" style="margin-top:1em; color: green;">
-        <span th:text="${message}"></span>
+      <span th:text="${message}"></span>
     </div>
-</div>
+  </div>
 </body>
+
 </html>
