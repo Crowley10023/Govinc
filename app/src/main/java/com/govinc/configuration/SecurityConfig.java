@@ -1,7 +1,7 @@
 package com.govinc.configuration;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -11,6 +11,7 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
@@ -56,7 +57,7 @@ public class SecurityConfig {
 }
 
 @Configuration
-@ConditionalOnExpression("'${iam.provider:MOCK}'.toUpperCase()=='KEYCLOAK' || '${iam.provider:MOCK}'.toUpperCase()=='AZURE'")
+@ConditionalOnBean(ClientRegistrationRepository.class)
 class OAuth2SecurityConfig {
     @Autowired
     private AuthenticationSuccessHandler customAuthenticationSuccessHandler;
@@ -82,7 +83,6 @@ class OAuth2SecurityConfig {
 }
 
 @Configuration
-@ConditionalOnExpression("!'${iam.provider:MOCK}'.toUpperCase().equals('KEYCLOAK') && !'${iam.provider:MOCK}'.toUpperCase().equals('AZURE')")
 class MockSecurityConfig {
     @Autowired
     private AuthenticationSuccessHandler customAuthenticationSuccessHandler;
