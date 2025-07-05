@@ -2,8 +2,10 @@ package com.govinc.configuration;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.PropertySource;
 
 @Configuration
+@PropertySource(value = "file:app/config/iam.properties", ignoreResourceNotFound = true)
 @ConfigurationProperties(prefix = "iam")
 public class IamConfig {
     private String provider; // AZURE, KEYCLOAK, MOCK
