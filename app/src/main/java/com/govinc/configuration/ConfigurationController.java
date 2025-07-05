@@ -91,8 +91,12 @@ public class ConfigurationController {
             iamConfig.setKeycloakClientId(updatedConfig.getKeycloakClientId());
             iamConfig.setKeycloakClientSecret(updatedConfig.getKeycloakClientSecret());
 
-            String workingDir = System.getProperty("user.dir");
-            String targetPath = "/build/resources/application.properties";
+            // Save to config/iam.properties (in working directory)
+            String configDir = "config";
+            java.io.File dir = new java.io.File(configDir);
+            if (!dir.exists()) dir.mkdirs();
+            String targetPath = configDir + java.io.File.separator + "iam.properties";
+            
             System.out.println("Attempting to save IAM config to: " + targetPath);
 
             IamConfigFileUtil.saveToPropertiesFile(iamConfig, targetPath);
