@@ -1,10 +1,10 @@
 package com.govinc.configuration;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.core.userdetails.User;
@@ -39,7 +39,6 @@ public class SecurityConfig {
             for (String key : p.stringPropertyNames()) {
                 String[] valParts = p.getProperty(key).split(",", 2);
                 String plainOrHashed = valParts[0].trim();
-                String email = valParts.length > 1 ? valParts[1].trim() : (key + "@local");
                 boolean isBCrypt = plainOrHashed.startsWith("{bcrypt}");
                 String pw = isBCrypt ? plainOrHashed : passwordEncoder().encode(plainOrHashed);
                 manager.createUser(User.withUsername(key)
@@ -54,49 +53,53 @@ public class SecurityConfig {
         }
         return manager;
     }
+}
+
+@Configuration
+@ConditionalOnExpression("'${iam.provider:MOCK}'.toUpperCase()=='KEYCLOAK' || '${iam.provider:MOCK}'.toUpperCase()=='AZURE'")
+class OAuth2SecurityConfig {
+    @Autowired
+    private AuthenticationSuccessHandler customAuthenticationSuccessHandler;
+    @Autowired
+    private IamConfig iamConfig;
 
     @Bean
     @Order(1)
     public SecurityFilterChain oauth2SecurityFilterChain(HttpSecurity http) throws Exception {
-        String provider = iamConfig.getProvider();
-        if (provider.equalsIgnoreCase("KEYCLOAK") || provider.equalsIgnoreCase("AZURE")) {
-            http
-                .authorizeHttpRequests(authz -> authz
-                    .requestMatchers("/css/**", "/js/**", "/webjars/**", "/images/**").permitAll()
-                    .requestMatchers("/configuration/database/restart").authenticated()
-                    .requestMatchers("/configuration/**").authenticated()
-                    .anyRequest().authenticated()
-                )
-                .oauth2Login(oauth2 -> oauth2
-                    .successHandler(customAuthenticationSuccessHandler)
-                );
-            return http.build();
-        }
-        // Return null if not an oauth2 provider, no bean will be registered
-        return null;
+        http
+            .authorizeHttpRequests(authz -> authz
+                .requestMatchers("/css/**", "/js/**", "/webjars/**", "/images/**").permitAll()
+                .requestMatchers("/configuration/database/restart").authenticated()
+                .requestMatchers("/configuration/**").authenticated()
+                .anyRequest().authenticated()
+            )
+            .oauth2Login(oauth2 -> oauth2
+                .successHandler(customAuthenticationSuccessHandler)
+            );
+        return http.build();
     }
+}
 
+@Configuration
+@ConditionalOnExpression("!'${iam.provider:MOCK}'.toUpperCase().equals('KEYCLOAK') && !'${iam.provider:MOCK}'.toUpperCase().equals('AZURE')")
+class MockSecurityConfig {
+    @Autowired
+    private AuthenticationSuccessHandler customAuthenticationSuccessHandler;
     @Bean
     @Order(2)
     public SecurityFilterChain formLoginSecurityFilterChain(HttpSecurity http) throws Exception {
-        String provider = iamConfig.getProvider();
-        if (!provider.equalsIgnoreCase("KEYCLOAK") && !provider.equalsIgnoreCase("AZURE")) {
-            // For MOCK or not set, use form login
-            http
-                .authorizeHttpRequests(authz -> authz
-                    .requestMatchers("/login", "/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
-                    .requestMatchers("/configuration/**").authenticated()
-                    .anyRequest().authenticated()
-                )
-                .formLogin(form -> form
-                    .defaultSuccessUrl("/", true)
-                    .successHandler(customAuthenticationSuccessHandler)
-                    .permitAll()
-                )
-                .logout(logout -> logout.permitAll());
-            return http.build();
-        }
-        // Return null if not a form login provider, no bean will be registered
-        return null;
+        http
+            .authorizeHttpRequests(authz -> authz
+                .requestMatchers("/login", "/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
+                .requestMatchers("/configuration/**").authenticated()
+                .anyRequest().authenticated()
+            )
+            .formLogin(form -> form
+                .defaultSuccessUrl("/", true)
+                .successHandler(customAuthenticationSuccessHandler)
+                .permitAll()
+            )
+            .logout(logout -> logout.permitAll());
+        return http.build();
     }
 }
