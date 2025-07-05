@@ -13,6 +13,7 @@ import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 
 @Configuration
 @EnableWebSecurity
@@ -28,17 +29,37 @@ public class SecurityConfig {
     @Bean
     public UserDetailsService userDetailsService() {
         String provider = (iamConfig.getProvider() == null) ? "MOCK" : iamConfig.getProvider();
-        // Always provide an admin fallback user for MOCK or unconfigured
-        if (provider.equalsIgnoreCase("MOCK") || provider.isEmpty()) {
-            InMemoryUserDetailsManager manager = new InMemoryUserDetailsManager();
+        InMemoryUserDetailsManager manager = new InMemoryUserDetailsManager();
+        // Always read admin from properties file
+        String adminProps = "app/src/main/resources/config/users.properties";
+        try (java.io.InputStream in = new java.io.FileInputStream(adminProps)) {
+            java.util.Properties p = new java.util.Properties();
+            p.load(in);
+            // Now: allow multiple users, value = password[,email]
+            for (String key : p.stringPropertyNames()) {
+                String[] valParts = p.getProperty(key).split(",", 2);
+                String plainOrHashed = valParts[0].trim();
+                String email = valParts.length > 1 ? valParts[1].trim() : (key + "@local");
+                boolean isBCrypt = plainOrHashed.startsWith("{bcrypt}");
+                String pw = isBCrypt ? plainOrHashed : passwordEncoder().encode(plainOrHashed);
+                manager.createUser(User.withUsername(key)
+                        .password(pw)
+                        .roles(key.equals("admin") ? "ADMIN" : "USER")
+                        .build());
+                // Optionally, store email in a static map for lookup if needed
+            }
+        } catch (Exception e) {
+            // Fallback in-memory admin
             manager.createUser(User.withUsername("admin")
-                  .password(passwordEncoder().encode("admin"))
-                  .roles("ADMIN").build());
-            return manager;
+                    .password(passwordEncoder().encode("admin"))
+                    .roles("ADMIN").build());
         }
-        // If a real IDP, no local users provided
-        return new InMemoryUserDetailsManager();
+        // If IDP, all users come from there, but admin always present
+        return manager;
     }
+
+    @Autowired
+    private AuthenticationSuccessHandler customAuthenticationSuccessHandler;
 
     @Bean
     @Order(1)
@@ -47,29 +68,37 @@ public class SecurityConfig {
         if (provider.equalsIgnoreCase("KEYCLOAK")) {
             http
                 .authorizeHttpRequests(authz -> authz
-                    .requestMatchers("/configuration/**", "/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
+                    .requestMatchers("/css/**", "/js/**", "/webjars/**", "/images/**").permitAll()
+                    .requestMatchers("/configuration/**").authenticated()
                     .anyRequest().authenticated()
                 )
-                .oauth2Login(Customizer.withDefaults());
+                .oauth2Login(oauth2 -> oauth2
+                    .successHandler(customAuthenticationSuccessHandler)
+                );
             // Use application.properties (via Spring Boot OIDC) for Keycloak
 
         } else if (provider.equalsIgnoreCase("AZURE")) {
             http
                 .authorizeHttpRequests(authz -> authz
-                    .requestMatchers("/configuration/**", "/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
+                    .requestMatchers("/css/**", "/js/**", "/webjars/**", "/images/**").permitAll()
+                    .requestMatchers("/configuration/**").authenticated()
                     .anyRequest().authenticated()
                 )
-                .oauth2Login(Customizer.withDefaults());
+                .oauth2Login(oauth2 -> oauth2
+                    .successHandler(customAuthenticationSuccessHandler)
+                );
             // Use application.properties for Azure OIDC
 
         } else { // MOCK or not set
             http
                 .authorizeHttpRequests(authz -> authz
-                    .requestMatchers("/login", "/configuration/**", "/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
+                    .requestMatchers("/login", "/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
+                    .requestMatchers("/configuration/**").authenticated()
                     .anyRequest().authenticated()
                 )
                 .formLogin(form -> form
                     .defaultSuccessUrl("/", true)
+                    .successHandler(customAuthenticationSuccessHandler)
                     .permitAll()
                 )
                 .logout(logout -> logout.permitAll());

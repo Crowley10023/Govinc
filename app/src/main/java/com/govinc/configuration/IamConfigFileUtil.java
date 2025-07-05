@@ -17,17 +17,25 @@ public class IamConfigFileUtil {
         props.setProperty("iam.keycloak-client-id", config.getKeycloakClientId() == null ? "" : config.getKeycloakClientId());
         props.setProperty("iam.keycloak-client-secret", config.getKeycloakClientSecret() == null ? "" : config.getKeycloakClientSecret());
 
+        // Ensure parent directories exist.
+        File file = new File(filename);
+        File parentDir = file.getParentFile();
+        if (parentDir != null && !parentDir.exists()) {
+            parentDir.mkdirs();
+        }
+
         // Load existing file to preserve non-iam keys
         Properties existing = new Properties();
-        java.io.File f = new java.io.File(filename);
-        try (InputStream in = new FileInputStream(f)) {
+        try (InputStream in = new FileInputStream(filename)) {
             existing.load(in);
+        } catch (FileNotFoundException fnfe) {
+            // ignore, it just means the file does not exist yet
         }
         // Remove old iam.*
         existing.keySet().removeIf(k -> k.toString().startsWith("iam."));
         // Put all iam.* back
         props.forEach((k, v) -> existing.setProperty((String)k, (String)v));
-        try (OutputStream out = new FileOutputStream(f)) {
+        try (OutputStream out = new FileOutputStream(filename)) {
             existing.store(out, "Updated IAM settings");
         }
     }

@@ -8,7 +8,100 @@
 <div th:replace="~{navigation :: mainNav}"></div>
 <div class="container">
     <h2>IAM Configuration</h2>
-    <p>(Configuration UI coming soon...)</p>
+    <form id="iam-config-form" method="post" th:action="@{/configuration/iam/save}">
+        <table class="config-table">
+        <tr><th colspan=2>Admin User Password</th></tr>
+        <tr>
+          <td><label for="adminPassword">Set Admin Password:</label></td>
+          <td>
+            <input type="password" name="adminPassword" id="adminPassword" minlength="6" />
+            <button type="button" onclick="changeAdminPassword()">Change Password</button>
+            <span id="admin-password-msg"></span>
+          </td>
+        </tr>
+            <tr>
+                <th>Provider</th><th>Configuration</th>
+            </tr>
+            <tr>
+                <td><label for="provider">Identity Provider:</label></td>
+                <td>
+                  <select id="provider" name="provider" onchange="updateProviderFields()">
+                    <option value="AZURE" th:selected="${iamConfig.provider == 'AZURE'}">Azure</option>
+                    <option value="KEYCLOAK" th:selected="${iamConfig.provider == 'KEYCLOAK'}">Keycloak</option>
+                    <option value="MOCK" th:selected="${iamConfig.provider == 'MOCK'}">Mock</option>
+                  </select>
+                </td>
+            </tr>
+            <tr class="provider-fields provider-azure">
+                <td>Azure Client Id:</td>
+                <td><input type="text" name="azureClientId" th:value="${iamConfig.azureClientId}" /></td>
+            </tr>
+            <tr class="provider-fields provider-azure">
+                <td>Azure Client Secret:</td>
+                <td><input type="password" name="azureClientSecret" th:value="${iamConfig.azureClientSecret}" /></td>
+            </tr>
+            <tr class="provider-fields provider-azure">
+                <td>Azure Tenant Id:</td>
+                <td><input type="text" name="azureTenantId" th:value="${iamConfig.azureTenantId}" /></td>
+            </tr>
+            <tr class="provider-fields provider-keycloak">
+                <td>Keycloak Issuer Url:</td>
+                <td><input type="text" name="keycloakIssuerUrl" th:value="${iamConfig.keycloakIssuerUrl}" /></td>
+            </tr>
+            <tr class="provider-fields provider-keycloak">
+                <td>Keycloak Realm:</td>
+                <td><input type="text" name="keycloakRealm" th:value="${iamConfig.keycloakRealm}" /></td>
+            </tr>
+            <tr class="provider-fields provider-keycloak">
+                <td>Keycloak Client Id:</td>
+                <td><input type="text" name="keycloakClientId" th:value="${iamConfig.keycloakClientId}" /></td>
+            </tr>
+            <tr class="provider-fields provider-keycloak">
+                <td>Keycloak Client Secret:</td>
+                <td><input type="password" name="keycloakClientSecret" th:value="${iamConfig.keycloakClientSecret}" /></td>
+            </tr>
+            <tr class="provider-fields provider-mock">
+                <td colspan=2><strong>Mock mode enabled - no real authentication.</strong></td>
+            </tr>
+        </table>
+        <div style="margin-top:1em;">
+            <button type="submit" class="btn btn-primary">Save Configuration</button>
+        </div>
+    </form>
+    <script>
+      function updateProviderFields() {
+        var provider = document.getElementById('provider').value;
+        var all = document.querySelectorAll('.provider-fields');
+        all.forEach(r => r.style.display = 'none');
+        var visible = document.querySelectorAll('.provider-' + provider.toLowerCase());
+        visible.forEach(r => r.style.display = 'table-row');
+      }
+      document.addEventListener('DOMContentLoaded', updateProviderFields);
+
+      function changeAdminPassword() {
+        var pw = document.getElementById('adminPassword').value;
+        var msg = document.getElementById('admin-password-msg');
+        if (!pw || pw.length < 6) {
+          msg.style.color = 'red';
+          msg.textContent = 'Password must be at least 6 characters.';
+          return;
+        }
+        fetch('/configuration/iam/change-admin-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: pw })
+        }).then(r => r.json())
+        .then(resp => {
+          msg.style.color = resp.success ? 'green' : 'red';
+          msg.textContent = resp.message;
+        }).catch(() => {
+          msg.style.color = 'red'; msg.textContent = 'Request failed.';
+        });
+      }
+    </script>
+    <div th:if="${message}" style="margin-top:1em; color: green;">
+        <span th:text="${message}"></span>
+    </div>
 </div>
 </body>
 </html>

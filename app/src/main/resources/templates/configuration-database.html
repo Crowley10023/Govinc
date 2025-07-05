@@ -1,48 +1,193 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
+
 <head>
-    <title>Database Configuration</title>
-    <link rel="stylesheet" href="/style.css">
+  <title>Database Configuration</title>
+  <link rel="stylesheet" href="/style.css">
+  <meta name="_csrf" th:content="${_csrf.token}" />
+  <meta name="_csrf_header" th:content="${_csrf.headerName}" />
 </head>
+
 <body>
-<div th:replace="~{navigation :: mainNav}"></div>
-<div class="container">
+  <div th:replace="~{navigation :: mainNav}"></div>
+  <div class="container">
     <h2>Database Configuration</h2>
-    <form id="database-config-form" method="post" th:action="@{/configuration/database/save}">
-        <div>
-            <label for="dbUrl">JDBC URL:</label>
-            <input type="text" id="dbUrl" name="url" th:value="${dbConfig.url}" required />
-        </div>
-        <div>
-            <label for="dbUsername">Username:</label>
-            <input type="text" id="dbUsername" name="username" th:value="${dbConfig.username}" required />
-        </div>
-        <div>
-            <label for="dbPassword">Password:</label>
-            <input type="password" id="dbPassword" name="password" th:value="${dbConfig.password}" required />
-        </div>
-        <div>
-            <label for="dbDriver">Driver Class Name:</label>
-            <input type="text" id="dbDriver" name="driverClassName" th:value="${dbConfig.driverClassName}" required />
-        </div>
-        <div>
-            <label for="jpaDdlAuto">JPA DDL Auto:</label>
-            <input type="text" id="jpaDdlAuto" name="ddlAuto" th:value="${dbConfig.ddlAuto}" required />
-        </div>
-        <div>
-            <label for="jpaShowSql">Show SQL:</label>
-            <select id="jpaShowSql" name="showSql">
-                <option th:selected="${dbConfig.showSql}" value="true">true</option>
-                <option th:selected="${!dbConfig.showSql}" value="false">false</option>
+    <form id="database-config-form" autocomplete="off">
+      <table class="config-table">
+        <tr>
+          <th>Property</th>
+          <th>Value</th>
+        </tr>
+        <tr>
+          <td><label for="dbUrl">JDBC URL:</label></td>
+          <td><input type="text" id="dbUrl" name="url" th:value="${dbConfig.url}" required /></td>
+        </tr>
+        <tr>
+          <td><label for="dbUsername">Username:</label></td>
+          <td><input type="text" id="dbUsername" name="username" th:value="${dbConfig.username}" required /></td>
+        </tr>
+        <tr>
+          <td><label for="dbPassword">Password:</label></td>
+          <td><input type="password" id="dbPassword" name="password" th:value="${dbConfig.password}" required /></td>
+        </tr>
+        <tr>
+          <td><label for="dbDriver">Driver Class Name:</label></td>
+          <td><input type="text" id="dbDriver" name="driverClassName" th:value="${dbConfig.driverClassName}" required />
+          </td>
+        </tr>
+        <tr>
+          <td><label for="jpaDdlAuto">JPA DDL Auto:</label></td>
+          <td>
+            <select id="jpaDdlAuto" name="ddlAuto">
+              <option th:selected="${dbConfig.ddlAuto == 'none'}" value="none">none</option>
+              <option th:selected="${dbConfig.ddlAuto == 'validate'}" value="validate">validate</option>
+              <option th:selected="${dbConfig.ddlAuto == 'update'}" value="update">update</option>
+              <option th:selected="${dbConfig.ddlAuto == 'create'}" value="create">create</option>
+              <option th:selected="${dbConfig.ddlAuto == 'create-drop'}" value="create-drop">create-drop</option>
             </select>
-        </div>
-        <div style="margin-top:1em;">
-            <button type="submit" class="btn btn-primary">Approve & Apply</button>
-        </div>
+          </td>
+        </tr>
+        <tr>
+          <td><label for="jpaShowSql">Show SQL:</label></td>
+          <td>
+            <select id="jpaShowSql" name="showSql">
+              <option th:selected="${dbConfig.showSql}" value="true">true</option>
+              <option th:selected="${!dbConfig.showSql}" value="false">false</option>
+            </select>
+          </td>
+        </tr>
+      </table>
+      <div style="margin-top:1em; display: flex; gap: 1em; align-items: center;">
+        <button id="save-btn" type="button" class="btn btn-primary" disabled onclick="saveConfig()">Save Configuration</button>
+        <button type="button" id="check-connection-btn" class="btn btn-secondary" onclick="checkConnection()">Check Connection</button>
+        <button type="button" class="btn btn-warning" onclick="restartApp()">Restart</button>
+      </div>
     </form>
-    <div th:if="${message}" style="margin-top:1em; color: green;">
-        <span th:text="${message}"></span>
+    <!-- Modal Popup Structure -->
+    <div id="custom-modal-overlay" class="modal-bg" style="display:none;justify-content:center;align-items:center;">
+      <div id="custom-modal" class="modal-popup" style="position:relative;min-width:320px;max-width:97vw;text-align:center;">
+        <button id="custom-modal-close" onclick="closeModal()" style="position:absolute; right:1.2em; top:1.2em; background:#222; color:#fff; border:none; font-size:1.48em; border-radius:100px; width:2.05em; height:2.05em; line-height:2.05em; text-align:center; cursor:pointer;transition: background 0.18s, color 0.18s; box-shadow:0 1px 6px #0002;">&times;</button>
+        <div id="custom-modal-icon" style="font-size:2.4em;margin-bottom:0.2em;"></div>
+        <div id="custom-modal-msg" style="margin-top:0.2em;word-break:break-word;"></div>
+      </div>
     </div>
-</div>
+    <script>
+      // Utility to center modal and animate show/hide, no stuck states
+      function popupMsg(msg, isError) {
+        const overlay = document.getElementById('custom-modal-overlay');
+        const modal = document.getElementById('custom-modal');
+        const icon = document.getElementById('custom-modal-icon');
+        const messageDiv = document.getElementById('custom-modal-msg');
+        overlay.style.display = 'flex';
+        modal.style.border = isError ? '2px solid #e62a29' : '2px solid #3ba077';
+        icon.textContent = isError ? '❌' : '✅';
+        icon.style.color = isError ? '#e62a29' : '#3ba077';
+        messageDiv.textContent = msg;
+        setTimeout(() => {
+          document.getElementById('custom-modal-close').focus();
+        }, 200);
+      }
+      function closeModal() {
+        const overlay = document.getElementById('custom-modal-overlay');
+        overlay.style.display = 'none';
+      }
+      // Prevent saveConfig button stuck: always enable after try
+      function saveConfig() {
+        let form = document.getElementById('database-config-form');
+        let data = new URLSearchParams();
+        for (const pair of new FormData(form)) {
+          data.append(pair[0], pair[1]);
+        }
+        const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+        const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+        document.getElementById('save-btn').disabled = true; // Prevent double clicks
+        fetch('/configuration/database/save', {
+          method: 'POST',
+          headers: {
+            'Accept': 'text/html',
+            [csrfHeader]: csrfToken
+          },
+          body: data,
+          credentials: 'same-origin'
+        })
+        .then(response => response.text())
+        .then(html => {
+          document.getElementById('save-btn').disabled = false;
+          const div = document.createElement('div');
+          div.innerHTML = html;
+          const msg = div.querySelector('[th\\:if], [data-message], [id="message"]');
+          let messageText = '';
+          if (msg) { messageText = msg.innerText || msg.textContent; }
+          else {
+            let match = html.match(/<span[^>]*>(.*?)<\/span>/);
+            messageText = match && match[1] ? match[1] : 'Configuration was saved. Reload may be required.';
+          }
+          if (/error/i.test(messageText)) {
+            popupMsg(messageText, true);
+          } else {
+            popupMsg(messageText, false);
+          }
+        })
+        .catch(e => {
+          document.getElementById('save-btn').disabled = false;
+          popupMsg('An error occurred while saving: ' + e, true);
+        });
+      }
+      function checkConnection() {
+        let form = document.getElementById('database-config-form');
+        let data = {
+          url: form.url.value,
+          username: form.username.value,
+          password: form.password.value,
+          driverClassName: form.driverClassName.value,
+        };
+        // CSRF token
+        const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+        const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+        fetch('/configuration/database/check', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            [csrfHeader]: csrfToken
+          },
+          body: JSON.stringify(data),
+          credentials: 'same-origin'
+        })
+          .then(resp => resp.json())
+          .then(r => {
+            if (r.success) {
+              document.getElementById('save-btn').disabled = false;
+              popupMsg('Connection successful. You may now Save.', false);
+            } else {
+              let msg = 'Not connected';
+              if (r.error) { msg = r.error; }
+              popupMsg(msg, true);
+              document.getElementById('save-btn').disabled = true;
+            }
+          })
+          .catch((e) => {
+            popupMsg('Error: ' + e, true);
+            document.getElementById('save-btn').disabled = true;
+          });
+      }
+      function restartApp() {
+        let form = document.getElementById('database-config-form');
+        let data = new FormData(form);
+        fetch('/configuration/database/restart', {
+          method: 'POST',
+          body: data,
+          credentials: 'same-origin'
+        })
+          .then(resp => resp.text())
+          .then(msg => {
+            popupMsg(msg, false);
+          })
+          .catch(() => {
+            popupMsg('Failed to request restart.', true);
+          });
+      }
+    </script>
+  </div>
 </body>
+
 </html>
