@@ -171,26 +171,6 @@
           });
       }
       function restartApp() {
-  let form = document.getElementById('database-config-form');
-  let data = new FormData(form);
-  // CSRF token
-  const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
-  const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
-  fetch('/configuration/database/restart', {
-    method: 'POST',
-    body: data,
-    credentials: 'same-origin',
-    headers: { [csrfHeader]: csrfToken }
-  })
-  .then(resp => resp.text())
-  .then(msg => {
-    popupMsg(msg, false);
-  })
-  .catch(() => {
-    popupMsg('Failed to request restart.', true);
-  });
-}
-
         let form = document.getElementById('database-config-form');
         let data = new FormData(form);
         // CSRF token
@@ -202,28 +182,13 @@
           credentials: 'same-origin',
           headers: { [csrfHeader]: csrfToken }
         })
-          .then(resp => resp.text())
-          .then(msg => {
-            popupMsg(msg, false);
-          })
-          .catch(() => {
-            popupMsg('Failed to request restart.', true);
-          });
-
-        let form = document.getElementById('database-config-form');
-        let data = new FormData(form);
-        fetch('/configuration/database/restart', {
-          method: 'POST',
-          body: data,
-          credentials: 'same-origin'
+        .then(resp => resp.text())
+        .then(msg => {
+          popupMsg(msg, false);
         })
-          .then(resp => resp.text())
-          .then(msg => {
-            popupMsg(msg, false);
-          })
-          .catch(() => {
-            popupMsg('Failed to request restart.', true);
-          });
+        .catch(() => {
+          popupMsg('Failed to request restart.', true);
+        });
       }
     </script>
   </div>
