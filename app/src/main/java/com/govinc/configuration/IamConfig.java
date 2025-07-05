@@ -2,10 +2,9 @@ package com.govinc.configuration;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.PropertySource;
+import jakarta.annotation.PostConstruct;
 
 @Configuration
-@PropertySource(value = "file:app/config/iam.properties", ignoreResourceNotFound = true)
 @ConfigurationProperties(prefix = "iam")
 public class IamConfig {
     /**
@@ -21,7 +20,21 @@ public class IamConfig {
     private String keycloakRealm;
     private String keycloakClientId;
     private String keycloakClientSecret;
-    // Getters and setters
+
+    @PostConstruct
+    public void debugPrintConfig() {
+        System.out.println("---- Active IAM Provider: " + getProvider());
+        System.out.println("iam.provider=" + getProvider());
+        System.out.println("iam.azure-client-id=" + getAzureClientId());
+        System.out.println("iam.azure-client-secret=" + (getAzureClientSecret() != null && !getAzureClientSecret().isEmpty() ? "***" : ""));
+        System.out.println("iam.azure-tenant-id=" + getAzureTenantId());
+        System.out.println("iam.keycloak-issuer-url=" + getKeycloakIssuerUrl());
+        System.out.println("iam.keycloak-realm=" + getKeycloakRealm());
+        System.out.println("iam.keycloak-client-id=" + getKeycloakClientId());
+        System.out.println("iam.keycloak-client-secret=" + (getKeycloakClientSecret() != null && !getKeycloakClientSecret().isEmpty() ? "***" : ""));
+        System.out.println("----");
+    }
+
     public String getProvider() {
         return (provider == null || provider.isBlank()) ? "MOCK" : provider;
     }

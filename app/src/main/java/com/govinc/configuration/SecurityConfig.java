@@ -66,6 +66,7 @@ class OAuth2SecurityConfig {
     @Bean
     @Order(1)
     public SecurityFilterChain oauth2SecurityFilterChain(HttpSecurity http) throws Exception {
+        System.out.println("[DEBUG] Using OAuth2 Security Configuration. Provider: " + iamConfig.getProvider());
         http
             .authorizeHttpRequests(authz -> authz
                 .requestMatchers("/css/**", "/js/**", "/webjars/**", "/images/**").permitAll()
@@ -85,9 +86,12 @@ class OAuth2SecurityConfig {
 class MockSecurityConfig {
     @Autowired
     private AuthenticationSuccessHandler customAuthenticationSuccessHandler;
+    @Autowired
+    private IamConfig iamConfig;
     @Bean
     @Order(2)
     public SecurityFilterChain formLoginSecurityFilterChain(HttpSecurity http) throws Exception {
+        System.out.println("[DEBUG] Using MOCK Security Configuration. Provider: " + iamConfig.getProvider());
         http
             .authorizeHttpRequests(authz -> authz
                 .requestMatchers("/login", "/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
