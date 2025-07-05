@@ -13,6 +13,7 @@ import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 
 @Configuration
 @EnableWebSecurity
@@ -34,12 +35,19 @@ public class SecurityConfig {
         try (java.io.InputStream in = new java.io.FileInputStream(adminProps)) {
             java.util.Properties p = new java.util.Properties();
             p.load(in);
-            String plainOrHashed = p.getProperty("admin", "admin");
-            boolean isBCrypt = plainOrHashed.startsWith("{bcrypt}");
-            String pw = isBCrypt ? plainOrHashed : passwordEncoder().encode(plainOrHashed);
-            manager.createUser(User.withUsername("admin")
-                    .password(pw)
-                    .roles("ADMIN").build());
+            // Now: allow multiple users, value = password[,email]
+            for (String key : p.stringPropertyNames()) {
+                String[] valParts = p.getProperty(key).split(",", 2);
+                String plainOrHashed = valParts[0].trim();
+                String email = valParts.length > 1 ? valParts[1].trim() : (key + "@local");
+                boolean isBCrypt = plainOrHashed.startsWith("{bcrypt}");
+                String pw = isBCrypt ? plainOrHashed : passwordEncoder().encode(plainOrHashed);
+                manager.createUser(User.withUsername(key)
+                        .password(pw)
+                        .roles(key.equals("admin") ? "ADMIN" : "USER")
+                        .build());
+                // Optionally, store email in a static map for lookup if needed
+            }
         } catch (Exception e) {
             // Fallback in-memory admin
             manager.createUser(User.withUsername("admin")
@@ -49,6 +57,9 @@ public class SecurityConfig {
         // If IDP, all users come from there, but admin always present
         return manager;
     }
+
+    @Autowired
+    private AuthenticationSuccessHandler customAuthenticationSuccessHandler;
 
     @Bean
     @Order(1)
@@ -61,7 +72,9 @@ public class SecurityConfig {
                     .requestMatchers("/configuration/**").authenticated()
                     .anyRequest().authenticated()
                 )
-                .oauth2Login(Customizer.withDefaults());
+                .oauth2Login(oauth2 -> oauth2
+                    .successHandler(customAuthenticationSuccessHandler)
+                );
             // Use application.properties (via Spring Boot OIDC) for Keycloak
 
         } else if (provider.equalsIgnoreCase("AZURE")) {
@@ -71,7 +84,9 @@ public class SecurityConfig {
                     .requestMatchers("/configuration/**").authenticated()
                     .anyRequest().authenticated()
                 )
-                .oauth2Login(Customizer.withDefaults());
+                .oauth2Login(oauth2 -> oauth2
+                    .successHandler(customAuthenticationSuccessHandler)
+                );
             // Use application.properties for Azure OIDC
 
         } else { // MOCK or not set
@@ -83,6 +98,7 @@ public class SecurityConfig {
                 )
                 .formLogin(form -> form
                     .defaultSuccessUrl("/", true)
+                    .successHandler(customAuthenticationSuccessHandler)
                     .permitAll()
                 )
                 .logout(logout -> logout.permitAll());
