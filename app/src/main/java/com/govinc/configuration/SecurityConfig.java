@@ -21,6 +21,9 @@ public class SecurityConfig {
     @Autowired
     private IamConfig iamConfig;
 
+    @Autowired
+    private AuthenticationSuccessHandler customAuthenticationSuccessHandler;
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return PasswordEncoderFactories.createDelegatingPasswordEncoder();
@@ -28,14 +31,11 @@ public class SecurityConfig {
 
     @Bean
     public UserDetailsService userDetailsService() {
-        String provider = iamConfig.getProvider();
         InMemoryUserDetailsManager manager = new InMemoryUserDetailsManager();
-        // Always read admin from properties file
         String adminProps = "app/src/main/resources/config/users.properties";
         try (java.io.InputStream in = new java.io.FileInputStream(adminProps)) {
             java.util.Properties p = new java.util.Properties();
             p.load(in);
-            // Now: allow multiple users, value = password[,email]
             for (String key : p.stringPropertyNames()) {
                 String[] valParts = p.getProperty(key).split(",", 2);
                 String plainOrHashed = valParts[0].trim();
@@ -46,26 +46,20 @@ public class SecurityConfig {
                         .password(pw)
                         .roles(key.equals("admin") ? "ADMIN" : "USER")
                         .build());
-                // Optionally, store email in a static map for lookup if needed
             }
         } catch (Exception e) {
-            // Fallback in-memory admin
             manager.createUser(User.withUsername("admin")
                     .password(passwordEncoder().encode("admin"))
                     .roles("ADMIN").build());
         }
-        // If IDP, all users come from there, but admin always present
         return manager;
     }
-
-    @Autowired
-    private AuthenticationSuccessHandler customAuthenticationSuccessHandler;
 
     @Bean
     @Order(1)
     public SecurityFilterChain oauth2SecurityFilterChain(HttpSecurity http) throws Exception {
         String provider = iamConfig.getProvider();
-        if (provider.equalsIgnoreCase("KEYCLOAK")) {
+        if (provider.equalsIgnoreCase("KEYCLOAK") || provider.equalsIgnoreCase("AZURE")) {
             http
                 .authorizeHttpRequests(authz -> authz
                     .requestMatchers("/css/**", "/js/**", "/webjars/**", "/images/**").permitAll()
@@ -76,22 +70,18 @@ public class SecurityConfig {
                 .oauth2Login(oauth2 -> oauth2
                     .successHandler(customAuthenticationSuccessHandler)
                 );
-            // Use application.properties (via Spring Boot OIDC) for Keycloak
+            return http.build();
+        }
+        // Return null if not an oauth2 provider, no bean will be registered
+        return null;
+    }
 
-        } else if (provider.equalsIgnoreCase("AZURE")) {
-            http
-                .authorizeHttpRequests(authz -> authz
-                    .requestMatchers("/css/**", "/js/**", "/webjars/**", "/images/**").permitAll()
-                    .requestMatchers("/configuration/database/restart").authenticated()
-                    .requestMatchers("/configuration/**").authenticated()
-                    .anyRequest().authenticated()
-                )
-                .oauth2Login(oauth2 -> oauth2
-                    .successHandler(customAuthenticationSuccessHandler)
-                );
-            // Use application.properties for Azure OIDC
-
-        } else { // MOCK or not set
+    @Bean
+    @Order(2)
+    public SecurityFilterChain formLoginSecurityFilterChain(HttpSecurity http) throws Exception {
+        String provider = iamConfig.getProvider();
+        if (!provider.equalsIgnoreCase("KEYCLOAK") && !provider.equalsIgnoreCase("AZURE")) {
+            // For MOCK or not set, use form login
             http
                 .authorizeHttpRequests(authz -> authz
                     .requestMatchers("/login", "/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
@@ -104,7 +94,9 @@ public class SecurityConfig {
                     .permitAll()
                 )
                 .logout(logout -> logout.permitAll());
+            return http.build();
         }
-        return http.build();
+        // Return null if not a form login provider, no bean will be registered
+        return null;
     }
 }
