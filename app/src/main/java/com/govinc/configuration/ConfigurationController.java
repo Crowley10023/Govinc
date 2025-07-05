@@ -92,7 +92,7 @@ public class ConfigurationController {
             iamConfig.setKeycloakClientSecret(updatedConfig.getKeycloakClientSecret());
 
             // Save to config/iam.properties (in working directory)
-            String configDir = "config";
+            String configDir = "app/config";
             java.io.File dir = new java.io.File(configDir);
             if (!dir.exists()) dir.mkdirs();
             String targetPath = configDir + java.io.File.separator + "iam.properties";
