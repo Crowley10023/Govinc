@@ -69,6 +69,7 @@ public class SecurityConfig {
             http
                 .authorizeHttpRequests(authz -> authz
                     .requestMatchers("/css/**", "/js/**", "/webjars/**", "/images/**").permitAll()
+                    .requestMatchers("/configuration/database/restart").authenticated()
                     .requestMatchers("/configuration/**").authenticated()
                     .anyRequest().authenticated()
                 )
@@ -81,6 +82,7 @@ public class SecurityConfig {
             http
                 .authorizeHttpRequests(authz -> authz
                     .requestMatchers("/css/**", "/js/**", "/webjars/**", "/images/**").permitAll()
+                    .requestMatchers("/configuration/database/restart").authenticated()
                     .requestMatchers("/configuration/**").authenticated()
                     .anyRequest().authenticated()
                 )
