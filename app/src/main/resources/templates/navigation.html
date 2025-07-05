@@ -9,16 +9,8 @@
             th:text="${userName != null} ? ${userName} : (${userId != null} ? ${userId} : 'no user')"></span></div>
         <div style="margin-bottom:0.5em;display:flex;align-items:center;">
           <span class="ci-headline">compliance incubator</span>
-          <a href="/" style="margin-left:1.25em;text-decoration:none;"><button type="button" class="btn-nav">Home</button></a>
-          <!-- Select User Dropdown -->
-          <form method="post" action="/users/set-session-user" style="margin-left:2em;">
-            <label for="select-user">Select User:</label>
-            <select id="select-user" name="userId" onchange="this.form.submit()">
-              <option th:each="u : ${allUsers}" th:value="${u.id}" th:text="${u.name}" th:selected="${u.id == userId}"></option>
-            </select>
-            <!-- CSRF token placeholder for Spring Security -->
-            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-          </form>
+          <a href="/" style="margin-left:1.25em;text-decoration:none;"><button type="button"
+              class="btn-nav">Home</button></a>
         </div>
         <div class="nav-row" style="display:flex;flex-direction:row;align-items:center;gap:1.2em;">
           <!-- Configuration Dropdown -->
@@ -33,11 +25,15 @@
           <div class="nav-entry dropdown" style="display:flex;align-items:center;gap:0.4em;">
             <button type="button" class="dropdown-button btn-nav">Security Framework</button>
             <div class="dropdown-content">
-              <a href="/security-control/list"><button type="button" class="dropdown-menu-btn">Security Controls</button></a>
-              <a href="/security-catalog/list"><button type="button" class="dropdown-menu-btn">Security Catalogs</button></a>
-              <a href="/security-control-domain/list"><button type="button" class="dropdown-menu-btn">Security Control Domains</button></a>
+              <a href="/security-control/list"><button type="button" class="dropdown-menu-btn">Security
+                  Controls</button></a>
+              <a href="/security-catalog/list"><button type="button" class="dropdown-menu-btn">Security
+                  Catalogs</button></a>
+              <a href="/security-control-domain/list"><button type="button" class="dropdown-menu-btn">Security Control
+                  Domains</button></a>
               <a href="/maturitymodel/list"><button type="button" class="dropdown-menu-btn">Maturity Models</button></a>
-              <a href="/maturityanswer/list"><button type="button" class="dropdown-menu-btn">Maturity Model Answers</button></a>
+              <a href="/maturityanswer/list"><button type="button" class="dropdown-menu-btn">Maturity Model
+                  Answers</button></a>
             </div>
           </div>
           <!-- Organization Dropdown -->
@@ -50,7 +46,8 @@
             </div>
           </div>
           <div class="nav-entry" style="display:flex;align-items:center;gap:0.4em;">
-            <a href="/assessment-urls-list" class="entry-link"><button type="button" class="nav-btn">Assessment URLs</button></a>
+            <a href="/assessment-urls-list" class="entry-link"><button type="button" class="nav-btn">Assessment
+                URLs</button></a>
           </div>
           <div class="nav-entry" style="display:flex;align-items:center;gap:0.4em;">
             <form action="/assessment/create" method="get" class="entry-form" style="margin:0;">
@@ -61,7 +58,8 @@
             <a href="/assessment/list" class="entry-link"><button type="button" class="nav-btn">Assessments</button></a>
           </div>
           <div class="nav-entry" style="display:flex;align-items:center;gap:0.4em;">
-            <a href="/compliance/view" class="entry-link"><button type="button" class="nav-btn">Compliance Check</button></a>
+            <a href="/compliance/view" class="entry-link"><button type="button" class="nav-btn">Compliance
+                Check</button></a>
           </div>
           <div class="nav-entry" style="display:flex;align-items:center;gap:0.4em;">
             <a href="/statistics" class="entry-link"><button type="button" class="nav-btn">Statistics</button></a>

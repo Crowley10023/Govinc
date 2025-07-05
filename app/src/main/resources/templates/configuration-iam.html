@@ -10,6 +10,15 @@
     <h2>IAM Configuration</h2>
     <form id="iam-config-form" method="post" th:action="@{/configuration/iam/save}">
         <table class="config-table">
+        <tr><th colspan=2>Admin User Password</th></tr>
+        <tr>
+          <td><label for="adminPassword">Set Admin Password:</label></td>
+          <td>
+            <input type="password" name="adminPassword" id="adminPassword" minlength="6" />
+            <button type="button" onclick="changeAdminPassword()">Change Password</button>
+            <span id="admin-password-msg"></span>
+          </td>
+        </tr>
             <tr>
                 <th>Provider</th><th>Configuration</th>
             </tr>
@@ -56,7 +65,7 @@
             </tr>
         </table>
         <div style="margin-top:1em;">
-            <button type="submit" class="btn btn-primary">Approve & Apply</button>
+            <button type="submit" class="btn btn-primary">Save Configuration</button>
         </div>
     </form>
     <script>
@@ -68,6 +77,27 @@
         visible.forEach(r => r.style.display = 'table-row');
       }
       document.addEventListener('DOMContentLoaded', updateProviderFields);
+
+      function changeAdminPassword() {
+        var pw = document.getElementById('adminPassword').value;
+        var msg = document.getElementById('admin-password-msg');
+        if (!pw || pw.length < 6) {
+          msg.style.color = 'red';
+          msg.textContent = 'Password must be at least 6 characters.';
+          return;
+        }
+        fetch('/configuration/iam/change-admin-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: pw })
+        }).then(r => r.json())
+        .then(resp => {
+          msg.style.color = resp.success ? 'green' : 'red';
+          msg.textContent = resp.message;
+        }).catch(() => {
+          msg.style.color = 'red'; msg.textContent = 'Request failed.';
+        });
+      }
     </script>
     <div th:if="${message}" style="margin-top:1em; color: green;">
         <span th:text="${message}"></span>

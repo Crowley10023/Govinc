@@ -28,16 +28,26 @@ public class SecurityConfig {
     @Bean
     public UserDetailsService userDetailsService() {
         String provider = (iamConfig.getProvider() == null) ? "MOCK" : iamConfig.getProvider();
-        // Always provide an admin fallback user for MOCK or unconfigured
-        if (provider.equalsIgnoreCase("MOCK") || provider.isEmpty()) {
-            InMemoryUserDetailsManager manager = new InMemoryUserDetailsManager();
+        InMemoryUserDetailsManager manager = new InMemoryUserDetailsManager();
+        // Always read admin from properties file
+        String adminProps = "app/src/main/resources/config/users.properties";
+        try (java.io.InputStream in = new java.io.FileInputStream(adminProps)) {
+            java.util.Properties p = new java.util.Properties();
+            p.load(in);
+            String plainOrHashed = p.getProperty("admin", "admin");
+            boolean isBCrypt = plainOrHashed.startsWith("{bcrypt}");
+            String pw = isBCrypt ? plainOrHashed : passwordEncoder().encode(plainOrHashed);
             manager.createUser(User.withUsername("admin")
-                  .password(passwordEncoder().encode("admin"))
-                  .roles("ADMIN").build());
-            return manager;
+                    .password(pw)
+                    .roles("ADMIN").build());
+        } catch (Exception e) {
+            // Fallback in-memory admin
+            manager.createUser(User.withUsername("admin")
+                    .password(passwordEncoder().encode("admin"))
+                    .roles("ADMIN").build());
         }
-        // If a real IDP, no local users provided
-        return new InMemoryUserDetailsManager();
+        // If IDP, all users come from there, but admin always present
+        return manager;
     }
 
     @Bean
@@ -47,7 +57,8 @@ public class SecurityConfig {
         if (provider.equalsIgnoreCase("KEYCLOAK")) {
             http
                 .authorizeHttpRequests(authz -> authz
-                    .requestMatchers("/configuration/**", "/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
+                    .requestMatchers("/css/**", "/js/**", "/webjars/**", "/images/**").permitAll()
+                    .requestMatchers("/configuration/**").authenticated()
                     .anyRequest().authenticated()
                 )
                 .oauth2Login(Customizer.withDefaults());
@@ -56,7 +67,8 @@ public class SecurityConfig {
         } else if (provider.equalsIgnoreCase("AZURE")) {
             http
                 .authorizeHttpRequests(authz -> authz
-                    .requestMatchers("/configuration/**", "/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
+                    .requestMatchers("/css/**", "/js/**", "/webjars/**", "/images/**").permitAll()
+                    .requestMatchers("/configuration/**").authenticated()
                     .anyRequest().authenticated()
                 )
                 .oauth2Login(Customizer.withDefaults());
@@ -65,7 +77,8 @@ public class SecurityConfig {
         } else { // MOCK or not set
             http
                 .authorizeHttpRequests(authz -> authz
-                    .requestMatchers("/login", "/configuration/**", "/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
+                    .requestMatchers("/login", "/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
+                    .requestMatchers("/configuration/**").authenticated()
                     .anyRequest().authenticated()
                 )
                 .formLogin(form -> form

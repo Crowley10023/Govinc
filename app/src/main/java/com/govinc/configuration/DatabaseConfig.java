@@ -1,9 +1,9 @@
 package com.govinc.configuration;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.stereotype.Component;
 
-@Configuration
+@Component
 @ConfigurationProperties(prefix = "spring.datasource")
 public class DatabaseConfig {
     private String url;

@@ -31,7 +31,8 @@ public class ConfigurationController {
 
     @PostMapping("/database/check")
     @org.springframework.web.bind.annotation.ResponseBody
-    public java.util.Map<String, Object> checkDbConnection(@org.springframework.web.bind.annotation.RequestBody java.util.Map<String, String> params) {
+    public java.util.Map<String, Object> checkDbConnection(
+            @org.springframework.web.bind.annotation.RequestBody java.util.Map<String, String> params) {
         java.util.Map<String, Object> response = new java.util.HashMap<>();
         try {
             String url = params.get("url");
@@ -44,21 +45,30 @@ public class ConfigurationController {
             }
         } catch (Exception e) {
             response.put("success", false);
+            String msg = e.getMessage();
+            if (msg == null && e.getCause() != null) msg = e.getCause().getMessage();
+            if (msg == null) msg = e.toString();
+            response.put("error", msg);
         }
         return response;
     }
 
     @PostMapping("/database/save")
     public String saveDatabaseConfig(@ModelAttribute DatabaseConfig dbConfigForm, Model model) {
-        dbConfig.setUrl(dbConfigForm.getUrl());
-        dbConfig.setUsername(dbConfigForm.getUsername());
-        dbConfig.setPassword(dbConfigForm.getPassword());
-        dbConfig.setDriverClassName(dbConfigForm.getDriverClassName());
-        dbConfig.setDdlAuto(dbConfigForm.getDdlAuto());
-        dbConfig.setShowSql(dbConfigForm.isShowSql());
-        // Dynamic reloading is hacky and not fully supported. Here, just say config saved.
-        model.addAttribute("dbConfig", dbConfig);
-        model.addAttribute("message", "Configuration saved. Full dynamic reload may require restart.");
+        try {
+            dbConfig.setUrl(dbConfigForm.getUrl());
+            dbConfig.setUsername(dbConfigForm.getUsername());
+            dbConfig.setPassword(dbConfigForm.getPassword());
+            dbConfig.setDriverClassName(dbConfigForm.getDriverClassName());
+            dbConfig.setDdlAuto(dbConfigForm.getDdlAuto());
+            dbConfig.setShowSql(dbConfigForm.isShowSql());
+            model.addAttribute("dbConfig", dbConfig);
+            model.addAttribute("message", "Database configuration was saved successfully! Note: A full reload of the application may be required for all changes to take effect.");
+        } catch (Exception e) {
+            model.addAttribute("dbConfig", dbConfigForm);
+            String errorMsg = (e.getMessage() != null) ? e.getMessage() : "Unknown error occurred while saving database configuration.";
+            model.addAttribute("message", "Error saving database configuration: " + errorMsg);
+        }
         return "configuration-database";
     }
 
@@ -67,43 +77,57 @@ public class ConfigurationController {
         model.addAttribute("iamConfig", iamConfig);
         return "configuration-iam";
     }
-    
+
     @PostMapping("/iam/save")
     public String saveIamConfig(@ModelAttribute IamConfig updatedConfig, Model model) {
         System.out.println("Entering /iam/save POST handler");
-    
-        // Set in-memory config
-        iamConfig.setProvider(updatedConfig.getProvider());
-        iamConfig.setAzureClientId(updatedConfig.getAzureClientId());
-        iamConfig.setAzureClientSecret(updatedConfig.getAzureClientSecret());
-        iamConfig.setAzureTenantId(updatedConfig.getAzureTenantId());
-        iamConfig.setKeycloakIssuerUrl(updatedConfig.getKeycloakIssuerUrl());
-        iamConfig.setKeycloakRealm(updatedConfig.getKeycloakRealm());
-        iamConfig.setKeycloakClientId(updatedConfig.getKeycloakClientId());
-        iamConfig.setKeycloakClientSecret(updatedConfig.getKeycloakClientSecret());
-    
-        // Show the updated config
-        System.out.println("Updated IAM config: " + iamConfig);
-    
-        // Print working directory
-        String workingDir = System.getProperty("user.dir");
-        System.out.println("Current working directory: " + workingDir);
-    
-        // Show the intended path to application.properties
-        String targetPath = "/build/resources/application.properties";
-        System.out.println("Attempting to save IAM config to: " + targetPath);
-    
         try {
+            iamConfig.setProvider(updatedConfig.getProvider());
+            iamConfig.setAzureClientId(updatedConfig.getAzureClientId());
+            iamConfig.setAzureClientSecret(updatedConfig.getAzureClientSecret());
+            iamConfig.setAzureTenantId(updatedConfig.getAzureTenantId());
+            iamConfig.setKeycloakIssuerUrl(updatedConfig.getKeycloakIssuerUrl());
+            iamConfig.setKeycloakRealm(updatedConfig.getKeycloakRealm());
+            iamConfig.setKeycloakClientId(updatedConfig.getKeycloakClientId());
+            iamConfig.setKeycloakClientSecret(updatedConfig.getKeycloakClientSecret());
+
+            String workingDir = System.getProperty("user.dir");
+            String targetPath = "/build/resources/application.properties";
+            System.out.println("Attempting to save IAM config to: " + targetPath);
+
             IamConfigFileUtil.saveToPropertiesFile(iamConfig, targetPath);
-            model.addAttribute("message", "Configuration saved. Full reload may require restart.");
+            model.addAttribute("message", "IAM configuration was saved successfully! Note: A full application reload may be needed for changes to fully apply.");
             System.out.println("Save appears successful.");
         } catch (Exception e) {
-            model.addAttribute("message", "ERROR: " + e.getMessage());
-            System.out.println("ERROR: Exception while saving: " + e.getMessage());
+            String errorMsg = (e.getMessage() != null) ? e.getMessage() : "Unknown error occurred while saving IAM configuration.";
+            model.addAttribute("message", "Error saving IAM configuration: " + errorMsg);
+            System.out.println("ERROR: Exception while saving: " + errorMsg);
             e.printStackTrace(System.out);
         }
         model.addAttribute("iamConfig", iamConfig);
         System.out.println("Returning view: configuration-iam");
         return "configuration-iam";
+    }
+
+    // --- New: Restart endpoint ---
+    @PostMapping("/database/restart")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public String restartWithDatabaseConfig(@ModelAttribute DatabaseConfig dbConfigForm) {
+        dbConfig.setUrl(dbConfigForm.getUrl());
+        dbConfig.setUsername(dbConfigForm.getUsername());
+        dbConfig.setPassword(dbConfigForm.getPassword());
+        dbConfig.setDriverClassName(dbConfigForm.getDriverClassName());
+        dbConfig.setDdlAuto(dbConfigForm.getDdlAuto());
+        dbConfig.setShowSql(dbConfigForm.isShowSql());
+        // Issue a restart; note: actually causes JVM to exit and relaunch
+        Thread thread = new Thread(() -> {
+            try {
+                Thread.sleep(1500); // let response flush
+            } catch (InterruptedException ignored) {}
+            org.springframework.boot.SpringApplication.exit(applicationContext, () -> 0);
+        });
+        thread.setDaemon(false);
+        thread.start();
+        return "Restarting application to apply new database configuration... Please wait and reload the page.";
     }
 }
