@@ -28,7 +28,7 @@ public class SecurityConfig {
 
     @Bean
     public UserDetailsService userDetailsService() {
-        String provider = (iamConfig.getProvider() == null) ? "MOCK" : iamConfig.getProvider();
+        String provider = iamConfig.getProvider();
         InMemoryUserDetailsManager manager = new InMemoryUserDetailsManager();
         // Always read admin from properties file
         String adminProps = "app/src/main/resources/config/users.properties";
@@ -64,7 +64,7 @@ public class SecurityConfig {
     @Bean
     @Order(1)
     public SecurityFilterChain oauth2SecurityFilterChain(HttpSecurity http) throws Exception {
-        String provider = (iamConfig.getProvider() == null) ? "MOCK" : iamConfig.getProvider();
+        String provider = iamConfig.getProvider();
         if (provider.equalsIgnoreCase("KEYCLOAK")) {
             http
                 .authorizeHttpRequests(authz -> authz

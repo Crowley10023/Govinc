@@ -8,7 +8,10 @@ import org.springframework.context.annotation.PropertySource;
 @PropertySource(value = "file:app/config/iam.properties", ignoreResourceNotFound = true)
 @ConfigurationProperties(prefix = "iam")
 public class IamConfig {
-    private String provider; // AZURE, KEYCLOAK, MOCK
+    /**
+     * AZURE, KEYCLOAK, MOCK (defaults to MOCK if missing/not set)
+     */
+    private String provider = "MOCK";
     // Azure fields
     private String azureClientId;
     private String azureClientSecret;
@@ -19,8 +22,12 @@ public class IamConfig {
     private String keycloakClientId;
     private String keycloakClientSecret;
     // Getters and setters
-    public String getProvider() { return provider; }
-    public void setProvider(String provider) { this.provider = provider; }
+    public String getProvider() {
+        return (provider == null || provider.isBlank()) ? "MOCK" : provider;
+    }
+    public void setProvider(String provider) {
+        this.provider = provider;
+    }
 
     public String getAzureClientId() { return azureClientId; }
     public void setAzureClientId(String azureClientId) { this.azureClientId = azureClientId; }
