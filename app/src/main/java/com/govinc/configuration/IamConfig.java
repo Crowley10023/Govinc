@@ -5,7 +5,7 @@ import org.springframework.context.annotation.Configuration;
 import jakarta.annotation.PostConstruct;
 
 @Configuration
-@ConfigurationProperties(prefix = "iam")
+@ConfigurationProperties(prefix = "spring.security.oauth2.client")
 public class IamConfig {
     /**
      * AZURE, KEYCLOAK, MOCK (defaults to MOCK if missing/not set)
@@ -15,23 +15,20 @@ public class IamConfig {
     private String azureClientId;
     private String azureClientSecret;
     private String azureTenantId;
-    // Keycloak fields
-    private String keycloakIssuerUrl;
-    private String keycloakRealm;
-    private String keycloakClientId;
-    private String keycloakClientSecret;
+    // Keycloak fields - using Spring Boot conventions
+    private String registrationKeycloakClientId;
+    private String registrationKeycloakClientSecret;
+    private String providerKeycloakIssuerUri;
+
+    private String loginPage; // new field for redirect login page like 'spring.security.oauth2.client.login-page'
 
     @PostConstruct
     public void debugPrintConfig() {
         System.out.println("---- Active IAM Provider: " + getProvider());
-        System.out.println("iam.provider=" + getProvider());
-        System.out.println("iam.azure-client-id=" + getAzureClientId());
-        System.out.println("iam.azure-client-secret=" + (getAzureClientSecret() != null && !getAzureClientSecret().isEmpty() ? "***" : ""));
-        System.out.println("iam.azure-tenant-id=" + getAzureTenantId());
-        System.out.println("iam.keycloak-issuer-url=" + getKeycloakIssuerUrl());
-        System.out.println("iam.keycloak-realm=" + getKeycloakRealm());
-        System.out.println("iam.keycloak-client-id=" + getKeycloakClientId());
-        System.out.println("iam.keycloak-client-secret=" + (getKeycloakClientSecret() != null && !getKeycloakClientSecret().isEmpty() ? "***" : ""));
+        System.out.println("spring.security.oauth2.client.registration.keycloak.client-id=" + getRegistrationKeycloakClientId());
+        System.out.println("spring.security.oauth2.client.registration.keycloak.client-secret=" + (getRegistrationKeycloakClientSecret() != null && !getRegistrationKeycloakClientSecret().isEmpty() ? "***" : ""));
+        System.out.println("spring.security.oauth2.client.provider.keycloak.issuer-uri=" + getProviderKeycloakIssuerUri());
+        System.out.println("spring.security.oauth2.client.login-page=" + getLoginPage());
         System.out.println("----");
     }
 
@@ -49,12 +46,13 @@ public class IamConfig {
     public String getAzureTenantId() { return azureTenantId; }
     public void setAzureTenantId(String azureTenantId) { this.azureTenantId = azureTenantId; }
 
-    public String getKeycloakIssuerUrl() { return keycloakIssuerUrl; }
-    public void setKeycloakIssuerUrl(String keycloakIssuerUrl) { this.keycloakIssuerUrl = keycloakIssuerUrl; }
-    public String getKeycloakRealm() { return keycloakRealm; }
-    public void setKeycloakRealm(String keycloakRealm) { this.keycloakRealm = keycloakRealm; }
-    public String getKeycloakClientId() { return keycloakClientId; }
-    public void setKeycloakClientId(String keycloakClientId) { this.keycloakClientId = keycloakClientId; }
-    public String getKeycloakClientSecret() { return keycloakClientSecret; }
-    public void setKeycloakClientSecret(String keycloakClientSecret) { this.keycloakClientSecret = keycloakClientSecret; }
+    public String getRegistrationKeycloakClientId() { return registrationKeycloakClientId; }
+    public void setRegistrationKeycloakClientId(String registrationKeycloakClientId) { this.registrationKeycloakClientId = registrationKeycloakClientId; }
+    public String getRegistrationKeycloakClientSecret() { return registrationKeycloakClientSecret; }
+    public void setRegistrationKeycloakClientSecret(String registrationKeycloakClientSecret) { this.registrationKeycloakClientSecret = registrationKeycloakClientSecret; }
+    public String getProviderKeycloakIssuerUri() { return providerKeycloakIssuerUri; }
+    public void setProviderKeycloakIssuerUri(String providerKeycloakIssuerUri) { this.providerKeycloakIssuerUri = providerKeycloakIssuerUri; }
+
+    public String getLoginPage() { return loginPage; }
+    public void setLoginPage(String loginPage) { this.loginPage = loginPage; }
 }

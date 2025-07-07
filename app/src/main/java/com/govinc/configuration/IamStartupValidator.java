@@ -26,9 +26,9 @@ public class IamStartupValidator {
         String provider = iamConfig.getProvider();
         boolean ok = true;
         if ("KEYCLOAK".equalsIgnoreCase(provider)) {
-            String issuerUrl = iamConfig.getKeycloakIssuerUrl();
-            System.out.println("[IAM] Checking Keycloak provider at: " + issuerUrl);
-            ok = checkHttpEndpoint(issuerUrl + "/.well-known/openid-configuration");
+            String issuerUri = iamConfig.getProviderKeycloakIssuerUri();
+            System.out.println("[IAM] Checking Keycloak provider at: " + issuerUri);
+            ok = checkHttpEndpoint(issuerUri + "/.well-known/openid-configuration");
         } else if ("AZURE".equalsIgnoreCase(provider)) {
             String tenant = iamConfig.getAzureTenantId();
             String endpoint = null;

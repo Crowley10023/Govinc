@@ -12,10 +12,11 @@ public class IamConfigFileUtil {
         props.setProperty("iam.azure-client-secret", config.getAzureClientSecret() == null ? "" : config.getAzureClientSecret());
         props.setProperty("iam.azure-tenant-id", config.getAzureTenantId() == null ? "" : config.getAzureTenantId());
         // Keycloak
-        props.setProperty("iam.keycloak-issuer-url", config.getKeycloakIssuerUrl() == null ? "" : config.getKeycloakIssuerUrl());
-        props.setProperty("iam.keycloak-realm", config.getKeycloakRealm() == null ? "" : config.getKeycloakRealm());
-        props.setProperty("iam.keycloak-client-id", config.getKeycloakClientId() == null ? "" : config.getKeycloakClientId());
-        props.setProperty("iam.keycloak-client-secret", config.getKeycloakClientSecret() == null ? "" : config.getKeycloakClientSecret());
+        props.setProperty("spring.security.oauth2.client.provider.keycloak.issuer-uri", config.getProviderKeycloakIssuerUri() == null ? "" : config.getProviderKeycloakIssuerUri());
+
+        props.setProperty("spring.security.oauth2.client.registration.keycloak.client-id", config.getRegistrationKeycloakClientId() == null ? "" : config.getRegistrationKeycloakClientId());
+        props.setProperty("spring.security.oauth2.client.registration.keycloak.client-secret", config.getRegistrationKeycloakClientSecret() == null ? "" : config.getRegistrationKeycloakClientSecret());
+        props.setProperty("spring.security.oauth2.client.login-page", config.getLoginPage() == null ? "" : config.getLoginPage());
 
         // Ensure parent directories exist.
         File file = new File(filename);

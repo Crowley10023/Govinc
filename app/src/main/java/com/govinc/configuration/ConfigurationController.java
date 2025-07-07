@@ -86,10 +86,11 @@ public class ConfigurationController {
             iamConfig.setAzureClientId(updatedConfig.getAzureClientId());
             iamConfig.setAzureClientSecret(updatedConfig.getAzureClientSecret());
             iamConfig.setAzureTenantId(updatedConfig.getAzureTenantId());
-            iamConfig.setKeycloakIssuerUrl(updatedConfig.getKeycloakIssuerUrl());
-            iamConfig.setKeycloakRealm(updatedConfig.getKeycloakRealm());
-            iamConfig.setKeycloakClientId(updatedConfig.getKeycloakClientId());
-            iamConfig.setKeycloakClientSecret(updatedConfig.getKeycloakClientSecret());
+            iamConfig.setProviderKeycloakIssuerUri(updatedConfig.getProviderKeycloakIssuerUri());
+
+            iamConfig.setRegistrationKeycloakClientId(updatedConfig.getRegistrationKeycloakClientId());
+            iamConfig.setRegistrationKeycloakClientSecret(updatedConfig.getRegistrationKeycloakClientSecret());
+            iamConfig.setLoginPage(updatedConfig.getLoginPage());
 
             // Save to config/iam.properties (in working directory)
             String configDir = "app/config";

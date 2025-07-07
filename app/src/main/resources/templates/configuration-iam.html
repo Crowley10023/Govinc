@@ -45,20 +45,20 @@
                 <td><input type="text" name="azureTenantId" th:value="${iamConfig.azureTenantId}" /></td>
             </tr>
             <tr class="provider-fields provider-keycloak">
-                <td>Keycloak Issuer Url:</td>
-                <td><input type="text" name="keycloakIssuerUrl" th:value="${iamConfig.keycloakIssuerUrl}" /></td>
-            </tr>
-            <tr class="provider-fields provider-keycloak">
-                <td>Keycloak Realm:</td>
-                <td><input type="text" name="keycloakRealm" th:value="${iamConfig.keycloakRealm}" /></td>
+                <td>Keycloak Issuer URI:</td>
+                <td><input type="text" name="providerKeycloakIssuerUri" th:value="${iamConfig.providerKeycloakIssuerUri}" /></td>
             </tr>
             <tr class="provider-fields provider-keycloak">
                 <td>Keycloak Client Id:</td>
-                <td><input type="text" name="keycloakClientId" th:value="${iamConfig.keycloakClientId}" /></td>
+                <td><input type="text" name="registrationKeycloakClientId" th:value="${iamConfig.registrationKeycloakClientId}" /></td>
             </tr>
             <tr class="provider-fields provider-keycloak">
                 <td>Keycloak Client Secret:</td>
-                <td><input type="password" name="keycloakClientSecret" th:value="${iamConfig.keycloakClientSecret}" /></td>
+                <td><input type="password" name="registrationKeycloakClientSecret" th:value="${iamConfig.registrationKeycloakClientSecret}" /></td>
+            </tr>
+            <tr class="provider-fields provider-keycloak">
+                <td>OAuth2 Login Page (Redirect):</td>
+                <td><input type="text" name="loginPage" th:value="${iamConfig.loginPage}" placeholder="/oauth2/authorization/keycloak (optional)" /></td>
             </tr>
             <tr class="provider-fields provider-mock">
                 <td colspan=2><strong>Mock mode enabled - no real authentication.</strong></td>
