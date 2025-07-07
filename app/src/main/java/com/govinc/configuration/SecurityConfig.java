@@ -9,6 +9,11 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -24,16 +29,13 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-             .authorizeHttpRequests(auth -> auth
-                .anyRequest().authenticated()
-            )
-            .formLogin(form -> form
-                .successHandler(customAuthenticationSuccessHandler)
-            )
-            .oauth2Login(oauth2 -> oauth2
-                .successHandler(customAuthenticationSuccessHandler)
-                .failureHandler(oauth2AuthenticationFailureHandler())
-            );
+                .authorizeHttpRequests(auth -> auth
+                        .anyRequest().authenticated())
+                .formLogin(form -> form
+                        .successHandler(customAuthenticationSuccessHandler))
+                .oauth2Login(oauth2 -> oauth2
+                        .successHandler(customAuthenticationSuccessHandler)
+                        .failureHandler(oauth2AuthenticationFailureHandler()));
         return http.build();
     }
 
@@ -42,11 +44,25 @@ public class SecurityConfig {
         return new SimpleUrlAuthenticationFailureHandler() {
             @Override
             public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
-                                                org.springframework.security.core.AuthenticationException exception)
+                    org.springframework.security.core.AuthenticationException exception)
                     throws IOException, ServletException {
                 logger.error("OAuth2 login failure", exception);
                 super.onAuthenticationFailure(request, response, exception);
             }
         };
+    }
+
+    @Bean
+    public UserDetailsService userDetailsService() {
+        return new InMemoryUserDetailsManager(
+                User.withUsername("admin")
+                        .password(passwordEncoder().encode("admin"))
+                        .roles("ADMIN")
+                        .build());
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
     }
 }
