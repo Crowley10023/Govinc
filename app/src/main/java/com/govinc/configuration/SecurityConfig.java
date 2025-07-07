@@ -8,6 +8,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
+import org.springframework.beans.factory.annotation.Autowired;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -17,13 +18,20 @@ import java.io.IOException;
 public class SecurityConfig {
     private static final Logger logger = LoggerFactory.getLogger(SecurityConfig.class);
 
+    @Autowired
+    private CustomAuthenticationSuccessHandler customAuthenticationSuccessHandler;
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
              .authorizeHttpRequests(auth -> auth
                 .anyRequest().authenticated()
             )
+            .formLogin(form -> form
+                .successHandler(customAuthenticationSuccessHandler)
+            )
             .oauth2Login(oauth2 -> oauth2
+                .successHandler(customAuthenticationSuccessHandler)
                 .failureHandler(oauth2AuthenticationFailureHandler())
             );
         return http.build();

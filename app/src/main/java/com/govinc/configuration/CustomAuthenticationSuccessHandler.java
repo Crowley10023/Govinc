@@ -2,6 +2,7 @@ package com.govinc.configuration;
 
 import com.govinc.user.User;
 import com.govinc.user.UserRepository;
+import com.govinc.session.UserSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -21,10 +22,16 @@ public class CustomAuthenticationSuccessHandler implements AuthenticationSuccess
     private UserRepository userRepository;
     @Autowired
     private org.springframework.core.env.Environment env;
+    @Autowired
+    private UserSession userSession;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
                                         Authentication authentication) throws IOException, ServletException {
+
+        System.out.println("[DEBUG] onAuthenticationSuccess triggered");
+        System.out.println("[DEBUG] Authentication: " + authentication);
+        System.out.println("[DEBUG] Principal: " + authentication.getPrincipal());
 
         String username = null;
         String email = null;
@@ -49,16 +56,17 @@ public class CustomAuthenticationSuccessHandler implements AuthenticationSuccess
         }
 
         // Only insert if not present
+        System.out.println("[DEBUG] Resolved username: " + username);
+        System.out.println("[DEBUG] Resolved email: " + email);
         if (username != null) {
-            final String finalUsername = username;
-            Optional<User> existing = userRepository.findAll()
-                .stream().filter(u -> finalUsername.equals(u.getName())).findFirst();
+            Optional<User> existing = userRepository.findByName(username);
+            System.out.println("[DEBUG] User exists in db? " + existing.isPresent());
             if (existing.isEmpty()) {
-                User user = new User(finalUsername, email);
+                System.out.println("[DEBUG] Creating user in DB: " + username + " / " + email);
+                User user = new User(username, email);
                 userRepository.save(user);
             }
         }
-
         // Continue with default behavior
         response.sendRedirect("/");
     }
