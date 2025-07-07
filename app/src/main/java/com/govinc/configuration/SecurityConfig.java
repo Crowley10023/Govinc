@@ -20,8 +20,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .authorizeHttpRequests(authz -> authz
-                .requestMatchers("/public/**").permitAll()
+             .authorizeHttpRequests(auth -> auth
                 .anyRequest().authenticated()
             )
             .oauth2Login(oauth2 -> oauth2
