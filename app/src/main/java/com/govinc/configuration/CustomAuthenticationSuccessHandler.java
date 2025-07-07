@@ -14,13 +14,13 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Optional;
-import java.util.Properties;
-import java.io.FileInputStream;
 
 @Component
 public class CustomAuthenticationSuccessHandler implements AuthenticationSuccessHandler {
     @Autowired
     private UserRepository userRepository;
+    @Autowired
+    private org.springframework.core.env.Environment env;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
@@ -35,18 +35,12 @@ public class CustomAuthenticationSuccessHandler implements AuthenticationSuccess
             email = oidcUser.getEmail();
         } else if (authentication.getPrincipal() instanceof UserDetails userDetails) {
             username = userDetails.getUsername();
-            // Check users.properties for email
-            String propFile = "app/src/main/resources/config/users.properties";
-            try (FileInputStream in = new FileInputStream(propFile)) {
-                Properties props = new Properties();
-                props.load(in);
-                String entry = props.getProperty(username);
-                if (entry != null && entry.contains(",")) {
-                    email = entry.split(",", 2)[1].trim();
-                } else {
-                    email = username + "@local";
-                }
-            } catch (Exception e) {
+            // Check users.* property for email in application.properties
+            String propKey = "users." + username;
+            String entry = env.getProperty(propKey);
+            if (entry != null && entry.contains(",")) {
+                email = entry.split(",", 2)[1].trim();
+            } else {
                 email = username + "@local";
             }
         } else if (authentication.getPrincipal() instanceof String str) {
