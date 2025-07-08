@@ -1,297 +1,212 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
-
+<html>
 <head>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <meta charset="UTF-8">
     <title>Assessment Direct Link</title>
     <link rel="stylesheet" href="/style.css">
 </head>
-
 <body>
     <div class="container">
-        <div th:if="${assessment.status == 'CLOSED'}">
-            <h1>SORRY NOT LONGER AVAILABLE</h1>
-        </div>
-        <div th:if="${assessment.status != 'CLOSED'}">
-            <h1>Assessment (Direct URL)</h1>
-            <section>
-                <table class="table card">
-                    <tr>
-                        <th>Date</th>
-                        <td th:text="${assessment.date}"></td>
-                    </tr>
-                    <tr>
-                        <th>Security Catalog</th>
-                        <td th:text="${assessment.securityCatalog.name}"></td>
-                    </tr>
-                    <tr>
-                        <th>Status</th>
-                        <td th:text="${assessment.status}"></td>
-                    </tr>
-                </table>
-            </section>
-            <section>
-                <h2>Summary of Answers</h2>
-                <table class="table card" style="margin-bottom: 2em;">
-                    <thead>
-                        <tr>
-                            <th>Answer Category</th>
-                            <th>Count</th>
-                            <th>Percent (%)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr th:if="${answerSummary == null || answerSummary.isEmpty()}">
-                            <td colspan="3">No answers yet</td>
-                        </tr>
-                        <tr th:each="entry : ${answerSummary}">
-                            <td th:text="${entry.key}"></td>
-                            <td th:text="${entry.value.count}"></td>
-                            <td th:text="${#numbers.formatDecimal(entry.value.percent, 0, 2)}"></td>
-                        </tr>
-                    </tbody>
-                </table>
-            </section>
-            <!-- Domain Grouped Controls - Enhanced Markup like details -->
-            <h2>Controls &amp; Answers</h2>
-            <div th:each="domain : ${securityControlDomains}" class="domain-outline card domain-collapsible"
-                style="margin-bottom:2.5em; padding: 0em; border: 2px solid #2274A5; border-radius: 9px;">
-                <div class="domain-header" onclick="toggleDomain(this)"
-                    style="display: flex; align-items: center; justify-content: space-between; cursor:pointer;">
-                    <div style="flex:1;">
-                        <span class="domain-title" th:text="${domain != null ? domain.name : 'No Domain'}"
-                            style="display:block;"></span>
-                        <span class="domain-desc"
-                            style="display:block; font-weight:normal; color:#888; font-size:0.88em; margin-top:2px;"
-                            th:text="${domain != null ? domain.description : ''}"></span>
-                    </div>
-                    <span class="domain-checkmark" th:attr="data-domain-id=${domain.id}" style="margin-left:.5em;"></span>
-                    <span style="display:inline-flex; align-items:center; margin-left:.5em; cursor:pointer;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" style="vertical-align:middle;">
-                            <polyline points="4,7 9,12 14,7" fill="none" stroke="#2274A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                    </span>
-                </div>
-                <div class="domain-controls" style="display:none;padding:1.1em 1.2em 0 1.2em;">
-                    <div th:if="${assessment.isOpen}">
-                        <table class="table card controls-table">
-                            <thead>
-                                <tr>
-                                    <th style="width:350px;">Control</th>
-                                    <th>Answer</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr th:each="ctrl : ${assessment.securityCatalog.securityControls}">
-                                    <th:block th:if="${ctrl.securityControlDomain != null && domain != null && ctrl.securityControlDomain.id == domain.id}">
-                                        <td class="ctrl-name-col">
-                                            <div class="ctrl-desc-wrap">
-                                                <span th:text="${ctrl.name}"></span>
-                                                <button type="button" class="ctrl-desc-btn" tabindex="0" title="Show description" onclick="toggleDesc(this)">
-                                                    <svg viewBox="0 0 24 24">
-                                                        <circle cx="12" cy="12" r="10" fill="#fff" stroke="#2274A5" stroke-width="2" />
-                                                        <text x="12" y="17" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="15" dy="-2" fill="#2274A5">?</text>
-                                                    </svg>
-                                                </button>
-                                                <div class="ctrl-desc-tooltip">
-                                                    <b>Description:</b>
-                                                    <div th:utext="${#strings.escapeXml(ctrl.detail) ?: 'No detail'}"></div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <span style="white-space:nowrap;">
-                                                <select th:name="${'control_' + ctrl.id}" th:data-control-id="${ctrl.id}" th:data-domain-id="${domain.id}" class="answer-select">
-                                                    <option value="">-- select an answer --</option>
-                                                    <option th:each="ans : ${maturityAnswers}" th:value="${ans.id}"
-                                                        th:selected="${controlAnswers != null and controlAnswers[ctrl.id] != null} ? ${ans.answer} == ${controlAnswers[ctrl.id]} : false"
-                                                        th:text="${ans.answer}"></option>
-                                                </select>
-                                                <span class="answer-feedback"></span>
-                                            </span>
-                                        </td>
-                                    </th:block>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div th:if="${!assessment.isOpen}">
-                        <table class="table card controls-table">
-                            <thead>
-                                <tr>
-                                    <th style="width:350px;">Control</th>
-                                    <th>Answer</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr th:each="ctrl : ${assessment.securityCatalog.securityControls}">
-                                    <th:block th:if="${ctrl.securityControlDomain != null && domain != null && ctrl.securityControlDomain.id == domain.id}">
-                                        <td class="ctrl-name-col">
-                                            <div class="ctrl-desc-wrap">
-                                                <span th:text="${ctrl.name}"></span>
-                                                <button type="button" class="ctrl-desc-btn" tabindex="0" title="Show description" onclick="toggleDesc(this)">
-                                                    <svg viewBox="0 0 24 24">
-                                                        <circle cx="12" cy="12" r="10" fill="#fff" stroke="#2274A5" stroke-width="2" />
-                                                        <text x="12" y="17" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="15" dy="-2" fill="#2274A5">?</text>
-                                                    </svg>
-                                                </button>
-                                                <div class="ctrl-desc-tooltip">
-                                                    <b>Description:</b>
-                                                    <div th:utext="${#strings.escapeXml(ctrl.detail) ?: 'No detail'}"></div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <span th:text="${controlAnswers != null and controlAnswers[ctrl.id] != null ? controlAnswers[ctrl.id] : 'No answer'}"></span>
-                                        </td>
-                                    </th:block>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            <!-- End Enhanced Domain/Control Table Blocks -->
-        </div>
-        </div> <!-- end not CLOSED div -->
+        <div id="assessment-status-container" style="margin-bottom:2em;"></div>
+        <div id="summary-container"></div>
+        <div id="controls-container"></div>
     </div>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
-        // Enhanced Collapsible and Tooltip JS copied/inspired from assessment-details
-        function toggleDomain(header) {
-            var controlsDiv = header.nextElementSibling;
-            if (controlsDiv.style.display === 'none' || controlsDiv.style.display === '') {
-                controlsDiv.style.display = 'block';
-            } else {
-                controlsDiv.style.display = 'none';
-            }
+    // Helper for answer post feedback (icons)
+    function showSuccessIcon(container) {
+        container.html('<span class="answer-success" title="Saved"><svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="#d8ffd8" stroke="#33aa33" stroke-width="2"/><path d="M5 9l3 3 5-5" fill="none" stroke="#33aa33" stroke-width="2"/></svg></span>');
+    }
+    function showErrorIcon(container) {
+        container.html('<span class="answer-error" title="Error saving"><svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="#ffd8d8" stroke="#cc2222" stroke-width="2"/><path d="M6 6l6 6M12 6l-6 6" fill="none" stroke="#cc2222" stroke-width="2"/></svg></span>');
+    }
+    function clearIcon(container) { container.empty(); }
+
+    // SVG for a checkmark - downgraded (no template literals)
+    var CHECKMARK_SVG = '<svg width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" stroke="#22b573" stroke-width="2" fill="#fff"/><polyline points="6,12 10,16 16,7" stroke="#22b573" stroke-width="2.5" fill="none"/></svg>';
+
+    function toggleDomain(header) {
+        var controlsDiv = header.nextElementSibling;
+        if (controlsDiv.style.display === 'none' || controlsDiv.style.display === '') {
+            controlsDiv.style.display = 'block';
+        } else {
+            controlsDiv.style.display = 'none';
         }
-        function toggleDesc(btn) {
-            var $tooltip = $(btn).siblings('.ctrl-desc-tooltip');
-            $('.ctrl-desc-tooltip').not($tooltip).fadeOut(120);
-            $tooltip.fadeToggle(120);
+    }
+    function toggleDesc(btn) {
+        var $tooltip = $(btn).siblings('.ctrl-desc-tooltip');
+        $('.ctrl-desc-tooltip').not($tooltip).fadeOut(120);
+        $tooltip.fadeToggle(120);
+    }
+    $(document).on('mousedown keydown', function (e) {
+        if (!$(e.target).closest('.ctrl-desc-wrap').length) {
+            $('.ctrl-desc-tooltip').fadeOut(120);
         }
-        $(document).on('mousedown keydown', function (e) {
-            if (!$(e.target).closest('.ctrl-desc-wrap').length) {
-                $('.ctrl-desc-tooltip').fadeOut(120);
-            }
+    });
+
+    function checkDomainCompleteness() {
+        document.querySelectorAll(".domain-checkmark").forEach(function (checkmarkSpan) {
+            var domainId = checkmarkSpan.getAttribute("data-domain-id");
+            var selects = document.querySelectorAll('.answer-select[data-domain-id="' + domainId + '"]');
+            var allAnswered = true;
+            if (selects.length === 0) allAnswered = false;
+            selects.forEach(function(select){ if (!select.value) allAnswered = false; });
+            checkmarkSpan.innerHTML = allAnswered ? CHECKMARK_SVG : "";
         });
-        // SVG for a checkmark
-        const CHECKMARK_SVG = `<svg width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" stroke="#22b573" stroke-width="2" fill="#fff"/><polyline points="6,12 10,16 16,7" stroke="#22b573" stroke-width="2.5" fill="none"/></svg>`;
-        function checkDomainCompleteness() {
-            document.querySelectorAll(".domain-checkmark").forEach(function (checkmarkSpan) {
-                const domainId = checkmarkSpan.getAttribute("data-domain-id");
-                const selects = document.querySelectorAll(`.answer-select[data-domain-id='${domainId}']`);
-                let allAnswered = true;
-                if (selects.length === 0) allAnswered = false;
-                selects.forEach(select => {
-                    if (!select.value) allAnswered = false;
-                });
-                checkmarkSpan.innerHTML = allAnswered ? CHECKMARK_SVG : "";
-            });
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        var pathMatch = window.location.pathname.match(/\/assessment-direct\/([^/]+)/);
+        var obfuscatedId = null;
+        if (pathMatch && pathMatch[1]) {
+            obfuscatedId = pathMatch[1];
+        } else {
+            // Fallback: check query parameter ?id=...
+            var urlSearch = new URLSearchParams(window.location.search);
+            if (urlSearch.has('id')) {
+                obfuscatedId = urlSearch.get('id');
+            }
         }
-        document.addEventListener("DOMContentLoaded", function () {
+        if (!obfuscatedId) {
+            document.getElementById('assessment-status-container').innerHTML = '<h1>Invalid assessment link</h1>';
+            return;
+        }
+        $.getJSON('/assessment-direct/' + obfuscatedId + '/alldata', function (data) {
+            if (!data || data.error) {
+                $('#assessment-status-container').html('<h1>Assessment Not Found</h1>');
+                return;
+            }
+            // Status block
+            if (data.assessment.status === 'CLOSED' || data.isOpen === false) {
+                $('#assessment-status-container').html('<h1>SORRY NOT LONGER AVAILABLE</h1>');
+                return;
+            }
+            var a = data.assessment;
+            var html = '<h1>Assessment (Direct URL)</h1>'+
+                '<section><table class="table card">'+
+                '<tr><th>Date</th><td>'+ (a.date || '-')+'</td></tr>'+ 
+                '<tr><th>Org Unit</th><td>'+(a.orgUnit||'-')+'</td></tr>'+ 
+                '<tr><th>Status</th><td>'+(a.status||'-')+'</td></tr>'+ 
+                '</table></section>';
+            $('#assessment-status-container').html(html);
+
+            // Summary block
+            var summaryRows = '';
+            var answerSummary = data.answerSummary;
+            if (!answerSummary || Object.keys(answerSummary).length === 0) {
+                summaryRows = '<tr><td colspan="3">No answers yet</td></tr>';
+            } else {
+                Object.entries(answerSummary).forEach(function(entry){
+                    var k = entry[0];
+                    var v = entry[1];
+                    summaryRows += '<tr><td>'+k+'</td><td>'+(v.count != null ? v.count : '')+'</td><td>'+(typeof v.percent === 'number' ? v.percent.toFixed(2) : v.percent)+'</td></tr>';
+                });
+            }
+            var summaryHtml = '<section><h2>Summary of Answers</h2><table class="table card" style="margin-bottom: 2em;"><thead><tr><th>Answer Category</th><th>Count</th><th>Percent (%)</th></tr></thead><tbody>' + summaryRows + '</tbody></table></section>';
+            $('#summary-container').html(summaryHtml);
+
+            // Domains/Controls/Answers section
+            var domains = Array.isArray(data.securityControlDomains) ? data.securityControlDomains : [];
+            var controls = Array.isArray(data.controls) ? data.controls : [];
+            var answers = Array.isArray(data.maturityAnswers) ? data.maturityAnswers : [];
+            var controlAnswers = data.controlAnswers || {};
+            var isOpen = data.isOpen;
+
+            var controlsHtml = '<h2>Controls &amp; Answers</h2>';
+            domains.forEach(function(domain) {
+                controlsHtml += '<div class="domain-outline card domain-collapsible" style="margin-bottom:2.5em; padding: 0em; border: 2px solid #2274A5; border-radius: 9px;">' +
+                '<div class="domain-header" onclick="toggleDomain(this)" style="display: flex; align-items: center; justify-content: space-between; cursor:pointer;">' +
+                    '<div style="flex:1;">' +
+                        '<span class="domain-title">' + (domain.name != null ? domain.name : 'No Domain') + '</span>' +
+                        '<span class="domain-desc" style="display:block; font-weight:normal; color:#888; font-size:0.88em; margin-top:2px;">' + (domain.description != null ? domain.description : '') + '</span>' +
+                    '</div>' +
+                    '<span class="domain-checkmark" data-domain-id="'+domain.id+'" style="margin-left:.5em;"></span>' +
+                    '<span style="display:inline-flex; align-items:center; margin-left:.5em; cursor:pointer;">' +
+                        '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" style="vertical-align:middle;">' +
+                            '<polyline points="4,7 9,12 14,7" fill="none" stroke="#2274A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />' +
+                        '</svg>' +
+                    '</span>' +
+                '</div><div class="domain-controls" style="display:none;padding:1.1em 1.2em 0 1.2em;">';
+                controlsHtml += '<table class="table card controls-table"><thead><tr><th style="width:350px;">Control</th><th>Answer</th></tr></thead><tbody>';
+
+                controls.filter(function(ctrl){return ctrl.domainId === domain.id;}).forEach(function(ctrl){
+                    // Build the answer cell
+                    var ansCell = '';
+                    if (isOpen) {
+                        var selectId = 'select-control-' + ctrl.id;
+                        ansCell = '<span style="white-space:nowrap;"><select name="control_' + ctrl.id + '" data-control-id="' + ctrl.id + '" data-domain-id="' + domain.id + '" class="answer-select" id="' + selectId + '"><option value="">-- select an answer --</option>';
+                        answers.forEach(function(ans){
+                            var selected = (controlAnswers && controlAnswers[ctrl.id] && ans.answer === controlAnswers[ctrl.id]) ? 'selected' : '';
+                            ansCell += '<option value="' + ans.id + '" ' + selected + '>' + ans.answer + '</option>';
+                        });
+                        ansCell += '</select><span class="answer-feedback"></span></span>';
+                    } else {
+                        var ca = controlAnswers[ctrl.id] != null ? controlAnswers[ctrl.id] : 'No answer';
+                        ansCell = '<span>' + ca + '</span>';
+                    }
+                    controlsHtml += '<tr><td class="ctrl-name-col"><div class="ctrl-desc-wrap"><span>' + (ctrl.name != null ? ctrl.name : '-') + '</span>' +
+                        '<button type="button" class="ctrl-desc-btn" tabindex="0" title="Show description" onclick="toggleDesc(this)">' +
+                        '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#fff" stroke="#2274A5" stroke-width="2" />' +
+                        '<text x="12" y="17" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="15" dy="-2" fill="#2274A5">?</text></svg></button>' +
+                        '<div class="ctrl-desc-tooltip"><b>Description:</b><div>' + ((ctrl.detail && ctrl.detail !== '') ? ctrl.detail : 'No detail') + '</div></div></div></td>' +
+                        '<td>' + ansCell + '</td></tr>';
+                });
+                controlsHtml += '</tbody></table></div></div>';
+            });
+            $('#controls-container').html(controlsHtml);
+
+            // Wire up answering (AJAX) and domain completeness after controls rendered
+            $('.answer-select').on('change', function () {
+                var select = $(this);
+                var controlId = select.data('control-id');
+                var answerId = select.val();
+                var feedbackIcon = select.closest('span').find('.answer-feedback');
+                select.css('background', '');
+                clearIcon(feedbackIcon);
+                if (!answerId) {
+                    clearIcon(feedbackIcon);
+                    return;
+                }
+                // The assessment id for POSTing is a.assessment.id
+                console.log("Submitting answer:", {
+                    url: '/assessment-direct/' + a.id + '/answer',
+                    controlId: controlId,
+                    answerId: answerId
+                });
+                $.post({
+                    url: '/assessment-direct/' + a.id + '/answer',
+                    data: {controlId: controlId, answerId: answerId},
+                    success: function (resp) {
+                        console.log("POST /assessment-direct/answered: Response:", resp);
+                        select.css('background', '#d8ffd8');
+                        showSuccessIcon(feedbackIcon);
+                        setTimeout(function () { clearIcon(feedbackIcon); select.css('background', ''); }, 1500);
+                    },
+                    error: function (xhr, status, error) {
+                        console.log("POST /assessment-direct/answered: Error", status, error, xhr.responseText);
+                        select.css('background', '#ffd8d8');
+                        showErrorIcon(feedbackIcon);
+                    }
+                });
+            });
             checkDomainCompleteness();
             document.body.addEventListener("change", function (e) {
                 if (e.target.classList.contains("answer-select")) {
                     checkDomainCompleteness();
                 }
             });
-        });
-    </script>
-    <script>
-        $(document).ready(function () {
-            let assessmentId = /*[[${assessment.id}]]*/[[${ assessment.id }]];
-            function showSuccessIcon(container) {
-                container.html('<span class="answer-success" title="Saved"><svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="#d8ffd8" stroke="#33aa33" stroke-width="2"/><path d="M5 9l3 3 5-5" fill="none" stroke="#33aa33" stroke-width="2"/></svg></span>');
-            }
-            function showErrorIcon(container) {
-                container.html('<span class="answer-error" title="Error saving"><svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="#ffd8d8" stroke="#cc2222" stroke-width="2"/><path d="M6 6l6 6M12 6l-6 6" fill="none" stroke="#cc2222" stroke-width="2"/></svg></span>');
-            }
-            function clearIcon(container) {
-                container.empty();
-            }
-            $('.answer-select').on('change', function () {
-                var select = $(this);
-                var controlId = select.data('control-id');
-                var answerId = select.val();
-                var feedbackIcon = select.closest('span').find('.answer-feedback');
-                select.css('background', ''); // reset
-                clearIcon(feedbackIcon);
-                if (!answerId) {
-                    clearIcon(feedbackIcon);
-                    return;
-                }
-                if (assessmentId && controlId) {
-                    $.post({
-                        url: '/assessment/' + assessmentId + '/answer', // <-- Respect existing backend logic
-                        data: {
-                            controlId: controlId,
-                            answerId: answerId
-                        },
-                        success: function (response) {
-                            select.css('background', '#d8ffd8');
-                            showSuccessIcon(feedbackIcon);
-                            setTimeout(function () { clearIcon(feedbackIcon); select.css('background', ''); }, 1500);
-                        },
-                        error: function (xhr) {
-                            select.css('background', '#ffd8d8');
-                            showErrorIcon(feedbackIcon);
-                        }
-                    });
-                }
-            });
-        });
+        }) // end $.getJSON
+    }) // end DOMContentLoaded
     </script>
     <style>
-        .answer-feedback {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            vertical-align: middle;
-            margin-left: 5px;
-        }
-        .answer-feedback svg {
-            width: 18px;
-            height: 18px;
-        }
-        .answer-success {
-            color: #33aa33;
-        }
-        .answer-error {
-            color: #cc2222;
-        }
-        .ctrl-desc-tooltip-icon {
-            display: inline-block;
-            position: relative;
-            cursor: pointer;
-        }
-        .ctrl-desc-tooltip-icon svg {
-            vertical-align: middle;
-        }
-        .ctrl-desc-tooltip {
-            display: none;
-            background: #fffbe8;
-            color: #333;
-            border: 1px solid #d4cead;
-            border-radius: 5px;
-            padding: 12px 15px;
-            min-width: 240px;
-            max-width: 300px;
-            position: absolute;
-            left: 30px;
-            top: -10px;
-            z-index: 99;
-            box-shadow: 0 0 10px 2px #0001;
-            font-size: 0.95em;
-            line-height: 1.3em;
-            text-align: left;
-            white-space: normal;
-        }
-        
-
+        .answer-feedback { display: inline-block; width: 20px; height: 20px; vertical-align: middle; margin-left: 5px; }
+        .answer-feedback svg {width: 18px; height: 18px;}
+        .answer-success {color: #33aa33;}
+        .answer-error {color: #cc2222;}
+        .ctrl-desc-tooltip-icon { display: inline-block; position: relative; cursor: pointer; }
+        .ctrl-desc-tooltip-icon svg { vertical-align: middle; }
+        .ctrl-desc-tooltip { display: none; background: #fffbe8; color: #333; border: 1px solid #d4cead; border-radius: 5px; padding: 12px 15px; min-width: 240px; max-width: 300px; position: absolute; left: 30px; top: -10px; z-index: 99; box-shadow: 0 0 10px 2px #0001; font-size: 0.95em; line-height: 1.3em; text-align: left; white-space: normal; }
     </style>
 </body>
-
 </html>

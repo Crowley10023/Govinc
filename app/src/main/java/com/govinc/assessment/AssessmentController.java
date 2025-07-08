@@ -382,7 +382,7 @@ public class AssessmentController {
                     controlAnswerIsTakenOver.put(ctrlId, Boolean.FALSE);
                 }
             }
-            System.out.println(" ... details (1)" + details.getControlAnswers().size());
+            
             // Save auto-assigned inherited answers if any were added
             if (answersPersisted && details != null) {
                 Set<AssessmentControlAnswer> mergedAnswers = new HashSet<>(details.getControlAnswers());

@@ -21,6 +21,20 @@ import java.io.IOException;
 
 @Configuration
 public class SecurityConfig {
+    // URLs to exclude from authentication (publicly accessible endpoints)
+    private static final String[] EXCLUDED_URLS = {
+            "/assessment-direct/*/alldata",
+            "/assessment-direct/*/data",
+            "/assessment-direct/*/answer",
+            "/assessment-direct.html",
+            "/assessment-direct/*",
+            "/assessment/*/answer",
+            "/static/**",
+            "/favicon.ico",
+            "style.css",
+            "/style.css"
+    };
+
     private static final Logger logger = LoggerFactory.getLogger(SecurityConfig.class);
 
     @Autowired
@@ -30,7 +44,11 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(EXCLUDED_URLS).permitAll() // Exclude these URLs from authentication
                         .anyRequest().authenticated())
+                .csrf(csrf -> csrf
+                        .ignoringRequestMatchers(EXCLUDED_URLS) // Disable CSRF for excluded URLs
+                )
                 .formLogin(form -> form
                         .successHandler(customAuthenticationSuccessHandler))
                 .oauth2Login(oauth2 -> oauth2

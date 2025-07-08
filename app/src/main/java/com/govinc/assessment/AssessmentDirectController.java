@@ -34,71 +34,145 @@ public class AssessmentDirectController {
     @Autowired
     private MaturityAnswerRepository maturityAnswerRepository; // Added for maturity answers
 
-    @GetMapping("/assessment-direct/{obfuscatedId}")
-    public String showAssessmentDirect(@PathVariable String obfuscatedId, Model model) {
+    // Replaced Thymeleaf mapping with RESTful endpoints
+
+    // New JSON endpoint: Get all assessment data needed for the direct page (formerly Thymeleaf model)
+    @GetMapping("/assessment-direct/{obfuscatedId}/alldata")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public org.springframework.http.ResponseEntity<?> getAssessmentDirectAllData(@PathVariable String obfuscatedId) {
         Optional<AssessmentUrls> maybeUrl = assessmentUrlsService.findByObfuscated(obfuscatedId);
         if (maybeUrl.isPresent()) {
             AssessmentUrls urlEntity = maybeUrl.get();
-            com.govinc.assessment.Assessment assessment = urlEntity.getAssessment();
-            System.out.println("\n\nassessment: " + assessment.getName());
+            Assessment assessment = urlEntity.getAssessment();
+            Map<String, Object> out = new HashMap<>();
 
-            model.addAttribute("assessment", assessment);
+            out.put("assessment", Map.of(
+                "id", assessment.getId(),
+                "date", assessment.getDate(),
+                "status", assessment.getStatus(),
+                "name", assessment.getName(),
+                "orgUnit", assessment.getOrgUnit() != null ? assessment.getOrgUnit().getName() : "-"
+            ));
 
-            // Control answers are always retrieved from AssessmentDetails
-            Optional<AssessmentDetails> detailsOpt = detailsService.findById(assessment.getId());
-            AssessmentDetails details = detailsOpt.orElse(null);
-            List<AssessmentControlAnswer> answers = new ArrayList<>();
-            Map<Long, String> controlAnswers = new HashMap<>();
-            if (details != null && details.getControlAnswers() != null) {
-                answers.addAll(details.getControlAnswers());
-                for (AssessmentControlAnswer aca : details.getControlAnswers()) {
-                    if (aca.getSecurityControl() != null && aca.getMaturityAnswer() != null)
-                        controlAnswers.put(aca.getSecurityControl().getId(), aca.getMaturityAnswer().getAnswer());
-                }
-            }
-            model.addAttribute("answers", answers);
-            model.addAttribute("controlAnswers", controlAnswers);
-
-            // Summary table by answer type
-            model.addAttribute("answerSummary", detailsService.computeAnswerSummary(details));
-
-            // Use only controls from the catalog assigned to this assessment
-            // Sorted controls by name
+            // Controls, sorted
             List<SecurityControl> controls = new ArrayList<>();
             if (assessment.getSecurityCatalog() != null) {
                 controls.addAll(assessment.getSecurityCatalog().getSecurityControls());
                 controls.sort(Comparator.comparing(SecurityControl::getName, Comparator.nullsLast(String::compareTo)));
             }
-            model.addAttribute("controls", controls);
+            out.put("controls", controls.stream().map(ctrl -> Map.of(
+                "id", ctrl.getId(),
+                "name", ctrl.getName(),
+                "detail", ctrl.getDetail(),
+                "domainId", ctrl.getSecurityControlDomain() != null ? ctrl.getSecurityControlDomain().getId() : null)).collect(Collectors.toList()));
 
-            // Add securityControlDomains to model (prevents null in Thymeleaf)
+            // Control Domains, sorted
             List<SecurityControlDomain> securityControlDomains = controls.stream()
                 .map(SecurityControl::getSecurityControlDomain)
                 .filter(Objects::nonNull)
                 .distinct()
                 .sorted(Comparator.comparing(SecurityControlDomain::getName, Comparator.nullsLast(String::compareTo)))
                 .collect(Collectors.toList());
-            model.addAttribute("securityControlDomains", securityControlDomains);
+            out.put("securityControlDomains", securityControlDomains.stream().map(domain -> Map.of(
+                "id", domain.getId(),
+                "name", domain.getName(),
+                "description", domain.getDescription())).collect(Collectors.toList()));
 
-            // Pass the correct answers from the associated maturity model only
-            // Sorted maturity answers
+            // Pass sorted maturity answers from the associated maturity model only
             List<MaturityAnswer> maturityAnswers = new ArrayList<>();
             if (assessment.getSecurityCatalog() != null && assessment.getSecurityCatalog().getMaturityModel() != null) {
                 maturityAnswers.addAll(assessment.getSecurityCatalog().getMaturityModel().getMaturityAnswers());
                 maturityAnswers.sort(Comparator.comparing(MaturityAnswer::getAnswer, Comparator.nullsLast(String::compareTo)));
             }
-            model.addAttribute("maturityAnswers", maturityAnswers);
+            out.put("maturityAnswers", maturityAnswers.stream().map(ans -> Map.of(
+                "id", ans.getId(),
+                "answer", ans.getAnswer()
+            )).collect(Collectors.toList()));
 
-            return "assessment-direct";
+            // Control Answers (ctrlId -> answer text if answered)
+            Optional<AssessmentDetails> detailsOpt = detailsService.findById(assessment.getId());
+            AssessmentDetails details = detailsOpt.orElse(null);
+            Map<Long, String> controlAnswers = new HashMap<>();
+            if (details != null && details.getControlAnswers() != null) {
+                for (AssessmentControlAnswer aca : details.getControlAnswers()) {
+                    if (aca.getSecurityControl() != null && aca.getMaturityAnswer() != null)
+                        controlAnswers.put(aca.getSecurityControl().getId(), aca.getMaturityAnswer().getAnswer());
+                }
+            }
+            out.put("controlAnswers", controlAnswers);
+
+            // answerSummary (as in old model)
+            Object summary = detailsService.computeAnswerSummary(details);
+            out.put("answerSummary", summary);
+
+            out.put("isOpen", "CLOSED".equals(assessment.getStatus()) ? false : true);
+
+            return org.springframework.http.ResponseEntity.ok(out);
         } else {
-            return "error";
+            return org.springframework.http.ResponseEntity.status(404).body(Map.of("error", "Not found"));
         }
+    }
+
+    // Deleted (replaced) Thymeleaf endpoint, but keep as fallback for old routes:
+    @Deprecated
+    @GetMapping("/assessment-direct/{obfuscatedId}")
+    public String showAssessmentDirect(@PathVariable String obfuscatedId, Model model) {
+        return "assessment-direct"; // fallback, all data fetched via API from now
     }
 
     // Allow using /assessment-direct.html?id=...
     @GetMapping("/assessment-direct.html")
     public String showAssessmentDirectByParam(@RequestParam("id") String obfuscatedId, Model model) {
         return showAssessmentDirect(obfuscatedId, model);
+    }
+
+    // Save/update answer for a single control (AJAX POST from assessment-direct UI)
+    @org.springframework.web.bind.annotation.PostMapping("/assessment-direct/{id}/answer")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public String saveDirectAnswer(@PathVariable Long id, @org.springframework.web.bind.annotation.RequestParam Long controlId, @org.springframework.web.bind.annotation.RequestParam Long answerId) {
+        System.out.println("[DEBUG] Called /assessment-direct/" + id + "/answer with controlId=" + controlId + " answerId=" + answerId);
+        Optional<AssessmentDetails> detailsOpt = detailsService.findById(id);
+        AssessmentDetails details = null;
+        if (!detailsOpt.isPresent()) {
+            System.out.println("[DEBUG] AssessmentDetails not found for id=" + id);
+            return "fail";
+        } else {
+            details = detailsOpt.get();
+        }
+        Set<AssessmentControlAnswer> answers = details.getControlAnswers();
+        // Find or add
+        AssessmentControlAnswer found = null;
+        for (AssessmentControlAnswer aca : answers) {
+            if (aca.getSecurityControl() != null && aca.getSecurityControl().getId().equals(controlId)) {
+                found = aca;
+                break;
+            }
+        }
+        // For direct controller: might not have all beans, basic logic only
+        SecurityControl control = null;
+        com.govinc.catalog.SecurityControlRepository controlRepo = null;
+        try {
+            controlRepo = (com.govinc.catalog.SecurityControlRepository)org.springframework.web.context.support.WebApplicationContextUtils
+                .getRequiredWebApplicationContext(((org.springframework.web.context.request.ServletRequestAttributes)org.springframework.web.context.request.RequestContextHolder.currentRequestAttributes()).getRequest().getServletContext())
+                .getBean(com.govinc.catalog.SecurityControlRepository.class);
+            control = controlRepo.findById(controlId).orElse(null);
+        } catch (Exception e) { System.out.println("[DEBUG] Exception initializing controlRepo: " + e); }
+        MaturityAnswer maturityAnswer = maturityAnswerRepository.findById(answerId).orElse(null);
+        if (control == null || maturityAnswer == null) {
+            System.out.println("[DEBUG] control or maturityAnswer not found: control=" + control + " maturityAnswer=" + maturityAnswer);
+            return "fail";
+        }
+        if (found == null) {
+            found = new AssessmentControlAnswer(control, maturityAnswer);
+            answers.add(found);
+            System.out.println("[DEBUG] New AssessmentControlAnswer created for controlId=" + controlId + " with answer=" + maturityAnswer.getAnswer());
+        } else {
+            found.setMaturityAnswer(maturityAnswer);
+            System.out.println("[DEBUG] Updated AssessmentControlAnswer for controlId=" + controlId + " to answer=" + maturityAnswer.getAnswer());
+        }
+        detailsService.save(details);
+        System.out.println("[DEBUG] detailsService.save(details) called for assessmentId=" + id);
+        return "ok";
     }
 
     // Web page listing all Assessment URLs
@@ -108,5 +182,28 @@ public class AssessmentDirectController {
         List<AssessmentUrls> allUrls = assessmentUrlsService.findAll();
         model.addAttribute("urls", allUrls);
         return "assessment-urls-list";
+    }
+
+    // Public summary JSON endpoint for assessment-direct
+    @GetMapping("/assessment-direct/{obfuscatedId}/data")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public org.springframework.http.ResponseEntity<?> getAssessmentDirectSummary(@PathVariable String obfuscatedId) {
+        Optional<AssessmentUrls> maybeUrl = assessmentUrlsService.findByObfuscated(obfuscatedId);
+        if (maybeUrl.isPresent()) {
+            Assessment assessment = maybeUrl.get().getAssessment();
+            java.util.Map<String, Object> result = new java.util.HashMap<>();
+            result.put("id", assessment.getId());
+            result.put("name", assessment.getName());
+            result.put("date", assessment.getDate());
+            result.put("status", assessment.getStatus());
+            if (assessment.getOrgUnit() != null) {
+                result.put("orgUnit", assessment.getOrgUnit().getName());
+            } else {
+                result.put("orgUnit", "-");
+            }
+            return org.springframework.http.ResponseEntity.ok(result);
+        } else {
+            return org.springframework.http.ResponseEntity.status(404).body(java.util.Map.of("error", "Not found"));
+        }
     }
 }
