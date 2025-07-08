@@ -183,6 +183,7 @@ public class AssessmentController {
     // POST handler for controls - saves answers and redirects to details page
     @PostMapping("/{id}/controls")
     public String handleAssessmentControls(@PathVariable Long id, @RequestParam MultiValueMap<String, String> params) {
+        System.out.println("\ncalled handleAssessmentControls");
         // Find details or create new
         Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
         AssessmentDetails details;
@@ -259,11 +260,13 @@ public class AssessmentController {
                 controls.sort(Comparator.comparing(SecurityControl::getName, Comparator.nullsLast(String::compareTo)));
             }
             model.addAttribute("controls", controls);
+            System.out.println("getAssessmentById, controls: " + controls.size());
 
             // Prepare maturity answers/answers by percent
             List<MaturityAnswer> maturityAnswers = new ArrayList<>();
             Map<Integer, String> percentToAnswer = new HashMap<>();
             if (assessment.getSecurityCatalog() != null && assessment.getSecurityCatalog().getMaturityModel() != null) {
+                System.out.println(" maturity answers (1):  " + assessment.getSecurityCatalog().getMaturityModel().getMaturityAnswers().size());
                 maturityAnswers.addAll(assessment.getSecurityCatalog().getMaturityModel().getMaturityAnswers());
                 maturityAnswers
                         .sort(Comparator.comparing(MaturityAnswer::getAnswer, Comparator.nullsLast(String::compareTo)));
@@ -300,6 +303,7 @@ public class AssessmentController {
                     if (osaList != null) {
                         for (OrgServiceAssessment osa : osaList) {
                             if (osa.getControls() != null) {
+                                System.out.println(" maturity answers (1a):  " + osa.getControls().size());
                                 for (OrgServiceAssessmentControl osac : osa.getControls()) {
                                     if (osac.isApplicable() && osac.getSecurityControl() != null) {
                                         Long ctrlId = osac.getSecurityControl().getId();
@@ -321,6 +325,7 @@ public class AssessmentController {
                     }
                 }
             }
+            System.out.println(" maturity answers (2):  " + assessment.getSecurityCatalog().getMaturityModel().getMaturityAnswers().size());
 
             // Main logic: iterate all controls, set answer with orgService inherited
             // PRECEDENCE
@@ -377,11 +382,31 @@ public class AssessmentController {
                     controlAnswerIsTakenOver.put(ctrlId, Boolean.FALSE);
                 }
             }
+            System.out.println(" ... details (1)" + details.getControlAnswers().size());
             // Save auto-assigned inherited answers if any were added
             if (answersPersisted && details != null) {
-                details.setControlAnswers(detailsAnswers);
+                Set<AssessmentControlAnswer> mergedAnswers = new HashSet<>(details.getControlAnswers());
+                for (AssessmentControlAnswer newAca : detailsAnswers) {
+                    boolean found = false;
+                    for (AssessmentControlAnswer existingAca : mergedAnswers) {
+                        if (existingAca.getSecurityControl() != null && newAca.getSecurityControl() != null &&
+                            existingAca.getSecurityControl().getId().equals(newAca.getSecurityControl().getId())) {
+                            // Same control: update maturity answer if changed
+                            if (!existingAca.getMaturityAnswer().getId().equals(newAca.getMaturityAnswer().getId())) {
+                                existingAca.setMaturityAnswer(newAca.getMaturityAnswer());
+                            }
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        mergedAnswers.add(newAca);
+                    }
+                }
+                details.setControlAnswers(mergedAnswers);
                 assessmentDetailsService.save(details);
             }
+            System.out.println(" ... details (2)" + details.getControlAnswers().size());
             // For backward compatibility in template, still give list of "answers" from
             // local answers only
             answers.addAll(localControlAnswers.values());

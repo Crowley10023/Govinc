@@ -54,7 +54,9 @@ public class AssessmentDetailsController {
 
     @GetMapping("/details/{id}")
     public String details(@PathVariable Long id, Model model) {
-        System.out.println(".... calling details!");
+        // ========= BEGIN VERY DETAILED DEBUG =========
+        System.out.println("========= DETAILS CONTROLLER DEBUG =========");
+        System.out.println("Loading AssessmentDetails for id=" + id);
         Optional<AssessmentDetails> details = assessmentDetailsService.findById(id);
         if (details.isPresent()) {
             System.out.println(".... details present");
