@@ -183,7 +183,7 @@ public class AssessmentController {
     // POST handler for controls - saves answers and redirects to details page
     @PostMapping("/{id}/controls")
     public String handleAssessmentControls(@PathVariable Long id, @RequestParam MultiValueMap<String, String> params) {
-        System.out.println("\ncalled handleAssessmentControls");
+        
         // Find details or create new
         Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
         AssessmentDetails details;
@@ -406,7 +406,7 @@ public class AssessmentController {
                 details.setControlAnswers(mergedAnswers);
                 assessmentDetailsService.save(details);
             }
-            System.out.println(" ... details (2)" + details.getControlAnswers().size());
+            
             // For backward compatibility in template, still give list of "answers" from
             // local answers only
             answers.addAll(localControlAnswers.values());
@@ -530,11 +530,11 @@ public class AssessmentController {
 
     @GetMapping("/{id}/word-report")
     public ResponseEntity<byte[]> downloadWordReport(@PathVariable Long id) {
-        System.out.println("Requested word report for assessment " + id);
+        
         Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
         Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
         if (assessmentOpt.isEmpty() || detailsOpt.isEmpty()) {
-            System.out.println("Assessment or details not found for ID: " + id);
+            
             return ResponseEntity.notFound().build();
         }
         Assessment assessment = assessmentOpt.get();
