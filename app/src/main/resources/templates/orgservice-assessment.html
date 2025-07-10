@@ -12,6 +12,12 @@
         <div th:replace="~{navigation :: mainNav}"></div>
         <h1>Org Service Assessment for <span th:text="${assessment.orgService.name}"></span></h1>
         <p class="caption-info">Number of applicable maturity answers: <span th:text="${applicableCount}"></span></p>
+
+        <!-- Show error message if present -->
+        <div th:if="${errorMsg}" style="color: red; font-weight: bold; margin-bottom: 1em;">
+            <span th:text="${errorMsg}"></span>
+        </div>
+
         <form th:action="@{/orgservice-assessment/save}" method="post">
             <input type="hidden" name="id" th:value="${assessment.id}" />
             <input type="hidden" name="orgService.id" th:value="${assessment.orgService.id}" />
@@ -30,15 +36,21 @@
                         <td th:text="${control.securityControl.name}"></td>
                         <td>
                             <input type="checkbox" th:name="'controls[' + ${stat.index} + '].applicable'"
-                                th:checked="${control.applicable}" />
+                                   th:checked="${control.applicable}"
+                                   th:disabled="${control.answeredByAnotherAssessment}" />
                             <input type="hidden" th:name="'controls[' + ${stat.index} + '].securityControl.id'"
                                 th:value="${control.securityControl.id}" />
                             <input type="hidden" th:name="'controls[' + ${stat.index} + '].id'"
                                 th:value="${control.id}" />
+                            <span th:if="${control.answeredByAnotherAssessment}" style="color:gray;">
+                                Already linked to service:
+                                <b th:text="${control.answeredByOrgServiceName}"></b>
+                            </span>
                         </td>
                         <td>
                             <input type="number" min="0" max="100" th:name="'controls[' + ${stat.index} + '].percent'"
-                                th:value="${control.percent}" required />
+                                th:value="${control.percent}" required
+                                th:disabled="${control.answeredByAnotherAssessment}" />
                         </td>
                     </tr>
                 </tbody>

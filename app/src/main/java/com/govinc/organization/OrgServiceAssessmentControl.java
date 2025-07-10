@@ -24,6 +24,12 @@ public class OrgServiceAssessmentControl {
     @Column(nullable = false)
     private int percent;
 
+    @Transient
+    private boolean answeredByAnotherAssessment = false;
+
+    @Transient
+    private String answeredByOrgServiceName;
+
     public OrgServiceAssessmentControl() {
     }
 
@@ -71,5 +77,21 @@ public class OrgServiceAssessmentControl {
 
     public void setPercent(int percent) {
         this.percent = percent;
+    }
+
+    public boolean isAnsweredByAnotherAssessment() {
+        return answeredByAnotherAssessment;
+    }
+
+    public void setAnsweredByAnotherAssessment(boolean answeredByAnotherAssessment) {
+        this.answeredByAnotherAssessment = answeredByAnotherAssessment;
+    }
+    
+    public String getAnsweredByOrgServiceName() {
+        return answeredByOrgServiceName;
+    }
+    
+    public void setAnsweredByOrgServiceName(String answeredByOrgServiceName) {
+        this.answeredByOrgServiceName = answeredByOrgServiceName;
     }
 }
