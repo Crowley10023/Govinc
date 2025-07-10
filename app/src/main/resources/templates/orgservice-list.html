@@ -4,6 +4,39 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>Org Service List</title>
     <link rel="stylesheet" href="/style.css">
+    <meta name="_csrf" th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+    <script>
+      function getCsrfHeader() {
+        var header = document.querySelector('meta[name="_csrf_header"]');
+        var token = document.querySelector('meta[name="_csrf"]');
+        return header && token ? {[header.content]: token.content} : {};
+      }
+      function confirmDeleteOrgService(orgServiceId, orgServiceName) {
+          document.getElementById('modal-bg').style.display = 'flex';
+          document.getElementById('modal-delete-msg').innerText = 'Delete Org Service "' + orgServiceName + '" and all its assessments?';
+          var confirmBtn = document.getElementById('modal-confirm-delete');
+          confirmBtn.disabled = false;
+          confirmBtn.onclick = function() {
+              confirmBtn.disabled = true;
+              fetch('/orgservices/' + orgServiceId, {
+                method: 'DELETE',
+                headers: getCsrfHeader()
+              })
+                .then(function(r) {
+                  if (!r.ok) throw new Error('Failed to delete');
+                  window.location.reload();
+                })
+                .catch(function(err) {
+                  confirmBtn.disabled = false;
+                  alert('Error deleting Org Service: ' + err);
+                });
+          };
+      }
+      function closeModal() {
+        document.getElementById('modal-bg').style.display = 'none';
+      }
+    </script>
 </head>
 <body>
 <div th:replace="~{navigation :: mainNav}"></div>
@@ -31,10 +64,29 @@
                 </td>
                 <td>
                     <a th:href="@{'/orgservices/edit/' + ${orgService.id}}">Edit</a>
+                    <button type="button"
+                            style="margin-left:8px;background:none;border:none;cursor:pointer;"
+                            title="Delete"
+                            th:attr="data-orgservice-id=${orgService.id},data-orgservice-name=${orgService.name}"
+                            onclick="confirmDeleteOrgService(this.getAttribute('data-orgservice-id'), this.getAttribute('data-orgservice-name'))">
+                        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5.5 5.5L14.5 14.5M5.5 14.5L14.5 5.5" stroke="#cc2222" stroke-width="2" stroke-linecap="round"/></svg>
+                    </button>
                 </td>
             </tr>
         </tbody>
     </table>
+
+    <!-- Modal Popup -->
+    <div id="modal-bg" class="modal-bg">
+      <div class="modal-popup">
+        <h3>Confirm Delete</h3>
+        <p id="modal-delete-msg">Are you sure?</p>
+        <div class="modal-btn-row">
+            <button id="modal-confirm-delete">Yes, delete</button>
+            <button type="button" onclick="closeModal()">Cancel</button>
+        </div>
+      </div>
+    </div>
 </div>
 </body>
 </html>

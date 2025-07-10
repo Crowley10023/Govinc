@@ -6,10 +6,18 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Optional;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import jakarta.transaction.Transactional;
+
 @Service
 public class OrgServiceService {
     @Autowired
     private OrgServiceRepository orgServiceRepository;
+    @Autowired
+    private OrgServiceAssessmentRepository orgServiceAssessmentRepository;
+    @PersistenceContext
+    private EntityManager entityManager;
 
     // DEMO seeding of org services if none are present
     @jakarta.annotation.PostConstruct
@@ -32,7 +40,12 @@ public class OrgServiceService {
         return orgServiceRepository.save(orgService);
     }
 
+    @Transactional
     public void deleteOrgService(Long id) {
+        // Remove from join tables that reference OrgService to avoid constraint violation
+        entityManager.createNativeQuery("DELETE FROM assessment_orgservice WHERE orgservice_id = :id")
+            .setParameter("id", id).executeUpdate();
+        orgServiceAssessmentRepository.findByOrgServiceId(id).forEach(orgServiceAssessmentRepository::delete);
         orgServiceRepository.deleteById(id);
     }
 }
