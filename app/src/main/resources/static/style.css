@@ -550,7 +550,7 @@ input:focus, textarea:focus, select:focus {
 
 /* Ensure main content is visible below navigation */
 .container {
-  margin-top: 10em;
+  margin-top: 11em;
   max-width: 90vw;
   margin-left: auto;
   margin-right: auto;

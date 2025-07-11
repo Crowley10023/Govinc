@@ -168,8 +168,14 @@ public class AssessmentReporter {
                         .filter(s -> s != null && !s.isBlank())
                         .collect(Collectors.toList());
                 String prompt = config.getSummaryPrompt() + "\n---\n" + String.join("\n", answerTexts);
-                String summary = openAIUtil.askAI(prompt);
-                System.out.println("[OpenAI AssessmentReporter] API result: " + summary);
+                String summary;
+                try {
+                    summary = openAIUtil.askAI(prompt);
+                    System.out.println("[OpenAI AssessmentReporter] API result: " + summary);
+                } catch (Exception ex) {
+                    summary = "AI-generated summary: Not available (OpenAI API not reachable)";
+                    System.err.println("[OpenAI AssessmentReporter] OpenAI API call failed: " + ex.getMessage());
+                }
                 Paragraph summaryAI = new Paragraph("Assessment AI-generated summary:", subHeaderFont);
                 summaryAI.setSpacingAfter(7);
                 doc.add(summaryAI);
@@ -573,6 +579,37 @@ public class AssessmentReporter {
             summaryRun.setBold(true);
             summaryRun.setFontSize(16);
             doc.createParagraph();
+
+            // --- AI-Generated Summary (matches PDF logic) ---
+            OpenAIConfiguration config = openAIConfigurationRepository.findAll().stream().findFirst().orElse(null);
+            if (config != null && config.getSummaryPrompt() != null && !config.getSummaryPrompt().isBlank()) {
+                java.util.List<String> answerTexts = answers.stream()
+                        .map(a -> {
+                            MaturityAnswer ma = a.getMaturityAnswer();
+                            return ma != null ? ma.getAnswer() : null;
+                        })
+                        .filter(s -> s != null && !s.isBlank())
+                        .collect(java.util.stream.Collectors.toList());
+                String prompt = config.getSummaryPrompt() + "\n---\n" + String.join("\n", answerTexts);
+                String summary;
+                try {
+                    summary = openAIUtil.askAI(prompt);
+                    System.out.println("[OpenAI AssessmentReporter] API result: " + summary);
+                } catch (Exception ex) {
+                    summary = "AI-generated summary: Not available (OpenAI API not reachable)";
+                    System.err.println("[OpenAI AssessmentReporter] OpenAI API call failed: " + ex.getMessage());
+                }
+                org.apache.poi.xwpf.usermodel.XWPFParagraph summaryAI = doc.createParagraph();
+                org.apache.poi.xwpf.usermodel.XWPFRun aiRun = summaryAI.createRun();
+                aiRun.setBold(true);
+                aiRun.setItalic(true);
+                aiRun.setFontSize(13);
+                aiRun.setText("Assessment AI-generated summary:");
+
+                org.apache.poi.xwpf.usermodel.XWPFParagraph summaryText = doc.createParagraph();
+                org.apache.poi.xwpf.usermodel.XWPFRun sumRun = summaryText.createRun();
+                sumRun.setText(summary);
+            }
 
             if (assessment.getOrgServices() != null && !assessment.getOrgServices().isEmpty()) {
                 org.apache.poi.xwpf.usermodel.XWPFParagraph orgSvcHead = doc.createParagraph();
