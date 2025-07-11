@@ -6,6 +6,10 @@ import com.govinc.maturity.MaturityAnswer;
 import com.govinc.user.User;
 import com.govinc.organization.OrgUnit;
 
+import com.govinc.entity.OpenAIConfiguration;
+import com.govinc.entity.OpenAIConfigurationRepository;
+import com.govinc.util.OpenAIUtil;
+
 import com.itextpdf.text.*;
 import com.itextpdf.text.pdf.*;
 import com.itextpdf.text.pdf.draw.LineSeparator;
@@ -15,15 +19,24 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
 public class AssessmentReporter {
 
-    private com.govinc.organization.OrgServiceAssessmentService orgServiceAssessmentService;
+    private final com.govinc.organization.OrgServiceAssessmentService orgServiceAssessmentService;
+    private final OpenAIConfigurationRepository openAIConfigurationRepository;
+    private final OpenAIUtil openAIUtil;
 
-    public AssessmentReporter(com.govinc.organization.OrgServiceAssessmentService orgServiceAssessmentService) {
+    @Autowired
+    public AssessmentReporter(
+            com.govinc.organization.OrgServiceAssessmentService orgServiceAssessmentService,
+            OpenAIConfigurationRepository openAIConfigurationRepository,
+            OpenAIUtil openAIUtil) {
         this.orgServiceAssessmentService = orgServiceAssessmentService;
+        this.openAIConfigurationRepository = openAIConfigurationRepository;
+        this.openAIUtil = openAIUtil;
     }
 
     public byte[] createPdfReport(Assessment assessment, AssessmentDetails details, java.util.List<User> users,
@@ -144,6 +157,27 @@ public class AssessmentReporter {
             doc.add(summarySection);
             doc.add(Chunk.NEWLINE);
 
+            // --- AI-Generated Summary ---
+            OpenAIConfiguration config = openAIConfigurationRepository.findAll().stream().findFirst().orElse(null);
+            if (config != null && config.getSummaryPrompt() != null && !config.getSummaryPrompt().isBlank()) {
+                List<String> answerTexts = answers.stream()
+                        .map(a -> {
+                            MaturityAnswer ma = a.getMaturityAnswer();
+                            return ma != null ? ma.getAnswer() : null;
+                        })
+                        .filter(s -> s != null && !s.isBlank())
+                        .collect(Collectors.toList());
+                String prompt = config.getSummaryPrompt() + "\n---\n" + String.join("\n", answerTexts);
+                String summary = openAIUtil.askAI(prompt);
+                System.out.println("[OpenAI AssessmentReporter] API result: " + summary);
+                Paragraph summaryAI = new Paragraph("Assessment AI-generated summary:", subHeaderFont);
+                summaryAI.setSpacingAfter(7);
+                doc.add(summaryAI);
+                Paragraph summaryText = new Paragraph(summary, regularFont);
+                summaryText.setSpacingAfter(17);
+                doc.add(summaryText);
+            }
+
             // Table: Org Services assigned (chapter 3a)
             if (assessment.getOrgServices() != null && !assessment.getOrgServices().isEmpty()) {
                 Paragraph orgSvcHead = new Paragraph("3.1 Assigned Org Services", subHeaderFont);
@@ -175,9 +209,9 @@ public class AssessmentReporter {
             java.util.List<SecurityControl> allControls = assessment.getSecurityCatalog().getSecurityControls();
             java.util.Map<Long, AssessmentControlAnswer> answerMap = answers.stream()
                     .collect(Collectors.toMap(
-                        a -> a.getSecurityControl().getId(),
-                        a -> a,
-                        (a1, a2) -> a1 // If duplicate, keep the first
+                            a -> a.getSecurityControl().getId(),
+                            a -> a,
+                            (a1, a2) -> a1 // If duplicate, keep the first
                     ));
             java.util.List<OrgUnit> allUnits = new java.util.ArrayList<>();
             if (orgUnit != null)
@@ -428,12 +462,14 @@ public class AssessmentReporter {
     }
 
     /**
-     * Creates a Word report (DOCX) using Apache POI, similar in structure to createPdfReport.
+     * Creates a Word report (DOCX) using Apache POI, similar in structure to
+     * createPdfReport.
+     * 
      * @param assessment The assessment instance
-     * @param details Assessment metadata
-     * @param users Users involved
-     * @param orgUnit OrgUnit
-     * @param answers List of control answers
+     * @param details    Assessment metadata
+     * @param users      Users involved
+     * @param orgUnit    OrgUnit
+     * @param answers    List of control answers
      * @return DOCX word report as byte array
      */
     public byte[] createWordReport(Assessment assessment, AssessmentDetails details, java.util.List<User> users,
@@ -453,7 +489,8 @@ public class AssessmentReporter {
 
             org.apache.poi.xwpf.usermodel.XWPFParagraph meta = doc.createParagraph();
             org.apache.poi.xwpf.usermodel.XWPFRun metarun = meta.createRun();
-            metarun.setText("Generated on: " + java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
+            metarun.setText("Generated on: " + java.time.LocalDateTime.now()
+                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
             metarun.setFontSize(12);
             metarun.addBreak();
             metarun.addBreak();
@@ -467,7 +504,8 @@ public class AssessmentReporter {
             tocRun.setBold(true);
             tocRun.setFontSize(16);
             tocRun.addBreak();
-            String[] toc = new String[] {"1. General Information", "2. Users and Organization", "3. Assessment Summary", "4. Domain Overview Table", "5. Controls by Domain"};
+            String[] toc = new String[] { "1. General Information", "2. Users and Organization",
+                    "3. Assessment Summary", "4. Domain Overview Table", "5. Controls by Domain" };
             for (String item : toc) {
                 org.apache.poi.xwpf.usermodel.XWPFParagraph p = doc.createParagraph();
                 org.apache.poi.xwpf.usermodel.XWPFRun r = p.createRun();
@@ -481,9 +519,9 @@ public class AssessmentReporter {
             java.util.List<SecurityControl> allControls = assessment.getSecurityCatalog().getSecurityControls();
             java.util.Map<Long, AssessmentControlAnswer> answerMap = answers.stream()
                     .collect(java.util.stream.Collectors.toMap(
-                        a -> a.getSecurityControl().getId(),
-                        a -> a,
-                        (a1, a2) -> a1 // If duplicate, keep the first
+                            a -> a.getSecurityControl().getId(),
+                            a -> a,
+                            (a1, a2) -> a1 // If duplicate, keep the first
                     ));
 
             // --- 1. General Info ---
@@ -496,7 +534,8 @@ public class AssessmentReporter {
             addKeyValue(doc, "Assessment Name: ", assessment.getName());
             addKeyValue(doc, "Assessment ID: ", String.valueOf(assessment.getId()));
             addKeyValue(doc, "Date: ", assessment.getDate() != null ? assessment.getDate().toString() : "-");
-            addKeyValue(doc, "Catalog: ", (assessment.getSecurityCatalog() != null ? assessment.getSecurityCatalog().getName() : "-"));
+            addKeyValue(doc, "Catalog: ",
+                    (assessment.getSecurityCatalog() != null ? assessment.getSecurityCatalog().getName() : "-"));
             addKeyValue(doc, "Completed On: ", details.getDate() != null ? details.getDate().toString() : "-");
             doc.createParagraph();
 
@@ -592,7 +631,8 @@ public class AssessmentReporter {
 
             java.util.Map<String, java.util.List<SecurityControl>> controlsPerDomain = allControls.stream()
                     .collect(java.util.stream.Collectors.groupingBy(
-                            ctrl -> ctrl.getSecurityControlDomain() != null ? ctrl.getSecurityControlDomain().getName() : "Unknown"));
+                            ctrl -> ctrl.getSecurityControlDomain() != null ? ctrl.getSecurityControlDomain().getName()
+                                    : "Unknown"));
             org.apache.poi.xwpf.usermodel.XWPFTable overviewTable = doc.createTable();
             org.apache.poi.xwpf.usermodel.XWPFTableRow ovwHeader = overviewTable.getRow(0);
             ovwHeader.getCell(0).setText("Security Control Domain");
@@ -648,17 +688,25 @@ public class AssessmentReporter {
                     String answ = "-";
                     String src = "-";
                     boolean foundServiceAnswer = false;
-                    // Only use an org service answer if this control is actually covered (mapped) by this org service AND is applicable
+                    // Only use an org service answer if this control is actually covered (mapped)
+                    // by this org service AND is applicable
                     if (assessment.getOrgServices() != null) {
                         for (com.govinc.organization.OrgService orgService : assessment.getOrgServices()) {
-                            com.govinc.organization.OrgServiceAssessment osa = orgServiceAssessmentService.findOrCreateAssessment(orgService.getId());
+                            com.govinc.organization.OrgServiceAssessment osa = orgServiceAssessmentService
+                                    .findOrCreateAssessment(orgService.getId());
                             if (osa != null && osa.getControls() != null) {
                                 for (com.govinc.organization.OrgServiceAssessmentControl osac : osa.getControls()) {
-                                    if (osac.getSecurityControl() != null && osac.getSecurityControl().getId().equals(ctrl.getId()) && osac.isApplicable()) {
+                                    if (osac.getSecurityControl() != null
+                                            && osac.getSecurityControl().getId().equals(ctrl.getId())
+                                            && osac.isApplicable()) {
                                         Integer osPercent = osac.getPercent();
                                         if (osPercent != null) {
-                                            java.util.Set<com.govinc.maturity.MaturityAnswer> maturityAnswersSet = assessment.getSecurityCatalog().getMaturityModel().getMaturityAnswers();
-                                            com.govinc.maturity.MaturityAnswer closest = maturityAnswersSet.stream().min(java.util.Comparator.comparingInt(ma -> Math.abs(ma.getScore() - osPercent))).orElse(null);
+                                            java.util.Set<com.govinc.maturity.MaturityAnswer> maturityAnswersSet = assessment
+                                                    .getSecurityCatalog().getMaturityModel().getMaturityAnswers();
+                                            com.govinc.maturity.MaturityAnswer closest = maturityAnswersSet.stream()
+                                                    .min(java.util.Comparator
+                                                            .comparingInt(ma -> Math.abs(ma.getScore() - osPercent)))
+                                                    .orElse(null);
                                             if (closest != null) {
                                                 answ = closest.getAnswer();
                                             } else {
@@ -704,12 +752,14 @@ public class AssessmentReporter {
             org.apache.poi.xwpf.usermodel.XWPFRun footerRun = footer.createRun();
             footerRun.setItalic(true);
             footerRun.setFontSize(10);
-            footerRun.setText("Generated by GovInc Assessment System on: " + java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
+            footerRun.setText("Generated by GovInc Assessment System on: " + java.time.LocalDateTime.now()
+                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
 
             // Serialize document
             doc.write(baos);
             return baos.toByteArray();
         }
+
     }
 
     // Helper: Add key-value pair to document as single paragraph

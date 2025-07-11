@@ -45,14 +45,18 @@ public class MaturityModelController {
 
     @PostMapping("/save")
     public String saveMaturityModel(@ModelAttribute MaturityModel maturityModel, @RequestParam(value = "maturityAnswers", required = false) Set<Long> answerIds) {
+        System.out.println("[DEBUG] Saving MaturityModel: " + maturityModel);
+        System.out.println("[DEBUG] Incoming maturityAnswers param: " + answerIds);
         // Attach selected answers (if any)
         if (answerIds != null) {
             List<MaturityAnswer> selectedAnswers = maturityAnswerRepository.findAllById(answerIds);
+            System.out.println("[DEBUG] Loaded selectedAnswers: " + selectedAnswers);
             maturityModel.setMaturityAnswers(Set.copyOf(selectedAnswers));
         } else {
             maturityModel.setMaturityAnswers(Set.of());
         }
         maturityModelRepository.save(maturityModel);
+        System.out.println("[DEBUG] Saved maturityModel with ID: " + maturityModel.getId());
         return "redirect:/maturitymodel/list";
     }
 

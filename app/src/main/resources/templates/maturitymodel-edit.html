@@ -17,7 +17,7 @@
             <label>Description: <textarea th:field="*{description}" required></textarea></label><br>
 
             <label>Maturity Answers:</label><br>
-            <select name="maturityAnswers" multiple size="7">
+            <select name="maturityAnswers[]" multiple size="7">
                 <option th:each="ans : ${allAnswers}"
                         th:value="${ans.id}"
                         th:text="${ans.answer} + ' (' + ${ans.description} + ')'"
@@ -26,10 +26,23 @@
             </select>
             <br>
 
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
             <button type="submit">Save</button>
             <a href="/maturitymodel/list">Cancel</a>
         </form>
     </div>
 </div>
+<script>
+// Debug code to display form data on submit
+const form = document.querySelector('form');
+if(form) {
+  form.addEventListener('submit', function(e) {
+    const formData = new FormData(form);
+    const entries = Array.from(formData.entries());
+    console.log('Submitting form data:', entries);
+    alert('JS FormData Debug (see browser console):\n' + JSON.stringify(entries));
+  });
+}
+</script>
 </body>
 </html>

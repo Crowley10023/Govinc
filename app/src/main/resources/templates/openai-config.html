@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <title>OpenAI Configuration</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" href="/style.css">
+</head>
+
+<body>
+    <div th:replace="~{navigation :: mainNav}"></div>
+    <div class="container">
+        <h2>OpenAI API Configuration</h2>
+        <form th:action="@{/config/openai}" method="post" th:object="${config}">
+            <input type="hidden" th:field="*{id}" />
+            <label>API Key:</label><br>
+            <input type="text" th:field="*{apiKey}" style="width:400px" /><br>
+            <label>Organization (optional):</label><br>
+            <input type="text" th:field="*{organization}" style="width:400px" /><br>
+            <label>Default Model (e.g. gpt-3.5-turbo):</label><br>
+            <input type="text" th:field="*{defaultModel}" style="width:250px" /><br><br>
+            <label>Summary Prompt for OpenAI assessment reports:</label><br>
+            <textarea th:field="*{summaryPrompt}" style="width:400px;height:90px;"></textarea><br><br>
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+            <button type="submit">Save</button>
+            <span th:if="${saved}"><b>✔ Saved!</b></span>
+        </form>
+
+        <h3>Test OpenAI API Connection</h3>
+        <form th:action="@{/config/openai/test}" method="post" id="testForm">
+            <input type="text" name="testPrompt" placeholder="Enter a prompt for OpenAI..." style="width:320px;"
+                required />
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" id="csrfTokenTest" />
+            <button type="submit">Send Test Message</button>
+        </form>
+        <div id="testResult" th:if="${testResult}"
+            style="margin-top:12px; border:1px solid #ccc; padding:7px; border-radius:7px">
+            <b>Result:</b><br>
+            <span th:text="${testResult}"></span>
+        </div>
+    </div>
+    <script>
+        // Optional: Allow AJAX test submission (fallbacks to normal POST)
+        document.getElementById('testForm').onsubmit = function (e) {
+            e.preventDefault();
+            var prompt = this.testPrompt.value;
+            var csrf = document.getElementById('csrfTokenTest');
+            var csrfName = csrf.getAttribute('name'), csrfValue = csrf.value;
+            fetch(this.action, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'testPrompt=' + encodeURIComponent(prompt) + '&' + encodeURIComponent(csrfName) + '=' + encodeURIComponent(csrfValue)
+            })
+                .then(r => r.text()).then(html => {
+                    document.open(); document.write(html); document.close();
+                });
+        };
+    </script>
+</body>
+
+</html>
