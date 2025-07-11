@@ -1,67 +1,227 @@
 <div th:fragment="mainNav">
-  <div class="main-navigation">
+  <nav class="main-navigation fancy-shine">
     <div class="landing-main">
       <div class="landing-image">
-        <img src="/title.png" style="width: 50px; padding: 10px" alt="Compliance Incubator Logo" class="ci-logo-img" />
+        <img src="/title.png" alt="Compliance Incubator Logo" class="ci-logo-img-visible" />
       </div>
-      <div style="flex:1;display:flex;flex-direction:column;gap:0.8em;">
-        <div style="padding:6px 8px;color:#444;font-size:1em">User: <span
-            th:text="${userName != null} ? ${userName} : (${userId != null} ? ${userId} : 'no user')"></span></div>
-        <div style="margin-bottom:0.5em;display:flex;align-items:center;">
-          <span class="ci-headline">compliance incubator</span>
-          <a href="/" style="margin-left:1.25em;text-decoration:none;"><button type="button"
-              class="btn-nav">Home</button></a>
-          <form th:action="@{/logout}" method="post" style="margin:0;">
-            <button type="submit" class="nav-btn">Logout</button>
+      <div class="nav-middle">
+        <div class="user-section">
+          <span class="nav-label">User:</span>
+          <span class="user-name" th:text="${userName != null} ? ${userName} : (${userId != null} ? ${userId} : 'no user')"></span>
+        </div>
+        <div class="nav-head-row">
+          <span class="ci-headline shiny-text">compliance incubator</span>
+          <a href="/" class="entry-link"><button type="button" class="btn-nav shiny">Home</button></a>
+          <form th:action="@{/logout}" method="post" class="logout-form">
+            <button type="submit" class="btn-nav nav-btn shiny">Logout</button>
           </form>
         </div>
-
-        <div class="nav-row" style="display:flex;flex-direction:row;align-items:center;gap:1.2em;">
+        <div class="nav-row">
           <!-- Security Framework Dropdown -->
-          <div class="nav-entry dropdown" style="display:flex;align-items:center;gap:0.4em;">
-            <button type="button" class="dropdown-button btn-nav">Security Framework</button>
+          <div class="nav-entry dropdown">
+            <button type="button" class="dropdown-button btn-nav shiny">Security Framework</button>
             <div class="dropdown-content">
-              <a href="/security-control/list"><button type="button" class="dropdown-menu-btn">Security
-                  Controls</button></a>
-              <a href="/security-catalog/list"><button type="button" class="dropdown-menu-btn">Security
-                  Catalogs</button></a>
-              <a href="/security-control-domain/list"><button type="button" class="dropdown-menu-btn">Security Control
-                  Domains</button></a>
+              <a href="/security-control/list"><button type="button" class="dropdown-menu-btn">Security Controls</button></a>
+              <a href="/security-catalog/list"><button type="button" class="dropdown-menu-btn">Security Catalogs</button></a>
+              <a href="/security-control-domain/list"><button type="button" class="dropdown-menu-btn">Security Control Domains</button></a>
               <a href="/maturitymodel/list"><button type="button" class="dropdown-menu-btn">Maturity Models</button></a>
-              <a href="/maturityanswer/list"><button type="button" class="dropdown-menu-btn">Maturity Model
-                  Answers</button></a>
+              <a href="/maturityanswer/list"><button type="button" class="dropdown-menu-btn">Maturity Model Answers</button></a>
             </div>
           </div>
           <!-- Organization Dropdown -->
-          <div class="nav-entry dropdown" style="display:flex;align-items:center;gap:0.4em;">
-            <button type="button" class="dropdown-button btn-nav">Organization</button>
+          <div class="nav-entry dropdown">
+            <button type="button" class="dropdown-button btn-nav shiny">Organization</button>
             <div class="dropdown-content">
               <a href="/users"><button type="button" class="dropdown-menu-btn">Users</button></a>
               <a href="/orgunits/list"><button type="button" class="dropdown-menu-btn">Org Units</button></a>
               <a href="/orgservices/list"><button type="button" class="dropdown-menu-btn">Org Services</button></a>
             </div>
           </div>
-          <div class="nav-entry" style="display:flex;align-items:center;gap:0.4em;">
-            <a href="/assessment-urls-list" class="entry-link"><button type="button" class="nav-btn">Assessment
-                URLs</button></a>
+          <div class="nav-entry">
+            <div class="nav-entry">
+            <a href="/assessment-urls-list" class="entry-link"><button type="button" class="btn-nav shiny">Assessment URLs</button></a>
           </div>
-          <div class="nav-entry" style="display:flex;align-items:center;gap:0.4em;">
-            <form action="/assessment/create" method="get" class="entry-form" style="margin:0;">
-              <button type="submit" class="nav-btn">Create Assessment</button>
+          <div class="nav-entry">
+            <form action="/assessment/create" method="get" class="entry-form">
+              <button type="submit" class="btn-nav shiny">Create Assessment</button>
             </form>
           </div>
-          <div class="nav-entry" style="display:flex;align-items:center;gap:0.4em;">
-            <a href="/assessment/list" class="entry-link"><button type="button" class="nav-btn">Assessments</button></a>
+          <div class="nav-entry">
+            <a href="/assessment/list" class="entry-link"><button type="button" class="btn-nav shiny">Assessments</button></a>
           </div>
-          <div class="nav-entry" style="display:flex;align-items:center;gap:0.4em;">
-            <a href="/compliance/view" class="entry-link"><button type="button" class="nav-btn">Compliance
-                Check</button></a>
+          <div class="nav-entry">
+            <a href="/compliance/view" class="entry-link"><button type="button" class="btn-nav shiny">Compliance Check</button></a>
           </div>
-          <div class="nav-entry" style="display:flex;align-items:center;gap:0.4em;">
-            <a href="/statistics" class="entry-link"><button type="button" class="nav-btn">Statistics</button></a>
+          <div class="nav-entry">
+            <a href="/statistics" class="entry-link"><button type="button" class="btn-nav shiny">Statistics</button></a>
           </div>
         </div>
       </div>
     </div>
-  </div>
+  </nav>
+  <style>
+    .main-navigation {
+      background: linear-gradient(135deg, #2274A5 2%, #53beff 60%, #FF9505 120%)!important;
+      box-shadow: 0 4px 18px rgba(34,116,165,0.12), 0 1px 0.5px 2px #ffd995;
+      min-height: 90px;
+      padding: 0.7em 1.2em 0.7em 1em;
+      border-radius: 0 0 22px 22px;
+      border: 1.5px solid #dae1e7;
+      position: fixed;
+      left:0; right:0; top:0;
+      z-index: 9999;
+      /* Seamless background image, logo as part of nav chrome */
+      background-image: url('/title.png'), linear-gradient(135deg, #2274A5 2%, #53beff 60%, #FF9505 120%);
+      background-repeat: no-repeat;
+      background-size: 89px, 100% 100%;
+      background-position: 32px 16px, center center;
+    }
+    .main-navigation::before {
+      opacity: 0.7;
+      background: radial-gradient(circle at 45% 30%, var(--shine-glare) 0%, rgba(255,255,255,0.25) 90%, transparent 100%);
+      filter: blur(4px);
+      border-radius: 0 0 40px 40px;
+    }
+    .fancy-shine::after {
+      opacity: 0.8;
+      animation: shine-move 3.2s linear infinite;
+    }
+    .shiny {
+      box-shadow: 0 2px 8px rgba(255, 149, 5, 0.10),0 0 14px 0 var(--shine-highlight);
+      background-image: linear-gradient(93deg, #2274A5 0%, #5adaff 75%, #FF9505 130%);
+      color: #fff !important;
+      border: 1.5px solid #FF9505;
+      transition: background 0.24s, box-shadow 0.22s, border 0.22s;
+      position: relative;
+      font-weight: 500;
+    }
+    .shiny:hover, .dropdown-button.btn-nav.shiny:hover, .dropdown-menu-btn:hover {
+      background-image: linear-gradient(92deg, #FF9505 50%, #ffd867 120%);
+      color: #164666 !important;
+      filter: brightness(1.09);
+      box-shadow: 0 3px 14px rgba(255,149,5,0.22), 0 0 7px var(--shine-glare) inset;
+      border-color: #ffae35;
+    }
+    .shiny-text {
+      background: linear-gradient(91deg, #fffbe7 13%, #ffd867 66%, #FF9505 84%, #2274A5 110%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 2px 16px #fff9c7);
+    }
+    .nav-label {
+      color: #E7F6FF;
+      background: #1b5885;
+      padding: 1px 13px 1px 9px;
+      font-size: 0.93em;
+      border-radius: 8px 8px 8px 0;
+      letter-spacing: 0.06em;
+      margin-right: 6px;
+      box-shadow: 0 0.5px 12px 0 rgba(34,116,165,0.10),0 1px 4px var(--shine-highlight);
+      font-weight: 500;
+    }
+    .user-section {
+      display: flex;
+      align-items: center;
+      margin-bottom: .6em;
+    }
+    .user-name {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.13);
+      padding: 1.5px 9px 1.5px 6px;
+      border-radius: 0 7px 7px 8px;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+      box-shadow: 0 1px 3px 0 rgba(34,116,165,0.04);
+      text-shadow:0 2px 6px #2274A5;
+    }
+    .nav-head-row {
+      display: flex;
+      align-items: center;
+      gap: 1em;
+      margin-bottom: 0.7em;
+    }
+    .nav-row {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 1.2em;
+      flex-wrap: wrap;
+    }
+    .nav-entry {
+      display: flex;
+      align-items: center;
+      gap: 0.4em;
+      height: 44px;
+    }
+    .dropdown-button, .dropdown-menu-btn, .btn-nav, .nav-btn {
+      cursor: pointer;
+    }
+    .dropdown-content {
+      min-width: 186px;
+      box-shadow: 0 9px 32px 0 rgba(83,190,255,0.19), 0 0 14px var(--shine-glare) inset;
+    }
+    .dropdown-menu-btn {
+      background: #f6faff !important;
+      color: #2274A5 !important;
+      border-radius: 4px;
+      border: 1.2px solid #eeeeee;
+      transition: background .2s, color .2s;
+      box-shadow: 0 1px 3px rgba(34,116,165,0.07), 0 0 20px var(--shine-highlight) inset;
+    }
+    .dropdown-menu-btn:hover {
+      background: #ffeadd!important;
+      color: #FF9505!important;
+    }
+    /* Responsive styles */
+    @media (max-width: 900px){ .nav-row{flex-wrap:wrap;gap:.8em;} .main-navigation{padding:0.2em .2em .8em .2em;}}
+    @media (max-width:600px) {
+      .landing-main {flex-direction: column;align-items: flex-start;}
+      .main-navigation{border-radius:11px; padding:0.22rem .12rem .33rem .12rem; min-height:unset;}
+      .nav-row{gap:.45em;margin-bottom:.5em;}
+      .nav-head-row{ gap: .48em;flex-wrap:wrap; }
+      .nav-label, .user-name{font-size:0.78em;}
+    }
+    .logout-form, .entry-form, .entry-link {margin: 0;}
+    .ci-logo-img { display: none !important; }
+.ci-logo-img-visible {
+  display: block !important;
+  max-width: 51px;
+  margin-right: 1.2em;
+  margin-top: 5px;
+  margin-bottom: 5px;
+  filter: drop-shadow(0 7px 22px #16466622);
+  border-radius: 13px;
+  border: 2.2px solid #fffbe7;
+  background: linear-gradient(101deg, #fffbe7 64%, #FF9505 120%);
+  padding: 4px 6px;
+  box-shadow: 0 2px 12px 0 #FF95057a, 0 0 8px #becafa3f;
+  transition: box-shadow 0.17s, border 0.17s;
+}
+.ci-logo-img-visible:hover { border-color: #FF9505; box-shadow: 0 8px 28px 0 #FF950568; }
+
+    .nav-btn, .btn-nav, .dropdown-button { font-size: 1em; min-height: 42px; line-height:1.1; background: #fff !important; color: #164666 !important; border: 2px solid #FF9505; font-weight: 600; box-shadow: 0 1.5px 11px #2274A530, 0 0 2.5px 2px #fff9dc66 inset; letter-spacing: 0.01em;
+    text-shadow: 0 2px 4px #fff7d7,0 1.5px 3px #16466618;
+}
+
+.btn-nav.shiny, .nav-btn.shiny, .dropdown-button.shiny { background:linear-gradient(99deg,#fffbe7 65%,#ffd867 99%) !important; color:#164666 !important; border-color:#FF9505; box-shadow: 0 2px 11px #FF950534, 0 0 9px #fde8c493, 0 0 2.5px 2px #fff9dc66 inset; }
+
+.btn-nav.shiny:hover, .nav-btn.shiny:hover, .dropdown-button.shiny:hover {
+    background:linear-gradient(93deg,#ffdfa9 35%,#FF9505 99%) !important; color:#fff !important; border-color:#cc7810; box-shadow: 0 5px 18px #FF9505cc,0 0 24px #ffe7c4;
+}
+
+    /* Extra subtle glare effect on nav */
+    .main-navigation::after {
+      content: '';
+      position: absolute;
+      left: -10%;
+      top: -35%;
+      width: 120%;
+      height: 135%;
+      pointer-events: none;
+      background: radial-gradient(circle at 70% 14%, var(--shine-glare) 0%, rgba(255,255,255,0.22) 33%, transparent 80%);
+      opacity: 0.24;
+      filter: blur(7px);
+    }
+  </style>
 </div>
