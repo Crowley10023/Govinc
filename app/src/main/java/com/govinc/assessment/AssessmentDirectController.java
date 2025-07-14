@@ -93,13 +93,19 @@ public class AssessmentDirectController {
             Optional<AssessmentDetails> detailsOpt = detailsService.findById(assessment.getId());
             AssessmentDetails details = detailsOpt.orElse(null);
             Map<Long, String> controlAnswers = new HashMap<>();
+            Map<Long, String> controlComments = new HashMap<>();
             if (details != null && details.getControlAnswers() != null) {
                 for (AssessmentControlAnswer aca : details.getControlAnswers()) {
-                    if (aca.getSecurityControl() != null && aca.getMaturityAnswer() != null)
-                        controlAnswers.put(aca.getSecurityControl().getId(), aca.getMaturityAnswer().getAnswer());
+                    if (aca.getSecurityControl() != null) {
+                        if (aca.getMaturityAnswer() != null)
+                            controlAnswers.put(aca.getSecurityControl().getId(), aca.getMaturityAnswer().getAnswer());
+                        if (aca.getComment() != null)
+                            controlComments.put(aca.getSecurityControl().getId(), aca.getComment());
+                    }
                 }
             }
             out.put("controlAnswers", controlAnswers);
+            out.put("controlComments", controlComments);
 
             // answerSummary (as in old model)
             Object summary = detailsService.computeAnswerSummary(details);
@@ -172,6 +178,47 @@ public class AssessmentDirectController {
         }
         detailsService.save(details);
         System.out.println("[DEBUG] detailsService.save(details) called for assessmentId=" + id);
+        return "ok";
+    }
+
+    // Save/update comment for a single control (AJAX PUT from direct UI)
+    @org.springframework.web.bind.annotation.PutMapping("/assessment-direct/{id}/control/{controlId}/comment")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public String saveDirectComment(@PathVariable Long id, @PathVariable Long controlId, @org.springframework.web.bind.annotation.RequestBody Map<String, String> body) {
+        String comment = body.get("comment");
+        Optional<AssessmentDetails> detailsOpt = detailsService.findById(id);
+        AssessmentDetails details = null;
+        if (!detailsOpt.isPresent()) {
+            return "fail";
+        } else {
+            details = detailsOpt.get();
+        }
+        Set<AssessmentControlAnswer> answers = details.getControlAnswers();
+        AssessmentControlAnswer found = null;
+        for (AssessmentControlAnswer aca : answers) {
+            if (aca.getSecurityControl() != null && aca.getSecurityControl().getId().equals(controlId)) {
+                found = aca;
+                break;
+            }
+        }
+        SecurityControl control = null;
+        com.govinc.catalog.SecurityControlRepository controlRepo = null;
+        try {
+            controlRepo = (com.govinc.catalog.SecurityControlRepository)org.springframework.web.context.support.WebApplicationContextUtils
+                .getRequiredWebApplicationContext(((org.springframework.web.context.request.ServletRequestAttributes)org.springframework.web.context.request.RequestContextHolder.currentRequestAttributes()).getRequest().getServletContext())
+                .getBean(com.govinc.catalog.SecurityControlRepository.class);
+            control = controlRepo.findById(controlId).orElse(null);
+        } catch (Exception e) { }
+        if (control == null)
+            return "fail";
+        if (found == null) {
+            // A comment with no answer yet
+            found = new AssessmentControlAnswer(control, null, comment);
+            answers.add(found);
+        } else {
+            found.setComment(comment);
+        }
+        detailsService.save(details);
         return "ok";
     }
 

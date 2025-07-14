@@ -14,7 +14,7 @@
     </div>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
-    // Helper for answer post feedback (icons)
+    // --- Helper for answer post feedback (icons) ---
     function showSuccessIcon(container) {
         container.html('<span class="answer-success" title="Saved"><svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="#d8ffd8" stroke="#33aa33" stroke-width="2"/><path d="M5 9l3 3 5-5" fill="none" stroke="#33aa33" stroke-width="2"/></svg></span>');
     }
@@ -22,10 +22,7 @@
         container.html('<span class="answer-error" title="Error saving"><svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="#ffd8d8" stroke="#cc2222" stroke-width="2"/><path d="M6 6l6 6M12 6l-6 6" fill="none" stroke="#cc2222" stroke-width="2"/></svg></span>');
     }
     function clearIcon(container) { container.empty(); }
-
-    // SVG for a checkmark - downgraded (no template literals)
     var CHECKMARK_SVG = '<svg width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" stroke="#22b573" stroke-width="2" fill="#fff"/><polyline points="6,12 10,16 16,7" stroke="#22b573" stroke-width="2.5" fill="none"/></svg>';
-
     function toggleDomain(header) {
         var controlsDiv = header.nextElementSibling;
         if (controlsDiv.style.display === 'none' || controlsDiv.style.display === '') {
@@ -44,7 +41,6 @@
             $('.ctrl-desc-tooltip').fadeOut(120);
         }
     });
-
     function checkDomainCompleteness() {
         document.querySelectorAll(".domain-checkmark").forEach(function (checkmarkSpan) {
             var domainId = checkmarkSpan.getAttribute("data-domain-id");
@@ -55,14 +51,12 @@
             checkmarkSpan.innerHTML = allAnswered ? CHECKMARK_SVG : "";
         });
     }
-
     document.addEventListener("DOMContentLoaded", function () {
         var pathMatch = window.location.pathname.match(/\/assessment-direct\/([^/]+)/);
         var obfuscatedId = null;
         if (pathMatch && pathMatch[1]) {
             obfuscatedId = pathMatch[1];
         } else {
-            // Fallback: check query parameter ?id=...
             var urlSearch = new URLSearchParams(window.location.search);
             if (urlSearch.has('id')) {
                 obfuscatedId = urlSearch.get('id');
@@ -77,12 +71,12 @@
                 $('#assessment-status-container').html('<h1>Assessment Not Found</h1>');
                 return;
             }
-            // Status block
             if (data.assessment.status === 'CLOSED' || data.isOpen === false) {
                 $('#assessment-status-container').html('<h1>SORRY NOT LONGER AVAILABLE</h1>');
                 return;
             }
             var a = data.assessment;
+            var comments = data.controlComments || {};
             var html = '<h1>Assessment (Direct URL)</h1>'+
                 '<section><table class="table card">'+
                 '<tr><th>Date</th><td>'+ (a.date || '-')+'</td></tr>'+ 
@@ -90,8 +84,6 @@
                 '<tr><th>Status</th><td>'+(a.status||'-')+'</td></tr>'+ 
                 '</table></section>';
             $('#assessment-status-container').html(html);
-
-            // Summary block
             var summaryRows = '';
             var answerSummary = data.answerSummary;
             if (!answerSummary || Object.keys(answerSummary).length === 0) {
@@ -105,14 +97,11 @@
             }
             var summaryHtml = '<section><h2>Summary of Answers</h2><table class="table card" style="margin-bottom: 2em;"><thead><tr><th>Answer Category</th><th>Count</th><th>Percent (%)</th></tr></thead><tbody>' + summaryRows + '</tbody></table></section>';
             $('#summary-container').html(summaryHtml);
-
-            // Domains/Controls/Answers section
             var domains = Array.isArray(data.securityControlDomains) ? data.securityControlDomains : [];
             var controls = Array.isArray(data.controls) ? data.controls : [];
             var answers = Array.isArray(data.maturityAnswers) ? data.maturityAnswers : [];
             var controlAnswers = data.controlAnswers || {};
             var isOpen = data.isOpen;
-
             var controlsHtml = '<h2>Controls &amp; Answers</h2>';
             domains.forEach(function(domain) {
                 controlsHtml += '<div class="domain-outline card domain-collapsible" style="margin-bottom:2.5em; padding: 0em; border: 2px solid #2274A5; border-radius: 9px;">' +
@@ -128,19 +117,19 @@
                         '</svg>' +
                     '</span>' +
                 '</div><div class="domain-controls" style="display:none;padding:1.1em 1.2em 0 1.2em;">';
-                controlsHtml += '<table class="table card controls-table"><thead><tr><th style="width:350px;">Control</th><th>Answer</th></tr></thead><tbody>';
-
+                controlsHtml += '<table class="table card controls-table"><thead><tr><th style="width:350px;">Control</th><th>Answer & Comment</th></tr></thead><tbody>';
                 controls.filter(function(ctrl){return ctrl.domainId === domain.id;}).forEach(function(ctrl){
-                    // Build the answer cell
                     var ansCell = '';
                     if (isOpen) {
                         var selectId = 'select-control-' + ctrl.id;
-                        ansCell = '<span style="white-space:nowrap;"><select name="control_' + ctrl.id + '" data-control-id="' + ctrl.id + '" data-domain-id="' + domain.id + '" class="answer-select" id="' + selectId + '"><option value="">-- select an answer --</option>';
+                        ansCell = '<div style="display:flex;flex-direction:column;gap:7px;min-width:230px;">' +
+                        '<span style="white-space:nowrap;"><select name="control_' + ctrl.id + '" data-control-id="' + ctrl.id + '" data-domain-id="' + domain.id + '" class="answer-select" id="' + selectId + '"><option value="">-- select an answer --</option>';
                         answers.forEach(function(ans){
                             var selected = (controlAnswers && controlAnswers[ctrl.id] && ans.answer === controlAnswers[ctrl.id]) ? 'selected' : '';
                             ansCell += '<option value="' + ans.id + '" ' + selected + '>' + ans.answer + '</option>';
                         });
-                        ansCell += '</select><span class="answer-feedback"></span></span>';
+                        ansCell += '</select><span class="answer-feedback"></span></span>' +
+                        '<textarea class="comment-textarea" name="comment_' + ctrl.id + '" data-control-id="' + ctrl.id + '" style="min-width:180px;min-height:36px;resize:vertical;" placeholder="Add comment (optional)">' + (comments && comments[ctrl.id] ? comments[ctrl.id] : '') + '</textarea><span class="comment-feedback"></span></div>';
                     } else {
                         var ca = controlAnswers[ctrl.id] != null ? controlAnswers[ctrl.id] : 'No answer';
                         ansCell = '<span>' + ca + '</span>';
@@ -155,8 +144,6 @@
                 controlsHtml += '</tbody></table></div></div>';
             });
             $('#controls-container').html(controlsHtml);
-
-            // Wire up answering (AJAX) and domain completeness after controls rendered
             $('.answer-select').on('change', function () {
                 var select = $(this);
                 var controlId = select.data('control-id');
@@ -168,27 +155,51 @@
                     clearIcon(feedbackIcon);
                     return;
                 }
-                // The assessment id for POSTing is a.assessment.id
-                console.log("Submitting answer:", {
+                $.ajax({
                     url: '/assessment-direct/' + a.id + '/answer',
-                    controlId: controlId,
-                    answerId: answerId
-                });
-                $.post({
-                    url: '/assessment-direct/' + a.id + '/answer',
+                    type: 'POST',
                     data: {controlId: controlId, answerId: answerId},
                     success: function (resp) {
-                        console.log("POST /assessment-direct/answered: Response:", resp);
                         select.css('background', '#d8ffd8');
                         showSuccessIcon(feedbackIcon);
                         setTimeout(function () { clearIcon(feedbackIcon); select.css('background', ''); }, 1500);
                     },
-                    error: function (xhr, status, error) {
-                        console.log("POST /assessment-direct/answered: Error", status, error, xhr.responseText);
+                    error: function () {
                         select.css('background', '#ffd8d8');
                         showErrorIcon(feedbackIcon);
                     }
                 });
+            });
+            // ==================== AUTOSAVE COMMENTS ====================
+            var debounceTimers = {};
+            $(document).on('input', '.comment-textarea', function () {
+                var textarea = $(this);
+                var controlId = textarea.data('control-id');
+                var comment = textarea.val();
+                var feedback = textarea.nextAll('.comment-feedback').first();
+                // Clear prior timer
+                if (debounceTimers[controlId])
+                    clearTimeout(debounceTimers[controlId]);
+                debounceTimers[controlId] = setTimeout(function() {
+                    $.ajax({
+                        url: '/assessment-direct/' + a.id + '/control/' + controlId + '/comment',
+                        type: 'PUT',
+                        contentType: 'application/json',
+                        data: JSON.stringify({ comment: comment }),
+                        success: function () {
+                            textarea.css('background', '#d8ffd8');
+                            feedback.html('<span style="color:#228B22;font-weight:bold;">Saved</span>');
+                            setTimeout(function () {
+                                feedback.empty();
+                                textarea.css('background', '');
+                            }, 1400);
+                        },
+                        error: function () {
+                            textarea.css('background', '#ffd8d8');
+                            feedback.html('<span style="color:red;font-weight:bold;">Error saving</span>');
+                        }
+                    });
+                }, 650);
             });
             checkDomainCompleteness();
             document.body.addEventListener("change", function (e) {
@@ -196,8 +207,8 @@
                     checkDomainCompleteness();
                 }
             });
-        }) // end $.getJSON
-    }) // end DOMContentLoaded
+        });
+    });
     </script>
     <style>
         .answer-feedback { display: inline-block; width: 20px; height: 20px; vertical-align: middle; margin-left: 5px; }

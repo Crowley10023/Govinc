@@ -26,6 +26,7 @@ public class SecurityConfig {
             "/assessment-direct/*/alldata",
             "/assessment-direct/*/data",
             "/assessment-direct/*/answer",
+            "/assessment-direct/*/control/*/comment",
             "/assessment-direct.html",
             "/assessment-direct/*",
             "/assessment/*/answer",
