@@ -333,6 +333,10 @@ public class AssessmentController {
             Set<AssessmentControlAnswer> detailsAnswers = (details != null && details.getControlAnswers() != null)
                     ? new HashSet<>(details.getControlAnswers())
                     : new HashSet<>();
+
+            // Gather comments as well
+            Map<Long, String> controlComments = new HashMap<>();
+
             for (SecurityControl control : controls) {
                 Long ctrlId = control.getId();
                 if (bestOrgServiceAnswer.containsKey(ctrlId)) {
@@ -372,11 +376,19 @@ public class AssessmentController {
                             }
                         }
                     }
-
+                    // If inherited, try to fetch the comment from local (user) answer if exists, else set to empty
+                    if (localControlAnswers.containsKey(ctrlId)) {
+                        String comment = localControlAnswers.get(ctrlId).getComment();
+                        if (comment != null) controlComments.put(ctrlId, comment);
+                    }
                 } else if (localControlAnswers.containsKey(ctrlId)) {
                     AssessmentControlAnswer aca = localControlAnswers.get(ctrlId);
                     controlAnswers.put(ctrlId, aca.getMaturityAnswer().getAnswer());
                     controlAnswerIsTakenOver.put(ctrlId, Boolean.FALSE);
+                    // Populate comment
+                    if (aca.getComment() != null) {
+                        controlComments.put(ctrlId, aca.getComment());
+                    }
                 } else {
                     controlAnswers.put(ctrlId, null);
                     controlAnswerIsTakenOver.put(ctrlId, Boolean.FALSE);
@@ -413,6 +425,7 @@ public class AssessmentController {
 
             model.addAttribute("answers", answers);
             model.addAttribute("controlAnswers", controlAnswers);
+            model.addAttribute("controlComments", controlComments);
             model.addAttribute("controlAnswerIsTakenOver", controlAnswerIsTakenOver);
             model.addAttribute("controlTakenOverOrgServiceName", controlTakenOverOrgServiceName);
 
@@ -490,6 +503,51 @@ public class AssessmentController {
         }
         // Only update the modified/new answer, do NOT replace the set with only one
         // answer
+        assessmentDetailsService.save(details);
+        return "ok";
+    }
+
+    // Save/update comment for a single control (AJAX PUT from UI)
+    @PutMapping("/{assessmentId}/control/{controlId}/comment")
+    @ResponseBody
+    public String saveComment(@PathVariable Long assessmentId, @PathVariable Long controlId, @RequestBody Map<String, String> body) {
+        String comment = body.get("comment");
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(assessmentId);
+        AssessmentDetails details = null;
+        if (!detailsOpt.isPresent()) {
+            // Try to find the assessment:
+            Optional<Assessment> assessmentOpt = assessmentRepository.findById(assessmentId);
+            if (!assessmentOpt.isPresent())
+                return "fail";
+            details = new AssessmentDetails();
+            Set<Assessment> assessmentSet = new HashSet<>();
+            assessmentSet.add(assessmentOpt.get());
+            details.setAssessments(assessmentSet);
+            details.setDate(LocalDate.now());
+        } else {
+            details = detailsOpt.get();
+        }
+        Set<AssessmentControlAnswer> answers = details.getControlAnswers();
+        // Find or add
+        AssessmentControlAnswer found = null;
+        for (AssessmentControlAnswer aca : answers) {
+            if (aca.getSecurityControl() != null && aca.getSecurityControl().getId().equals(controlId)) {
+                found = aca;
+                break;
+            }
+        }
+        SecurityControl control = securityControlRepository.findById(controlId).orElse(null);
+        if (control == null)
+            return "fail";
+        if (found == null) {
+            // A comment with no answer: create a dummy with null maturity answer
+            found = new AssessmentControlAnswer(control, null, comment);
+            found = assessmentControlAnswerRepository.save(found);
+            answers.add(found);
+        } else {
+            found.setComment(comment);
+            found = assessmentControlAnswerRepository.save(found);
+        }
         assessmentDetailsService.save(details);
         return "ok";
     }

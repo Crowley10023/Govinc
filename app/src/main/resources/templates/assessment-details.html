@@ -141,7 +141,7 @@
                                 <thead>
                                     <tr>
                                         <th style="width:350px;">Control</th>
-                                        <th>Answer</th>
+                                        <th>Answer & Comment</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -170,26 +170,36 @@
                                                 </div>
                                             </td>
                                             <td>
-                                                <span style="white-space:nowrap;">
-                                                    <select th:name="${'control_' + ctrl.id}"
-                                                        th:data-control-id="${ctrl.id}" th:data-domain-id="${domain.id}"
-                                                        class="answer-select"
-                                                        th:disabled="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])}"
-                                                        th:classappend="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])} ? 'taken-over' : ''">
-                                                        <option value="">-- select an answer --</option>
-                                                        <option th:each="ans : ${maturityAnswers}" th:value="${ans.id}"
-                                                            th:selected="${controlAnswers != null and controlAnswers[ctrl.id] != null} ? ${ans.answer} == ${controlAnswers[ctrl.id]} : false"
-                                                            th:text="${ans.answer}"></option>
-                                                    </select>
-                                                    <span class="answer-feedback"></span>
-                                                    <span
-                                                        th:if="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])}"
-                                                        class="taken-over-label"
-                                                        title="Answer is taken from an Org Service">
+                                                <div style="display:flex;flex-direction:column;gap:7px;min-width:250px;">
+                                                    <span style="white-space:nowrap;">
+                                                        <select th:name="${'control_' + ctrl.id}"
+                                                            th:data-control-id="${ctrl.id}" th:data-domain-id="${domain.id}"
+                                                            class="answer-select"
+                                                            th:disabled="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])}"
+                                                            th:classappend="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])} ? 'taken-over' : ''">
+                                                            <option value="">-- select an answer --</option>
+                                                            <option th:each="ans : ${maturityAnswers}" th:value="${ans.id}"
+                                                                th:selected="${controlAnswers != null and controlAnswers[ctrl.id] != null} ? ${ans.answer} == ${controlAnswers[ctrl.id]} : false"
+                                                                th:text="${ans.answer}"></option>
+                                                        </select>
+                                                        <span class="answer-feedback"></span>
                                                         <span
-                                                            th:text="${controlTakenOverOrgServiceName[ctrl.id]}"></span>
+                                                            th:if="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])}"
+                                                            class="taken-over-label"
+                                                            title="Answer is taken from an Org Service">
+                                                            <span th:text="${controlTakenOverOrgServiceName[ctrl.id]}"></span>
+                                                        </span>
                                                     </span>
-                                                </span>
+                                                    <textarea
+                                                        class="comment-textarea"
+                                                        th:name="${'comment_' + ctrl.id}"
+                                                        th:data-control-id="${ctrl.id}"
+                                                        th:disabled="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])}"
+                                                        style="min-width:220px;min-height:36px;resize:vertical;"
+                                                        th:placeholder="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])} ? 'Comment from Org Service' : 'Add comment (optional)'"
+                                                        th:text="${controlComments != null and controlComments[ctrl.id] != null ? controlComments[ctrl.id] : ''}"></textarea>
+                                                    <span class="comment-feedback"></span>
+                                                </div>
                                             </td>
                                         </th:block>
                                     </tr>
@@ -489,6 +499,41 @@
                     }
                 });
             });
+
+            // =================== AUTOSAVE COMMENT ===================
+            var debounceTimers = {};
+            $(document).on('input', '.comment-textarea', function () {
+                var textarea = $(this);
+                var controlId = textarea.data('control-id');
+                var comment = textarea.val();
+                var assessmentId = /*[[${assessment.id}]]*/[[${ assessment.id }]];
+                var feedback = textarea.nextAll('.comment-feedback').first();
+                if (textarea.prop('disabled')) return;
+                // Clear prior timer
+                if (debounceTimers[controlId])
+                    clearTimeout(debounceTimers[controlId]);
+                debounceTimers[controlId] = setTimeout(function() {
+                    // AJAX save comment
+                    $.ajax({
+                        url: '/assessment/' + assessmentId + '/control/' + controlId + '/comment',
+                        type: 'PUT',
+                        contentType: 'application/json',
+                        data: JSON.stringify({ comment: comment }),
+                        success: function () {
+                            textarea.css('background', '#d8ffd8');
+                            feedback.html('<span style="color:#228B22;font-weight:bold;">Saved</span>');
+                            setTimeout(function () {
+                                feedback.empty();
+                                textarea.css('background', '');
+                            }, 1400);
+                        },
+                        error: function () {
+                            textarea.css('background', '#ffd8d8');
+                            feedback.html('<span style="color:red;font-weight:bold;">Error saving</span>');
+                        }
+                    });
+                }, 650);
+            });
         });
         // =================== End modal handling section ===================
 
@@ -551,8 +596,9 @@
                     return;
                 }
                 if (assessmentId && controlId) {
-                    $.post({
+                    $.ajax({
                         url: '/assessment/' + assessmentId + '/answer',
+                        type: 'POST',
                         data: { controlId: controlId, answerId: answerId },
                         success: function () {
                             select.css('background', '#d8ffd8');

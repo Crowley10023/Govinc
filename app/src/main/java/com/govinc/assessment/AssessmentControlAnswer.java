@@ -8,6 +8,9 @@ import jakarta.persistence.*;
 @Entity
 @Table(name = "assessment_control_answer")
 public class AssessmentControlAnswer {
+    @Column(length = 4096)
+    private String comment; // New field for comment
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -21,8 +24,13 @@ public class AssessmentControlAnswer {
     public AssessmentControlAnswer() {}
 
     public AssessmentControlAnswer(SecurityControl securityControl, MaturityAnswer maturityAnswer) {
+        this(securityControl, maturityAnswer, null);
+    }
+
+    public AssessmentControlAnswer(SecurityControl securityControl, MaturityAnswer maturityAnswer, String comment) {
         this.securityControl = securityControl;
         this.maturityAnswer = maturityAnswer;
+        this.comment = comment;
     }
 
     public Long getId() {
@@ -49,6 +57,14 @@ public class AssessmentControlAnswer {
     // Added to support SpEL/Thymeleaf property 'answer'
     public MaturityAnswer getAnswer() {
         return getMaturityAnswer();
+    }
+
+    public String getComment() {
+        return comment;
+    }
+
+    public void setComment(String comment) {
+        this.comment = comment;
     }
 
     /**
