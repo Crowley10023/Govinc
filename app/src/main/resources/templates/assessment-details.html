@@ -30,7 +30,7 @@
                             <em>No Org Services available.</em>
                         </div>
                         <div th:each="orgService : ${orgServicesAll}">
-                            <label style="display:block;margin-bottom:3px;">
+                            <label class="orgservice-label">
                                 <input type="checkbox" name="orgServiceIds" th:value="${orgService.id}"
                                     th:checked="${selectedOrgServiceIds != null and selectedOrgServiceIds.contains(orgService.id)}">
                                 <span th:text="${orgService.name}">Org Service Name</span>
@@ -91,7 +91,7 @@
         </section>
         <section>
             <h2>Summary of Answers</h2>
-            <table class="table card" style="margin-bottom: 2em;">
+            <table class="table card summary-table">
                 <thead>
                     <tr>
                         <th>Answer Category</th>
@@ -112,29 +112,21 @@
             </table>
 
             <!-- Grouped by Security Control Domain -->
-            <div th:each="domain : ${securityControlDomains}" class="domain-outline card domain-collapsible"
-                style="margin-bottom:2.5em; padding: 0em; border: 2px solid #2274A5; border-radius: 9px;">
-                <div class="domain-header" onclick="toggleDomain(this)"
-                    style="display: flex; align-items: center; justify-content: space-between;">
-                    <div style="flex:1;">
-                        <span class="domain-title" th:text="${domain != null ? domain.name : 'No Domain'}"
-                            style="display:block;"></span>
-                        <span class="domain-desc"
-                            style="display:block; font-weight:normal; color:#888; font-size:0.88em; margin-top:2px;"
-                            th:text="${domain != null ? domain.description : ''}">
-                        </span>
+            <div th:each="domain : ${securityControlDomains}"
+                class="domain-outline card domain-collapsible">
+                <div class="domain-header" onclick="toggleDomain(this)">
+                    <div class="domain-header-info">
+                        <span class="domain-title" th:text="${domain != null ? domain.name : 'No Domain'}"></span>
+                        <span class="domain-desc" th:text="${domain != null ? domain.description : ''}"></span>
                     </div>
-                    <span class="domain-checkmark" th:attr="data-domain-id=${domain.id}"
-                        style="margin-left:.5em;"></span>
-                    <span style="display:inline-flex; align-items:center; margin-left:.5em; cursor:pointer;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18"
-                            style="vertical-align:middle;">
-                            <polyline points="4,7 9,12 14,7" fill="none" stroke="#2274A5" stroke-width="2"
-                                stroke-linecap="round" stroke-linejoin="round" />
+                    <span class="domain-checkmark" th:attr="data-domain-id=${domain.id}"></span>
+                    <span class="domain-chevron">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+                            <polyline points="4,7 9,12 14,7" fill="none" stroke="#2274A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                         </svg>
                     </span>
                 </div>
-                <div class="domain-controls" style="display:none;padding:1.1em 1.2em 0 1.2em;">
+                <div class="domain-controls">
                     <div class="domain-controls-tbl">
                         <div th:if="${assessment.isOpen}">
                             <table class="table card controls-table">
@@ -170,8 +162,8 @@
                                                 </div>
                                             </td>
                                             <td>
-                                                <div style="display:flex;flex-direction:column;gap:7px;min-width:250px;">
-                                                    <span style="white-space:nowrap;">
+                                                <div class="control-actions-column">
+                                                    <span class="dropdown-row">
                                                         <select th:name="${'control_' + ctrl.id}"
                                                             th:data-control-id="${ctrl.id}" th:data-domain-id="${domain.id}"
                                                             class="answer-select"
@@ -195,7 +187,6 @@
                                                         th:name="${'comment_' + ctrl.id}"
                                                         th:data-control-id="${ctrl.id}"
                                                         th:disabled="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])}"
-                                                        style="min-width:220px;min-height:36px;resize:vertical;"
                                                         th:placeholder="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])} ? 'Comment from Org Service' : 'Add comment (optional)'"
                                                         th:text="${controlComments != null and controlComments[ctrl.id] != null ? controlComments[ctrl.id] : ''}"></textarea>
                                                     <span class="comment-feedback"></span>
@@ -274,9 +265,9 @@
             <form th:action="@{'/assessment/' + ${assessment.id} + '/excel'}" method="get" style="margin: 0;">
                 <button type="submit" class="btn-nav">Export to Excel</button>
             </form>
-            <button id="create-url-btn" type="button" class="btn-nav" style="margin: 0;">Create URL</button>
+            <button id="create-url-btn" type="button" class="btn-nav">Create URL</button>
             <span id="create-url-feedback"></span>
-            <div id="direct-url-row" style="margin-top:8px; display:none;">
+            <div id="direct-url-row" class="direct-url-row">
                 <strong>Direct assessment link:</strong> <a id="direct-url-link" href="#" target="_blank"></a>
             </div>
             <form action="/assessment/list" method="get" style="display: inline; margin: 0;">
@@ -306,8 +297,7 @@
             <div class="modal-popup">
                 <h3>Choose Users for Assessment</h3>
                 <form id="users-modal-form">
-                    <select id="users-multiselect" name="userIds" multiple size="8"
-                        style="min-width:220px;max-width:400px;">
+                    <select id="users-multiselect" name="userIds" multiple size="8" class="users-multiselect">
                         <option th:each="user : ${users}" th:value="${user.id}"
                             th:selected="${assessment.users != null and assessment.users.contains(user)}"
                             th:text="${user.name + ' (' + user.email + ')'}"></option>
@@ -317,7 +307,7 @@
                         <button id="users-modal-cancel-btn" type="button">Cancel</button>
                     </div>
                 </form>
-                <div id="users-modal-error" style="color:#c44;display:none;margin-top:.5em;"></div>
+                <div id="users-modal-error" class="modal-error"></div>
             </div>
         </div>
     </div>
@@ -451,7 +441,7 @@
                         if (Array.isArray(allServices) && allServices.length > 0) {
                             allServices.forEach(function (os) {
                                 var checked = Array.isArray(assignedIds) && assignedIds.map(String).indexOf(String(os.id)) !== -1 ? 'checked' : '';
-                                html += '<label style="display:block;margin-bottom:3px;">' +
+                                html += '<label class="orgservice-label">' +
                                     '<input type="checkbox" name="orgServiceIds" value="' + os.id + '" ' + checked + '> ' +
                                     $('<span/>').text(os.name).prop('outerHTML') +
                                     '</label>';
@@ -500,40 +490,7 @@
                 });
             });
 
-            // =================== AUTOSAVE COMMENT ===================
-            var debounceTimers = {};
-            $(document).on('input', '.comment-textarea', function () {
-                var textarea = $(this);
-                var controlId = textarea.data('control-id');
-                var comment = textarea.val();
-                var assessmentId = /*[[${assessment.id}]]*/[[${ assessment.id }]];
-                var feedback = textarea.nextAll('.comment-feedback').first();
-                if (textarea.prop('disabled')) return;
-                // Clear prior timer
-                if (debounceTimers[controlId])
-                    clearTimeout(debounceTimers[controlId]);
-                debounceTimers[controlId] = setTimeout(function() {
-                    // AJAX save comment
-                    $.ajax({
-                        url: '/assessment/' + assessmentId + '/control/' + controlId + '/comment',
-                        type: 'PUT',
-                        contentType: 'application/json',
-                        data: JSON.stringify({ comment: comment }),
-                        success: function () {
-                            textarea.css('background', '#d8ffd8');
-                            feedback.html('<span style="color:#228B22;font-weight:bold;">Saved</span>');
-                            setTimeout(function () {
-                                feedback.empty();
-                                textarea.css('background', '');
-                            }, 1400);
-                        },
-                        error: function () {
-                            textarea.css('background', '#ffd8d8');
-                            feedback.html('<span style="color:red;font-weight:bold;">Error saving</span>');
-                        }
-                    });
-                }, 650);
-            });
+
         });
         // =================== End modal handling section ===================
 
