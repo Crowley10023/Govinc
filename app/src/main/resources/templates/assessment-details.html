@@ -15,10 +15,83 @@
     <div th:replace="~{navigation :: mainNav}"></div>
     <div class="container">
         <h1>Assessment Details</h1>
-        <div class="choose-buttons-row">
-            <button id="choose-orgunit-btn" type="button" class="modal-launch-btn">Choose Org Unit</button>
-            <button id="choose-users-btn" type="button" class="modal-launch-btn">Choose Users</button>
-            <button id="choose-orgservices-btn" type="button" class="modal-launch-btn">Choose Org Services</button>
+
+        <!-- Collapsible Assessment Details Section (Default: Collapsed) -->
+        <div class="assessment-details-collapsible card">
+            <div class="assessment-details-header" onclick="toggleAssessmentDetails(this)">
+                <span class="assessment-details-title">Assessment Details</span>
+                <span class="assessment-details-chevron">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+                        <polyline points="4,7 9,12 14,7" fill="none" stroke="#2274A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                </span>
+            </div>
+            <div class="assessment-details-body" style="display:none;">
+                <section class="assessment-meta">
+                    <table class="table card">
+                        <tr>
+                            <th>Date</th>
+                            <td th:text="${assessment.date}"></td>
+                        </tr>
+                        <tr>
+                            <th>Organization Unit</th>
+                            <td th:text="${assessment.orgUnit != null ? assessment.orgUnit.name : 'None'}"></td>
+                        </tr>
+                        <tr>
+                            <th>Security Catalog</th>
+                            <td th:text="${assessment.securityCatalog.name}"></td>
+                        </tr>
+                        <tr>
+                            <th>Status</th>
+                            <td th:text="${assessment.status}"></td>
+                        </tr>
+                        <tr th:if="${orgServices != null}">
+                            <th>Org Services</th>
+                            <td>
+                                <ul>
+                                    <li th:each="orgService : ${orgServices}" th:text="${orgService.name}"></li>
+                                </ul>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Assessment URL</th>
+                            <td><span th:if="${assessment.assessmentUrls != null && assessment.assessmentUrls.url != null}"><a
+                                        th:href="@{'/assessment-direct/' + ${assessment.assessmentUrls.url}}"
+                                        th:text="${assessment.name}" target="_blank"></a></span><span
+                                    th:if="${assessment.assessmentUrls == null || assessment.assessmentUrls.url == null}">Not
+                                    set</span></td>
+                        </tr>
+                        <tr>
+                            <th>Users</th>
+                            <td id="assessment-users-cell"><span
+                                    th:if="${assessment.users == null || #lists.isEmpty(assessment.users)}">None</span><span
+                                    th:each="user,iterStat : ${assessment.users}"><span
+                                        th:text="${user.name + ' (' + user.email + ')'}"></span><span
+                                        th:if="${!iterStat.last}">, </span></span></td>
+                        </tr>
+                    </table>
+                    <h2>Summary of Answers</h2>
+                    <table class="table card summary-table">
+                        <thead>
+                            <tr>
+                                <th>Answer Category</th>
+                                <th>Count</th>
+                                <th>Percent (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:if="${answerSummary == null || answerSummary.isEmpty()}">
+                                <td colspan="3">No answers yet</td>
+                            </tr>
+                            <tr th:each="entry : ${answerSummary}">
+                                <td th:text="${entry.key}"></td>
+                                <td th:text="${entry.value.count}"></td>
+                                <td th:text="${#numbers.formatDecimal(entry.value.percent, 0, 2)}"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </section>
+            </div>
         </div>
 
         <div id="orgservice-modal" class="modal-bg">
@@ -45,208 +118,150 @@
             </div>
         </div>
         <!-- End OrgService Selection Modal -->
-        <section class="assessment-meta">
-            <table class="table card">
-                <tr>
-                    <th>Date</th>
-                    <td th:text="${assessment.date}"></td>
-                </tr>
-                <tr>
-                    <th>Organization Unit</th>
-                    <td th:text="${assessment.orgUnit != null ? assessment.orgUnit.name : 'None'}"></td>
-                </tr>
-                <tr>
-                    <th>Security Catalog</th>
-                    <td th:text="${assessment.securityCatalog.name}"></td>
-                </tr>
-                <tr>
-                    <th>Status</th>
-                    <td th:text="${assessment.status}"></td>
-                </tr>
-                <tr th:if="${orgServices != null}">
-                    <th>Org Services</th>
-                    <td>
-                        <ul>
-                            <li th:each="orgService : ${orgServices}" th:text="${orgService.name}"></li>
-                        </ul>
-                    </td>
-                </tr>
-                <tr>
-                    <th>Assessment URL</th>
-                    <td><span th:if="${assessment.assessmentUrls != null && assessment.assessmentUrls.url != null}"><a
-                                th:href="@{'/assessment-direct/' + ${assessment.assessmentUrls.url}}"
-                                th:text="${assessment.name}" target="_blank"></a></span><span
-                            th:if="${assessment.assessmentUrls == null || assessment.assessmentUrls.url == null}">Not
-                            set</span></td>
-                </tr>
-                <tr>
-                    <th>Users</th>
-                    <td id="assessment-users-cell"><span
-                            th:if="${assessment.users == null || #lists.isEmpty(assessment.users)}">None</span><span
-                            th:each="user,iterStat : ${assessment.users}"><span
-                                th:text="${user.name + ' (' + user.email + ')'}"></span><span
-                                th:if="${!iterStat.last}">, </span></span></td>
-                </tr>
-            </table>
-            <h2>Summary of Answers</h2>
-            <table class="table card summary-table">
-                <thead>
-                    <tr>
-                        <th>Answer Category</th>
-                        <th>Count</th>
-                        <th>Percent (%)</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr th:if="${answerSummary == null || answerSummary.isEmpty()}">
-                        <td colspan="3">No answers yet</td>
-                    </tr>
-                    <tr th:each="entry : ${answerSummary}">
-                        <td th:text="${entry.key}"></td>
-                        <td th:text="${entry.value.count}"></td>
-                        <td th:text="${#numbers.formatDecimal(entry.value.percent, 0, 2)}"></td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
 
         <div class="controls-viewport">
-    <!-- Security Control Domains (Group) -->
-        <!-- Grouped by Security Control Domain -->
-        <div th:each="domain : ${securityControlDomains}"
-            class="domain-outline card domain-collapsible">
-            <div class="domain-header" onclick="toggleDomain(this)">
-                <div class="domain-header-info">
-                    <span class="domain-title" th:text="${domain != null ? domain.name : 'No Domain'}"></span>
-                    <span class="domain-desc" th:text="${domain != null ? domain.description : ''}"></span>
+            <!-- Security Control Domains (Group) -->
+            <!-- Grouped by Security Control Domain -->
+            <div th:each="domain : ${securityControlDomains}" class="domain-outline card domain-collapsible">
+                <div class="domain-header" onclick="toggleDomain(this)">
+                    <div class="domain-header-info">
+                        <span class="domain-title" th:text="${domain != null ? domain.name : 'No Domain'}"></span>
+                        <span class="domain-desc" th:text="${domain != null ? domain.description : ''}"></span>
+                    </div>
+                    <span class="domain-checkmark" th:attr="data-domain-id=${domain.id}"></span>
+                    <span class="domain-chevron">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+                            <polyline points="4,7 9,12 14,7" fill="none" stroke="#2274A5" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                    </span>
                 </div>
-                <span class="domain-checkmark" th:attr="data-domain-id=${domain.id}"></span>
-                <span class="domain-chevron">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
-                        <polyline points="4,7 9,12 14,7" fill="none" stroke="#2274A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
-                </span>
-            </div>
-            <div class="domain-controls">
-                <div class="domain-controls-tbl">
-                    <div th:if="${assessment.isOpen}">
-                        <table class="table card controls-table">
-                            <thead>
-                                <tr>
-                                    <th style="width:350px;">Control</th>
-                                    <th>Answer & Comment</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr th:each="ctrl : ${assessment.securityCatalog.securityControls}">
-                                    <th:block
-                                        th:if="${ctrl.securityControlDomain != null && domain != null && ctrl.securityControlDomain.id == domain.id}">
-                                        <td class="ctrl-name-col">
-                                            <div class="ctrl-desc-wrap">
-                                                <span th:text="${ctrl.name}"></span>
-                                                <button type="button" class="ctrl-desc-btn" tabindex="0"
-                                                    title="Show description" onclick="toggleDesc(this)">
-                                                    <svg viewBox="0 0 24 24">
-                                                        <circle cx="12" cy="12" r="10" fill="#fff" stroke="#2274A5"
-                                                            stroke-width="2" />
-                                                        <text x="12" y="17" text-anchor="middle"
-                                                            font-family="Arial,Helvetica,sans-serif" font-size="15"
-                                                            dy="-2" fill="#2274A5">?</text>
-                                                    </svg>
-                                                </button>
-                                                <div class="ctrl-desc-tooltip">
-                                                    <b>Description:</b>
-                                                    <div
-                                                        th:utext="${#strings.escapeXml(ctrl.detail) ?: 'No detail'}">
+                <div class="domain-controls">
+                    <div class="domain-controls-tbl">
+                        <div th:if="${assessment.isOpen}">
+                            <table class="table card controls-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width:350px;">Control</th>
+                                        <th>Answer & Comment</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:each="ctrl : ${assessment.securityCatalog.securityControls}">
+                                        <th:block
+                                            th:if="${ctrl.securityControlDomain != null && domain != null && ctrl.securityControlDomain.id == domain.id}">
+                                            <td class="ctrl-name-col">
+                                                <div class="ctrl-desc-wrap">
+                                                    <span th:text="${ctrl.name}"></span>
+                                                    <button type="button" class="ctrl-desc-btn" tabindex="0"
+                                                        title="Show description" onclick="toggleDesc(this)">
+                                                        <svg viewBox="0 0 24 24">
+                                                            <circle cx="12" cy="12" r="10" fill="#fff" stroke="#2274A5"
+                                                                stroke-width="2" />
+                                                            <text x="12" y="17" text-anchor="middle"
+                                                                font-family="Arial,Helvetica,sans-serif" font-size="15"
+                                                                dy="-2" fill="#2274A5">?</text>
+                                                        </svg>
+                                                    </button>
+                                                    <div class="ctrl-desc-tooltip">
+                                                        <b>Description:</b>
+                                                        <div
+                                                            th:utext="${#strings.escapeXml(ctrl.detail) ?: 'No detail'}">
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div class="control-actions-column">
-                                                <span class="dropdown-row">
-                                                    <select th:name="${'control_' + ctrl.id}"
-                                                        th:data-control-id="${ctrl.id}" th:data-domain-id="${domain.id}"
-                                                        class="answer-select"
-                                                        th:disabled="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])}"
-                                                        th:classappend="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])} ? 'taken-over' : ''">
-                                                        <option value="">-- select an answer --</option>
-                                                        <option th:each="ans : ${maturityAnswers}" th:value="${ans.id}"
-                                                            th:selected="${controlAnswers != null and controlAnswers[ctrl.id] != null} ? ${ans.answer} == ${controlAnswers[ctrl.id]} : false"
-                                                            th:text="${ans.answer}"></option>
-                                                    </select>
-                                                    <span class="answer-feedback"></span>
-                                                    <span
-                                                        th:if="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])}"
-                                                        class="taken-over-label"
-                                                        title="Answer is taken from an Org Service">
-                                                        <span th:text="${controlTakenOverOrgServiceName[ctrl.id]}"></span>
+                                            </td>
+                                            <td>
+                                                <div class="control-actions-column">
+                                                    <span class="dropdown-row">
+                                                        <select th:name="${'control_' + ctrl.id}"
+                                                            th:data-control-id="${ctrl.id}"
+                                                            th:data-domain-id="${domain.id}" class="answer-select"
+                                                            th:disabled="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])}"
+                                                            th:classappend="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])} ? 'taken-over' : ''">
+                                                            <option value="">-- select an answer --</option>
+                                                            <option th:each="ans : ${maturityAnswers}"
+                                                                th:value="${ans.id}"
+                                                                th:selected="${controlAnswers != null and controlAnswers[ctrl.id] != null} ? ${ans.answer} == ${controlAnswers[ctrl.id]} : false"
+                                                                th:text="${ans.answer}"></option>
+                                                        </select>
+                                                        <span class="answer-feedback"></span>
+                                                        <span
+                                                            th:if="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])}"
+                                                            class="taken-over-label"
+                                                            title="Answer is taken from an Org Service">
+                                                            <span
+                                                                th:text="${controlTakenOverOrgServiceName[ctrl.id]}"></span>
+                                                        </span>
                                                     </span>
-                                                </span>
-                                                <textarea
-                                                    class="comment-textarea"
-                                                    th:name="${'comment_' + ctrl.id}"
-                                                    th:data-control-id="${ctrl.id}"
-                                                    th:disabled="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])}"
-                                                    th:placeholder="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])} ? 'Comment from Org Service' : 'Add comment (optional)'"
-                                                    th:text="${controlComments != null and controlComments[ctrl.id] != null ? controlComments[ctrl.id] : ''}"></textarea>
-                                                <span class="comment-feedback"></span>
-                                            </div>
-                                        </td>
-                                    </th:block>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div th:if="${!assessment.isOpen}">
-                        <table class="table card controls-table">
-                            <thead>
-                                <tr>
-                                    <th style="width:350px;">Control</th>
-                                    <th>Answer</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr th:each="ctrl : ${assessment.securityCatalog.securityControls}">
-                                    <th:block
-                                        th:if="${ctrl.securityControlDomain != null && domain != null && ctrl.securityControlDomain.id == domain.id}">
-                                        <td class="ctrl-name-col">
-                                            <div class="ctrl-desc-wrap">
-                                                <span th:text="${ctrl.name}"></span>
-                                                <button type="button" class="ctrl-desc-btn" tabindex="0"
-                                                    title="Show description" onclick="toggleDesc(this)">
-                                                    <svg viewBox="0 0 24 24">
-                                                        <circle cx="12" cy="12" r="10" fill="#fff" stroke="#2274A5"
-                                                            stroke-width="2" />
-                                                        <text x="12" y="17" text-anchor="middle"
-                                                            font-family="Arial,Helvetica,sans-serif" font-size="15"
-                                                            dy="-2" fill="#2274A5">?</text>
-                                                    </svg>
-                                                </button>
-                                                <div class="ctrl-desc-tooltip">
-                                                    <b>Description:</b>
-                                                    <div
-                                                        th:utext="${#strings.escapeXml(ctrl.detail) ?: 'No detail'}">
+                                                    <textarea class="comment-textarea" th:name="${'comment_' + ctrl.id}"
+                                                        th:data-control-id="${ctrl.id}"
+                                                        th:disabled="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])}"
+                                                        th:placeholder="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])} ? 'Comment from Org Service' : 'Add comment (optional)'"
+                                                        th:text="${controlComments != null and controlComments[ctrl.id] != null ? controlComments[ctrl.id] : ''}"></textarea>
+                                                    <span class="comment-feedback"></span>
+                                                </div>
+                                            </td>
+                                        </th:block>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div th:if="${!assessment.isOpen}">
+                            <table class="table card controls-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width:350px;">Control</th>
+                                        <th>Answer</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:each="ctrl : ${assessment.securityCatalog.securityControls}">
+                                        <th:block
+                                            th:if="${ctrl.securityControlDomain != null && domain != null && ctrl.securityControlDomain.id == domain.id}">
+                                            <td class="ctrl-name-col">
+                                                <div class="ctrl-desc-wrap">
+                                                    <span th:text="${ctrl.name}"></span>
+                                                    <button type="button" class="ctrl-desc-btn" tabindex="0"
+                                                        title="Show description" onclick="toggleDesc(this)">
+                                                        <svg viewBox="0 0 24 24">
+                                                            <circle cx="12" cy="12" r="10" fill="#fff" stroke="#2274A5"
+                                                                stroke-width="2" />
+                                                            <text x="12" y="17" text-anchor="middle"
+                                                                font-family="Arial,Helvetica,sans-serif" font-size="15"
+                                                                dy="-2" fill="#2274A5">?</text>
+                                                        </svg>
+                                                    </button>
+                                                    <div class="ctrl-desc-tooltip">
+                                                        <b>Description:</b>
+                                                        <div
+                                                            th:utext="${#strings.escapeXml(ctrl.detail) ?: 'No detail'}">
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <span
-                                                th:text="${controlAnswers != null and controlAnswers[ctrl.id] != null ? controlAnswers[ctrl.id] : 'No answer'}"></span>
-                                        </td>
-                                    </th:block>
-                                </tr>
-                            </tbody>
-                        </table>
+                                            </td>
+                                            <td>
+                                                <span
+                                                    th:text="${controlAnswers != null and controlAnswers[ctrl.id] != null ? controlAnswers[ctrl.id] : 'No answer'}"></span>
+                                            </td>
+                                        </th:block>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-        </div> <!-- domain-outline loop -->
-    </div> <!-- controls-viewport -->
+            </div> <!-- domain-outline loop -->
+        </div> <!-- controls-viewport -->
 
         <section class="actions-panel general-button-bar">
+            <!-- Added: Choose buttons moved from top into button bar -->
+            <div class="choose-buttons-row">
+                <button id="choose-orgunit-btn" type="button" class="modal-launch-btn">Choose Org Unit</button>
+                <button id="choose-users-btn" type="button" class="modal-launch-btn">Choose Users</button>
+                <button id="choose-orgservices-btn" type="button" class="modal-launch-btn">Choose Org Services</button>
+            </div>
             <form th:if="${assessment.isOpen}" th:action="@{'/assessment/' + ${assessment.id} + '/finalize'}"
                 method="post" style="margin: 0;">
                 <button type="submit" class="btn-nav"
@@ -314,16 +329,16 @@
     <!-- ============================ JavaScript Section =============================== -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
-    // CSRF protection for all AJAX requests
-    $(function () {
-        var csrfToken = $('meta[name="_csrf"]').attr('content');
-        var csrfHeader = $('meta[name="_csrf_header"]').attr('content');
-        if (csrfToken && csrfHeader) {
-            $(document).ajaxSend(function(e, xhr, options) {
-                xhr.setRequestHeader(csrfHeader, csrfToken);
-            });
-        }
-    });
+        // CSRF protection for all AJAX requests
+        $(function () {
+            var csrfToken = $('meta[name="_csrf"]').attr('content');
+            var csrfHeader = $('meta[name="_csrf_header"]').attr('content');
+            if (csrfToken && csrfHeader) {
+                $(document).ajaxSend(function (e, xhr, options) {
+                    xhr.setRequestHeader(csrfHeader, csrfToken);
+                });
+            }
+        });
     </script>
     <script>
         // =================== Modal logic and dynamic content loading ===================
@@ -597,6 +612,27 @@
                 controlsDiv.style.display = 'none';
             }
         }
+        // Collapsible assessment details handler:
+        function toggleAssessmentDetails(header) {
+            var body = header.nextElementSibling;
+            if (body.style.display === 'none' || body.style.display === '') {
+                body.style.display = 'block';
+            } else {
+                body.style.display = 'none';
+            }
+            // Optionally rotate chevron here for UX, if desired
+            var chevron = header.querySelector('.assessment-details-chevron svg');
+            if (body.style.display === 'block') {
+                chevron.style.transform = 'rotate(180deg)';
+            } else {
+                chevron.style.transform = '';
+            }
+        }
+        // Collapse by default on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            var adBody = document.querySelector('.assessment-details-body');
+            if(adBody) adBody.style.display = 'none';
+        });
     </script>
     <script th:inline="javascript">
         /*<![CDATA[*/
