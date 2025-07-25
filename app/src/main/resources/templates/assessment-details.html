@@ -17,17 +17,21 @@
         <h1>Assessment Details</h1>
 
         <!-- Collapsible Assessment Details Section (Default: Collapsed) -->
-        <div class="assessment-details-collapsible card">
-            <div class="assessment-details-header" onclick="toggleAssessmentDetails(this)">
-                <span class="assessment-details-title">Assessment Details</span>
-                <span class="assessment-details-chevron">
+        <div class="domain-outline card assessment-details-collapsible domain-collapsible">
+            <div class="domain-header" onclick="toggleAssessmentDetails(this)">
+                <div class="domain-header-info">
+                    <span class="domain-title">Assessment Details</span>
+                    <span class="domain-desc" style="font-weight:normal;"></span>
+                </div>
+                <span class="domain-checkmark"></span>
+                <span class="domain-chevron">
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
                         <polyline points="4,7 9,12 14,7" fill="none" stroke="#2274A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                     </svg>
                 </span>
             </div>
-            <div class="assessment-details-body" style="display:none;">
-                <section class="assessment-meta">
+            <div class="domain-controls assessment-details-body" style="display:none;">
+                <div class="domain-controls-tbl">
                     <table class="table card">
                         <tr>
                             <th>Date</th>
@@ -90,7 +94,7 @@
                             </tr>
                         </tbody>
                     </table>
-                </section>
+                </div>
             </div>
         </div>
 
