@@ -76,7 +76,8 @@
     border-radius: 10px;
     box-shadow: 0 1.5px 14px rgba(0, 0, 0, 0.15);
     padding: 2em 2em 1.2em 2em;
-    min-width: 320px;
+    min-width: 400px;
+    min-height: 350px;
     max-width: 95vw;
     text-align: center;
     position: relative;
@@ -212,7 +213,7 @@ body {
   color: var(--text-main);
   margin: 0;
   padding: 0;
-  font-size: 0.96em;
+  font-size: 0.76em;
 }
 
 a {
@@ -550,7 +551,7 @@ input:focus, textarea:focus, select:focus {
 
 /* Ensure main content is visible below navigation */
 .container {
-  margin-top: 11em;
+  margin-top: 0.5em;
   max-width: 90vw;
   margin-left: auto;
   margin-right: auto;
@@ -641,8 +642,8 @@ input:focus, textarea:focus, select:focus {
   filter: drop-shadow(0 0 6px var(--shine-glare));
 }
 .entry-form button, .entry-link button {
-  min-width: 76px !important;
-  width: 76px !important;
+  min-width: 14em !important;
+  width: 14em !important;
   padding-left: 0.3em !important;
   font-weight: 500 !important;
   letter-spacing: 0.01em;
@@ -714,11 +715,11 @@ input:focus, textarea:focus, select:focus {
     background: linear-gradient(135deg,#fafdff 86%,#e6f2fe 99%);
     border-radius: 10px;
     box-shadow: 0 3px 12px 0 rgba(34,116,165,0.08), 0 0px 0px 1.5px var(--primary-blue);
-    padding: 1.15em 1.6em 1.15em 1.6em;
+    padding: 0.25em 0.25em 0.25em 0.25em;
     margin: 2.3em auto 1em auto;
     min-width: 320px;
     display: flex;
-    gap: 1em;
+    gap: 0.1em;
     flex-wrap: wrap;
     align-items: center;
     justify-content: flex-start;

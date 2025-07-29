@@ -14,8 +14,6 @@
 <body>
     <div th:replace="~{navigation :: mainNav}"></div>
     <div class="container">
-        <h1>Assessment Details</h1>
-
         <!-- Collapsible Assessment Details Section (Default: Collapsed) -->
         <div class="domain-outline card assessment-details-collapsible domain-collapsible">
             <div class="domain-header" onclick="toggleAssessmentDetails(this)">
@@ -26,7 +24,8 @@
                 <span class="domain-checkmark"></span>
                 <span class="domain-chevron">
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
-                        <polyline points="4,7 9,12 14,7" fill="none" stroke="#2274A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        <polyline points="4,7 9,12 14,7" fill="none" stroke="#2274A5" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round" />
                     </svg>
                 </span>
             </div>
@@ -59,7 +58,8 @@
                         </tr>
                         <tr>
                             <th>Assessment URL</th>
-                            <td><span th:if="${assessment.assessmentUrls != null && assessment.assessmentUrls.url != null}"><a
+                            <td><span
+                                    th:if="${assessment.assessmentUrls != null && assessment.assessmentUrls.url != null}"><a
                                         th:href="@{'/assessment-direct/' + ${assessment.assessmentUrls.url}}"
                                         th:text="${assessment.name}" target="_blank"></a></span><span
                                     th:if="${assessment.assessmentUrls == null || assessment.assessmentUrls.url == null}">Not
@@ -261,11 +261,11 @@
 
         <section class="actions-panel general-button-bar">
             <!-- Added: Choose buttons moved from top into button bar -->
-            <div class="choose-buttons-row">
-                <button id="choose-orgunit-btn" type="button" class="modal-launch-btn">Choose Org Unit</button>
-                <button id="choose-users-btn" type="button" class="modal-launch-btn">Choose Users</button>
-                <button id="choose-orgservices-btn" type="button" class="modal-launch-btn">Choose Org Services</button>
-            </div>
+            
+                <button id="choose-orgunit-btn" type="button" class="modal-launch-btn btn-nav">Choose Org Unit</button>
+                <button id="choose-users-btn" type="button" class="modal-launch-btn btn-nav">Choose Users</button>
+                <button id="choose-orgservices-btn" type="button" class="modal-launch-btn btn-nav">Choose Org Services</button>
+            
             <form th:if="${assessment.isOpen}" th:action="@{'/assessment/' + ${assessment.id} + '/finalize'}"
                 method="post" style="margin: 0;">
                 <button type="submit" class="btn-nav"
@@ -287,48 +287,46 @@
             <button id="create-url-btn" type="button" class="btn-nav">Create URL</button>
             <span id="create-url-feedback"></span>
             <div id="direct-url-row" class="direct-url-row">
-                <strong>Direct assessment link:</strong> <a id="direct-url-link" href="#" target="_blank"></a>
+                <a id="direct-url-link" href="#" target="_blank"></a>
             </div>
-            <form action="/assessment/list" method="get" style="display: inline; margin: 0;">
-                <button type="submit" class="btn-nav">&larr; Back to list</button>
-            </form>
+
+            <!-- Org Unit Selection Modal -->
+            <div class="modal-bg" id="orgunit-modal-bg">
+                <div class="modal-popup">
+                    <h3>Choose Organization Unit</h3>
+                    <form id="orgunit-form" th:action="@{'/assessment/' + ${assessment.id} + '/set-orgunit'}"
+                        method="post">
+                        <!-- Org units will be loaded dynamically via JS -->
+                        <select id="orgunit-select" name="orgUnitId" required>
+                            <option value="">-- Please choose an organization unit --</option>
+                        </select>
+                        <div class="modal-btn-row">
+                            <button type="submit">Confirm</button>
+                            <button type="button" onclick="closeOrgUnitModal()">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- User Selection Modal -->
+            <div class="modal-bg" id="users-modal-bg">
+                <div class="modal-popup">
+                    <h3>Choose Users for Assessment</h3>
+                    <form id="users-modal-form">
+                        <select id="users-multiselect" name="userIds" multiple size="8" class="users-multiselect">
+                            <option th:each="user : ${users}" th:value="${user.id}"
+                                th:selected="${assessment.users != null and assessment.users.contains(user)}"
+                                th:text="${user.name + ' (' + user.email + ')'}"></option>
+                        </select>
+                        <div class="modal-btn-row">
+                            <button id="users-modal-save-btn" type="submit">Save</button>
+                            <button id="users-modal-cancel-btn" type="button">Cancel</button>
+                        </div>
+                    </form>
+                    <div id="users-modal-error" class="modal-error"></div>
+                </div>
+            </div>
         </section>
-
-
-        <!-- Org Unit Selection Modal -->
-        <div class="modal-bg" id="orgunit-modal-bg">
-            <div class="modal-popup">
-                <h3>Choose Organization Unit</h3>
-                <form id="orgunit-form" th:action="@{'/assessment/' + ${assessment.id} + '/set-orgunit'}" method="post">
-                    <!-- Org units will be loaded dynamically via JS -->
-                    <select id="orgunit-select" name="orgUnitId" required>
-                        <option value="">-- Please choose an organization unit --</option>
-                    </select>
-                    <div class="modal-btn-row">
-                        <button type="submit">Confirm</button>
-                        <button type="button" onclick="closeOrgUnitModal()">Cancel</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-        <!-- User Selection Modal -->
-        <div class="modal-bg" id="users-modal-bg">
-            <div class="modal-popup">
-                <h3>Choose Users for Assessment</h3>
-                <form id="users-modal-form">
-                    <select id="users-multiselect" name="userIds" multiple size="8" class="users-multiselect">
-                        <option th:each="user : ${users}" th:value="${user.id}"
-                            th:selected="${assessment.users != null and assessment.users.contains(user)}"
-                            th:text="${user.name + ' (' + user.email + ')'}"></option>
-                    </select>
-                    <div class="modal-btn-row">
-                        <button id="users-modal-save-btn" type="submit">Save</button>
-                        <button id="users-modal-cancel-btn" type="button">Cancel</button>
-                    </div>
-                </form>
-                <div id="users-modal-error" class="modal-error"></div>
-            </div>
-        </div>
     </div>
     <!-- ============================ JavaScript Section =============================== -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -633,9 +631,9 @@
             }
         }
         // Collapse by default on page load
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             var adBody = document.querySelector('.assessment-details-body');
-            if(adBody) adBody.style.display = 'none';
+            if (adBody) adBody.style.display = 'none';
         });
     </script>
     <script th:inline="javascript">
