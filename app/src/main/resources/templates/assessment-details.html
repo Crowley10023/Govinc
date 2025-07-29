@@ -21,13 +21,15 @@
                     <span class="domain-title">Assessment Details</span>
                     <span class="domain-desc" style="font-weight:normal;"></span>
                 </div>
-                <span class="domain-checkmark"></span>
-                <span class="domain-chevron">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
-                        <polyline points="4,7 9,12 14,7" fill="none" stroke="#2274A5" stroke-width="2"
-                            stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
-                </span>
+                <div class="domain-header-actions">
+                    <span class="domain-checkmark"></span>
+                    <span class="domain-chevron">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+                            <polyline points="4,7 9,12 14,7" fill="none" stroke="#2274A5" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                    </span>
+                </div>
             </div>
             <div class="domain-controls assessment-details-body" style="display:none;">
                 <div class="domain-controls-tbl">
@@ -132,13 +134,15 @@
                         <span class="domain-title" th:text="${domain != null ? domain.name : 'No Domain'}"></span>
                         <span class="domain-desc" th:text="${domain != null ? domain.description : ''}"></span>
                     </div>
-                    <span class="domain-checkmark" th:attr="data-domain-id=${domain.id}"></span>
-                    <span class="domain-chevron">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
-                            <polyline points="4,7 9,12 14,7" fill="none" stroke="#2274A5" stroke-width="2"
-                                stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                    </span>
+                    <div class="domain-header-actions">
+                        <span class="domain-checkmark" th:attr="data-domain-id=${domain.id}"></span>
+                        <span class="domain-chevron">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+                                <polyline points="4,7 9,12 14,7" fill="none" stroke="#2274A5" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                        </span>
+                    </div>
                 </div>
                 <div class="domain-controls">
                     <div class="domain-controls-tbl">
@@ -329,6 +333,7 @@
         </section>
     </div>
     <!-- ============================ JavaScript Section =============================== -->
+    <!-- [scripts unchanged below] -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
         // CSRF protection for all AJAX requests

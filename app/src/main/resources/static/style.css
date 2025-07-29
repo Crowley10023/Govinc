@@ -227,6 +227,8 @@ a:hover, a:focus {
   text-shadow: 0 0 8px var(--shine-highlight), 0 2px 3px rgba(255,149,5, 0.14);
 }
 
+
+
 header, footer {
   background: linear-gradient(92deg,#2274A5 80%,#5adaff 104%);
   color: #fff;
@@ -645,7 +647,16 @@ input:focus, textarea:focus, select:focus {
     min-width: 90%;
 }
 
-/* Removed original .domain-header for new collapsible layout */
+.domain-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.domain-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
 
 /* ——— Styled Actions Panel for Assessment Details ——— */
 .actions-panel {
