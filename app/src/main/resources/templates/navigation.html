@@ -5,7 +5,12 @@
 
     <div class="nav-row">
       <div class="landing-image">
-        <img src="/title.png" alt="Compliance Incubator Logo" class="ci-logo-img-visible" />
+        <img th:if="${layoutConfig != null and layoutConfig.imageData != null}"
+             src="/config/layout/image"
+             alt="Compliance Incubator Logo" class="ci-logo-img-visible" />
+        <img th:if="${layoutConfig == null or layoutConfig.imageData == null}"
+             src="/title.png"
+             alt="Default Compliance Incubator Logo" class="ci-logo-img-visible" />
       </div>
       <span class="ci-headline shiny-text">compliance incubator</span>
       <a href="/"><button type="button" class="btn-nav shiny">Home</button></a>
@@ -68,6 +73,7 @@
           <button type="button" class="dropdown-button btn-nav shiny">Config</button>
           <div class="dropdown-content">
             <a href="/config/openai"><button type="button" class="dropdown-menu-btn">Open AI</button></a>
+            <a href="/config/layout"><button type="button" class="dropdown-menu-btn">Layout</button></a>
           </div>
         </div>
       </div>
