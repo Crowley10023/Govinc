@@ -48,6 +48,9 @@ public class LayoutConfigController {
         persisted.setShineGlare(layoutConfig.getShineGlare());
         persisted.setShineHighlight(layoutConfig.getShineHighlight());
         persisted.setSecondaryColor(layoutConfig.getSecondaryColor());
+        persisted.setFontFamily(layoutConfig.getFontFamily());
+        persisted.setFontSizeNav(layoutConfig.getFontSizeNav());
+        persisted.setFontSizeHeadline(layoutConfig.getFontSizeHeadline());
 
         layoutConfigurationRepository.save(persisted);
         model.addAttribute("layoutConfig", persisted);

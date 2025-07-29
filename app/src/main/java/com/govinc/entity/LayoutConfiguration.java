@@ -46,6 +46,15 @@ public class LayoutConfiguration {
     @Column(nullable = true)
     private String secondaryColor;
 
+    @Column(nullable = true)
+    private String fontFamily;
+
+    @Column(nullable = true)
+    private String fontSizeNav;
+
+    @Column(nullable = true)
+    private String fontSizeHeadline;
+
     public LayoutConfiguration() {}
 
     public Long getId() { return id; }
@@ -86,4 +95,14 @@ public class LayoutConfiguration {
 
     public String getSecondaryColor() { return secondaryColor; }
     public void setSecondaryColor(String secondaryColor) { this.secondaryColor = secondaryColor; }
+
+    public String getFontFamily() { return fontFamily; }
+    public void setFontFamily(String fontFamily) { this.fontFamily = fontFamily; }
+
+    public String getFontSizeNav() { return fontSizeNav; }
+    public void setFontSizeNav(String fontSizeNav) { this.fontSizeNav = fontSizeNav; }
+
+    public String getFontSizeHeadline() { return fontSizeHeadline; }
+    public void setFontSizeHeadline(String fontSizeHeadline) { this.fontSizeHeadline = fontSizeHeadline; }
 }
+

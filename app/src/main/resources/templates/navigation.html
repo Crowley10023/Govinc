@@ -1,8 +1,7 @@
 <div th:fragment="mainNav">
   <link rel="stylesheet" href="/general.css">
   <th:block th:replace="~{fragments/theme-css :: themeCss}"/>
-  <nav class="main-navigation fancy-shine">
-
+  <nav class="main-navigation fancy-shine" style="font-family: var(--nav-font-family); font-size: var(--font-size-nav);">
 
     <div class="nav-row">
       <div class="landing-image">
@@ -13,15 +12,16 @@
              src="/title.png"
              alt="Default Compliance Incubator Logo" class="ci-logo-img-visible" />
       </div>
-      <span class="ci-headline shiny-text">compliance incubator</span>
+      <span class="ci-headline shiny-text" style="color: var(--primary-blue); text-shadow: 0 2px 12px var(--shine-highlight); font-size: var(--font-size-headline);">compliance incubator</span>
       <a href="/"><button type="button" class="btn-nav shiny">Home</button></a>
       <form th:action="@{/logout}" method="post" class="logout-form">
         <button type="submit" class="btn-nav nav-btn shiny">Logout</button>
       </form>
       <div class="user-section">
-        <span class="nav-label">User:</span>
+        <span class="nav-label" style="color: var(--background-light); background: var(--primary-blue-dark);">User:</span>
         <span class="user-name"
-          th:text="${userName != null} ? ${userName} : (${userId != null} ? ${userId} : 'no user')"></span>
+          th:text="${userName != null} ? ${userName} : (${userId != null} ? ${userId} : 'no user')"
+          style="color: var(--text-main); background: var(--shine-glare);"></span>
       </div>
     </div>
     <div class="nav-row">

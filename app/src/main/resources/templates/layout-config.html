@@ -40,6 +40,15 @@
 
             <label for="secondaryColor">Secondary color:</label><br>
             <input type="color" th:field="*{secondaryColor}" id="secondaryColor"><br>
+
+            <label for="fontFamily">Font Family (CSS, optional):</label><br>
+            <input type="text" th:field="*{fontFamily}" id="fontFamily" placeholder="Segoe UI, Arial, sans-serif"><br>
+
+            <label for="fontSizeNav">Navigation Font Size (CSS):</label><br>
+            <input type="text" th:field="*{fontSizeNav}" id="fontSizeNav" placeholder="1em"><br>
+
+            <label for="fontSizeHeadline">Headline Font Size (CSS):</label><br>
+            <input type="text" th:field="*{fontSizeHeadline}" id="fontSizeHeadline" placeholder="1.5em"><br>
   
             <label for="shineGlare">Shine Glare (RGBA):</label>
             <input type="text" th:field="*{shineGlare}" id="shineGlare" placeholder="rgba(255,255,255,0.60)"><br>
