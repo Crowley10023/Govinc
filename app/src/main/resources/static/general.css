@@ -1,14 +1,14 @@
 /* General and navigation layout styles moved from navigation.html */
 
 .main-navigation {
-  background: linear-gradient(135deg, #2274A5 2%, #53beff 60%, #FF9505 120%)!important;
+  background: linear-gradient(135deg, var(--primary-blue) 2%, var(--accent-orange) 60%, var(--accent-orange) 120%)!important;
   height: 60px;
   min-height: 6em;
   max-height: 60px;
   padding: 0.15em 0.7em 0.13em 0.6em;
   box-shadow: 0 2px 8px rgba(34,116,165,0.07);
   border-radius: 0 0 14px 14px;
-  border: 1.5px solid #dae1e7;
+  border: 1.5px solid var(--border);
   display: flex;
   position: fixed;
   top: 0;
@@ -26,7 +26,7 @@
   overflow-y: auto;
   width: 100vw;
   box-sizing: border-box;
-  background: #f9fbfc; /* Optional: different from navbar */
+  background: var(--background-light); /* Optional: different from navbar */
 }
 
 
@@ -75,8 +75,8 @@
   min-height: 28px;
 }
 .nav-label {
-  color: #E7F6FF;
-  background: #1b5885;
+  color: var(--background-light);
+  background: var(--primary-blue-dark);
   padding: 1px 7px 1px 7px;
   font-size: 0.89em;
   border-radius: 8px 8px 8px 0;
@@ -106,9 +106,9 @@
   height: 28px;
   font-size: 0.97em;
   border-radius: 4px;
-  background: #eaf3fa;
-  color: #2274A5;
-  border: 1px solid #2274A5;
+  background: var(--nav-violet);
+  color: var(--primary-blue);
+  border: 1px solid var(--primary-blue);
   font-weight: 500;
   margin: 0;
   box-sizing: border-box;
@@ -117,8 +117,8 @@
   padding: 0 0.65em;
 }
 .dropdown-button:hover {
-  background: #daf0ff;
-  color: #164666;
+  background: var(--nav-violet);
+  color: var(--primary-blue-dark);
 }
 .dropdown-content {
   display: none;
@@ -142,9 +142,9 @@
   height: 24px;
   margin: 1px 6px;
   border-radius: 3px;
-  background: #f6faff;
+  background: var(--nav-violet);
   border: 1px solid #eeeeee;
-  color: #2274A5;
+  color: var(--primary-blue);
   font-size: 0.97em;
   cursor: pointer;
   transition: background .13s;
@@ -152,8 +152,8 @@
   padding-left: 7px;
 }
 .dropdown-menu-btn:hover {
-  background: #d1e7f8;
-  color: #185a89;
+  background: var(--nav-violet);
+  color: var(--primary-blue-dark);
 }
 .entry-link, .entry-form {
   margin: 0;
@@ -165,9 +165,9 @@
   height: 28px;
   font-size: 0.97em;
   border-radius: 4px;
-  background: #eaf3fa;
-  color: #2274A5;
-  border: 1px solid #2274A5;
+  background: var(--nav-violet);
+  color: var(--primary-blue);
+  border: 1px solid var(--primary-blue);
   font-weight: 500;
   margin: 0;
   margin-right: 0.06em;
@@ -176,7 +176,7 @@
   display: inline-block;
   padding: 0 0.63em;
 }
-.btn-nav:hover,.nav-btn:hover { background: #daf0ff; color: #164666; }
+.btn-nav:hover,.nav-btn:hover { background: var(--nav-violet); color: var(--primary-blue-dark); }
 
 @media (max-width: 900px) {
   .main-navigation { padding: 0.11em 0.2em 0.22em 0.12em; }

@@ -26,12 +26,12 @@
 .ctrl-desc-btn svg {
     width: 18px;
     height: 18px;
-    fill: #2274A5;
+    fill: var(--primary-blue);
     filter: drop-shadow(0 0 4px rgba(34, 116, 165, 0.22));
     transition: fill 0.2s;
 }
 .ctrl-desc-btn:hover svg {
-    fill: #FF9505;
+    fill: var(--accent-orange);
 }
 .ctrl-desc-tooltip {
     display: none;
@@ -114,7 +114,7 @@
     margin-bottom: 2em;
 }
 .modal-launch-btn {
-    background: linear-gradient(89deg,#2274A5 86%,#53beff 100%);
+    background: linear-gradient(89deg,var(--primary-blue) 86%,var(--accent-orange) 100%);
     color: #fff;
     border: none;
     padding: 0.35em 1.2em;
@@ -128,8 +128,8 @@
     min-width: 18em;
 }
 .modal-launch-btn:hover {
-    background: linear-gradient(92deg,#FF9505 68%,#ffd867 99%);
-    color: #164666;
+    background: linear-gradient(92deg,var(--accent-orange) 68%,#ffd867 99%);
+    color: var(--primary-blue-dark);
 }
 
 /* ----- START: Collapsible/Domain/Card Styles ---- */
@@ -196,15 +196,15 @@
 
 /* Base colors */
 :root {
-  --primary-blue: #2274A5;
-  --primary-blue-dark: #164666;
-  --accent-orange: #FF9505;
-  --background-light: #F5F9FC;
-  --text-main: #222E3A;
-  --border: #dae1e7;
-  --nav-violet: #ebe8fc;
-  --shine-glare: rgba(255,255,255,0.60);
-  --shine-highlight: rgba(255,255,255,0.33);
+  --primary-blue: var(--primary-blue);
+  --primary-blue-dark: var(--primary-blue-dark);
+  --accent-orange: var(--accent-orange);
+  --background-light: var(--background-light);
+  --text-main: var(--text-main);
+  --border: var(--border);
+  --nav-violet: var(--nav-violet);
+  --shine-glare: var(--shine-glare);
+  --shine-highlight: var(--shine-highlight);
 }
 
 body {
@@ -230,7 +230,7 @@ a:hover, a:focus {
 
 
 header, footer {
-  background: linear-gradient(92deg,#2274A5 80%,#5adaff 104%);
+  background: linear-gradient(92deg,var(--primary-blue) 80%,#5adaff 104%);
   color: #fff;
   padding: 1.2rem 1.3rem;
   text-align: center;
@@ -298,7 +298,7 @@ h4 {font-size: 1em;}
 }
 
 button, input[type=submit], .btn {
-  background: linear-gradient(89deg,#2274A5 86%,#53beff 100%);
+  background: linear-gradient(89deg,var(--primary-blue) 86%,var(--accent-orange) 100%);
   color: #fff;
   border: none;
   padding: 0.19em 0.68em;
@@ -312,7 +312,7 @@ button, input[type=submit], .btn {
   font-weight: 470;
 }
 button:hover, input[type=submit]:hover, .btn:hover {
-  background: linear-gradient(92deg,#FF9505 68%,#ffd867 99%);
+  background: linear-gradient(92deg,var(--accent-orange) 68%,#ffd867 99%);
   box-shadow: 0 3px 14px rgba(255,149,5,0.22), 0 0 7px var(--shine-glare) inset;
   filter: brightness(1.04);
 }
@@ -355,7 +355,7 @@ input:focus, textarea:focus, select:focus {
 }
 
 .table th, table th {
-  background: linear-gradient(93deg,#2274A5 60%,#b8d8ec 110%);
+  background: linear-gradient(93deg,var(--primary-blue) 60%,#b8d8ec 110%);
   color: #fff;
   font-size: 0.98em;
   text-shadow: 0 2px 8px var(--shine-highlight);
@@ -439,7 +439,7 @@ input:focus, textarea:focus, select:focus {
   border-radius: 3px;
   background: #f6faff;
   border: 1px solid #eeeeee;
-  color: #2274A5;
+  color: var(--primary-blue);
   transition: background .15s;
   font-size: 1em;
   cursor: pointer;
@@ -479,8 +479,8 @@ input:focus, textarea:focus, select:focus {
   font-size: 1em;
   padding: 0 18px;
   border-radius: 4px;
-  border: 1px solid #2274A5;
-  color: #2274A5;
+  border: 1px solid var(--primary-blue);
+  color: var(--primary-blue);
   background: #eaf3fa;
   transition: background 0.15s;
   font-weight: 500;
@@ -489,7 +489,7 @@ input:focus, textarea:focus, select:focus {
 .btn-secondary:hover,
 .secondary-nav .btn-nav:hover {
   background: #d1e7f8;
-  color: #164666;
+  color: var(--primary-blue-dark);
   border-color: #185a89;
 }
 
@@ -501,7 +501,7 @@ input:focus, textarea:focus, select:focus {
   right: 0;
   width: 100%;
   z-index: 9999;
-  background: linear-gradient(135deg, #eee7ff 0%, #ebe8fc 78%, #f6e9ff 100%);
+  background: linear-gradient(135deg, #eee7ff 0%, var(--nav-violet) 78%, #f6e9ff 100%);
   box-shadow: 0 3px 18px 0 rgba(140, 55, 255, 0.09), 0 0.5px 0px 1.5px #d6c7f5;
   border-radius: 0 0 15px 15px;
   font-size: 0.98em;
@@ -576,7 +576,7 @@ input:focus, textarea:focus, select:focus {
   text-transform: lowercase;
   letter-spacing: 0.07em;
   font-size: 1.5rem;
-  color: #2274A5;
+  color: var(--primary-blue);
   text-shadow: 0 2px 12px rgba(34,116,165,0.15), 0 1px 10px var(--shine-highlight) ;
   font-weight: 400;
   vertical-align: middle;

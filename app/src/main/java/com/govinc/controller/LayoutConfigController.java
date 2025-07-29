@@ -3,13 +3,12 @@ package com.govinc.controller;
 import com.govinc.entity.LayoutConfiguration;
 import com.govinc.entity.LayoutConfigurationRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Controller;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.util.StringUtils;
 import java.io.IOException;
 
 @Controller
@@ -30,28 +29,32 @@ public class LayoutConfigController {
             @ModelAttribute LayoutConfiguration layoutConfig,
             @RequestParam(value = "imageFile", required = false) MultipartFile imageFile,
             Model model) throws IOException {
-        LayoutConfiguration persisted = layoutConfigurationRepository.findAll().stream().findFirst().orElse(null);
+        LayoutConfiguration persisted = layoutConfigurationRepository.findAll().stream().findFirst().orElse(new LayoutConfiguration());
+
+        // If image uploaded, always replace
         if (imageFile != null && !imageFile.isEmpty()) {
-            if (persisted == null) {
-                persisted = new LayoutConfiguration();
-            }
             persisted.setImageData(imageFile.getBytes());
             persisted.setImageType(imageFile.getContentType());
         }
-        if (persisted != null) {
-            if (layoutConfig.getPrimaryColor() != null) persisted.setPrimaryColor(layoutConfig.getPrimaryColor());
-            if (layoutConfig.getSecondaryColor() != null) persisted.setSecondaryColor(layoutConfig.getSecondaryColor());
-            layoutConfigurationRepository.save(persisted);
-            model.addAttribute("layoutConfig", persisted);
-        } else {
-            layoutConfigurationRepository.save(layoutConfig);
-            model.addAttribute("layoutConfig", layoutConfig);
-        }
+
+        // For all color/theme fields: overwrite with user value if present, else keep old
+        persisted.setPrimaryColor(layoutConfig.getPrimaryColor());
+        persisted.setPrimaryColorDark(layoutConfig.getPrimaryColorDark());
+        persisted.setAccentColor(layoutConfig.getAccentColor());
+        persisted.setBackgroundColor(layoutConfig.getBackgroundColor());
+        persisted.setBorderColor(layoutConfig.getBorderColor());
+        persisted.setNavViolet(layoutConfig.getNavViolet());
+        persisted.setTextMain(layoutConfig.getTextMain());
+        persisted.setShineGlare(layoutConfig.getShineGlare());
+        persisted.setShineHighlight(layoutConfig.getShineHighlight());
+        persisted.setSecondaryColor(layoutConfig.getSecondaryColor());
+
+        layoutConfigurationRepository.save(persisted);
+        model.addAttribute("layoutConfig", persisted);
         model.addAttribute("saved", true);
         return "layout-config";
     }
 
-    // Endpoint to serve the image from DB
     @GetMapping("/image")
     @ResponseBody
     public ResponseEntity<byte[]> getNavBarImage() {

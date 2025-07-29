@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head></head>
+<body>
+    <th:block th:fragment="themeCss">
+        <style type="text/css">
+        :root {
+            /* Use DB-configured values, fallback to defaults if null */
+            --primary-blue: [[${layoutConfig.primaryColor} ?: '#2274A5']];
+            --primary-blue-dark: [[${layoutConfig.primaryColorDark} ?: '#164666']];
+            --accent-orange: [[${layoutConfig.accentColor} ?: '#FF9505']];
+            --background-light: [[${layoutConfig.backgroundColor} ?: '#F5F9FC']];
+            --border: [[${layoutConfig.borderColor} ?: '#dae1e7']];
+            --nav-violet: [[${layoutConfig.navViolet} ?: '#ebe8fc']];
+            --text-main: [[${layoutConfig.textMain} ?: '#222E3A']];
+            --shine-glare: [[${layoutConfig.shineGlare} ?: 'rgba(255,255,255,0.60)']];
+            --shine-highlight: [[${layoutConfig.shineHighlight} ?: 'rgba(255,255,255,0.33)']];
+        }
+        </style>
+    </th:block>
+</body>
+</html>
