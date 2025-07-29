@@ -2,16 +2,45 @@
 
 .main-navigation {
   background: linear-gradient(135deg, #2274A5 2%, #53beff 60%, #FF9505 120%)!important;
-  min-height: 38px;
+  height: 60px;
+  min-height: 6em;
+  max-height: 60px;
   padding: 0.15em 0.7em 0.13em 0.6em;
   box-shadow: 0 2px 8px rgba(34,116,165,0.07);
   border-radius: 0 0 14px 14px;
   border: 1.5px solid #dae1e7;
   display: flex;
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1200;
+  width: 100%;
   flex-direction: column;
+}
 
+/* The main content area under the nav bar; gets its own scrolling; adjust selector as needed */
+.main-scroll-container {
+  margin-top: 60px; /* Matches .main-navigation height */
+  height: calc(100vh - 60px);
+  overflow-y: auto;
+  width: 100vw;
+  box-sizing: border-box;
+  background: #f9fbfc; /* Optional: different from navbar */
+}
+
+
+/* Container viewport for centered content */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-left: 24px;
+  padding-right: 24px;
+  width: 100%;
+  box-sizing: border-box;
+  position: absolute;
+  top: 7em;
+  
 }
 .nav-row {
   display: flex;
@@ -41,6 +70,7 @@
   display: flex;
   align-items: center;
   margin-left: auto;
+  margin-right: 2em;
   gap: 0.23em;
   min-height: 28px;
 }
@@ -145,7 +175,6 @@
   transition: background 0.13s, color 0.13s;
   display: inline-block;
   padding: 0 0.63em;
-  line-height: 28px;
 }
 .btn-nav:hover,.nav-btn:hover { background: #daf0ff; color: #164666; }
 

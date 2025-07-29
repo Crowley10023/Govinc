@@ -1,62 +1,68 @@
 <div th:fragment="mainNav">
   <link rel="stylesheet" href="/general.css">
   <nav class="main-navigation fancy-shine">
-    <div class="landing-main">
+
+
+    <div class="nav-row">
       <div class="landing-image">
         <img src="/title.png" alt="Compliance Incubator Logo" class="ci-logo-img-visible" />
       </div>
-      <div class="nav-middle">
-        <div class="user-section">
-          <span class="nav-label">User:</span>
-          <span class="user-name" th:text="${userName != null} ? ${userName} : (${userId != null} ? ${userId} : 'no user')"></span>
+      <span class="ci-headline shiny-text">compliance incubator</span>
+      <a href="/"><button type="button" class="btn-nav shiny">Home</button></a>
+      <form th:action="@{/logout}" method="post" class="logout-form">
+        <button type="submit" class="btn-nav nav-btn shiny">Logout</button>
+      </form>
+      <div class="user-section">
+        <span class="nav-label">User:</span>
+        <span class="user-name"
+          th:text="${userName != null} ? ${userName} : (${userId != null} ? ${userId} : 'no user')"></span>
+      </div>
+    </div>
+    <div class="nav-row">
+      <div class="nav-entry dropdown">
+        <button type="button" class="dropdown-button btn-nav shiny entry-link">Security Framework</button>
+        <div class="dropdown-content">
+          <a href="/security-control/list"><button type="button" class="dropdown-menu-btn">Security
+              Controls</button></a>
+          <a href="/security-catalog/list"><button type="button" class="dropdown-menu-btn">Security
+              Catalogs</button></a>
+          <a href="/security-control-domain/list"><button type="button" class="dropdown-menu-btn">Security Control
+              Domains</button></a>
+          <a href="/maturitymodel/list"><button type="button" class="dropdown-menu-btn">Maturity Models</button></a>
+          <a href="/maturityanswer/list"><button type="button" class="dropdown-menu-btn">Maturity Model
+              Answers</button></a>
         </div>
-        <div class="nav-head-row">
-          <span class="ci-headline shiny-text">compliance incubator</span>
-          <a href="/" class="entry-link"><button type="button" class="btn-nav shiny">Home</button></a>
-          <form th:action="@{/logout}" method="post" class="logout-form">
-            <button type="submit" class="btn-nav nav-btn shiny">Logout</button>
+      </div>
+      <!-- Organization Dropdown -->
+      <div class="nav-entry dropdown">
+        <button type="button" class="dropdown-button btn-nav shiny">Organization</button>
+        <div class="dropdown-content">
+          <a href="/users"><button type="button" class="dropdown-menu-btn">Users</button></a>
+          <a href="/orgunits/list"><button type="button" class="dropdown-menu-btn">Org Units</button></a>
+          <a href="/orgservices/list"><button type="button" class="dropdown-menu-btn">Org Services</button></a>
+        </div>
+      </div>
+      <div class="nav-entry">
+        <div class="nav-entry">
+          <a href="/assessment-urls-list"><button type="button" class="btn-nav shiny">Assessment URLs</button></a>
+        </div>
+        <div class="nav-entry">
+          <form action="/assessment/create" method="get" class="entry-form">
+            <button type="submit" class="btn-nav shiny">Create Assessment</button>
           </form>
         </div>
-        <div class="nav-row">
-          <!-- Security Framework Dropdown -->
-          <div class="nav-entry dropdown">
-            <button type="button" class="dropdown-button btn-nav shiny entry-link">Security Framework</button>
-            <div class="dropdown-content">
-              <a href="/security-control/list"><button type="button" class="dropdown-menu-btn entry-link">Security Controls</button></a>
-              <a href="/security-catalog/list"><button type="button" class="dropdown-menu-btn entry-link">Security Catalogs</button></a>
-              <a href="/security-control-domain/list"><button type="button" class="dropdown-menu-btn entry-link">Security Control Domains</button></a>
-              <a href="/maturitymodel/list"><button type="button" class="dropdown-menu-btn entry-link">Maturity Models</button></a>
-              <a href="/maturityanswer/list"><button type="button" class="dropdown-menu-btn entry-link">Maturity Model Answers</button></a>
-            </div>
-          </div>
-          <!-- Organization Dropdown -->
-          <div class="nav-entry dropdown">
-            <button type="button" class="dropdown-button btn-nav shiny">Organization</button>
-            <div class="dropdown-content">
-              <a href="/users"><button type="button" class="dropdown-menu-btn">Users</button></a>
-              <a href="/orgunits/list"><button type="button" class="dropdown-menu-btn">Org Units</button></a>
-              <a href="/orgservices/list"><button type="button" class="dropdown-menu-btn">Org Services</button></a>
-            </div>
-          </div>
-          <div class="nav-entry">
-            <div class="nav-entry">
-            <a href="/assessment-urls-list" class="entry-link"><button type="button" class="btn-nav shiny">Assessment URLs</button></a>
-          </div>
-          <div class="nav-entry">
-            <form action="/assessment/create" method="get" class="entry-form">
-              <button type="submit" class="btn-nav shiny">Create Assessment</button>
-            </form>
-          </div>
-          <div class="nav-entry">
-            <a href="/assessment/list" class="entry-link"><button type="button" class="btn-nav shiny">Assessments</button></a>
-          </div>
-          <div class="nav-entry">
-            <a href="/compliance/view" class="entry-link"><button type="button" class="btn-nav shiny">Compliance Check</button></a>
-          </div>
-          <div class="nav-entry">
-            <a href="/statistics" class="entry-link"><button type="button" class="btn-nav shiny">Statistics</button></a>
-          </div>
+        <div class="nav-entry">
+          <a href="/assessment/list" class="entry-link"><button type="button"
+              class="btn-nav shiny">Assessments</button></a>
         </div>
+        <div class="nav-entry">
+          <a href="/compliance/view" class="entry-link"><button type="button" class="btn-nav shiny">Compliance
+              Check</button></a>
+        </div>
+        <div class="nav-entry">
+          <a href="/statistics" class="entry-link"><button type="button" class="btn-nav shiny">Statistics</button></a>
+        </div>
+
         <!-- Config Dropdown for OpenAI -->
         <div class="nav-entry dropdown">
           <button type="button" class="dropdown-button btn-nav shiny">Config</button>
@@ -65,7 +71,8 @@
           </div>
         </div>
       </div>
-    </div>
+
+
   </nav>
   <script src="/general.js"></script>
 </div>

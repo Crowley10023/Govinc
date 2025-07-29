@@ -412,27 +412,7 @@ input:focus, textarea:focus, select:focus {
 }
 
 /************** Navigation & Dropdown Styles **************/
-.dropdown {
-  position: relative;
-}
-.dropdown-button {
-  min-width: 170px;
-  min-height: 36px;
-  width: 170px;
-  height: 36px;
-  background: #eaf3fa;
-  border: 1px solid #2274A5;
-  color: #2274A5;
-  cursor: pointer;
-  font-size: 1em;
-  border-radius: 5px;
-  margin: 0;
-  padding: 5px 0px;
-  transition: background 0.15s;
-}
-.dropdown-button:hover {
-  background: #d1e7f8;
-}
+
 .dropdown-content {
   display: none;
   flex-direction: column;
@@ -472,29 +452,7 @@ input:focus, textarea:focus, select:focus {
   overflow: visible !important;
 }
 
-/************** General Button Classes **************/
-.btn-nav,
-.nav-row .nav-entry > .entry-link > .nav-btn,
-.nav-row .nav-entry > form > .nav-btn {
-  min-width: 170px;
-  min-height: 36px;
-  width: 170px;
-  height: 36px;
-  background: #eaf3fa;
-  border: 1px solid #2274A5;
-  color: #2274A5;
-  cursor: pointer;
-  font-size: 1em;
-  border-radius: 5px;
-  margin: 0;
-  padding: 5px 0px;
-  transition: background 0.15s;
-}
-.btn-nav:hover,
-.nav-row .nav-entry > .entry-link > .nav-btn:hover,
-.nav-row .nav-entry > form > .nav-btn:hover {
-  background: #d1e7f8;
-}
+
 
 .secondary-nav {
   display: flex;
@@ -548,16 +506,6 @@ input:focus, textarea:focus, select:focus {
   min-height: 56px;
   margin-bottom: 0;
 }
-
-/* Ensure main content is visible below navigation */
-.container {
-  margin-top: 0.5em;
-  max-width: 90vw;
-  margin-left: auto;
-  margin-right: auto;
-  padding: 0;
-}
-
 
 .main-navigation::before {
   content: '';
@@ -640,16 +588,6 @@ input:focus, textarea:focus, select:focus {
   width: 17px !important;
   height: 17px !important;
   filter: drop-shadow(0 0 6px var(--shine-glare));
-}
-.entry-form button, .entry-link button {
-  min-width: 14em !important;
-  width: 14em !important;
-  padding-left: 0.3em !important;
-  font-weight: 500 !important;
-  letter-spacing: 0.01em;
-  font-size: 0.80em !important;
-  line-height: 1.1 !important;
-  box-shadow: 0 1px 3px rgba(34,116,165,0.05),0 0 7px 1px var(--shine-highlight) inset;
 }
 
 /************** Fancy shine animation **************/
