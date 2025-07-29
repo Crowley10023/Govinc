@@ -33,7 +33,8 @@ public class SecurityConfig {
             "/static/**",
             "/favicon.ico",
             "style.css",
-            "/style.css"
+            "/style.css",
+            "/config/openai/suggest-theme"
     };
 
     private static final Logger logger = LoggerFactory.getLogger(SecurityConfig.class);
