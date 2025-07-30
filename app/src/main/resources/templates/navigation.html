@@ -12,7 +12,10 @@
              src="/title.png"
              alt="Default Compliance Incubator Logo" class="ci-logo-img-visible" />
       </div>
-      <span class="ci-headline shiny-text" style="color: var(--primary-blue); text-shadow: 0 2px 12px var(--shine-highlight); font-size: var(--font-size-headline);">compliance incubator</span>
+      <div class="org-details">
+        <span class="org-name" th:text="${organisationDetails != null and organisationDetails.organisationName != null ? organisationDetails.organisationName : ''}"></span>
+<span class="tool-name" th:text="${organisationDetails != null and organisationDetails.toolName != null ? organisationDetails.toolName : ''}"></span>
+      </div>
       <a href="/"><button type="button" class="btn-nav shiny">Home</button></a>
       <form th:action="@{/logout}" method="post" class="logout-form">
         <button type="submit" class="btn-nav nav-btn shiny">Logout</button>
@@ -75,6 +78,7 @@
           <div class="dropdown-content">
             <a href="/config/openai"><button type="button" class="dropdown-menu-btn">Open AI</button></a>
             <a href="/config/layout"><button type="button" class="dropdown-menu-btn">Layout</button></a>
+            <a href="/config/organisation-details"><button type="button" class="dropdown-menu-btn">Organisation Details</button></a>
           </div>
         </div>
       </div>

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Organisation Details</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div th:replace="~{navigation :: mainNav}"></div>
+    <div class="container">
+        <h2>Organisation Details Configuration</h2>
+        <form th:action="@{/config/organisation-details}" method="post" th:object="${organisationDetails}">
+            <input type="hidden" th:field="*{id}" />
+            <label for="organisationName">Organisation Name:</label><br>
+            <input type="text" th:field="*{organisationName}" id="organisationName" placeholder="Organisation Name" style="width:350px"><br>
+
+            <label for="toolName">Name of Tool:</label><br>
+            <input type="text" th:field="*{toolName}" id="toolName" placeholder="Tool/Application Name" style="width:350px"><br><br>
+
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+            <button type="submit">Save</button>
+            <span th:if="${saved}"><b>✔ Saved!</b></span>
+        </form>
+    </div>
+</body>
+</html>

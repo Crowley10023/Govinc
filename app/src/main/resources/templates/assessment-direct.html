@@ -9,7 +9,7 @@
     <th:block th:replace="~{fragments/theme-css :: themeCss}"/>
 </head>
 <body>
-    <div class="container">
+    <div class="container" style="margin:2em;">
         <div class="domain-outline card domain-collapsible assessment-details-collapsible" style="margin-bottom: 2.8em;">
             <div class="domain-header" onclick="toggleAssessmentDetails(this)">
                 <div class="domain-header-info">
@@ -178,20 +178,24 @@
                         '</span>' +
                     '</div>' +
                 '</div>' +
-                '<div class="domain-controls" style="display:none;">';
+                '<div class="domain-controls" style="display:none;"><div class="domain-controls-tbl">';
                 controlsHtml += '<table class="table card controls-table"><thead><tr><th style="width:350px;">Control</th><th>Answer & Comment</th></tr></thead><tbody>';
                 controls.filter(function(ctrl){return ctrl.domainId === domain.id;}).forEach(function(ctrl){
                     var ansCell = '';
                     if (isOpen) {
                         var selectId = 'select-control-' + ctrl.id;
-                        ansCell = '<div style="display:flex;flex-direction:column;gap:7px;min-width:230px;">' +
-                        '<span style="white-space:nowrap;"><select name="control_' + ctrl.id + '" data-control-id="' + ctrl.id + '" data-domain-id="' + domain.id + '" class="answer-select" id="' + selectId + '"><option value="">-- select an answer --</option>';
+                        ansCell = '<div class="control-actions-flex-row">' +
+                            '<div class="dropdown-row">'+
+                              '<select name="control_' + ctrl.id + '" data-control-id="' + ctrl.id + '" data-domain-id="' + domain.id + '" class="answer-select" id="' + selectId + '"><option value="">-- select an answer --</option>';
                         answers.forEach(function(ans){
                             var selected = (controlAnswers && controlAnswers[ctrl.id] && ans.answer === controlAnswers[ctrl.id]) ? 'selected' : '';
                             ansCell += '<option value="' + ans.id + '" ' + selected + '>' + ans.answer + '</option>';
                         });
-                        ansCell += '</select><span class="answer-feedback"></span></span>' +
-                        '<textarea class="comment-textarea" name="comment_' + ctrl.id + '" data-control-id="' + ctrl.id + '" style="min-width:180px;min-height:36px;resize:vertical;" placeholder="Add comment (optional)">' + (comments && comments[ctrl.id] ? comments[ctrl.id] : '') + '</textarea><span class="comment-feedback"></span></div>';
+                        ansCell += '</select><span class="answer-feedback"></span></div>' +
+                            '<div class="testarea-row">' +
+                              '<textarea class="comment-textarea" name="comment_' + ctrl.id + '" data-control-id="' + ctrl.id + '" style="min-width:180px;min-height:36px;resize:vertical;" placeholder="Add comment (optional)">' + (comments && comments[ctrl.id] ? comments[ctrl.id] : '') + '</textarea><span class="comment-feedback"></span>' +
+                            '</div>' +
+                          '</div>';
                     } else {
                         var ca = controlAnswers[ctrl.id] != null ? controlAnswers[ctrl.id] : 'No answer';
                         ansCell = '<span>' + ca + '</span>';
@@ -203,7 +207,7 @@
                         '<div class="ctrl-desc-tooltip"><b>Description:</b><div>' + ((ctrl.detail && ctrl.detail !== '') ? ctrl.detail : 'No detail') + '</div></div></div></td>' +
                         '<td>' + ansCell + '</td></tr>';
                 });
-                controlsHtml += '</tbody></table></div></div>';
+                controlsHtml += '</tbody></table></div></div></div>';
             });
             document.getElementById('controls-container').innerHTML = controlsHtml;
             $('.answer-select').on('change', function () {
