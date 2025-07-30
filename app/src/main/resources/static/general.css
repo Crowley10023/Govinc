@@ -187,7 +187,7 @@
   font-size: 0.97em;
   border-radius: 4px;
   background: var(--nav-violet);
-  color: var(--primary-blue);
+  color: var(--text-main);
   border: 1px solid var(--primary-blue);
   font-weight: 500;
   margin: 0;

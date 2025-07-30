@@ -6,12 +6,57 @@
     <title>Assessment Direct Link</title>
     <link rel="stylesheet" href="/style.css">
     <link rel="stylesheet" href="/general.css">
+    <th:block th:replace="~{fragments/theme-css :: themeCss}"/>
 </head>
 <body>
     <div class="container">
-        <div id="assessment-status-container" style="margin-bottom:2em;"></div>
-        <div id="summary-container"></div>
-        <div id="controls-container"></div>
+        <div class="domain-outline card domain-collapsible assessment-details-collapsible" style="margin-bottom: 2.8em;">
+            <div class="domain-header" onclick="toggleAssessmentDetails(this)">
+                <div class="domain-header-info">
+                    <span class="domain-title">Assessment Details</span>
+                </div>
+                <div class="domain-header-actions">
+                    <span class="domain-checkmark"></span>
+                    <span class="domain-chevron">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+                            <polyline points="4,7 9,12 14,7" fill="none" stroke="#2274A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                    </span>
+                </div>
+            </div>
+            <div class="domain-controls assessment-details-body" style="display:none;">
+                <div class="domain-controls-tbl">
+                    <table class="table card" id="public-assessment-table">
+                        <tr>
+                            <th>Date</th>
+                            <td id="ad-date">-</td>
+                        </tr>
+                        <tr>
+                            <th>Org Unit</th>
+                            <td id="ad-orgunit">-</td>
+                        </tr>
+                        <tr>
+                            <th>Status</th>
+                            <td id="ad-status">-</td>
+                        </tr>
+                    </table>
+                    <h2>Summary of Answers</h2>
+                    <table class="table card summary-table">
+                        <thead>
+                            <tr>
+                                <th>Answer Category</th>
+                                <th>Count</th>
+                                <th>Percent (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ad-summary-tbody">
+                            <tr><td colspan="3">No answers yet</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div id="controls-container" class="controls-viewport"></div>
     </div>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
@@ -42,6 +87,26 @@
             $('.ctrl-desc-tooltip').fadeOut(120);
         }
     });
+    function toggleAssessmentDetails(header) {
+        var body = header.nextElementSibling;
+        if (body.style.display === 'none' || body.style.display === '') {
+            body.style.display = 'block';
+        } else {
+            body.style.display = 'none';
+        }
+        var chevron = header.querySelector('.domain-chevron svg');
+        if (chevron) {
+            if (body.style.display === 'block') {
+                chevron.style.transform = 'rotate(180deg)';
+            } else {
+                chevron.style.transform = '';
+            }
+        }
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+        var adBody = document.querySelector('.assessment-details-body');
+        if (adBody) adBody.style.display = 'none';
+    });
     function checkDomainCompleteness() {
         document.querySelectorAll(".domain-checkmark").forEach(function (checkmarkSpan) {
             var domainId = checkmarkSpan.getAttribute("data-domain-id");
@@ -64,27 +129,22 @@
             }
         }
         if (!obfuscatedId) {
-            document.getElementById('assessment-status-container').innerHTML = '<h1>Invalid assessment link</h1>';
+            document.getElementById('ad-date').innerHTML = '<h1>Invalid assessment link</h1>';
             return;
         }
         $.getJSON('/assessment-direct/' + obfuscatedId + '/alldata', function (data) {
             if (!data || data.error) {
-                $('#assessment-status-container').html('<h1>Assessment Not Found</h1>');
+                document.getElementById('ad-date').innerHTML = '<h1>Assessment Not Found</h1>';
                 return;
             }
             if (data.assessment.status === 'CLOSED' || data.isOpen === false) {
-                $('#assessment-status-container').html('<h1>SORRY NOT LONGER AVAILABLE</h1>');
+                document.getElementById('ad-date').innerHTML = '<h1>SORRY NOT LONGER AVAILABLE</h1>';
                 return;
             }
             var a = data.assessment;
-            var comments = data.controlComments || {};
-            var html = '<h1>Assessment (Direct URL)</h1>'+
-                '<section><table class="table card">'+
-                '<tr><th>Date</th><td>'+ (a.date || '-')+'</td></tr>'+ 
-                '<tr><th>Org Unit</th><td>'+(a.orgUnit||'-')+'</td></tr>'+ 
-                '<tr><th>Status</th><td>'+(a.status||'-')+'</td></tr>'+ 
-                '</table></section>';
-            $('#assessment-status-container').html(html);
+            document.getElementById('ad-date').textContent = a.date || '-';
+            document.getElementById('ad-orgunit').textContent = a.orgUnit || '-';
+            document.getElementById('ad-status').textContent = a.status || '-';
             var summaryRows = '';
             var answerSummary = data.answerSummary;
             if (!answerSummary || Object.keys(answerSummary).length === 0) {
@@ -96,28 +156,29 @@
                     summaryRows += '<tr><td>'+k+'</td><td>'+(v.count != null ? v.count : '')+'</td><td>'+(typeof v.percent === 'number' ? v.percent.toFixed(2) : v.percent)+'</td></tr>';
                 });
             }
-            var summaryHtml = '<section><h2>Summary of Answers</h2><table class="table card" style="margin-bottom: 2em;"><thead><tr><th>Answer Category</th><th>Count</th><th>Percent (%)</th></tr></thead><tbody>' + summaryRows + '</tbody></table></section>';
-            $('#summary-container').html(summaryHtml);
+            document.getElementById('ad-summary-tbody').innerHTML = summaryRows;
             var domains = Array.isArray(data.securityControlDomains) ? data.securityControlDomains : [];
             var controls = Array.isArray(data.controls) ? data.controls : [];
             var answers = Array.isArray(data.maturityAnswers) ? data.maturityAnswers : [];
             var controlAnswers = data.controlAnswers || {};
+            var comments = data.controlComments || {};
             var isOpen = data.isOpen;
-            var controlsHtml = '<h2>Controls &amp; Answers</h2>';
+            var controlsHtml = '';
             domains.forEach(function(domain) {
-                controlsHtml += '<div class="domain-outline card domain-collapsible" style="margin-bottom:2.5em; padding: 0em; border: 2px solid #2274A5; border-radius: 9px;">' +
-                '<div class="domain-header" onclick="toggleDomain(this)" style="display: flex; align-items: center; justify-content: space-between; cursor:pointer;">' +
-                    '<div style="flex:1;">' +
+                controlsHtml += '<div class="domain-outline card domain-collapsible" style="margin-bottom:2.5em;">' +
+                '<div class="domain-header" onclick="toggleDomain(this)">' +
+                    '<div class="domain-header-info">' +
                         '<span class="domain-title">' + (domain.name != null ? domain.name : 'No Domain') + '</span>' +
-                        '<span class="domain-desc" style="display:block; font-weight:normal; color:#888; font-size:0.88em; margin-top:2px;">' + (domain.description != null ? domain.description : '') + '</span>' +
+                        '<span class="domain-desc">' + (domain.description != null ? domain.description : '') + '</span>' +
                     '</div>' +
-                    '<span class="domain-checkmark" data-domain-id="'+domain.id+'" style="margin-left:.5em;"></span>' +
-                    '<span style="display:inline-flex; align-items:center; margin-left:.5em; cursor:pointer;">' +
-                        '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" style="vertical-align:middle;">' +
-                            '<polyline points="4,7 9,12 14,7" fill="none" stroke="#2274A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />' +
-                        '</svg>' +
-                    '</span>' +
-                '</div><div class="domain-controls" style="display:none;padding:1.1em 1.2em 0 1.2em;">';
+                    '<div class="domain-header-actions">' +
+                        '<span class="domain-checkmark" data-domain-id="'+domain.id+'"></span>' +
+                        '<span class="domain-chevron">' +
+                            '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18"><polyline points="4,7 9,12 14,7" fill="none" stroke="#2274A5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>' +
+                        '</span>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="domain-controls" style="display:none;">';
                 controlsHtml += '<table class="table card controls-table"><thead><tr><th style="width:350px;">Control</th><th>Answer & Comment</th></tr></thead><tbody>';
                 controls.filter(function(ctrl){return ctrl.domainId === domain.id;}).forEach(function(ctrl){
                     var ansCell = '';
@@ -144,7 +205,7 @@
                 });
                 controlsHtml += '</tbody></table></div></div>';
             });
-            $('#controls-container').html(controlsHtml);
+            document.getElementById('controls-container').innerHTML = controlsHtml;
             $('.answer-select').on('change', function () {
                 var select = $(this);
                 var controlId = select.data('control-id');
@@ -171,14 +232,12 @@
                     }
                 });
             });
-            // ==================== AUTOSAVE COMMENTS ====================
             var debounceTimers = {};
             $(document).on('input', '.comment-textarea', function () {
                 var textarea = $(this);
                 var controlId = textarea.data('control-id');
                 var comment = textarea.val();
                 var feedback = textarea.nextAll('.comment-feedback').first();
-                // Clear prior timer
                 if (debounceTimers[controlId])
                     clearTimeout(debounceTimers[controlId]);
                 debounceTimers[controlId] = setTimeout(function() {
