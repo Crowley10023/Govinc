@@ -80,7 +80,7 @@ public class OpenAIConfigController {
             String base64Image = java.util.Base64.getEncoder().encodeToString(imageBytes);
 
             String prompt = """
-            Given this company logo image (base64 below), suggest a modern theme with nice contrast and beautiful professional colors.
+            Given this company logo image (base64 below), suggest a modern bright theme with nice contrast and beautiful professional colors.
             Respond ONLY with a single JSON object with the keys:
               primaryColor, primaryColorDark, accentColor, backgroundColor, borderColor,
               navViolet, textMain, shineGlare, shineHighlight, secondaryColor,
@@ -92,12 +92,13 @@ public class OpenAIConfigController {
               headerGradHighlight, yellowHighlight,
               tableHover1, tableHover2,
               alertBg1, alertBg2, alertColor,
-              takenOverBg, dropdownBgHover,
+              takenOverBg, dropdownBgHover,org-name-color,org-name-font-size,tool-name-color,tool-name-font-size
               secondaryNavBg, secondaryNavBorder,
               logoBorder, dropdownHoverBlue, mainNavBorder, faintBlue1.
             Colors as valid hex (e.g. #RRGGBB) or rgba(...). Fonts as CSS font-family strings. Font sizes as common CSS units (e.g. 1em, 1.25em, etc).
             Logo image (base64): %s
             """.formatted(base64Image);
+
 
             String raw = openAIUtil.askAI(prompt);
 

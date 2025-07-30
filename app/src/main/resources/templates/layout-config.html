@@ -49,7 +49,26 @@
 
             <label for="fontSizeHeadline">Headline Font Size (CSS):</label><br>
             <input type="text" th:field="*{fontSizeHeadline}" id="fontSizeHeadline" placeholder="1.5em"><br>
-  
+
+            <!-- Organisation and Tool name color/font config -->
+            <fieldset style="margin-top:14px; margin-bottom:16px; border:1px solid var(--border); padding:0.8em 1.2em; border-radius:7px;">
+                <legend style="font-size:1em;color:var(--primary-blue-dark);font-weight:bold;">Organisation/Tool Name Styles (Nav)</legend>
+                <div>
+                    <label for="orgNameColor">Organisation Name Color:</label>
+                    <input type="color" th:field="*{orgNameColor}" id="orgNameColor">
+                    &nbsp;&nbsp;&nbsp;
+                    <label for="orgNameFontSize">Font Size:</label>
+                    <input type="text" th:field="*{orgNameFontSize}" id="orgNameFontSize" placeholder="e.g. 1.18em">
+                </div>
+                <div style="margin-top:6px;">
+                    <label for="toolNameColor">Tool Name Color:</label>
+                    <input type="color" th:field="*{toolNameColor}" id="toolNameColor">
+                    &nbsp;&nbsp;&nbsp;
+                    <label for="toolNameFontSize">Font Size:</label>
+                    <input type="text" th:field="*{toolNameFontSize}" id="toolNameFontSize" placeholder="e.g. 1em">
+                </div>
+            </fieldset>
+
             <label for="shineGlare">Shine Glare (RGBA):</label>
             <input type="text" th:field="*{shineGlare}" id="shineGlare" placeholder="rgba(255,255,255,0.60)"><br>
 

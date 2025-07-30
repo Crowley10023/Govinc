@@ -86,6 +86,19 @@ public class LayoutConfiguration {
     @Column(nullable = true)
     private String fontSizeHeadline;
 
+    // ADDED: Organisation/Tool details styles for navigation bar
+    @Column(nullable = true)
+    private String orgNameColor;
+
+    @Column(nullable = true)
+    private String orgNameFontSize;
+
+    @Column(nullable = true)
+    private String toolNameColor;
+
+    @Column(nullable = true)
+    private String toolNameFontSize;
+
     public LayoutConfiguration() {}
 
     public Long getId() { return id; }
@@ -223,5 +236,17 @@ public class LayoutConfiguration {
 
     public String getFontSizeHeadline() { return fontSizeHeadline; }
     public void setFontSizeHeadline(String fontSizeHeadline) { this.fontSizeHeadline = fontSizeHeadline; }
+
+    public String getOrgNameColor() { return orgNameColor; }
+    public void setOrgNameColor(String orgNameColor) { this.orgNameColor = orgNameColor; }
+
+    public String getOrgNameFontSize() { return orgNameFontSize; }
+    public void setOrgNameFontSize(String orgNameFontSize) { this.orgNameFontSize = orgNameFontSize; }
+
+    public String getToolNameColor() { return toolNameColor; }
+    public void setToolNameColor(String toolNameColor) { this.toolNameColor = toolNameColor; }
+
+    public String getToolNameFontSize() { return toolNameFontSize; }
+    public void setToolNameFontSize(String toolNameFontSize) { this.toolNameFontSize = toolNameFontSize; }
 }
 

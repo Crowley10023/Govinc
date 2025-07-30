@@ -1,27 +1,29 @@
 <div th:fragment="mainNav">
   <link rel="stylesheet" href="/general.css">
-  <th:block th:replace="~{fragments/theme-css :: themeCss}"/>
-  <nav class="main-navigation fancy-shine" style="font-family: var(--nav-font-family); font-size: var(--font-size-nav);">
+  <th:block th:replace="~{fragments/theme-css :: themeCss}" />
+  <nav class="main-navigation fancy-shine"
+    style="font-family: var(--nav-font-family); font-size: var(--font-size-nav);">
 
     <div class="nav-row">
       <div class="landing-image">
-        <img th:if="${layoutConfig != null and layoutConfig.imageData != null}"
-             src="/config/layout/image"
-             alt="Compliance Incubator Logo" class="ci-logo-img-visible" />
-        <img th:if="${layoutConfig == null or layoutConfig.imageData == null}"
-             src="/title.png"
-             alt="Default Compliance Incubator Logo" class="ci-logo-img-visible" />
+        <img th:if="${layoutConfig != null and layoutConfig.imageData != null}" src="/config/layout/image"
+          alt="Compliance Incubator Logo" class="ci-logo-img-visible" />
+        <img th:if="${layoutConfig == null or layoutConfig.imageData == null}" src="/title.png"
+          alt="Default Compliance Incubator Logo" class="ci-logo-img-visible" />
       </div>
       <div class="org-details">
-        <span class="org-name" th:text="${organisationDetails != null and organisationDetails.organisationName != null ? organisationDetails.organisationName : ''}"></span>
-<span class="tool-name" th:text="${organisationDetails != null and organisationDetails.toolName != null ? organisationDetails.toolName : ''}"></span>
+        <span class="org-name"
+          th:text="${organisationDetails != null and organisationDetails.organisationName != null ? organisationDetails.organisationName : ''}"></span>
+        <span class="tool-name"
+          th:text="${organisationDetails != null and organisationDetails.toolName != null ? organisationDetails.toolName : ''}"></span>
       </div>
       <a href="/"><button type="button" class="btn-nav shiny">Home</button></a>
       <form th:action="@{/logout}" method="post" class="logout-form">
         <button type="submit" class="btn-nav nav-btn shiny">Logout</button>
       </form>
       <div class="user-section">
-        <span class="nav-label" style="color: var(--background-light); background: var(--primary-blue-dark);">User:</span>
+        <span class="nav-label"
+          style="color: var(--background-light); background: var(--primary-blue-dark);">User:</span>
         <span class="user-name"
           th:text="${userName != null} ? ${userName} : (${userId != null} ? ${userId} : 'no user')"
           style="color: var(--text-main); background: var(--shine-glare);"></span>
@@ -78,7 +80,8 @@
           <div class="dropdown-content">
             <a href="/config/openai"><button type="button" class="dropdown-menu-btn">Open AI</button></a>
             <a href="/config/layout"><button type="button" class="dropdown-menu-btn">Layout</button></a>
-            <a href="/config/organisation-details"><button type="button" class="dropdown-menu-btn">Organisation Details</button></a>
+            <a href="/config/organisation-details"><button type="button" class="dropdown-menu-btn">Organisation
+                Details</button></a>
           </div>
         </div>
       </div>

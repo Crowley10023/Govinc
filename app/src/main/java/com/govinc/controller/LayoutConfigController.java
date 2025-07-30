@@ -52,6 +52,12 @@ public class LayoutConfigController {
         persisted.setFontSizeNav(layoutConfig.getFontSizeNav());
         persisted.setFontSizeHeadline(layoutConfig.getFontSizeHeadline());
 
+        // New fields:
+        persisted.setOrgNameColor(layoutConfig.getOrgNameColor());
+        persisted.setOrgNameFontSize(layoutConfig.getOrgNameFontSize());
+        persisted.setToolNameColor(layoutConfig.getToolNameColor());
+        persisted.setToolNameFontSize(layoutConfig.getToolNameFontSize());
+
         layoutConfigurationRepository.save(persisted);
         model.addAttribute("layoutConfig", persisted);
         model.addAttribute("saved", true);
