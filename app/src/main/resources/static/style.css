@@ -186,6 +186,7 @@
 .domain-header .domain-desc {
   font-weight: normal;
   color: var(--gray-777);
+  display: flex;
 }
 .domain-collapsible .domain-controls {
   padding: 1em 1.2em 0 1.2em;
@@ -658,7 +659,7 @@ input:focus, textarea:focus, select:focus {
 
 .domain-header {
   display: flex;
-  align-items: center;
+  align-items: start;
   justify-content: space-between;
 }
 .domain-header-actions {
