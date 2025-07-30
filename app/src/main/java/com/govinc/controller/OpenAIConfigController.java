@@ -80,15 +80,24 @@ public class OpenAIConfigController {
             String base64Image = java.util.Base64.getEncoder().encodeToString(imageBytes);
 
             String prompt = """
-                        Given this company logo image (base64 below), suggest a modern theme with nice contrast and beautiful professional colors.
-                        Respond ONLY with a single JSON object with the keys:
-                          primaryColor, primaryColorDark, accentColor, backgroundColor, borderColor,
-                          navViolet, textMain, shineGlare, shineHighlight, secondaryColor,
-                          fontFamily, fontSizeNav, fontSizeHeadline.
-                        Colors as valid hex (e.g. #RRGGBB) or rgba(...). Fonts as CSS font-family strings. Font sizes as common CSS units (e.g. 1em, 1.25em, etc).
-                        Logo image (base64): %s
-                    """
-                    .formatted(base64Image);
+            Given this company logo image (base64 below), suggest a modern theme with nice contrast and beautiful professional colors.
+            Respond ONLY with a single JSON object with the keys:
+              primaryColor, primaryColorDark, accentColor, backgroundColor, borderColor,
+              navViolet, textMain, shineGlare, shineHighlight, secondaryColor,
+              fontFamily, fontSizeNav, fontSizeHeadline,
+              successGreen, errorRed,
+              modalBeige1, modalBeige2, modalBeige3, modalBeige4,
+              labelGold, gray777, gray888,
+              tableBg1, tableBg2, tableBg3, tableBg4, tableBg5,
+              headerGradHighlight, yellowHighlight,
+              tableHover1, tableHover2,
+              alertBg1, alertBg2, alertColor,
+              takenOverBg, dropdownBgHover,
+              secondaryNavBg, secondaryNavBorder,
+              logoBorder, dropdownHoverBlue, mainNavBorder, faintBlue1.
+            Colors as valid hex (e.g. #RRGGBB) or rgba(...). Fonts as CSS font-family strings. Font sizes as common CSS units (e.g. 1em, 1.25em, etc).
+            Logo image (base64): %s
+            """.formatted(base64Image);
 
             String raw = openAIUtil.askAI(prompt);
 
@@ -123,7 +132,36 @@ public class OpenAIConfigController {
             config.setFontSizeNav(map.get("fontSizeNav"));
             config.setFontSizeHeadline(map.get("fontSizeHeadline"));
 
-            layoutConfigurationRepository.save(config);
+            config.setSuccessGreen(map.get("successGreen"));
+        config.setErrorRed(map.get("errorRed"));
+        config.setModalBeige1(map.get("modalBeige1"));
+        config.setModalBeige2(map.get("modalBeige2"));
+        config.setModalBeige3(map.get("modalBeige3"));
+        config.setModalBeige4(map.get("modalBeige4"));
+        config.setLabelGold(map.get("labelGold"));
+        config.setGray777(map.get("gray777"));
+        config.setGray888(map.get("gray888"));
+        config.setTableBg1(map.get("tableBg1"));
+        config.setTableBg2(map.get("tableBg2"));
+        config.setTableBg3(map.get("tableBg3"));
+        config.setTableBg4(map.get("tableBg4"));
+        config.setTableBg5(map.get("tableBg5"));
+        config.setHeaderGradHighlight(map.get("headerGradHighlight"));
+        config.setYellowHighlight(map.get("yellowHighlight"));
+        config.setTableHover1(map.get("tableHover1"));
+        config.setTableHover2(map.get("tableHover2"));
+        config.setAlertBg1(map.get("alertBg1"));
+        config.setAlertBg2(map.get("alertBg2"));
+        config.setAlertColor(map.get("alertColor"));
+        config.setTakenOverBg(map.get("takenOverBg"));
+        config.setDropdownBgHover(map.get("dropdownBgHover"));
+        config.setSecondaryNavBg(map.get("secondaryNavBg"));
+        config.setSecondaryNavBorder(map.get("secondaryNavBorder"));
+        config.setLogoBorder(map.get("logoBorder"));
+        config.setDropdownHoverBlue(map.get("dropdownHoverBlue"));
+        config.setMainNavBorder(map.get("mainNavBorder"));
+        config.setFaintBlue1(map.get("faintBlue1"));
+        layoutConfigurationRepository.save(config);
 
             // Respond with suggested theme JSON (so frontend can fill form immediately)
             return ResponseEntity.ok()

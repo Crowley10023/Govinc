@@ -29,6 +29,27 @@
   background: var(--background-light); /* Optional: different from navbar */
 }
 
+.control-actions-column {
+  width: 30%;
+}
+
+.dropdown-row {
+  width: 30%;
+}
+
+.testarea-row {
+  width: 40%;
+}
+
+.takenOver-row {
+  display: flex;
+  flex-direction: row;
+  width: 20%;
+}
+
+.comment-textarea {
+  width: 30%;
+}
 
 /* Container viewport for centered content */
 .container {

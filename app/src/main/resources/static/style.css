@@ -11,10 +11,10 @@
     height: 18px;
 }
 .answer-success {
-    color: #33aa33;
+    color: var(--success-green);
 }
 .answer-error {
-    color: #cc2222;
+    color: var(--error-red);
 }
 .ctrl-desc-btn {
     background: none;
@@ -39,10 +39,10 @@
     left: 44px;
     z-index: 20;
     max-width: 320px;
-    background: linear-gradient(94deg, #fffbe7 90%, #ffe6d1 100%);
-    color: #333;
-    border: 1.5px solid #ffe3ad;
-    box-shadow: 0 6px 24px rgba(255, 205, 58, 0.25), 0 1.5px 0px 1.5px #ffd995;
+    background: linear-gradient(94deg, var(--modal-beige1) 90%, var(--modal-beige2) 100%);
+    color: var(--text-main);
+    border: 1.5px solid var(--modal-beige3);
+    box-shadow: 0 6px 24px rgba(255, 205, 58, 0.25), 0 1.5px 0px 1.5px var(--modal-beige4);
     padding: 0.7em 1em;
     border-radius: 10px;
     font-size: 0.96em;
@@ -72,7 +72,7 @@
     align-items: center;
 }
 .modal-popup {
-    background: #fffbe7;
+    background: var(--modal-beige1);
     border-radius: 10px;
     box-shadow: 0 1.5px 14px rgba(0, 0, 0, 0.15);
     padding: 2em 2em 1.2em 2em;
@@ -96,16 +96,43 @@
     margin-top: 1em;
 }
 .taken-over {
-    background: #eee !important;
-    color: #888 !important;
+    background: var(--taken-over-bg) !important;
+    color: var(--gray-888) !important;
 }
 .taken-over-label {
-    color: #ab6f00;
+    color: var(--label-gold);
     font-size: 0.92em;
     margin-left: 8px;
 }
 
 /* ---- End Assessment Details Styles ---- */
+
+/* Flex row for control actions in controls-table */
+.control-actions-flex-row {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 18px;
+    width: 100%;
+}
+.dropdown-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+}
+.testarea-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+}
+.comment-textarea {
+    min-width: 180px;
+    max-width: 400px;
+    height: 32px;
+    resize: horizontal;
+}
 
 /* Modal Launch Buttons Row for Assessment Details */
 .choose-buttons-row {
@@ -128,7 +155,7 @@
     min-width: 18em;
 }
 .modal-launch-btn:hover {
-    background: linear-gradient(92deg,var(--accent-orange) 68%,#ffd867 99%);
+    background: linear-gradient(92deg,var(--accent-orange) 68%,var(--yellow-highlight) 99%);
     color: var(--primary-blue-dark);
 }
 
@@ -137,12 +164,12 @@
   border: 2px solid var(--primary-blue);
   border-radius: 9px;
   margin-bottom:2.5em;
-  background: linear-gradient(94deg,#f8faff 94%,#e9f4fc 100%);
+  background: linear-gradient(94deg,var(--table-bg1) 94%,var(--table-bg2) 100%);
 }
 .domain-header {
   cursor: pointer;
   font-weight: bold;
-  background: linear-gradient(90deg,#daf0ff 89%, #f4fbff 100%);
+  background: linear-gradient(90deg,var(--table-bg3) 89%, var(--table-bg4) 100%);
   border-radius: 9px 9px 0 0;
   padding: 1.1em 1.2em;
   font-size: 1.22em;
@@ -158,7 +185,7 @@
 }
 .domain-header .domain-desc {
   font-weight: normal;
-  color: #777;
+  color: var(--gray-777);
 }
 .domain-collapsible .domain-controls {
   padding: 1em 1.2em 0 1.2em;
@@ -177,7 +204,7 @@
 }
 /* ----------- Added for Control Name Column ----------- */
 .ctrl-name-col {
-    width: 70%;
+    width: 40%;
     min-width: 210px;
     max-width: 700px;
 }
@@ -230,7 +257,7 @@ a:hover, a:focus {
 
 
 header, footer {
-  background: linear-gradient(92deg,var(--primary-blue) 80%,#5adaff 104%);
+  background: linear-gradient(92deg,var(--primary-blue) 80%,var(--header-grad-highlight) 104%);
   color: #fff;
   padding: 1.2rem 1.3rem;
   text-align: center;
@@ -252,7 +279,7 @@ header::after, footer::after {
 main {
   max-width: 830px;
   margin: 1.1rem auto;
-  background: linear-gradient(138deg, #fff 83%, #e9f4fc 99%);
+  background: linear-gradient(138deg, #fff 83%, var(--table-bg2) 99%);
   padding: 1.2rem 1rem;
   border-radius: 9px;
   box-shadow: 0 3px 12px rgba(34,116,165, 0.10);
@@ -312,7 +339,7 @@ button, input[type=submit], .btn {
   font-weight: 470;
 }
 button:hover, input[type=submit]:hover, .btn:hover {
-  background: linear-gradient(92deg,var(--accent-orange) 68%,#ffd867 99%);
+  background: linear-gradient(92deg,var(--accent-orange) 68%,var(--yellow-highlight) 99%);
   box-shadow: 0 3px 14px rgba(255,149,5,0.22), 0 0 7px var(--shine-glare) inset;
   filter: brightness(1.04);
 }
@@ -355,7 +382,7 @@ input:focus, textarea:focus, select:focus {
 }
 
 .table th, table th {
-  background: linear-gradient(93deg,var(--primary-blue) 60%,#b8d8ec 110%);
+  background: linear-gradient(93deg,var(--primary-blue) 60%,var(--table-bg5) 110%);
   color: #fff;
   font-size: 0.98em;
   text-shadow: 0 2px 8px var(--shine-highlight);
@@ -363,15 +390,15 @@ input:focus, textarea:focus, select:focus {
 }
 
 .table tbody tr:hover, table tbody tr:hover {
-  background: linear-gradient(90deg,#eaf3fa 80%, #fcf6e4 100%);
+  background: linear-gradient(90deg,var(--table-hover1) 80%, var(--table-hover2) 100%);
   box-shadow: 0 2px 8px rgba(255,223,139,0.06);
 }
 
 .alert {
   padding: 0.7em 1em;
   border-left: 5px solid var(--accent-orange);
-  background: linear-gradient(90deg,#fffbea 84%,#ffeedd 100%);
-  color: #945100;
+  background: linear-gradient(90deg,var(--alert-bg1) 84%,var(--alert-bg2) 100%);
+  color: var(--alert-color);
   border-radius: 4px;
   margin-bottom: 0.87em;
   box-shadow: 0 4px 13px rgba(255,223,139,0.11);
@@ -593,26 +620,7 @@ input:focus, textarea:focus, select:focus {
   filter: drop-shadow(0 0 6px var(--shine-glare));
 }
 
-/************** Fancy shine animation **************/
-@keyframes shine-move {
-  0% { left: -60%; }
-  60% { left: 120%; }
-  100% { left: 120%; }
-}
-.fancy-shine {
-  position: relative;
-  overflow: hidden;
-}
-.fancy-shine::after {
-  content: '';
-  display: block;
-  position: absolute;
-  top: 0; left: -60%;
-  height: 100%; width: 50%;
-  background: linear-gradient(112deg,rgba(255,255,255,0) 0%,rgba(255,255,255,0.65) 71%,rgba(255,255,255,0) 100%);
-  pointer-events: none;
-  animation: shine-move 2.6s linear infinite;
-}
+
 
 /*********** Assessment Details Scrollable Controls Table ***********/
 .controls-scroll-wrapper {

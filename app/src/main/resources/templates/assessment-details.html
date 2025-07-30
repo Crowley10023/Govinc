@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <title>Assessment Details</title>
     <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/general.css">
     <!-- All moved styles are now in style.css -->
     <!-- CSRF meta tags for AJAX -->
     <meta name="_csrf" th:content="${_csrf.token}" />
@@ -180,8 +181,8 @@
                                                 </div>
                                             </td>
                                             <td>
-                                                <div class="control-actions-column">
-                                                    <span class="dropdown-row">
+                                                <div class="control-actions-flex-row">
+                                                    <div class="dropdown-row">
                                                         <select th:name="${'control_' + ctrl.id}"
                                                             th:data-control-id="${ctrl.id}"
                                                             th:data-domain-id="${domain.id}" class="answer-select"
@@ -194,6 +195,8 @@
                                                                 th:text="${ans.answer}"></option>
                                                         </select>
                                                         <span class="answer-feedback"></span>
+                                                    </div>
+                                                    <div class="takenOver-row">
                                                         <span
                                                             th:if="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])}"
                                                             class="taken-over-label"
@@ -201,13 +204,21 @@
                                                             <span
                                                                 th:text="${controlTakenOverOrgServiceName[ctrl.id]}"></span>
                                                         </span>
-                                                    </span>
-                                                    <textarea class="comment-textarea" th:name="${'comment_' + ctrl.id}"
-                                                        th:data-control-id="${ctrl.id}"
-                                                        th:disabled="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])}"
-                                                        th:placeholder="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])} ? 'Comment from Org Service' : 'Add comment (optional)'"
-                                                        th:text="${controlComments != null and controlComments[ctrl.id] != null ? controlComments[ctrl.id] : ''}"></textarea>
-                                                    <span class="comment-feedback"></span>
+                                                        <span
+                                                            th:if="${T(java.lang.Boolean).FALSE.equals(controlAnswerIsTakenOver[ctrl.id])}"
+                                                            class="taken-over-label"                                                            
+                                                            <span>&nbsp;</span>
+                                                        </span>                                                        
+                                                    </div>
+                                                    <div class="testarea-row">
+                                                        <textarea class="comment-textarea"
+                                                            th:name="${'comment_' + ctrl.id}"
+                                                            th:data-control-id="${ctrl.id}"
+                                                            th:disabled="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])}"
+                                                            th:placeholder="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])} ? 'Comment from Org Service' : 'Add comment (optional)'"
+                                                            th:text="${controlComments != null and controlComments[ctrl.id] != null ? controlComments[ctrl.id] : ''}"></textarea>
+                                                        <span class="comment-feedback"></span>
+                                                    </div>
                                                 </div>
                                             </td>
                                         </th:block>
@@ -265,11 +276,12 @@
 
         <section class="actions-panel general-button-bar">
             <!-- Added: Choose buttons moved from top into button bar -->
-            
-                <button id="choose-orgunit-btn" type="button" class="modal-launch-btn btn-nav">Choose Org Unit</button>
-                <button id="choose-users-btn" type="button" class="modal-launch-btn btn-nav">Choose Users</button>
-                <button id="choose-orgservices-btn" type="button" class="modal-launch-btn btn-nav">Choose Org Services</button>
-            
+
+            <button id="choose-orgunit-btn" type="button" class="modal-launch-btn btn-nav">Choose Org Unit</button>
+            <button id="choose-users-btn" type="button" class="modal-launch-btn btn-nav">Choose Users</button>
+            <button id="choose-orgservices-btn" type="button" class="modal-launch-btn btn-nav">Choose Org
+                Services</button>
+
             <form th:if="${assessment.isOpen}" th:action="@{'/assessment/' + ${assessment.id} + '/finalize'}"
                 method="post" style="margin: 0;">
                 <button type="submit" class="btn-nav"
@@ -629,10 +641,12 @@
             }
             // Optionally rotate chevron here for UX, if desired
             var chevron = header.querySelector('.assessment-details-chevron svg');
-            if (body.style.display === 'block') {
-                chevron.style.transform = 'rotate(180deg)';
-            } else {
-                chevron.style.transform = '';
+            if (chevron) {
+                if (body.style.display === 'block') {
+                    chevron.style.transform = 'rotate(180deg)';
+                } else {
+                    chevron.style.transform = '';
+                }
             }
         }
         // Collapse by default on page load
