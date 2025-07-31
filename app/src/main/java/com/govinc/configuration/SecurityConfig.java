@@ -34,7 +34,8 @@ public class SecurityConfig {
             "/favicon.ico",
             "style.css",
             "/style.css",
-            "/config/openai/suggest-theme"
+            "/config/openai/suggest-theme",
+            "/login" // Allow login page
     };
 
     private static final Logger logger = LoggerFactory.getLogger(SecurityConfig.class);
@@ -45,17 +46,19 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(EXCLUDED_URLS).permitAll() // Exclude these URLs from authentication
-                        .anyRequest().authenticated())
-                .csrf(csrf -> csrf
-                        .ignoringRequestMatchers(EXCLUDED_URLS) // Disable CSRF for excluded URLs
-                )
-                .formLogin(form -> form
-                        .successHandler(customAuthenticationSuccessHandler))
-                .oauth2Login(oauth2 -> oauth2
-                        .successHandler(customAuthenticationSuccessHandler)
-                        .failureHandler(oauth2AuthenticationFailureHandler()));
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers(EXCLUDED_URLS).permitAll()
+                .anyRequest().authenticated())
+            .csrf(csrf -> csrf
+                .ignoringRequestMatchers(EXCLUDED_URLS))
+            .formLogin(form -> form
+                .loginPage("/login")
+                .permitAll()
+                .successHandler(customAuthenticationSuccessHandler))
+            .oauth2Login(oauth2 -> oauth2
+                .loginPage("/login") // Redirects to our login page for OAuth
+                .successHandler(customAuthenticationSuccessHandler)
+                .failureHandler(oauth2AuthenticationFailureHandler()));
         return http.build();
     }
 
@@ -75,10 +78,11 @@ public class SecurityConfig {
     @Bean
     public UserDetailsService userDetailsService() {
         return new InMemoryUserDetailsManager(
-                User.withUsername("admin")
-                        .password(passwordEncoder().encode("admin"))
-                        .roles("ADMIN")
-                        .build());
+            User.withUsername("admin")
+                .password(passwordEncoder().encode("admin"))
+                .roles("ADMIN")
+                .build()
+        );
     }
 
     @Bean
