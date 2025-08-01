@@ -3,6 +3,7 @@
 <head>
     <title>Login - Govinc</title>
     <link rel="stylesheet" type="text/css" href="/static/style.css">
+    <th:block th:replace="~{fragments/theme-css :: themeCss}" />
     <style>
         .login-container {
             max-width: 400px;
@@ -33,7 +34,7 @@
             cursor: pointer;
             font-size: 1.1em;
         }
-        .login-container button:hover {
+        .login-container button:hover:not(:disabled) {
             background-color: #25639a;
         }
         .or-separator {
@@ -56,6 +57,39 @@
             color: #d63c3c;
             margin-bottom: 16px;
         }
+        .oauth-btn {
+            display: inline-block;
+            text-decoration: none;
+            padding: 8px 0;
+            width: 100%;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 1.07em;
+            margin-bottom: 8px;
+            border: none;
+            cursor: pointer;
+        }
+        .oauth-keycloak {
+            background:#49236d;
+            color:#fff;
+        }
+        .oauth-azure {
+            background: #0078d4;
+            color: #fff;
+        }
+        .oauth-google {
+            background: #db4437;
+            color: #fff;
+        }
+        .oauth-github {
+            background: #333;
+            color: #fff;
+        }
+        .oauth-btn:disabled, .oauth-btn.disabled {
+            background: #dadada !important;
+            color: #ababab !important;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
@@ -75,7 +109,22 @@
         <label>OR</label>
         <span></span>
     </div>
-    <a href="/oauth2/authorization/keycloak" style="display:inline-block;text-decoration:none;padding:8px 0;width:100%;background:#49236d;color:#fff;border-radius:4px;font-weight:bold;font-size:1.07em;">Login with Keycloak</a>
+    <button class="oauth-btn oauth-keycloak"
+            th:disabled="${!oauthProviders['keycloak']}"
+            th:onclick="${oauthProviders['keycloak']} ? 'window.location=\'/oauth2/authorization/keycloak\'' : 'return false;'"
+            type="button">Login with Keycloak</button>
+    <button class="oauth-btn oauth-azure"
+            th:disabled="${!oauthProviders['azure']}"
+            th:onclick="${oauthProviders['azure']} ? 'window.location=\'/oauth2/authorization/azure\'' : 'return false;'"
+            type="button">Login with Azure</button>
+    <button class="oauth-btn oauth-google"
+            th:disabled="${!oauthProviders['google']}"
+            th:onclick="${oauthProviders['google']} ? 'window.location=\'/oauth2/authorization/google\'' : 'return false;'"
+            type="button">Login with Google</button>
+    <button class="oauth-btn oauth-github"
+            th:disabled="${!oauthProviders['github']}"
+            th:onclick="${oauthProviders['github']} ? 'window.location=\'/oauth2/authorization/github\'' : 'return false;'"
+            type="button">Login with GitHub</button>
 </div>
 </body>
 </html>
