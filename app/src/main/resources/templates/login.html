@@ -117,14 +117,6 @@
             th:disabled="${!oauthProviders['azure']}"
             th:onclick="${oauthProviders['azure']} ? 'window.location=\'/oauth2/authorization/azure\'' : 'return false;'"
             type="button">Login with Azure</button>
-    <button class="oauth-btn oauth-google"
-            th:disabled="${!oauthProviders['google']}"
-            th:onclick="${oauthProviders['google']} ? 'window.location=\'/oauth2/authorization/google\'' : 'return false;'"
-            type="button">Login with Google</button>
-    <button class="oauth-btn oauth-github"
-            th:disabled="${!oauthProviders['github']}"
-            th:onclick="${oauthProviders['github']} ? 'window.location=\'/oauth2/authorization/github\'' : 'return false;'"
-            type="button">Login with GitHub</button>
 </div>
 </body>
 </html>
