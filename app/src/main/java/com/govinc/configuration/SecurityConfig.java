@@ -34,7 +34,13 @@ public class SecurityConfig {
             "/favicon.ico",
             "style.css",
             "/style.css",
+            "/general.css",            
             "/config/openai/suggest-theme",
+            "/theme-css",
+            "/config/layout/**",
+            "/layoutConfig/**",
+            "/config/layout",
+            "/layoutConfig",
             "/login" // Allow login page
     };
 

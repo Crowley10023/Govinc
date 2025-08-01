@@ -14,6 +14,9 @@ public class GlobalLayoutConfigAdvice {
 
     @ModelAttribute("layoutConfig")
     public LayoutConfiguration loadLayoutConfig() {
-        return layoutConfigurationRepository.findAll().stream().findFirst().orElse(null);
+        LayoutConfiguration resu = layoutConfigurationRepository.findAll().stream().findFirst().orElse(null);
+        System.out.println("checked\n\n\n" + resu);
+        System.out.println("PrimaryColor: " + resu.getPrimaryColor());
+        return resu;
     }
 }

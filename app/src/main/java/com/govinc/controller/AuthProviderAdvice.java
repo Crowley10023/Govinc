@@ -1,29 +1,22 @@
 package com.govinc.controller;
 
-import org.springframework.core.env.Environment;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
-import java.util.HashMap;
-import java.util.Map;
 
 @ControllerAdvice
 public class AuthProviderAdvice {
-    private final Environment env;
+    private final AvailableAuthProviders availableAuthProviders;
 
-    public AuthProviderAdvice(Environment env) {
-        this.env = env;
+    public AuthProviderAdvice(AvailableAuthProviders availableAuthProviders) {
+        this.availableAuthProviders = availableAuthProviders;
     }
 
     @ModelAttribute("oauthProviders")
-    public Map<String, Boolean> listProviders() {
-        // Add more providers to this array as needed
-        String[] providers = {"keycloak", "azure", "google", "github"};
-        Map<String, Boolean> map = new HashMap<>();
-        for (String provider : providers) {
-            String cid = env.getProperty(
-                    "spring.security.oauth2.client.registration." + provider + ".client-id");
-            map.put(provider, cid != null && !cid.isBlank());
-        }
+    public java.util.Map<String, Boolean> listProviders() {
+        java.util.Map<String, Boolean> map = new java.util.HashMap<>();
+        map.put("keycloak", availableAuthProviders.isKeycloakAvailable());
+        map.put("azure", availableAuthProviders.isAzureAvailable());
+        // Add more providers if needed, e.g. map.put("google", ...);
         return map;
     }
 }

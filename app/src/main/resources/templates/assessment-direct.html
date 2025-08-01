@@ -5,12 +5,13 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <meta charset="UTF-8">
     <title>Assessment Direct Link</title>
-    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" type="text/css" href="/style.css">
     <link rel="stylesheet" href="/general.css">
     <th:block th:replace="~{fragments/theme-css :: themeCss}" />
 </head>
 
 <body>
+    var(--font-size-nav)
     <nav class="main-navigation fancy-shine"
         style="font-family: var(--nav-font-family); font-size: var(--font-size-nav);">
 
@@ -29,7 +30,7 @@
             </div>
         </div>
     </nav>
-    <div class="container" style="margin:2em;">
+    <div class="container" style="margin:3em;">
         <div class="domain-outline card domain-collapsible assessment-details-collapsible"
             style="margin-bottom: 2.8em;">
             <div class="domain-header" onclick="toggleAssessmentDetails(this)">
