@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <title>Authentication Configuration - Govinc</title>
+    <link rel="stylesheet" type="text/css" href="/style.css">
+    <link rel="stylesheet" href="/general.css">
+    <th:block th:replace="~{fragments/theme-css :: themeCss}" />
+    <style>
+        .auth-config-container {
+            max-width: 1000px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+
+        .provider-card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            padding: 20px;
+        }
+
+        .provider-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .provider-title {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
+        .status-indicator {
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+
+        .status-healthy {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-unhealthy {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-unconfigured {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .form-group input[type=text],
+        .form-group input[type=password] {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            margin-right: 10px;
+        }
+
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .alert {
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .alert-danger {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .provider-form {
+            border-top: 1px solid #eee;
+            padding-top: 15px;
+            margin-top: 15px;
+        }
+
+        .health-details {
+            background: #f8f9fa;
+            border-radius: 4px;
+            padding: 12px;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+
+        .health-details h4 {
+            margin: 0 0 8px 0;
+            font-size: 1em;
+        }
+
+        .health-error {
+            background: #ffe6e6;
+            border: 1px solid #ffcccc;
+        }
+
+        .health-success {
+            background: #e6ffe6;
+            border: 1px solid #ccffcc;
+        }
+
+        .expandable {
+            cursor: pointer;
+        }
+
+        .expandable:hover {
+            background: #f0f0f0;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 15px;
+        }
+
+        .form-row .form-group {
+            flex: 1;
+        }
+
+        .redirect-uri-section {
+            border-top: 1px solid #eee;
+            padding-top: 15px;
+            margin-top: 15px;
+        }
+
+        .health-check-btn {
+            background: #28a745;
+            color: white;
+        }
+
+        .health-check-btn:hover {
+            background: #218838;
+        }
+    </style>
+</head>
+
+<body>
+    <div th:replace="~{navigation :: mainNav}"></div>
+    <div class="container">
+        <div class="auth-config-container">
+            <h1>Authentication Configuration</h1>
+            <p>Configure authentication providers for the application. Changes will require an application restart for
+                full integration.</p>
+
+            <div id="message-area"></div>
+
+            <!-- Status Overview -->
+            <div class="provider-card">
+                <div class="provider-header">
+                    <div class="provider-title">Authentication Status Overview</div>
+                    <button class="btn btn-secondary" onclick="refreshStatus()">Refresh Status</button>
+                </div>
+                <div id="status-overview">
+                    <p>Loading status...</p>
+                </div>
+            </div>
+
+            <!-- Keycloak Configuration -->
+            <div class="provider-card">
+                <div class="provider-header">
+                    <div class="provider-title">Keycloak</div>
+                    <div id="keycloak-status" class="status-indicator status-unconfigured expandable"
+                        onclick="toggleHealthDetails('keycloak')">Loading...</div>
+                </div>
+                <div id="keycloak-health-details" class="health-details hidden"></div>
+                <div class="provider-form">
+                    <form id="keycloak-form" onsubmit="configureKeycloak(event)">
+                        <div class="form-group">
+                            <label for="keycloak-client-id">Client ID:</label>
+                            <input type="text" id="keycloak-client-id" name="clientId" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="keycloak-client-secret">Client Secret:</label>
+                            <input type="password" id="keycloak-client-secret" name="clientSecret" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="keycloak-issuer-uri">Issuer URI:</label>
+                            <input type="text" id="keycloak-issuer-uri" name="issuerUri" required
+                                placeholder="http://your-keycloak-server:8080/realms/your-realm">
+                        </div>
+                        <div class="form-group">
+                            <label for="keycloak-redirect-uri">Redirect URI (optional):</label>
+                            <input type="text" id="keycloak-redirect-uri" name="redirectUri"
+                                placeholder="http://your-app-server:8080/login/oauth2/code/keycloak">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Configure Keycloak</button>
+                        <button type="button" class="btn btn-secondary health-check-btn"
+                            onclick="performHealthCheck('keycloak')">Test Connection</button>
+                        <button type="button" class="btn btn-danger"
+                            onclick="removeProvider('keycloak')">Remove</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Azure Configuration -->
+            <div class="provider-card">
+                <div class="provider-header">
+                    <div class="provider-title">Microsoft Azure AD</div>
+                    <div id="azure-status" class="status-indicator status-unconfigured expandable"
+                        onclick="toggleHealthDetails('azure')">Loading...</div>
+                </div>
+                <div id="azure-health-details" class="health-details hidden"></div>
+                <div class="provider-form">
+                    <form id="azure-form" onsubmit="configureAzure(event)">
+                        <div class="form-group">
+                            <label for="azure-client-id">Client ID:</label>
+                            <input type="text" id="azure-client-id" name="clientId" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="azure-client-secret">Client Secret:</label>
+                            <input type="password" id="azure-client-secret" name="clientSecret" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="azure-tenant-id">Tenant ID:</label>
+                            <input type="text" id="azure-tenant-id" name="tenantId" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="azure-redirect-uri">Redirect URI (optional):</label>
+                            <input type="text" id="azure-redirect-uri" name="redirectUri"
+                                placeholder="{baseUrl}/login/oauth2/code/{registrationId}">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Configure Azure</button>
+                        <button type="button" class="btn btn-secondary health-check-btn"
+                            onclick="performHealthCheck('azure')">Test Connection</button>
+                        <button type="button" class="btn btn-danger" onclick="removeProvider('azure')">Remove</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Form Authentication (Always Available) -->
+            <div class="provider-card">
+                <div class="provider-header">
+                    <div class="provider-title">Local Form Authentication</div>
+                    <div class="status-indicator status-healthy">Always Available</div>
+                </div>
+                <p>Local form-based authentication is always available as a fallback option.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showMessage(message, type) {
+            const messageArea = document.getElementById('message-area');
+            messageArea.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => {
+                messageArea.innerHTML = '';
+            }, 5000);
+        }
+
+        function refreshStatus() {
+            fetch('/admin/auth-config/status')
+                .then(response => response.json())
+                .then(data => {
+                    updateStatusDisplay(data);
+                })
+                .catch(error => {
+                    console.error('Error refreshing status:', error);
+                    showMessage('Failed to refresh status', 'danger');
+                });
+        }
+
+        function updateStatusDisplay(data) {
+            const providers = data.providers;
+
+            // Update individual provider status
+            for (const [providerId, info] of Object.entries(providers)) {
+                const statusElement = document.getElementById(`${providerId}-status`);
+                if (statusElement) {
+                    let statusClass = 'status-unconfigured';
+                    let statusText = 'Not Configured';
+
+                    if (info.configured && info.healthy) {
+                        statusClass = 'status-healthy';
+                        statusText = 'Healthy (click for details)';
+                    } else if (info.configured && !info.healthy) {
+                        statusClass = 'status-unhealthy';
+                        statusText = 'Unhealthy (click for details)';
+                    }
+
+                    statusElement.className = `status-indicator ${statusClass} expandable`;
+                    statusElement.textContent = statusText;
+
+                    // Update health details
+                    updateHealthDetails(providerId, info);
+                }
+
+                // Pre-fill current configuration values
+                if (info.configured) {
+                    fillProviderForm(providerId, info);
+                }
+            }
+
+            // Update overview
+            const overview = document.getElementById('status-overview');
+            const configuredProviders = Object.values(providers).filter(p => p.configured).length;
+            overview.innerHTML = `
+                <p><strong>Total Providers:</strong> ${Object.keys(providers).length}</p>
+                <p><strong>Configured:</strong> ${configuredProviders}</p>
+                <p><strong>OAuth2 Available:</strong> ${data.hasOAuth2 ? 'Yes' : 'No'}</p>
+            `;
+        }
+
+        function configureKeycloak(event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData(form);
+
+            // Show loading state
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.textContent = 'Configuring...';
+            submitBtn.disabled = true;
+
+            fetch('/admin/auth-config/keycloak', {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showMessage(data.message, 'success');
+                        setTimeout(() => refreshStatus(), 1000); // Delay to allow health check to complete
+                    } else {
+                        showMessage(data.message, 'danger');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error configuring Keycloak:', error);
+                    showMessage('Failed to configure Keycloak', 'danger');
+                })
+                .finally(() => {
+                    submitBtn.textContent = originalText;
+                    submitBtn.disabled = false;
+                });
+        }
+
+        function configureAzure(event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData(form);
+
+            // Show loading state
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.textContent = 'Configuring...';
+            submitBtn.disabled = true;
+
+            fetch('/admin/auth-config/azure', {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showMessage(data.message, 'success');
+                        setTimeout(() => refreshStatus(), 1000); // Delay to allow health check to complete
+                    } else {
+                        showMessage(data.message, 'danger');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error configuring Azure:', error);
+                    showMessage('Failed to configure Azure', 'danger');
+                })
+                .finally(() => {
+                    submitBtn.textContent = originalText;
+                    submitBtn.disabled = false;
+                });
+        }
+
+        function removeProvider(providerId) {
+            if (!confirm(`Are you sure you want to remove the ${providerId} provider?`)) {
+                return;
+            }
+
+            fetch(`/admin/auth-config/provider/${providerId}`, {
+                method: 'DELETE'
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showMessage(data.message, 'success');
+                        refreshStatus();
+                    } else {
+                        showMessage(data.message, 'danger');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error removing provider:', error);
+                    showMessage('Failed to remove provider', 'danger');
+                });
+        }
+
+        function toggleHealthDetails(providerId) {
+            const detailsElement = document.getElementById(`${providerId}-health-details`);
+            if (detailsElement.classList.contains('hidden')) {
+                detailsElement.classList.remove('hidden');
+            } else {
+                detailsElement.classList.add('hidden');
+            }
+        }
+
+        function updateHealthDetails(providerId, info) {
+            const detailsElement = document.getElementById(`${providerId}-health-details`);
+            if (!detailsElement) return;
+
+            if (info.healthCheck) {
+                const healthClass = info.healthy ? 'health-success' : 'health-error';
+                detailsElement.className = `health-details ${healthClass}`;
+                detailsElement.innerHTML = `
+                    <h4>Health Check Details</h4>
+                    <p><strong>Status:</strong> ${info.healthCheck.errorCode}</p>
+                    <p><strong>Message:</strong> ${info.healthCheck.message}</p>
+                    ${info.healthCheck.details ? `<p><strong>Details:</strong> ${info.healthCheck.details}</p>` : ''}
+                    <p><strong>Last Check:</strong> ${info.healthCheck.timestamp}</p>
+                    ${info.clientId ? `<p><strong>Client ID:</strong> ${info.clientId}</p>` : ''}
+                    ${info.redirectUri ? `<p><strong>Redirect URI:</strong> ${info.redirectUri}</p>` : ''}
+                    ${info.issuerUri ? `<p><strong>Issuer URI:</strong> ${info.issuerUri}</p>` : ''}
+                    ${info.tenantId ? `<p><strong>Tenant ID:</strong> ${info.tenantId}</p>` : ''}
+                `;
+            } else {
+                detailsElement.className = 'health-details';
+                detailsElement.innerHTML = '<p>No health check data available</p>';
+            }
+        }
+
+        function fillProviderForm(providerId, info) {
+            // Fill current values into form fields (but mask sensitive data)
+            if (providerId === 'keycloak') {
+                if (info.issuerUri) {
+                    document.getElementById('keycloak-issuer-uri').value = info.issuerUri;
+                }
+                if (info.redirectUri) {
+                    document.getElementById('keycloak-redirect-uri').value = info.redirectUri;
+                }
+            } else if (providerId === 'azure') {
+                if (info.tenantId) {
+                    document.getElementById('azure-tenant-id').value = info.tenantId;
+                }
+                if (info.redirectUri) {
+                    document.getElementById('azure-redirect-uri').value = info.redirectUri;
+                }
+            }
+        }
+
+        function performHealthCheck(providerId) {
+            showMessage('Performing health check...', 'success');
+
+            fetch('/admin/auth-config/health-check', {
+                method: 'POST'
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showMessage('Health check completed', 'success');
+                        refreshStatus();
+                    } else {
+                        showMessage('Health check failed: ' + data.message, 'danger');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error performing health check:', error);
+                    showMessage('Failed to perform health check', 'danger');
+                });
+        }
+
+        function updateRedirectUri(providerId) {
+            const redirectUri = document.getElementById(`${providerId}-redirect-uri`).value;
+
+            if (!redirectUri.trim()) {
+                showMessage('Please enter a redirect URI', 'danger');
+                return;
+            }
+
+            fetch(`/admin/auth-config/provider/${providerId}/redirect-uri`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: `redirectUri=${encodeURIComponent(redirectUri)}`
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showMessage(data.message, 'success');
+                        refreshStatus();
+                    } else {
+                        showMessage(data.message, 'danger');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error updating redirect URI:', error);
+                    showMessage('Failed to update redirect URI', 'danger');
+                });
+        }
+
+        // Initial status load
+        document.addEventListener('DOMContentLoaded', function () {
+            refreshStatus();
+        });
+    </script>
+</body>
+
+</html>

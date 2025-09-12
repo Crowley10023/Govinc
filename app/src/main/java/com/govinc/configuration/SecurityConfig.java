@@ -1,5 +1,6 @@
 package com.govinc.configuration;
 
+import com.govinc.service.AuthConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
@@ -41,13 +42,18 @@ public class SecurityConfig {
             "/layoutConfig/**",
             "/config/layout",
             "/layoutConfig",
-            "/login" // Allow login page
+            "/login", // Allow login page
+            "/admin/auth-config/**", // Allow auth config interface
+            "/admin/auth-config"
     };
 
     private static final Logger logger = LoggerFactory.getLogger(SecurityConfig.class);
 
     @Autowired
     private CustomAuthenticationSuccessHandler customAuthenticationSuccessHandler;
+    
+    @Autowired(required = false)
+    private AuthConfigService authConfigService;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -60,11 +66,23 @@ public class SecurityConfig {
             .formLogin(form -> form
                 .loginPage("/login")
                 .permitAll()
-                .successHandler(customAuthenticationSuccessHandler))
-            .oauth2Login(oauth2 -> oauth2
-                .loginPage("/login") // Redirects to our login page for OAuth
-                .successHandler(customAuthenticationSuccessHandler)
-                .failureHandler(oauth2AuthenticationFailureHandler()));
+                .successHandler(customAuthenticationSuccessHandler));
+        
+        // Only configure OAuth2 login if OAuth2 providers are available and configured
+        try {
+            if (authConfigService != null && authConfigService.hasOAuth2Providers()) {
+                http.oauth2Login(oauth2 -> oauth2
+                    .loginPage("/login") // Redirects to our login page for OAuth
+                    .successHandler(customAuthenticationSuccessHandler)
+                    .failureHandler(oauth2AuthenticationFailureHandler()));
+                logger.info("OAuth2 login configured with available providers");
+            } else {
+                logger.info("No OAuth2 providers available - using form authentication only");
+            }
+        } catch (Exception e) {
+            logger.warn("Failed to configure OAuth2 login - falling back to form authentication only: {}", e.getMessage());
+        }
+        
         return http.build();
     }
 

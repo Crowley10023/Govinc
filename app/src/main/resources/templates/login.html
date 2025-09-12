@@ -139,6 +139,11 @@
         <button class="oauth-btn oauth-azure" th:disabled="${!oauthProviders['azure']}"
             th:onclick="${oauthProviders['azure']} ? 'window.location=\'/oauth2/authorization/azure\'' : 'return false;'"
             type="button">Login with Azure</button>
+        
+        <!-- Configuration hint for admins -->
+        <div th:if="${!oauthProviders['keycloak'] && !oauthProviders['azure']}" style="margin-top: 15px; font-size: 0.9em; color: #666; text-align: center;">
+            <p><em>OAuth2 providers not configured. <a href="/admin/auth-config" style="color: #3583ba;">Configure authentication providers</a></em></p>
+        </div>
     </div>
 </body>
 
