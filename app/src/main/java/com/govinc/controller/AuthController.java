@@ -5,8 +5,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 
 @Controller
 public class AuthController {
-    @GetMapping("/login")
-    public String login() {
-        return "login";
-    }
+    // Removed duplicate /login mapping - handled by LoginController
+    // Add other auth-related mappings here if needed
 }

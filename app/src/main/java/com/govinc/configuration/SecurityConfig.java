@@ -1,8 +1,6 @@
 package com.govinc.configuration;
 
 import com.govinc.service.AuthConfigService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -15,11 +13,27 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.beans.factory.annotation.Value;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.logging.Logger;
+import java.util.logging.Level;
 
+/**
+ * Spring Security configuration that supports dynamic authentication providers.
+ * 
+ * This configuration:
+ * - Always provides form-based authentication as a fallback
+ * - Dynamically configures OAuth2 login when providers are available
+ * - Loads users from application.properties for local authentication
+ * - Excludes public endpoints from authentication
+ */
 @Configuration
 public class SecurityConfig {
     // URLs to exclude from authentication (publicly accessible endpoints)
@@ -47,13 +61,20 @@ public class SecurityConfig {
             "/admin/auth-config"
     };
 
-    private static final Logger logger = LoggerFactory.getLogger(SecurityConfig.class);
+    private static final Logger logger = Logger.getLogger(SecurityConfig.class.getName());
 
     @Autowired
     private CustomAuthenticationSuccessHandler customAuthenticationSuccessHandler;
     
     @Autowired(required = false)
     private AuthConfigService authConfigService;
+    
+    @Autowired(required = false)
+    private ClientRegistrationRepository clientRegistrationRepository;
+    
+    // Load users from properties for form-based authentication
+    @Value("#{${users:{:}}}")
+    private Map<String, String> userProperties;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -68,19 +89,22 @@ public class SecurityConfig {
                 .permitAll()
                 .successHandler(customAuthenticationSuccessHandler));
         
-        // Only configure OAuth2 login if OAuth2 providers are available and configured
+        // Configure OAuth2 login if OAuth2 providers are available
+        // The dynamic client registration repository will handle provider availability
         try {
-            if (authConfigService != null && authConfigService.hasOAuth2Providers()) {
+            if (authConfigService != null && authConfigService.hasOAuth2Providers() && clientRegistrationRepository != null) {
                 http.oauth2Login(oauth2 -> oauth2
                     .loginPage("/login") // Redirects to our login page for OAuth
                     .successHandler(customAuthenticationSuccessHandler)
-                    .failureHandler(oauth2AuthenticationFailureHandler()));
-                logger.info("OAuth2 login configured with available providers");
+                    .failureHandler(oauth2AuthenticationFailureHandler())
+                    // Use the dynamic client registration repository
+                    .clientRegistrationRepository(clientRegistrationRepository));
+                logger.info("OAuth2 login configured with " + (authConfigService.getAvailableProviders().size() - 1) + " OAuth2 providers"); // -1 for form auth
             } else {
                 logger.info("No OAuth2 providers available - using form authentication only");
             }
         } catch (Exception e) {
-            logger.warn("Failed to configure OAuth2 login - falling back to form authentication only: {}", e.getMessage());
+            logger.warning("Failed to configure OAuth2 login - falling back to form authentication only: " + e.getMessage());
         }
         
         return http.build();
@@ -93,20 +117,51 @@ public class SecurityConfig {
             public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
                     org.springframework.security.core.AuthenticationException exception)
                     throws IOException, ServletException {
-                logger.error("OAuth2 login failure", exception);
+                //logger.severe("OAuth2 login failure for request from " + request.getRemoteAddr() + ": " + exception.getMessage());
+                //logger.log(java.util.logging.Level.FINE, "OAuth2 login failure details", exception);
                 super.onAuthenticationFailure(request, response, exception);
             }
         };
     }
 
+    /**
+     * Creates UserDetailsService with users loaded from application.properties
+     * Format: users.<username>=<password>[,<email>]
+     */
     @Bean
     public UserDetailsService userDetailsService() {
-        return new InMemoryUserDetailsManager(
-            User.withUsername("admin")
+        List<org.springframework.security.core.userdetails.UserDetails> users = new ArrayList<>();
+        
+        // Add users from properties
+        if (userProperties != null && !userProperties.isEmpty()) {
+            for (Map.Entry<String, String> entry : userProperties.entrySet()) {
+                String username = entry.getKey();
+                String value = entry.getValue();
+                
+                // Parse password and optional email from value
+                String[] parts = value.split(",");
+                String password = parts[0].trim();
+                
+                users.add(User.withUsername(username)
+                    .password(passwordEncoder().encode(password))
+                    .roles("USER", "ADMIN") // All local users get admin role for now
+                    .build());
+                
+                logger.fine("Loaded local user: " + username);
+            }
+        }
+        
+        // Always ensure at least one admin user exists
+        if (users.isEmpty()) {
+            users.add(User.withUsername("admin")
                 .password(passwordEncoder().encode("admin"))
                 .roles("ADMIN")
-                .build()
-        );
+                .build());
+            logger.warning("No users configured in properties, using default admin/admin");
+        }
+        
+        logger.info("Configured " + users.size() + " local users for form-based authentication");
+        return new InMemoryUserDetailsManager(users);
     }
 
     @Bean

@@ -128,6 +128,18 @@
             color: #721c24;
         }
 
+        .alert-warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+
         .hidden {
             display: none;
         }
@@ -192,6 +204,24 @@
         .health-check-btn:hover {
             background: #218838;
         }
+
+        .health-check-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        .auto-refresh-indicator {
+            font-size: 0.8em;
+            color: #6c757d;
+            margin-top: 10px;
+        }
     </style>
 </head>
 
@@ -200,8 +230,7 @@
     <div class="container">
         <div class="auth-config-container">
             <h1>Authentication Configuration</h1>
-            <p>Configure authentication providers for the application. Changes will require an application restart for
-                full integration.</p>
+            <p>Configure authentication providers for the application. Form authentication is always available as a fallback.</p>
 
             <div id="message-area"></div>
 
@@ -209,10 +238,20 @@
             <div class="provider-card">
                 <div class="provider-header">
                     <div class="provider-title">Authentication Status Overview</div>
-                    <button class="btn btn-secondary" onclick="refreshStatus()">Refresh Status</button>
+                    <div>
+                        <button class="btn btn-secondary" onclick="refreshStatus()">Refresh Status</button>
+                        <button class="btn health-check-btn" onclick="performHealthCheck()">Test All Connections</button>
+                    </div>
                 </div>
                 <div id="status-overview">
                     <p>Loading status...</p>
+                </div>
+                <div class="alert alert-info" style="margin-top: 15px; font-size: 0.9em;">
+                    <strong>Note:</strong> Changes to authentication providers may require an application restart for full integration. 
+                    Form authentication is always available as a fallback option.
+                </div>
+                <div class="auto-refresh-indicator">
+                    Status automatically refreshes every 30 seconds
                 </div>
             </div>
 
@@ -246,7 +285,7 @@
                         </div>
                         <button type="submit" class="btn btn-primary">Configure Keycloak</button>
                         <button type="button" class="btn btn-secondary health-check-btn"
-                            onclick="performHealthCheck('keycloak')">Test Connection</button>
+                            onclick="performProviderHealthCheck('keycloak')">Test Connection</button>
                         <button type="button" class="btn btn-danger"
                             onclick="removeProvider('keycloak')">Remove</button>
                     </form>
@@ -282,7 +321,7 @@
                         </div>
                         <button type="submit" class="btn btn-primary">Configure Azure</button>
                         <button type="button" class="btn btn-secondary health-check-btn"
-                            onclick="performHealthCheck('azure')">Test Connection</button>
+                            onclick="performProviderHealthCheck('azure')">Test Connection</button>
                         <button type="button" class="btn btn-danger" onclick="removeProvider('azure')">Remove</button>
                     </form>
                 </div>
@@ -295,17 +334,24 @@
                     <div class="status-indicator status-healthy">Always Available</div>
                 </div>
                 <p>Local form-based authentication is always available as a fallback option.</p>
+                <p><em>Users are configured in application.properties under the 'users.*' properties.</em></p>
             </div>
         </div>
     </div>
 
     <script>
-        function showMessage(message, type) {
+        function showMessage(message, type, permanent = false) {
             const messageArea = document.getElementById('message-area');
             messageArea.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
-            setTimeout(() => {
-                messageArea.innerHTML = '';
-            }, 5000);
+            if (!permanent) {
+                setTimeout(() => {
+                    messageArea.innerHTML = '';
+                }, 8000);
+            }
+        }
+        
+        function clearMessage() {
+            document.getElementById('message-area').innerHTML = '';
         }
 
         function refreshStatus() {
@@ -316,7 +362,7 @@
                 })
                 .catch(error => {
                     console.error('Error refreshing status:', error);
-                    showMessage('Failed to refresh status', 'danger');
+                    showMessage('Failed to refresh status: ' + error.message, 'danger');
                 });
         }
 
@@ -354,10 +400,30 @@
             // Update overview
             const overview = document.getElementById('status-overview');
             const configuredProviders = Object.values(providers).filter(p => p.configured).length;
+            const healthyProviders = Object.values(providers).filter(p => p.configured && p.healthy).length;
+            
+            let statusClass = 'success';
+            let statusMessage = 'All systems operational';
+            
+            if (healthyProviders < configuredProviders) {
+                statusClass = 'warning';
+                statusMessage = 'Some providers have issues';
+            }
+            if (configuredProviders === 0) {
+                statusClass = 'info';
+                statusMessage = 'Only form authentication available';
+            }
+            
             overview.innerHTML = `
-                <p><strong>Total Providers:</strong> ${Object.keys(providers).length}</p>
-                <p><strong>Configured:</strong> ${configuredProviders}</p>
-                <p><strong>OAuth2 Available:</strong> ${data.hasOAuth2 ? 'Yes' : 'No'}</p>
+                <div class="alert alert-${statusClass}" style="margin-bottom: 15px;">
+                    <strong>System Status:</strong> ${statusMessage}
+                </div>
+                <div class="status-grid">
+                    <div><strong>Total Providers:</strong> ${Object.keys(providers).length}</div>
+                    <div><strong>Configured:</strong> ${configuredProviders}</div>
+                    <div><strong>Healthy:</strong> ${healthyProviders}</div>
+                    <div><strong>OAuth2 Available:</strong> ${data.hasOAuth2 ? 'Yes' : 'No'}</div>
+                </div>
             `;
         }
 
@@ -380,14 +446,14 @@
                 .then(data => {
                     if (data.status === 'success') {
                         showMessage(data.message, 'success');
-                        setTimeout(() => refreshStatus(), 1000); // Delay to allow health check to complete
+                        setTimeout(() => refreshStatus(), 1000);
                     } else {
                         showMessage(data.message, 'danger');
                     }
                 })
                 .catch(error => {
                     console.error('Error configuring Keycloak:', error);
-                    showMessage('Failed to configure Keycloak', 'danger');
+                    showMessage('Failed to configure Keycloak: ' + error.message, 'danger');
                 })
                 .finally(() => {
                     submitBtn.textContent = originalText;
@@ -414,14 +480,14 @@
                 .then(data => {
                     if (data.status === 'success') {
                         showMessage(data.message, 'success');
-                        setTimeout(() => refreshStatus(), 1000); // Delay to allow health check to complete
+                        setTimeout(() => refreshStatus(), 1000);
                     } else {
                         showMessage(data.message, 'danger');
                     }
                 })
                 .catch(error => {
                     console.error('Error configuring Azure:', error);
-                    showMessage('Failed to configure Azure', 'danger');
+                    showMessage('Failed to configure Azure: ' + error.message, 'danger');
                 })
                 .finally(() => {
                     submitBtn.textContent = originalText;
@@ -448,7 +514,7 @@
                 })
                 .catch(error => {
                     console.error('Error removing provider:', error);
-                    showMessage('Failed to remove provider', 'danger');
+                    showMessage('Failed to remove provider: ' + error.message, 'danger');
                 });
         }
 
@@ -504,8 +570,17 @@
             }
         }
 
-        function performHealthCheck(providerId) {
-            showMessage('Performing health check...', 'success');
+        function performHealthCheck() {
+            clearMessage();
+            showMessage('Performing comprehensive health check...', 'info', true);
+            
+            // Disable health check button during check
+            const healthCheckBtns = document.querySelectorAll('.health-check-btn');
+            healthCheckBtns.forEach(btn => {
+                btn.disabled = true;
+                const originalText = btn.textContent;
+                btn.textContent = btn.textContent.includes('All') ? 'Checking All...' : 'Checking...';
+            });
 
             fetch('/admin/auth-config/health-check', {
                 method: 'POST'
@@ -513,7 +588,14 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success') {
-                        showMessage('Health check completed', 'success');
+                        let resultSummary = 'Health check completed. ';
+                        const results = data.results || {};
+                        const totalChecked = Object.keys(results).length;
+                        const healthyCount = Object.values(results).filter(r => r.healthy).length;
+                        
+                        resultSummary += `${healthyCount}/${totalChecked} providers healthy.`;
+                        
+                        showMessage(resultSummary, healthyCount === totalChecked ? 'success' : 'warning');
                         refreshStatus();
                     } else {
                         showMessage('Health check failed: ' + data.message, 'danger');
@@ -521,43 +603,56 @@
                 })
                 .catch(error => {
                     console.error('Error performing health check:', error);
-                    showMessage('Failed to perform health check', 'danger');
-                });
-        }
-
-        function updateRedirectUri(providerId) {
-            const redirectUri = document.getElementById(`${providerId}-redirect-uri`).value;
-
-            if (!redirectUri.trim()) {
-                showMessage('Please enter a redirect URI', 'danger');
-                return;
-            }
-
-            fetch(`/admin/auth-config/provider/${providerId}/redirect-uri`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                },
-                body: `redirectUri=${encodeURIComponent(redirectUri)}`
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        showMessage(data.message, 'success');
-                        refreshStatus();
-                    } else {
-                        showMessage(data.message, 'danger');
-                    }
+                    showMessage('Failed to perform health check: ' + error.message, 'danger');
                 })
-                .catch(error => {
-                    console.error('Error updating redirect URI:', error);
-                    showMessage('Failed to update redirect URI', 'danger');
+                .finally(() => {
+                    // Re-enable health check buttons
+                    const healthCheckBtns = document.querySelectorAll('.health-check-btn');
+                    healthCheckBtns.forEach(btn => {
+                        btn.disabled = false;
+                        if (btn.textContent.includes('Checking All')) {
+                            btn.textContent = 'Test All Connections';
+                        } else if (btn.textContent.includes('Checking')) {
+                            btn.textContent = 'Test Connection';
+                        }
+                    });
                 });
         }
 
-        // Initial status load
+        function performProviderHealthCheck(providerId) {
+            showMessage(`Testing ${providerId} connection...`, 'info');
+            performHealthCheck(); // For now, just run full health check
+        }
+
+        // Auto-refresh status every 30 seconds
+        let autoRefreshInterval;
+        
+        function startAutoRefresh() {
+            autoRefreshInterval = setInterval(() => {
+                refreshStatus();
+            }, 30000);
+        }
+        
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+            }
+        }
+        
+        // Initial status load and start auto-refresh
         document.addEventListener('DOMContentLoaded', function () {
             refreshStatus();
+            startAutoRefresh();
+        });
+        
+        // Stop auto-refresh when page is not visible
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                stopAutoRefresh();
+            } else {
+                refreshStatus();
+                startAutoRefresh();
+            }
         });
     </script>
 </body>
