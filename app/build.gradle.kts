@@ -13,6 +13,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa") // JPA & persistence
     implementation("org.mariadb.jdbc:mariadb-java-client:3.3.3") // MariaDB driver    
+    runtimeOnly("com.h2database:h2") // H2 Database for development/testing
     implementation("jakarta.persistence:jakarta.persistence-api:3.1.0") // Jakarta Persistence
     implementation("org.springframework.boot:spring-boot-starter") // Spring Application core dependency
     implementation("org.hibernate.orm:hibernate-core:6.4.4.Final") // Hibernate Core with MariaDB dialect
