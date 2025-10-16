@@ -58,7 +58,7 @@ check_database_exists() {
     local database="$5"
     
     local output
-    output=$(mysql -h"$host" -P"$port" -u"$user" -p"$password" -e "SHOW DATABASES LIKE '$database';" 2>/dev/null)
+    output=$(sudo mysql -h"$host" -P"$port" -u"$user" -p"$password" -e "SHOW DATABASES LIKE '$database';" 2>/dev/null)
     
     if [[ -n "$output" && "$output" != *"Database"* ]]; then
         return 0  # Database exists
@@ -88,9 +88,9 @@ test_db_connection() {
     # Test basic connectivity first with timeout
     local connection_test
     if [ -n "$timeout_cmd" ]; then
-        connection_test=$($timeout_cmd mysql -h"$host" -P"$port" -u"$user" -p"$password" --connect-timeout=10 -e "SELECT 1;" 2>&1)
+        connection_test=$($timeout_cmd sudo mysql -h"$host" -P"$port" -u"$user" -p"$password" --connect-timeout=10 -e "SELECT 1;" 2>&1)
     else
-        connection_test=$(mysql -h"$host" -P"$port" -u"$user" -p"$password" --connect-timeout=10 -e "SELECT 1;" 2>&1)
+        connection_test=$(sudo mysql -h"$host" -P"$port" -u"$user" -p"$password" --connect-timeout=10 -e "SELECT 1;" 2>&1)
     fi
     local conn_result=$?
     
@@ -132,9 +132,9 @@ test_db_connection() {
         # Just test the connection without checking database existence with timeout
         local db_test
         if [ -n "$timeout_cmd" ]; then
-            db_test=$($timeout_cmd mysql -h"$host" -P"$port" -u"$user" -p"$password" --connect-timeout=10 -e "USE $database;" 2>&1)
+            db_test=$($timeout_cmd sudo mysql -h"$host" -P"$port" -u"$user" -p"$password" --connect-timeout=10 -e "USE $database;" 2>&1)
         else
-            db_test=$(mysql -h"$host" -P"$port" -u"$user" -p"$password" --connect-timeout=10 -e "USE $database;" 2>&1)
+            db_test=$(sudo mysql -h"$host" -P"$port" -u"$user" -p"$password" --connect-timeout=10 -e "USE $database;" 2>&1)
         fi
         local db_result=$?
         
@@ -167,7 +167,7 @@ create_database() {
     # Test root connection first
     echo -e "${YELLOW}Testing root connection...${NC}"
     local root_test
-    root_test=$(mysql -h"$host" -P"$port" -uroot -p"$root_password" -e "SELECT 1;" 2>&1)
+    root_test=$(sudo mysql -h"$host" -P"$port" -uroot -p"$root_password" -e "SELECT 1;" 2>&1)
     
     if [ $? -ne 0 ]; then
         echo -e "${RED}✗ Cannot connect as root user!${NC}"
@@ -189,7 +189,7 @@ create_database() {
     
     # Create database and user
     local create_output
-    create_output=$(mysql -h"$host" -P"$port" -uroot -p"$root_password" 2>&1 << EOF
+    create_output=$(sudo mysql -h"$host" -P"$port" -uroot -p"$root_password" 2>&1 << EOF
 CREATE DATABASE IF NOT EXISTS $DB_NAME CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$db_password';
 CREATE USER IF NOT EXISTS '$DB_USER'@'%' IDENTIFIED BY '$db_password';
