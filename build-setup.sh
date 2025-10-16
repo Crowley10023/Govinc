@@ -5,8 +5,9 @@
 #
 # Password Handling Security Notes:
 # - Removed 'sudo' from mysql commands to fix password piping issues
-# - Using MYSQL_PWD environment variable instead of -p flag for better security
-# - This prevents passwords from appearing in process lists and command history
+# - Using temporary configuration files with secure permissions (600) for authentication
+# - This prevents passwords from appearing in process lists, command history, and environment variables
+# - Temporary files are automatically cleaned up after use
 
 set -e  # Exit on any error
 
@@ -28,7 +29,7 @@ echo -e "${BLUE}  Theia01 Governance Tool Build Setup  ${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo
 
-# Alternative secure password handling using temporary config file
+# Secure password handling using temporary config file
 create_mysql_config_file() {
     local user="$1"
     local password="$2"
@@ -52,6 +53,47 @@ cleanup_mysql_config() {
     if [ -f "$config_file" ]; then
         rm -f "$config_file"
     fi
+}
+
+# Function to execute MySQL command with temporary config file
+execute_mysql_with_config() {
+    local host="$1"
+    local port="$2"
+    local user="$3"
+    local password="$4"
+    local mysql_command="$5"
+    local timeout_duration="${6:-30}"
+    
+    # Create temporary config file
+    local temp_config
+    temp_config=$(mktemp -t mysql_config_XXXXXX.cnf)
+    
+    # Set up cleanup trap
+    trap "cleanup_mysql_config '$temp_config'" RETURN EXIT INT TERM
+    
+    # Create config file
+    create_mysql_config_file "$user" "$password" "$host" "$port" "$temp_config"
+    
+    # Execute MySQL command with timeout
+    local result
+    local timeout_cmd="timeout $timeout_duration"
+    if ! command -v timeout &> /dev/null; then
+        timeout_cmd=""
+    fi
+    
+    if [ -n "$timeout_cmd" ]; then
+        result=$($timeout_cmd mysql --defaults-file="$temp_config" -e "$mysql_command" 2>&1)
+    else
+        result=$(mysql --defaults-file="$temp_config" -e "$mysql_command" 2>&1)
+    fi
+    local exit_code=$?
+    
+    # Clean up
+    cleanup_mysql_config "$temp_config"
+    
+    # Return result
+    echo "$result"
+    return $exit_code
 }
 
 # Function to test if MySQL server is reachable (without authentication)
@@ -135,10 +177,23 @@ check_database_exists() {
     local password="$4"
     local database="$5"
     
+    # Create temporary config file
+    local temp_config
+    temp_config=$(mktemp -t mysql_config_XXXXXX.cnf)
+    
+    # Set up cleanup trap
+    trap "cleanup_mysql_config '$temp_config'" RETURN EXIT INT TERM
+    
+    # Create config file
+    create_mysql_config_file "$user" "$password" "$host" "$port" "$temp_config"
+    
+    # Execute command
     local output
-    # Use environment variable to pass password securely
-    MYSQL_PWD="$password" output=$(mysql -h"$host" -P"$port" -u"$user" -e "SHOW DATABASES LIKE '$database';" 2>/dev/null)
+    output=$(mysql --defaults-file="$temp_config" -e "SHOW DATABASES LIKE '$database';" 2>/dev/null)
     local result=$?
+    
+    # Clean up
+    cleanup_mysql_config "$temp_config"
     
     # Check if the command succeeded and if the database name appears in output
     if [ $result -eq 0 ] && [[ -n "$output" ]] && echo "$output" | grep -q "$database"; then
@@ -176,11 +231,22 @@ test_db_connection() {
     
     # Test basic connectivity first with timeout
     echo -e "${YELLOW}  Step 1: Testing basic connection...${NC}"
+    
+    # Create temporary config file
+    local temp_config
+    temp_config=$(mktemp -t mysql_config_XXXXXX.cnf)
+    
+    # Set up cleanup trap
+    trap "cleanup_mysql_config '$temp_config'" RETURN EXIT INT TERM
+    
+    # Create config file
+    create_mysql_config_file "$user" "$password" "$host" "$port" "$temp_config"
+    
     local connection_test
     if [ -n "$timeout_cmd" ]; then
-        MYSQL_PWD="$password" connection_test=$($timeout_cmd mysql -h"$host" -P"$port" -u"$user" --connect-timeout=10 -e "SELECT 1 AS test;" 2>&1)
+        connection_test=$($timeout_cmd mysql --defaults-file="$temp_config" --connect-timeout=10 -e "SELECT 1 AS test;" 2>&1)
     else
-        MYSQL_PWD="$password" connection_test=$(mysql -h"$host" -P"$port" -u"$user" --connect-timeout=10 -e "SELECT 1 AS test;" 2>&1)
+        connection_test=$(mysql --defaults-file="$temp_config" --connect-timeout=10 -e "SELECT 1 AS test;" 2>&1)
     fi
     local conn_result=$?
     
@@ -240,9 +306,9 @@ test_db_connection() {
         echo -e "${YELLOW}  Step 2: Testing database access...${NC}"
         local db_test
         if [ -n "$timeout_cmd" ]; then
-            MYSQL_PWD="$password" db_test=$($timeout_cmd mysql -h"$host" -P"$port" -u"$user" --connect-timeout=10 -e "USE \`$database\`; SELECT 'OK' AS status;" 2>&1)
+            db_test=$($timeout_cmd mysql --defaults-file="$temp_config" --connect-timeout=10 -e "USE \`$database\`; SELECT 'OK' AS status;" 2>&1)
         else
-            MYSQL_PWD="$password" db_test=$(mysql -h"$host" -P"$port" -u"$user" --connect-timeout=10 -e "USE \`$database\`; SELECT 'OK' AS status;" 2>&1)
+            db_test=$(mysql --defaults-file="$temp_config" --connect-timeout=10 -e "USE \`$database\`; SELECT 'OK' AS status;" 2>&1)
         fi
         local db_result=$?
         
@@ -270,6 +336,9 @@ test_db_connection() {
             return 2
         fi
     fi
+    
+    # Clean up temporary config file
+    cleanup_mysql_config "$temp_config"
 }
 
 # Function to create database and user with detailed error handling
@@ -284,10 +353,21 @@ create_database() {
     echo -e "${BLUE}  Database: $DB_NAME${NC}"
     echo -e "${BLUE}  User: $DB_USER${NC}"
     
-    # Test root connection first
+    # Test root connection first using temporary config file
     echo -e "${YELLOW}Testing root connection...${NC}"
+    
+    # Create temporary config file for root user
+    local root_temp_config
+    root_temp_config=$(mktemp -t mysql_root_config_XXXXXX.cnf)
+    
+    # Set up cleanup trap for root config
+    trap "cleanup_mysql_config '$root_temp_config'" RETURN EXIT INT TERM
+    
+    # Create root config file
+    create_mysql_config_file "root" "$root_password" "$host" "$port" "$root_temp_config"
+    
     local root_test
-    MYSQL_PWD="$root_password" root_test=$(mysql -h"$host" -P"$port" -uroot -e "SELECT 1;" 2>&1)
+    root_test=$(mysql --defaults-file="$root_temp_config" -e "SELECT 1;" 2>&1)
     
     if [ $? -ne 0 ]; then
         echo -e "${RED}✗ Cannot connect as root user!${NC}"
@@ -296,6 +376,7 @@ create_database() {
         else
             echo -e "${RED}  Error details: $root_test${NC}"
         fi
+        cleanup_mysql_config "$root_temp_config"
         return 1
     fi
     
@@ -307,10 +388,9 @@ create_database() {
         echo -e "${YELLOW}Ensuring user '$DB_USER' has proper permissions...${NC}"
     fi
     
-    # Create database and user
+    # Create database and user using temporary config file
     local create_output
-    export MYSQL_PWD="$root_password"
-    create_output=$(mysql -h"$host" -P"$port" -uroot 2>&1 << EOF
+    create_output=$(mysql --defaults-file="$root_temp_config" 2>&1 << EOF
 CREATE DATABASE IF NOT EXISTS $DB_NAME CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$db_password';
 CREATE USER IF NOT EXISTS '$DB_USER'@'%' IDENTIFIED BY '$db_password';
@@ -320,7 +400,9 @@ FLUSH PRIVILEGES;
 EOF
 )
     local create_result=$?
-    unset MYSQL_PWD
+    
+    # Clean up root config file
+    cleanup_mysql_config "$root_temp_config"
     
     if [ $create_result -eq 0 ]; then
         echo -e "${GREEN}✓ Database and user created/updated successfully!${NC}"
