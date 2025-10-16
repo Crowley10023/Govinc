@@ -54,6 +54,53 @@ cleanup_mysql_config() {
     fi
 }
 
+# Function to test if MySQL server is reachable (without authentication)
+test_mysql_server_reachable() {
+    local host="$1"
+    local port="$2"
+    
+    echo -e "${YELLOW}Testing if MySQL server is reachable at $host:$port...${NC}"
+    
+    # Try to connect without credentials to see if server responds
+    local server_test
+    server_test=$(mysql -h"$host" -P"$port" -u"nonexistent_user" --connect-timeout=5 -e "SELECT 1;" 2>&1 || true)
+    
+    if echo "$server_test" | grep -qi "Access denied"; then
+        echo -e "${GREEN}  ✓ MySQL server is reachable (authentication required)${NC}"
+        return 0
+    elif echo "$server_test" | grep -qi "Can't connect"; then
+        echo -e "${RED}  ✗ Cannot reach MySQL server${NC}"
+        echo -e "${RED}  Server may be down or host/port incorrect${NC}"
+        return 1
+    elif echo "$server_test" | grep -qi "Unknown database"; then
+        echo -e "${GREEN}  ✓ MySQL server is reachable${NC}"
+        return 0
+    else
+        echo -e "${YELLOW}  ? Server response unclear: $server_test${NC}"
+        return 0  # Assume reachable if we get any response
+    fi
+}
+
+# Function to check if MySQL client is installed
+check_mysql_client_installed() {
+    if command -v mysql &> /dev/null; then
+        echo -e "${GREEN}✓ MySQL client found: $(which mysql)${NC}"
+        mysql --version 2>/dev/null || echo -e "${YELLOW}  Warning: Could not get MySQL client version${NC}"
+        return 0
+    elif command -v mariadb &> /dev/null; then
+        echo -e "${GREEN}✓ MariaDB client found: $(which mariadb)${NC}"
+        mariadb --version 2>/dev/null || echo -e "${YELLOW}  Warning: Could not get MariaDB client version${NC}"
+        return 0
+    else
+        echo -e "${RED}✗ No MySQL/MariaDB client found${NC}"
+        echo -e "${YELLOW}  Install with:${NC}"
+        echo -e "${YELLOW}    Ubuntu/Debian: sudo apt-get install mysql-client${NC}"
+        echo -e "${YELLOW}    RHEL/CentOS:   sudo yum install mysql${NC}"
+        echo -e "${YELLOW}    macOS:         brew install mysql-client${NC}"
+        return 1
+    fi
+}
+
 # Function to check if MariaDB/MySQL is installed
 check_mariadb_installed() {
     if command -v mysql &> /dev/null; then
@@ -91,11 +138,13 @@ check_database_exists() {
     local output
     # Use environment variable to pass password securely
     MYSQL_PWD="$password" output=$(mysql -h"$host" -P"$port" -u"$user" -e "SHOW DATABASES LIKE '$database';" 2>/dev/null)
+    local result=$?
     
-    if [[ -n "$output" && "$output" != *"Database"* ]]; then
+    # Check if the command succeeded and if the database name appears in output
+    if [ $result -eq 0 ] && [[ -n "$output" ]] && echo "$output" | grep -q "$database"; then
         return 0  # Database exists
     else
-        return 1  # Database doesn't exist
+        return 1  # Database doesn't exist or connection failed
     fi
 }
 
@@ -109,6 +158,14 @@ test_db_connection() {
     local check_db_exists="${6:-true}"
     
     echo -e "${YELLOW}Testing database connection to $host:$port...${NC}"
+    echo -e "${BLUE}  User: $user${NC}"
+    echo -e "${BLUE}  Database: $database${NC}"
+    
+    # Check if MySQL client is available
+    if ! command -v mysql &> /dev/null; then
+        echo -e "${RED}✗ MySQL client not found! Please install mysql-client or mariadb-client${NC}"
+        return 1
+    fi
     
     # Set timeout for mysql commands to prevent hanging
     local timeout_cmd="timeout 30"
@@ -118,13 +175,20 @@ test_db_connection() {
     fi
     
     # Test basic connectivity first with timeout
+    echo -e "${YELLOW}  Step 1: Testing basic connection...${NC}"
     local connection_test
     if [ -n "$timeout_cmd" ]; then
-        MYSQL_PWD="$password" connection_test=$($timeout_cmd mysql -h"$host" -P"$port" -u"$user" --connect-timeout=10 -e "SELECT 1;" 2>&1)
+        MYSQL_PWD="$password" connection_test=$($timeout_cmd mysql -h"$host" -P"$port" -u"$user" --connect-timeout=10 -e "SELECT 1 AS test;" 2>&1)
     else
-        MYSQL_PWD="$password" connection_test=$(mysql -h"$host" -P"$port" -u"$user" --connect-timeout=10 -e "SELECT 1;" 2>&1)
+        MYSQL_PWD="$password" connection_test=$(mysql -h"$host" -P"$port" -u"$user" --connect-timeout=10 -e "SELECT 1 AS test;" 2>&1)
     fi
     local conn_result=$?
+    
+    # Debug: Show what we're getting
+    echo -e "${BLUE}  Connection test result: $conn_result${NC}"
+    if [ $conn_result -ne 0 ]; then
+        echo -e "${BLUE}  Connection test output: $connection_test${NC}"
+    fi
     
     # Handle timeout or connection failure
     if [ $conn_result -eq 124 ]; then
@@ -135,24 +199,30 @@ test_db_connection() {
         echo -e "${RED}✗ Database connection failed!${NC}"
         
         # Analyze the error and provide specific feedback
-        if echo "$connection_test" | grep -q "Access denied"; then
+        if echo "$connection_test" | grep -qi "Access denied"; then
             echo -e "${RED}  Error: Access denied - Invalid username or password${NC}"
-        elif echo "$connection_test" | grep -q "Can't connect to"; then
+            echo -e "${RED}  Hint: Check if user '$user' exists and password is correct${NC}"
+        elif echo "$connection_test" | grep -qi "Can't connect to"; then
             echo -e "${RED}  Error: Cannot connect to database server${NC}"
             echo -e "${RED}  Possible causes:${NC}"
             echo -e "${RED}  - Database server is not running${NC}"
             echo -e "${RED}  - Wrong host or port${NC}"
             echo -e "${RED}  - Firewall blocking connection${NC}"
-        elif echo "$connection_test" | grep -q "Unknown database"; then
+        elif echo "$connection_test" | grep -qi "Unknown database"; then
             echo -e "${RED}  Error: Database '$database' does not exist${NC}"
+        elif echo "$connection_test" | grep -qi "command not found"; then
+            echo -e "${RED}  Error: MySQL client is not installed${NC}"
         else
             echo -e "${RED}  Error details: $connection_test${NC}"
         fi
         return 1
     fi
     
+    echo -e "${GREEN}  ✓ Basic connection successful${NC}"
+    
     # If we should check database existence
     if [[ "$check_db_exists" == "true" ]]; then
+        echo -e "${YELLOW}  Step 2: Checking if database '$database' exists...${NC}"
         if check_database_exists "$host" "$port" "$user" "$password" "$database"; then
             echo -e "${GREEN}✓ Database connection successful! Database '$database' exists.${NC}"
             return 0
@@ -162,13 +232,20 @@ test_db_connection() {
         fi
     else
         # Just test the connection without checking database existence with timeout
+        echo -e "${YELLOW}  Step 2: Testing database access...${NC}"
         local db_test
         if [ -n "$timeout_cmd" ]; then
-            MYSQL_PWD="$password" db_test=$($timeout_cmd mysql -h"$host" -P"$port" -u"$user" --connect-timeout=10 -e "USE $database;" 2>&1)
+            MYSQL_PWD="$password" db_test=$($timeout_cmd mysql -h"$host" -P"$port" -u"$user" --connect-timeout=10 -e "USE \`$database\`; SELECT 'OK' AS status;" 2>&1)
         else
-            MYSQL_PWD="$password" db_test=$(mysql -h"$host" -P"$port" -u"$user" --connect-timeout=10 -e "USE $database;" 2>&1)
+            MYSQL_PWD="$password" db_test=$(mysql -h"$host" -P"$port" -u"$user" --connect-timeout=10 -e "USE \`$database\`; SELECT 'OK' AS status;" 2>&1)
         fi
         local db_result=$?
+        
+        # Debug: Show database test result
+        echo -e "${BLUE}  Database test result: $db_result${NC}"
+        if [ $db_result -ne 0 ]; then
+            echo -e "${BLUE}  Database test output: $db_test${NC}"
+        fi
         
         if [ $db_result -eq 124 ]; then
             echo -e "${YELLOW}⚠ Database access test timed out.${NC}"
@@ -178,7 +255,13 @@ test_db_connection() {
             return 0
         else
             echo -e "${YELLOW}⚠ Database connection successful, but cannot access database '$database'.${NC}"
-            echo -e "${YELLOW}  This might be due to missing permissions or the database not existing.${NC}"
+            if echo "$db_test" | grep -qi "Unknown database"; then
+                echo -e "${YELLOW}  Reason: Database '$database' does not exist${NC}"
+            elif echo "$db_test" | grep -qi "Access denied"; then
+                echo -e "${YELLOW}  Reason: User '$user' does not have permission to access database${NC}"
+            else
+                echo -e "${YELLOW}  Details: $db_test${NC}"
+            fi
             return 2
         fi
     fi
@@ -377,6 +460,35 @@ setup_database() {
         1)
             echo -e "${YELLOW}Connecting to existing database...${NC}"
             
+            # Pre-flight check: MySQL client
+            echo -e "${BLUE}Checking MySQL client availability...${NC}"
+            if ! check_mysql_client_installed; then
+                echo -e "${RED}MySQL client is required but not found!${NC}"
+                echo -e "${YELLOW}Options:${NC}"
+                echo "1. Install MySQL client and retry"
+                echo "2. Use H2 fallback database"
+                read -p "Choose option (1-2): " client_option
+                
+                if [[ $client_option == "2" ]]; then
+                    echo -e "${YELLOW}Using H2 fallback database.${NC}"
+                    setup_h2_fallback
+                    return 0
+                else
+                    echo -e "${RED}Please install MySQL client and run the script again.${NC}"
+                    return 1
+                fi
+            fi
+            
+            # Test basic MySQL client functionality
+            echo -e "${BLUE}Testing MySQL client basic functionality...${NC}"
+            if ! mysql --help >/dev/null 2>&1; then
+                echo -e "${RED}✗ MySQL client appears to be broken or misconfigured${NC}"
+                echo -e "${YELLOW}Using H2 fallback database.${NC}"
+                setup_h2_fallback
+                return 0
+            fi
+            echo -e "${GREEN}✓ MySQL client is working${NC}"
+            
             local max_retries=3
             local retry_count=0
             local connection_successful=false
@@ -407,6 +519,25 @@ setup_database() {
                 
                 read -s -p "Database password: " db_password
                 echo
+                
+                # Show what we're trying to connect with (without password)
+                echo -e "${BLUE}Attempting connection with:${NC}"
+                echo -e "${BLUE}  Host: $db_host${NC}"
+                echo -e "${BLUE}  Port: $db_port${NC}"
+                echo -e "${BLUE}  User: $db_user${NC}"
+                echo -e "${BLUE}  Database: $db_name${NC}"
+                echo -e "${BLUE}  Password: $(echo "$db_password" | sed 's/./*/g')${NC}"
+                echo
+                
+                # First test if server is reachable
+                if ! test_mysql_server_reachable "$db_host" "$db_port"; then
+                    echo -e "${RED}Cannot reach MySQL server. Please check:${NC}"
+                    echo -e "${RED}  1. Server is running${NC}"
+                    echo -e "${RED}  2. Host and port are correct${NC}"
+                    echo -e "${RED}  3. Firewall settings${NC}"
+                    retry_count=$((retry_count + 1))
+                    continue
+                fi
                 
                 local conn_result
                 test_db_connection "$db_host" "$db_port" "$db_user" "$db_password" "$db_name"
