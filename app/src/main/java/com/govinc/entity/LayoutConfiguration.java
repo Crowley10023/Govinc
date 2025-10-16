@@ -13,93 +13,203 @@ public class LayoutConfiguration {
     @Column(nullable = true)
     private byte[] imageData;
 
-    @Column(nullable = true)
+    @Column(nullable = true, columnDefinition = "VARCHAR(50) DEFAULT 'image/png'")
     private String imageType;
 
-    @Column(nullable = true)
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#007bff'")
     private String primaryColor;
 
-    @Column(nullable = true)
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#0056b3'")
     private String primaryColorDark;
 
-    @Column(nullable = true)
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#28a745'")
     private String accentColor;
 
-    @Column(nullable = true)
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#ffffff'")
     private String backgroundColor;
 
-    @Column(nullable = true)
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#dee2e6'")
     private String borderColor;
 
-    @Column(nullable = true)
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#6f42c1'")
     private String navViolet;
 
-    @Column(nullable = true)
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#212529'")
     private String textMain;
 
-    @Column(nullable = true)
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#f8f9fa'")
     private String shineGlare;
 
-    @Column(nullable = true)
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#e9ecef'")
     private String shineHighlight;
 
-    @Column(nullable = true)
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#6c757d'")
     private String secondaryColor;
 
     // THEME COLORS ADDED FOR FULL REBRANDING
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#28a745'")
     private String successGreen;
+
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#dc3545'")
     private String errorRed;
+
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#f8f5f0'")
     private String modalBeige1;
+
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#f5f2ed'")
     private String modalBeige2;
+
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#f2efea'")
     private String modalBeige3;
+
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#efece7'")
     private String modalBeige4;
+
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#ffd700'")
     private String labelGold;
+
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#777777'")
     private String gray777;
+
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#888888'")
     private String gray888;
+
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#f8f9fa'")
     private String tableBg1;
+
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#f1f3f4'")
     private String tableBg2;
+
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#e9ecef'")
     private String tableBg3;
+
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#dee2e6'")
     private String tableBg4;
+
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#ced4da'")
     private String tableBg5;
+
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#007bff'")
     private String headerGradHighlight;
+
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#ffeb3b'")
     private String yellowHighlight;
+
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#f5f5f5'")
     private String tableHover1;
+
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#e8e8e8'")
     private String tableHover2;
+
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#d4edda'")
     private String alertBg1;
+
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#c3e6cb'")
     private String alertBg2;
+
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#155724'")
     private String alertColor;
+
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#fff3cd'")
     private String takenOverBg;
+
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#e2e6ea'")
     private String dropdownBgHover;
+
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#f8f9fa'")
     private String secondaryNavBg;
+
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#dee2e6'")
     private String secondaryNavBorder;
+
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#adb5bd'")
     private String logoBorder;
+
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#0d6efd'")
     private String dropdownHoverBlue;
+
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#495057'")
     private String mainNavBorder;
+
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#e3f2fd'")
     private String faintBlue1;
 
-    @Column(nullable = true)
+    @Column(nullable = true, columnDefinition = "VARCHAR(100) DEFAULT 'Arial, sans-serif'")
     private String fontFamily;
 
-    @Column(nullable = true)
+    @Column(nullable = true, columnDefinition = "VARCHAR(10) DEFAULT '14px'")
     private String fontSizeNav;
 
-    @Column(nullable = true)
+    @Column(nullable = true, columnDefinition = "VARCHAR(10) DEFAULT '24px'")
     private String fontSizeHeadline;
 
     // ADDED: Organisation/Tool details styles for navigation bar
-    @Column(nullable = true)
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#212529'")
     private String orgNameColor;
 
-    @Column(nullable = true)
+    @Column(nullable = true, columnDefinition = "VARCHAR(10) DEFAULT '16px'")
     private String orgNameFontSize;
 
-    @Column(nullable = true)
+    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#6c757d'")
     private String toolNameColor;
 
-    @Column(nullable = true)
+    @Column(nullable = true, columnDefinition = "VARCHAR(10) DEFAULT '14px'")
     private String toolNameFontSize;
 
-    public LayoutConfiguration() {}
+    public LayoutConfiguration() {
+        // Initialize with default values if not set by columnDefinition
+        initializeDefaults();
+    }
+
+    private void initializeDefaults() {
+        if (this.imageType == null) this.imageType = "image/png";
+        if (this.primaryColor == null) this.primaryColor = "#007bff";
+        if (this.primaryColorDark == null) this.primaryColorDark = "#0056b3";
+        if (this.accentColor == null) this.accentColor = "#28a745";
+        if (this.backgroundColor == null) this.backgroundColor = "#ffffff";
+        if (this.borderColor == null) this.borderColor = "#dee2e6";
+        if (this.navViolet == null) this.navViolet = "#6f42c1";
+        if (this.textMain == null) this.textMain = "#212529";
+        if (this.shineGlare == null) this.shineGlare = "#f8f9fa";
+        if (this.shineHighlight == null) this.shineHighlight = "#e9ecef";
+        if (this.secondaryColor == null) this.secondaryColor = "#6c757d";
+        if (this.successGreen == null) this.successGreen = "#28a745";
+        if (this.errorRed == null) this.errorRed = "#dc3545";
+        if (this.modalBeige1 == null) this.modalBeige1 = "#f8f5f0";
+        if (this.modalBeige2 == null) this.modalBeige2 = "#f5f2ed";
+        if (this.modalBeige3 == null) this.modalBeige3 = "#f2efea";
+        if (this.modalBeige4 == null) this.modalBeige4 = "#efece7";
+        if (this.labelGold == null) this.labelGold = "#ffd700";
+        if (this.gray777 == null) this.gray777 = "#777777";
+        if (this.gray888 == null) this.gray888 = "#888888";
+        if (this.tableBg1 == null) this.tableBg1 = "#f8f9fa";
+        if (this.tableBg2 == null) this.tableBg2 = "#f1f3f4";
+        if (this.tableBg3 == null) this.tableBg3 = "#e9ecef";
+        if (this.tableBg4 == null) this.tableBg4 = "#dee2e6";
+        if (this.tableBg5 == null) this.tableBg5 = "#ced4da";
+        if (this.headerGradHighlight == null) this.headerGradHighlight = "#007bff";
+        if (this.yellowHighlight == null) this.yellowHighlight = "#ffeb3b";
+        if (this.tableHover1 == null) this.tableHover1 = "#f5f5f5";
+        if (this.tableHover2 == null) this.tableHover2 = "#e8e8e8";
+        if (this.alertBg1 == null) this.alertBg1 = "#d4edda";
+        if (this.alertBg2 == null) this.alertBg2 = "#c3e6cb";
+        if (this.alertColor == null) this.alertColor = "#155724";
+        if (this.takenOverBg == null) this.takenOverBg = "#fff3cd";
+        if (this.dropdownBgHover == null) this.dropdownBgHover = "#e2e6ea";
+        if (this.secondaryNavBg == null) this.secondaryNavBg = "#f8f9fa";
+        if (this.secondaryNavBorder == null) this.secondaryNavBorder = "#dee2e6";
+        if (this.logoBorder == null) this.logoBorder = "#adb5bd";
+        if (this.dropdownHoverBlue == null) this.dropdownHoverBlue = "#0d6efd";
+        if (this.mainNavBorder == null) this.mainNavBorder = "#495057";
+        if (this.faintBlue1 == null) this.faintBlue1 = "#e3f2fd";
+        if (this.fontFamily == null) this.fontFamily = "Arial, sans-serif";
+        if (this.fontSizeNav == null) this.fontSizeNav = "14px";
+        if (this.fontSizeHeadline == null) this.fontSizeHeadline = "24px";
+        if (this.orgNameColor == null) this.orgNameColor = "#212529";
+        if (this.orgNameFontSize == null) this.orgNameFontSize = "16px";
+        if (this.toolNameColor == null) this.toolNameColor = "#6c757d";
+        if (this.toolNameFontSize == null) this.toolNameFontSize = "14px";
+    }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -249,4 +359,3 @@ public class LayoutConfiguration {
     public String getToolNameFontSize() { return toolNameFontSize; }
     public void setToolNameFontSize(String toolNameFontSize) { this.toolNameFontSize = toolNameFontSize; }
 }
-
