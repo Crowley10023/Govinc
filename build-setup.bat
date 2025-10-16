@@ -32,7 +32,7 @@ if %errorlevel% equ 0 (
 )
 goto :eof
 
-REM Function to check if database exists
+REM Function to check if database exists with timeout
 :check_database_exists
 set "host=%1"
 set "port=%2"
@@ -40,21 +40,31 @@ set "user=%3"
 set "password=%4"
 set "database=%5"
 
-mysql -h%host% -P%port% -u%user% -p%password% -e "SHOW DATABASES LIKE '%database%';" >temp_db_check.txt 2>&1
-if %errorlevel% equ 0 (
-    findstr /C:"%database%" temp_db_check.txt >nul 2>&1
-    if !errorlevel! equ 0 (
-        set DB_EXISTS=1
+REM Use PowerShell with timeout to check database existence
+start /wait /b powershell -Command "& {try { $process = Start-Process -FilePath 'mysql' -ArgumentList '-h%host%', '-P%port%', '-u%user%', '-p%password%', '--connect-timeout=10', '-e', 'SHOW DATABASES LIKE \"%database%\";' -NoNewWindow -PassThru -RedirectStandardOutput 'temp_db_check.txt' -RedirectStandardError 'temp_db_check_err.txt'; if ($process.WaitForExit(15000)) { exit $process.ExitCode } else { $process.Kill(); exit 124 } } catch { exit 1 } }"
+set check_result=%errorlevel%
+
+if %check_result% equ 0 (
+    if exist temp_db_check.txt (
+        findstr /C:"%database%" temp_db_check.txt >nul 2>&1
+        if !errorlevel! equ 0 (
+            set DB_EXISTS=1
+        ) else (
+            set DB_EXISTS=0
+        )
     ) else (
         set DB_EXISTS=0
     )
 ) else (
     set DB_EXISTS=0
 )
+
+REM Clean up temporary files
 del temp_db_check.txt >nul 2>&1
+del temp_db_check_err.txt >nul 2>&1
 goto :eof
 
-REM Function to test database connection with detailed error reporting
+REM Function to test database connection with detailed error reporting and timeout
 :test_db_connection
 set "host=%1"
 set "port=%2"
@@ -66,33 +76,43 @@ if "%check_db_exists%"=="" set check_db_exists=true
 
 echo [INFO] Testing database connection to %host%:%port%...
 
-REM Test basic connectivity first
-mysql -h%host% -P%port% -u%user% -p%password% -e "SELECT 1;" >temp_conn_test.txt 2>&1
+REM Test basic connectivity first with timeout
+echo Testing connection... > temp_conn_test.txt
+start /wait /b powershell -Command "& {try { $process = Start-Process -FilePath 'mysql' -ArgumentList '-h%host%', '-P%port%', '-u%user%', '-p%password%', '--connect-timeout=10', '-e', 'SELECT 1;' -NoNewWindow -PassThru -RedirectStandardOutput 'temp_conn_output.txt' -RedirectStandardError 'temp_conn_error.txt'; if ($process.WaitForExit(30000)) { exit $process.ExitCode } else { $process.Kill(); exit 124 } } catch { exit 1 } }"
 set conn_result=%errorlevel%
 
-if %conn_result% neq 0 (
+if %conn_result% equ 124 (
+    echo [ERROR] Database connection timed out!
+    echo [ERROR]   Connection attempt exceeded 30 seconds
+    set DB_CONNECTION_OK=0
+    set DB_CONNECTION_CODE=1
+) else if %conn_result% neq 0 (
     echo [ERROR] Database connection failed!
     
-    REM Analyze the error and provide specific feedback
-    findstr /C:"Access denied" temp_conn_test.txt >nul 2>&1
-    if !errorlevel! equ 0 (
-        echo [ERROR]   Access denied - Invalid username or password
-    ) else (
-        findstr /C:"Can't connect" temp_conn_test.txt >nul 2>&1
+    REM Check if error files exist and analyze them
+    if exist temp_conn_error.txt (
+        findstr /C:"Access denied" temp_conn_error.txt >nul 2>&1
         if !errorlevel! equ 0 (
-            echo [ERROR]   Cannot connect to database server
-            echo [ERROR]   Possible causes:
-            echo [ERROR]   - Database server is not running
-            echo [ERROR]   - Wrong host or port
-            echo [ERROR]   - Firewall blocking connection
+            echo [ERROR]   Access denied - Invalid username or password
         ) else (
-            findstr /C:"Unknown database" temp_conn_test.txt >nul 2>&1
+            findstr /C:"Can't connect" temp_conn_error.txt >nul 2>&1
             if !errorlevel! equ 0 (
-                echo [ERROR]   Database '%database%' does not exist
+                echo [ERROR]   Cannot connect to database server
+                echo [ERROR]   Possible causes:
+                echo [ERROR]   - Database server is not running
+                echo [ERROR]   - Wrong host or port
+                echo [ERROR]   - Firewall blocking connection
             ) else (
-                echo [ERROR]   Connection error - check temp_conn_test.txt for details
+                findstr /C:"Unknown database" temp_conn_error.txt >nul 2>&1
+                if !errorlevel! equ 0 (
+                    echo [ERROR]   Database '%database%' does not exist
+                ) else (
+                    echo [ERROR]   Connection error - check temp_conn_error.txt for details
+                )
             )
         )
+    ) else (
+        echo [ERROR]   Unknown connection error
     )
     set DB_CONNECTION_OK=0
     set DB_CONNECTION_CODE=1
@@ -110,8 +130,15 @@ if %conn_result% neq 0 (
             set DB_CONNECTION_CODE=2
         )
     ) else (
-        mysql -h%host% -P%port% -u%user% -p%password% -e "USE %database%;" >nul 2>&1
-        if !errorlevel! equ 0 (
+        REM Test database access with timeout
+        start /wait /b powershell -Command "& {try { $process = Start-Process -FilePath 'mysql' -ArgumentList '-h%host%', '-P%port%', '-u%user%', '-p%password%', '--connect-timeout=10', '-e', 'USE %database%;' -NoNewWindow -PassThru -RedirectStandardError 'temp_db_error.txt'; if ($process.WaitForExit(15000)) { exit $process.ExitCode } else { $process.Kill(); exit 124 } } catch { exit 1 } }"
+        set db_result=%errorlevel%
+        
+        if !db_result! equ 124 (
+            echo [WARNING] Database access test timed out.
+            set DB_CONNECTION_OK=0
+            set DB_CONNECTION_CODE=2
+        ) else if !db_result! equ 0 (
             echo [SUCCESS] Database connection successful! Database '%database%' is accessible.
             set DB_CONNECTION_OK=1
             set DB_CONNECTION_CODE=0
@@ -121,10 +148,14 @@ if %conn_result% neq 0 (
             set DB_CONNECTION_OK=0
             set DB_CONNECTION_CODE=2
         )
+        del temp_db_error.txt >nul 2>&1
     )
 )
 
+REM Clean up temporary files
 del temp_conn_test.txt >nul 2>&1
+del temp_conn_output.txt >nul 2>&1
+del temp_conn_error.txt >nul 2>&1
 goto :eof
 
 REM Function to create database and user with detailed error handling
@@ -423,26 +454,98 @@ if %errorlevel% equ 0 (
 )
 goto :eof
 
+REM Function to perform final database connection verification
+:final_db_verification
+echo [INFO] Performing final database verification...
+
+REM Check if using H2 database
+findstr /C:"h2:mem" "%APPLICATION_PROPS%" >nul 2>&1
+if %errorlevel% equ 0 (
+    echo [SUCCESS] H2 in-memory database configured - no connection test needed
+    goto :eof
+)
+
+REM Extract database configuration from application.properties
+set db_url=
+set db_username=
+set db_password=
+
+for /f "tokens=2 delims==" %%a in ('findstr "^spring.datasource.url=" "%APPLICATION_PROPS%" 2^>nul') do set db_url=%%a
+for /f "tokens=2 delims==" %%a in ('findstr "^spring.datasource.username=" "%APPLICATION_PROPS%" 2^>nul') do set db_username=%%a
+for /f "tokens=2 delims==" %%a in ('findstr "^spring.datasource.password=" "%APPLICATION_PROPS%" 2^>nul') do set db_password=%%a
+
+if "%db_url%"=="" (
+    echo [WARNING] Database configuration not found in application.properties
+    goto :eof
+)
+
+REM Parse database URL to extract host, port, and database name
+echo %db_url% | findstr /R "jdbc:mariadb://.*:[0-9]*/.*" >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [WARNING] Could not parse database URL format
+    goto :eof
+)
+
+REM Extract components using PowerShell for better parsing
+for /f "tokens=1,2,3" %%a in ('powershell -Command "if ('%db_url%' -match 'jdbc:mariadb://([^:]+):([0-9]+)/([^?]+)') { Write-Host $Matches[1] $Matches[2] $Matches[3] }"') do (
+    set db_host=%%a
+    set db_port=%%b
+    set db_name=%%c
+)
+
+if "%db_host%"=="" (
+    echo [WARNING] Could not extract database connection details
+    goto :eof
+)
+
+echo [INFO] Testing final database connection...
+
+REM Perform a quick connection test
+call :test_db_connection "%db_host%" "%db_port%" "%db_username%" "%db_password%" "%db_name%" "false"
+
+if !DB_CONNECTION_OK! equ 1 (
+    echo [SUCCESS] Database connection verified successfully
+) else (
+    echo [WARNING] Database connection test failed, but application may still work
+    echo [WARNING]   The application will attempt to connect at startup
+)
+
+goto :eof
+
 REM Main execution
 :main
+echo [INFO] Starting build setup process...
+
 REM Check if MariaDB is installed
 call :check_mariadb_installed
 
+echo [INFO] Step 1: Database Setup
 REM Setup database
 call :setup_database
 
 echo.
-echo [INFO] Building application...
+echo [INFO] Step 2: Building Application
 
 REM Build application
 call :build_application
 
 if !BUILD_SUCCESS! equ 1 (
     echo.
-    set /p run_test="Would you like to run tests? (y/n): "
+    echo Would you like to run tests? (y/n - timeout in 30 seconds):
+    
+    REM Use PowerShell to implement timeout for user input
+    for /f "delims=" %%i in ('powershell -Command "$Host.UI.RawUI.ReadKey('IncludeKeyDown').Character" -inputformat none -outputformat text') do set run_test=%%i
+    
     if /i "!run_test!"=="y" (
+        echo [INFO] Step 3: Running Tests
         call :run_tests
+    ) else (
+        echo [INFO] Skipping tests
     )
+    
+    echo.
+    echo [INFO] Step 4: Final Verification
+    call :final_db_verification
     
     echo.
     echo ========================================
@@ -463,19 +566,28 @@ if !BUILD_SUCCESS! equ 1 (
         echo [INFO] Database: H2 in-memory (development mode)
         echo [INFO] H2 Console: http://localhost:8080/h2-console
     ) else (
-        for /f "tokens=2 delims==" %%a in ('findstr "^spring.datasource.url=" "%APPLICATION_PROPS%"') do (
+        for /f "tokens=2 delims==" %%a in ('findstr "^spring.datasource.url=" "%APPLICATION_PROPS%" 2^>nul') do (
             echo [INFO] Database: %%a
         )
     )
+    
+    echo.
+    echo [SUCCESS] Setup completed successfully! You can now start the application.
+    echo.
+    pause
+    exit /b 0
 ) else (
+    echo.
     echo [ERROR] Build failed! Please check the errors above.
+    echo [INFO] You may need to:
+    echo [INFO]   - Check your Java version (Java 17+ required)
+    echo [INFO]   - Verify database configuration
+    echo [INFO]   - Check network connectivity
+    echo [INFO]   - Review the error messages above
+    echo.
     pause
     exit /b 1
 )
-
-echo.
-pause
-goto :eof
 
 REM Call main function
 call :main

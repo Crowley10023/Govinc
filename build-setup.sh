@@ -78,12 +78,28 @@ test_db_connection() {
     
     echo -e "${YELLOW}Testing database connection to $host:$port...${NC}"
     
-    # Test basic connectivity first
+    # Set timeout for mysql commands to prevent hanging
+    local timeout_cmd="timeout 30"
+    if ! command -v timeout &> /dev/null; then
+        # If timeout command is not available, use alternative method
+        timeout_cmd=""
+    fi
+    
+    # Test basic connectivity first with timeout
     local connection_test
-    connection_test=$(mysql -h"$host" -P"$port" -u"$user" -p"$password" -e "SELECT 1;" 2>&1)
+    if [ -n "$timeout_cmd" ]; then
+        connection_test=$($timeout_cmd mysql -h"$host" -P"$port" -u"$user" -p"$password" --connect-timeout=10 -e "SELECT 1;" 2>&1)
+    else
+        connection_test=$(mysql -h"$host" -P"$port" -u"$user" -p"$password" --connect-timeout=10 -e "SELECT 1;" 2>&1)
+    fi
     local conn_result=$?
     
-    if [ $conn_result -ne 0 ]; then
+    # Handle timeout or connection failure
+    if [ $conn_result -eq 124 ]; then
+        echo -e "${RED}✗ Database connection timed out!${NC}"
+        echo -e "${RED}  Connection attempt exceeded 30 seconds${NC}"
+        return 1
+    elif [ $conn_result -ne 0 ]; then
         echo -e "${RED}✗ Database connection failed!${NC}"
         
         # Analyze the error and provide specific feedback
@@ -113,10 +129,19 @@ test_db_connection() {
             return 2  # Special return code for "connection OK but database missing"
         fi
     else
-        # Just test the connection without checking database existence
+        # Just test the connection without checking database existence with timeout
         local db_test
-        db_test=$(mysql -h"$host" -P"$port" -u"$user" -p"$password" -e "USE $database;" 2>&1)
-        if [ $? -eq 0 ]; then
+        if [ -n "$timeout_cmd" ]; then
+            db_test=$($timeout_cmd mysql -h"$host" -P"$port" -u"$user" -p"$password" --connect-timeout=10 -e "USE $database;" 2>&1)
+        else
+            db_test=$(mysql -h"$host" -P"$port" -u"$user" -p"$password" --connect-timeout=10 -e "USE $database;" 2>&1)
+        fi
+        local db_result=$?
+        
+        if [ $db_result -eq 124 ]; then
+            echo -e "${YELLOW}⚠ Database access test timed out.${NC}"
+            return 2
+        elif [ $db_result -eq 0 ]; then
             echo -e "${GREEN}✓ Database connection successful! Database '$database' is accessible.${NC}"
             return 0
         else
@@ -466,28 +491,95 @@ run_tests() {
     fi
 }
 
+# Function to perform final database connection verification
+final_db_verification() {
+    echo -e "${BLUE}Performing final database verification...${NC}"
+    
+    # Check if using H2 database
+    if grep -q "h2:mem" "$APPLICATION_PROPS"; then
+        echo -e "${GREEN}✓ H2 in-memory database configured - no connection test needed${NC}"
+        return 0
+    fi
+    
+    # Extract database configuration from application.properties
+    local db_url=$(grep "^spring.datasource.url=" "$APPLICATION_PROPS" 2>/dev/null | cut -d'=' -f2-)
+    local db_username=$(grep "^spring.datasource.username=" "$APPLICATION_PROPS" 2>/dev/null | cut -d'=' -f2-)
+    local db_password=$(grep "^spring.datasource.password=" "$APPLICATION_PROPS" 2>/dev/null | cut -d'=' -f2-)
+    
+    if [ -z "$db_url" ] || [ -z "$db_username" ]; then
+        echo -e "${YELLOW}⚠ Database configuration not found in application.properties${NC}"
+        return 0
+    fi
+    
+    # Parse database URL to extract host, port, and database name
+    if [[ $db_url =~ jdbc:mariadb://([^:]+):([0-9]+)/([^?]+) ]]; then
+        local db_host="${BASH_REMATCH[1]}"
+        local db_port="${BASH_REMATCH[2]}"
+        local db_name="${BASH_REMATCH[3]}"
+        
+        echo -e "${YELLOW}Testing final database connection...${NC}"
+        
+        # Perform a quick connection test with short timeout
+        if test_db_connection "$db_host" "$db_port" "$db_username" "$db_password" "$db_name" "false"; then
+            echo -e "${GREEN}✓ Database connection verified successfully${NC}"
+            return 0
+        else
+            echo -e "${YELLOW}⚠ Database connection test failed, but application may still work${NC}"
+            echo -e "${YELLOW}  The application will attempt to connect at startup${NC}"
+            return 0  # Don't fail the script, just warn
+        fi
+    else
+        echo -e "${YELLOW}⚠ Could not parse database URL format${NC}"
+        return 0
+    fi
+}
+
 # Main execution
 main() {
+    # Set error handling - don't exit on errors during setup
+    set +e
+    
     # Check if we're in the right directory
     if [ ! -f "settings.gradle.kts" ]; then
         echo -e "${RED}Error: This script must be run from the project root directory!${NC}"
         exit 1
     fi
     
-    # Setup database
-    setup_database
+    echo -e "${BLUE}Starting build setup process...${NC}"
+    
+    # Setup database with error handling
+    echo -e "${BLUE}Step 1: Database Setup${NC}"
+    if ! setup_database; then
+        echo -e "${YELLOW}⚠ Database setup encountered issues, but continuing with build${NC}"
+    fi
     
     echo
-    echo -e "${BLUE}Building application...${NC}"
+    echo -e "${BLUE}Step 2: Building Application${NC}"
     
     # Build application
     if build_application; then
         echo
         echo -e "${YELLOW}Would you like to run tests? (y/n)${NC}"
-        read -p "" run_test
-        if [[ $run_test =~ ^[Yy]$ ]]; then
-            run_tests
+        read -t 30 -p "" run_test
+        local read_result=$?
+        
+        # Handle timeout or user input
+        if [ $read_result -eq 142 ]; then
+            echo
+            echo -e "${YELLOW}No response received, skipping tests${NC}"
+            run_test="n"
         fi
+        
+        if [[ $run_test =~ ^[Yy]$ ]]; then
+            echo -e "${BLUE}Step 3: Running Tests${NC}"
+            run_tests
+        else
+            echo -e "${YELLOW}Skipping tests${NC}"
+        fi
+        
+        echo
+        echo -e "${BLUE}Step 4: Final Verification${NC}"
+        final_db_verification
         
         echo
         echo -e "${GREEN}========================================${NC}"
@@ -503,18 +595,39 @@ main() {
         echo
         
         # Show database info
-        if grep -q "h2:mem" "$APPLICATION_PROPS"; then
+        if grep -q "h2:mem" "$APPLICATION_PROPS" 2>/dev/null; then
             echo -e "${YELLOW}Database: H2 in-memory (development mode)${NC}"
             echo -e "${YELLOW}H2 Console: http://localhost:8080/h2-console${NC}"
         else
-            db_url=$(grep "^spring.datasource.url=" "$APPLICATION_PROPS" | cut -d'=' -f2-)
-            echo -e "${YELLOW}Database: $db_url${NC}"
+            local db_url=$(grep "^spring.datasource.url=" "$APPLICATION_PROPS" 2>/dev/null | cut -d'=' -f2-)
+            if [ -n "$db_url" ]; then
+                echo -e "${YELLOW}Database: $db_url${NC}"
+            fi
         fi
+        
+        echo
+        echo -e "${GREEN}✓ Setup completed successfully! You can now start the application.${NC}"
+        return 0
     else
+        echo
         echo -e "${RED}Build failed! Please check the errors above.${NC}"
-        exit 1
+        echo -e "${YELLOW}You may need to:${NC}"
+        echo -e "${YELLOW}  - Check your Java version (Java 17+ required)${NC}"
+        echo -e "${YELLOW}  - Verify database configuration${NC}"
+        echo -e "${YELLOW}  - Check network connectivity${NC}"
+        echo -e "${YELLOW}  - Review the error messages above${NC}"
+        return 1
     fi
 }
 
-# Run main function
-main "$@"
+# Set up signal handling to ensure clean exit
+trap 'echo -e "\n${YELLOW}Script interrupted by user${NC}"; exit 130' INT TERM
+
+# Run main function and handle its exit code
+if main "$@"; then
+    echo -e "${GREEN}Script completed successfully!${NC}"
+    exit 0
+else
+    echo -e "${RED}Script completed with errors. Please review the output above.${NC}"
+    exit 1
+fi
