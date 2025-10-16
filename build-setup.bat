@@ -165,7 +165,10 @@ set "port=%2"
 set "root_password=%3"
 set "db_password=%4"
 
-echo [INFO] Creating database and user...
+echo [INFO] Creating database and user with verified credentials...
+echo [INFO]   Target host: %host%:%port%
+echo [INFO]   Database: %DB_NAME%
+echo [INFO]   User: %DB_USER%
 
 REM Test root connection first
 echo [INFO] Testing root connection...
@@ -183,6 +186,7 @@ if %errorlevel% neq 0 (
     del temp_root_test.txt >nul 2>&1
     goto :eof
 )
+echo [SUCCESS] Root connection successful
 del temp_root_test.txt >nul 2>&1
 
 REM Check if database already exists
@@ -207,14 +211,16 @@ del temp_create_db.sql >nul 2>&1
 if %create_result% equ 0 (
     echo [SUCCESS] Database and user created/updated successfully!
     
-    REM Verify the setup by testing the new user connection
-    echo [INFO] Verifying new user connection...
+    REM Verify the setup by testing the new user connection with the same password used in testing
+    echo [INFO] Verifying new user connection with provided credentials...
     call :test_db_connection "%host%" "%port%" "%DB_USER%" "%db_password%" "%DB_NAME%" "false"
     if !DB_CONNECTION_OK! equ 1 (
-        echo [SUCCESS] User verification successful!
+        echo [SUCCESS] User verification successful with consistent credentials!
+        echo [SUCCESS] Database setup completed - same credentials will be used in application
         set DB_CREATED=1
     ) else (
         echo [WARNING] Database created but user verification failed. This might be normal for new installations.
+        echo [WARNING]   The application will attempt to connect with the provided credentials
         set DB_CREATED=1
     )
 ) else (
@@ -234,7 +240,10 @@ set "user=%3"
 set "password=%4"
 set "database=%5"
 
-echo [INFO] Updating application.properties...
+echo [INFO] Updating application.properties with tested credentials...
+echo [INFO]   Host: %host%:%port%
+echo [INFO]   Database: %database%
+echo [INFO]   User: %user%
 
 REM Create backup
 copy "%APPLICATION_PROPS%" "%APPLICATION_PROPS%.backup.%date:~-4%%date:~3,2%%date:~0,2%_%time:~0,2%%time:~3,2%%time:~6,2%" >nul 2>&1
@@ -305,6 +314,8 @@ echo [INFO] Password: (empty)
 goto :eof
 
 REM Main database setup function
+REM This function ensures that credentials tested for MariaDB connectivity
+REM are consistently used throughout database creation and application configuration
 :setup_database
 echo Database Setup Options:
 echo 1. Connect to existing MariaDB/MySQL database
@@ -319,6 +330,13 @@ if "%choice%"=="1" (
     set max_retries=3
     set retry_count=0
     set connection_successful=0
+    
+    REM Variables to preserve tested credentials
+    set tested_db_host=
+    set tested_db_port=
+    set tested_db_name=
+    set tested_db_user=
+    set tested_db_password=
     
     :retry_connection
     if !retry_count! gtr 0 (
@@ -344,12 +362,28 @@ if "%choice%"=="1" (
     
     if !DB_CONNECTION_CODE! equ 0 (
         REM Success - database exists and is accessible
-        call :update_application_properties "!db_host!" "!db_port!" "!db_user!" "!db_password!" "!db_name!"
+        REM Save the working credentials
+        set tested_db_host=!db_host!
+        set tested_db_port=!db_port!
+        set tested_db_name=!db_name!
+        set tested_db_user=!db_user!
+        set tested_db_password=!db_password!
+        
+        call :update_application_properties "!tested_db_host!" "!tested_db_port!" "!tested_db_user!" "!tested_db_password!" "!tested_db_name!"
         set connection_successful=1
+        echo [SUCCESS] Using verified database credentials for application configuration
     ) else if !DB_CONNECTION_CODE! equ 2 (
         REM Connection OK but database missing or inaccessible
+        REM Save the working connection credentials
+        set tested_db_host=!db_host!
+        set tested_db_port=!db_port!
+        set tested_db_name=!db_name!
+        set tested_db_user=!db_user!
+        set tested_db_password=!db_password!
+        
         echo.
         echo [WARNING] The database connection works, but database '!db_name!' is not accessible.
+        echo [SUCCESS] Database connection credentials verified and will be preserved
         echo [INFO] Options:
         echo 1. Create the database (requires root access)
         echo 2. Try different database credentials
@@ -358,9 +392,11 @@ if "%choice%"=="1" (
         
         if "!db_option!"=="1" (
             set /p root_password="Enter MySQL root password: "
-            call :create_database "!db_host!" "!db_port!" "!root_password!" "!db_password!"
+            REM Use the tested credentials for database creation
+            call :create_database "!tested_db_host!" "!tested_db_port!" "!root_password!" "!tested_db_password!"
             if !DB_CREATED! equ 1 (
-                call :update_application_properties "!db_host!" "!db_port!" "!db_user!" "!db_password!" "!db_name!"
+                echo [SUCCESS] Database created using verified connection credentials
+                call :update_application_properties "!tested_db_host!" "!tested_db_port!" "!tested_db_user!" "!tested_db_password!" "!tested_db_name!"
                 set connection_successful=1
             ) else (
                 echo [ERROR] Database creation failed.

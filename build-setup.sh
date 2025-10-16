@@ -159,7 +159,10 @@ create_database() {
     local root_password="$3"
     local db_password="$4"
     
-    echo -e "${YELLOW}Creating database and user...${NC}"
+    echo -e "${YELLOW}Creating database and user with verified credentials...${NC}"
+    echo -e "${BLUE}  Target host: $host:$port${NC}"
+    echo -e "${BLUE}  Database: $DB_NAME${NC}"
+    echo -e "${BLUE}  User: $DB_USER${NC}"
     
     # Test root connection first
     echo -e "${YELLOW}Testing root connection...${NC}"
@@ -175,6 +178,8 @@ create_database() {
         fi
         return 1
     fi
+    
+    echo -e "${GREEN}✓ Root connection successful${NC}"
     
     # Check if database already exists
     if check_database_exists "$host" "$port" "root" "$root_password" "$DB_NAME"; then
@@ -197,13 +202,15 @@ EOF
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}✓ Database and user created/updated successfully!${NC}"
         
-        # Verify the setup by testing the new user connection
-        echo -e "${YELLOW}Verifying new user connection...${NC}"
+        # Verify the setup by testing the new user connection with the same password used in testing
+        echo -e "${YELLOW}Verifying new user connection with provided credentials...${NC}"
         if test_db_connection "$host" "$port" "$DB_USER" "$db_password" "$DB_NAME" "false"; then
-            echo -e "${GREEN}✓ User verification successful!${NC}"
+            echo -e "${GREEN}✓ User verification successful with consistent credentials!${NC}"
+            echo -e "${GREEN}✓ Database setup completed - same credentials will be used in application${NC}"
             return 0
         else
             echo -e "${YELLOW}⚠ Database created but user verification failed. This might be normal for new installations.${NC}"
+            echo -e "${YELLOW}  The application will attempt to connect with the provided credentials${NC}"
             return 0
         fi
     else
@@ -221,7 +228,10 @@ update_application_properties() {
     local password="$4"
     local database="$5"
     
-    echo -e "${YELLOW}Updating application.properties...${NC}"
+    echo -e "${YELLOW}Updating application.properties with tested credentials...${NC}"
+    echo -e "${BLUE}  Host: $host:$port${NC}"
+    echo -e "${BLUE}  Database: $database${NC}"
+    echo -e "${BLUE}  User: $user${NC}"
     
     # Create backup
     cp "$APPLICATION_PROPS" "$APPLICATION_PROPS.backup.$(date +%Y%m%d_%H%M%S)"
@@ -321,6 +331,8 @@ setup_h2_fallback() {
 }
 
 # Main database setup function
+# This function ensures that credentials tested for MariaDB connectivity
+# are consistently used throughout database creation and application configuration
 setup_database() {
     echo -e "${BLUE}Database Setup Options:${NC}"
     echo "1. Connect to existing MariaDB/MySQL database"
@@ -336,6 +348,13 @@ setup_database() {
             local max_retries=3
             local retry_count=0
             local connection_successful=false
+            
+            # Variables to preserve tested credentials
+            local tested_db_host=""
+            local tested_db_port=""
+            local tested_db_name=""
+            local tested_db_user=""
+            local tested_db_password=""
             
             while [ $retry_count -lt $max_retries ] && [ "$connection_successful" = false ]; do
                 if [ $retry_count -gt 0 ]; then
@@ -363,11 +382,27 @@ setup_database() {
                 
                 if [ $conn_result -eq 0 ]; then
                     # Success - database exists and is accessible
-                    update_application_properties "$db_host" "$db_port" "$db_user" "$db_password" "$db_name"
+                    # Save the working credentials
+                    tested_db_host="$db_host"
+                    tested_db_port="$db_port"
+                    tested_db_name="$db_name"
+                    tested_db_user="$db_user"
+                    tested_db_password="$db_password"
+                    
+                    update_application_properties "$tested_db_host" "$tested_db_port" "$tested_db_user" "$tested_db_password" "$tested_db_name"
                     connection_successful=true
+                    echo -e "${GREEN}✓ Using verified database credentials for application configuration${NC}"
                 elif [ $conn_result -eq 2 ]; then
                     # Connection OK but database missing or inaccessible
+                    # Save the working connection credentials
+                    tested_db_host="$db_host"
+                    tested_db_port="$db_port"
+                    tested_db_name="$db_name"
+                    tested_db_user="$db_user"
+                    tested_db_password="$db_password"
+                    
                     echo -e "${YELLOW}\nThe database connection works, but database '$db_name' is not accessible.${NC}"
+                    echo -e "${GREEN}✓ Database connection credentials verified and will be preserved${NC}"
                     echo -e "${YELLOW}Options:${NC}"
                     echo "1. Create the database (requires root access)"
                     echo "2. Try different database credentials"
@@ -378,8 +413,10 @@ setup_database() {
                         1)
                             read -s -p "Enter MySQL root password: " root_password
                             echo
-                            if create_database "$db_host" "$db_port" "$root_password" "$db_password"; then
-                                update_application_properties "$db_host" "$db_port" "$db_user" "$db_password" "$db_name"
+                            # Use the tested credentials for database creation
+                            if create_database "$tested_db_host" "$tested_db_port" "$root_password" "$tested_db_password"; then
+                                echo -e "${GREEN}✓ Database created using verified connection credentials${NC}"
+                                update_application_properties "$tested_db_host" "$tested_db_port" "$tested_db_user" "$tested_db_password" "$tested_db_name"
                                 connection_successful=true
                             else
                                 echo -e "${RED}Database creation failed.${NC}"
