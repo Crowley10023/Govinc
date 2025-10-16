@@ -3,13 +3,73 @@
 # Build Setup Script for Theia01 Governance Tool
 # This script handles database setup and application build
 #
+# SECURITY REQUIREMENTS:
+# - All MySQL commands MUST use 'sudo' for system security compliance
+# - Sudo password handling is implemented in script-safe manner
+#
 # Password Handling Security Notes:
-# - Removed 'sudo' from mysql commands to fix password piping issues
+# - All mysql commands use 'sudo' as required for system security
 # - Using temporary configuration files with secure permissions (600) for authentication
 # - This prevents passwords from appearing in process lists, command history, and environment variables
 # - Temporary files are automatically cleaned up after use
+# - Sudo password prompts are handled in script-safe manner using SUDO_ASKPASS
+# - Falls back to regular sudo prompts if SUDO_ASKPASS is not available
 
 set -e  # Exit on any error
+
+# Function to handle sudo password in script-safe manner
+setup_sudo_askpass() {
+    # Check if we already have sudo access
+    if sudo -n true 2>/dev/null; then
+        echo -e "${GREEN}✓ Sudo access already available${NC}"
+        return 0
+    fi
+    
+    # Check if SUDO_ASKPASS is already set and working
+    if [ -n "$SUDO_ASKPASS" ] && [ -x "$SUDO_ASKPASS" ]; then
+        echo -e "${GREEN}✓ SUDO_ASKPASS is configured${NC}"
+        return 0
+    fi
+    
+    echo -e "${YELLOW}Setting up script-safe sudo password handling...${NC}"
+    
+    # Prompt for sudo password once
+    echo -e "${BLUE}This script requires sudo access for MySQL commands.${NC}"
+    read -s -p "Please enter your sudo password (will be cached for this session): " sudo_password
+    echo
+    
+    # Create a temporary askpass script
+    local askpass_script
+    askpass_script=$(mktemp -t sudo_askpass_XXXXXX.sh)
+    
+    cat > "$askpass_script" << EOF
+#!/bin/bash
+echo '$sudo_password'
+EOF
+    
+    chmod 700 "$askpass_script"
+    export SUDO_ASKPASS="$askpass_script"
+    
+    # Test sudo with the password
+    if sudo -A true 2>/dev/null; then
+        echo -e "${GREEN}✓ Sudo password verified and cached${NC}"
+        
+        # Set up cleanup trap for askpass script
+        cleanup_sudo_askpass() {
+            if [ -f "$askpass_script" ]; then
+                rm -f "$askpass_script"
+            fi
+            unset SUDO_ASKPASS
+        }
+        trap cleanup_sudo_askpass EXIT INT TERM
+        
+        return 0
+    else
+        echo -e "${RED}✗ Invalid sudo password${NC}"
+        rm -f "$askpass_script"
+        return 1
+    fi
+}
 
 # Colors for output
 RED='\033[0;31m'
@@ -47,6 +107,15 @@ EOF
     chmod 600 "$config_file"
 }
 
+# Function to get the appropriate sudo mysql command
+get_sudo_mysql_cmd() {
+    if [ -n "$SUDO_ASKPASS" ] && [ -x "$SUDO_ASKPASS" ]; then
+        echo "sudo -A mysql"
+    else
+        echo "sudo mysql"
+    fi
+}
+
 # Function to clean up temporary config file
 cleanup_mysql_config() {
     local config_file="$1"
@@ -81,10 +150,14 @@ execute_mysql_with_config() {
         timeout_cmd=""
     fi
     
+    # Get appropriate sudo mysql command
+    local mysql_cmd
+    mysql_cmd=$(get_sudo_mysql_cmd)
+    
     if [ -n "$timeout_cmd" ]; then
-        result=$($timeout_cmd mysql --defaults-file="$temp_config" -e "$mysql_command" 2>&1)
+        result=$($timeout_cmd $mysql_cmd --defaults-file="$temp_config" -e "$mysql_command" 2>&1)
     else
-        result=$(mysql --defaults-file="$temp_config" -e "$mysql_command" 2>&1)
+        result=$($mysql_cmd --defaults-file="$temp_config" -e "$mysql_command" 2>&1)
     fi
     local exit_code=$?
     
@@ -105,7 +178,9 @@ test_mysql_server_reachable() {
     
     # Try to connect without credentials to see if server responds
     local server_test
-    server_test=$(mysql -h"$host" -P"$port" -u"nonexistent_user" --connect-timeout=5 -e "SELECT 1;" 2>&1 || true)
+    local mysql_cmd
+    mysql_cmd=$(get_sudo_mysql_cmd)
+    server_test=$($mysql_cmd -h"$host" -P"$port" -u"nonexistent_user" --connect-timeout=5 -e "SELECT 1;" 2>&1 || true)
     
     if echo "$server_test" | grep -qi "Access denied"; then
         echo -e "${GREEN}  ✓ MySQL server is reachable (authentication required)${NC}"
@@ -125,9 +200,19 @@ test_mysql_server_reachable() {
 
 # Function to check if MySQL client is installed
 check_mysql_client_installed() {
+    # First check if we have sudo access for mysql commands
+    if ! command -v sudo &> /dev/null; then
+        echo -e "${RED}✗ sudo command not found - required for MySQL operations${NC}"
+        return 1
+    fi
     if command -v mysql &> /dev/null; then
         echo -e "${GREEN}✓ MySQL client found: $(which mysql)${NC}"
-        mysql --version 2>/dev/null || echo -e "${YELLOW}  Warning: Could not get MySQL client version${NC}"
+        # Try to get version with sudo
+        local mysql_cmd
+        mysql_cmd=$(get_sudo_mysql_cmd)
+        if ! $mysql_cmd --version 2>/dev/null; then
+            echo -e "${YELLOW}  Warning: Could not get MySQL client version (sudo access may be required)${NC}"
+        fi
         return 0
     elif command -v mariadb &> /dev/null; then
         echo -e "${GREEN}✓ MariaDB client found: $(which mariadb)${NC}"
@@ -189,7 +274,9 @@ check_database_exists() {
     
     # Execute command
     local output
-    output=$(mysql --defaults-file="$temp_config" -e "SHOW DATABASES LIKE '$database';" 2>/dev/null)
+    local mysql_cmd
+    mysql_cmd=$(get_sudo_mysql_cmd)
+    output=$($mysql_cmd --defaults-file="$temp_config" -e "SHOW DATABASES LIKE '$database';" 2>/dev/null)
     local result=$?
     
     # Clean up
@@ -244,9 +331,11 @@ test_db_connection() {
     
     local connection_test
     if [ -n "$timeout_cmd" ]; then
-        connection_test=$($timeout_cmd mysql --defaults-file="$temp_config" --connect-timeout=10 -e "SELECT 1 AS test;" 2>&1)
+        local mysql_cmd
+        mysql_cmd=$(get_sudo_mysql_cmd)
+        connection_test=$($timeout_cmd $mysql_cmd --defaults-file="$temp_config" --connect-timeout=10 -e "SELECT 1 AS test;" 2>&1)
     else
-        connection_test=$(mysql --defaults-file="$temp_config" --connect-timeout=10 -e "SELECT 1 AS test;" 2>&1)
+        connection_test=$($mysql_cmd --defaults-file="$temp_config" --connect-timeout=10 -e "SELECT 1 AS test;" 2>&1)
     fi
     local conn_result=$?
     
@@ -306,9 +395,11 @@ test_db_connection() {
         echo -e "${YELLOW}  Step 2: Testing database access...${NC}"
         local db_test
         if [ -n "$timeout_cmd" ]; then
-            db_test=$($timeout_cmd mysql --defaults-file="$temp_config" --connect-timeout=10 -e "USE \`$database\`; SELECT 'OK' AS status;" 2>&1)
+            local mysql_cmd
+            mysql_cmd=$(get_sudo_mysql_cmd)
+            db_test=$($timeout_cmd $mysql_cmd --defaults-file="$temp_config" --connect-timeout=10 -e "USE \`$database\`; SELECT 'OK' AS status;" 2>&1)
         else
-            db_test=$(mysql --defaults-file="$temp_config" --connect-timeout=10 -e "USE \`$database\`; SELECT 'OK' AS status;" 2>&1)
+            db_test=$($mysql_cmd --defaults-file="$temp_config" --connect-timeout=10 -e "USE \`$database\`; SELECT 'OK' AS status;" 2>&1)
         fi
         local db_result=$?
         
@@ -367,7 +458,9 @@ create_database() {
     create_mysql_config_file "root" "$root_password" "$host" "$port" "$root_temp_config"
     
     local root_test
-    root_test=$(mysql --defaults-file="$root_temp_config" -e "SELECT 1;" 2>&1)
+    local mysql_cmd
+    mysql_cmd=$(get_sudo_mysql_cmd)
+    root_test=$($mysql_cmd --defaults-file="$root_temp_config" -e "SELECT 1;" 2>&1)
     
     if [ $? -ne 0 ]; then
         echo -e "${RED}✗ Cannot connect as root user!${NC}"
@@ -390,7 +483,7 @@ create_database() {
     
     # Create database and user using temporary config file
     local create_output
-    create_output=$(mysql --defaults-file="$root_temp_config" 2>&1 << EOF
+    create_output=$($mysql_cmd --defaults-file="$root_temp_config" 2>&1 << EOF
 CREATE DATABASE IF NOT EXISTS $DB_NAME CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$db_password';
 CREATE USER IF NOT EXISTS '$DB_USER'@'%' IDENTIFIED BY '$db_password';
@@ -539,6 +632,18 @@ setup_h2_fallback() {
 # This function ensures that credentials tested for MariaDB connectivity
 # are consistently used throughout database creation and application configuration
 setup_database() {
+    # Setup sudo askpass for MySQL commands if needed
+    local needs_sudo_for_mysql=false
+    
+    # Check if any MySQL operations will be needed
+    echo -e "${BLUE}Checking if sudo access is needed for MySQL commands...${NC}"
+    
+    # Always setup sudo askpass since we require it for all mysql commands
+    if ! setup_sudo_askpass; then
+        echo -e "${RED}Failed to setup sudo access. Some MySQL operations may fail.${NC}"
+        echo -e "${YELLOW}Continuing with setup, but MySQL operations will require manual sudo password entry.${NC}"
+    fi
+    echo
     echo -e "${BLUE}Database Setup Options:${NC}"
     echo "1. Connect to existing MariaDB/MySQL database"
     echo "2. Install and setup MariaDB locally"
@@ -571,7 +676,9 @@ setup_database() {
             
             # Test basic MySQL client functionality
             echo -e "${BLUE}Testing MySQL client basic functionality...${NC}"
-            if ! mysql --help >/dev/null 2>&1; then
+            local mysql_cmd
+    mysql_cmd=$(get_sudo_mysql_cmd)
+    if ! $mysql_cmd --help >/dev/null 2>&1; then
                 echo -e "${RED}✗ MySQL client appears to be broken or misconfigured${NC}"
                 echo -e "${YELLOW}Using H2 fallback database.${NC}"
                 setup_h2_fallback
@@ -836,6 +943,12 @@ main() {
     fi
     
     echo -e "${BLUE}Starting build setup process...${NC}"
+    
+    # Early check for sudo availability (required for MySQL commands)
+    if ! command -v sudo &> /dev/null; then
+        echo -e "${RED}Error: sudo command not found but is required for MySQL operations!${NC}"
+        echo -e "${YELLOW}MySQL operations will be skipped, using H2 fallback database.${NC}"
+    fi
     
     # Setup database with error handling
     echo -e "${BLUE}Step 1: Database Setup${NC}"
