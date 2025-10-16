@@ -32,27 +32,102 @@ if %errorlevel% equ 0 (
 )
 goto :eof
 
-REM Function to test database connection
-:test_db_connection
+REM Function to check if database exists
+:check_database_exists
 set "host=%1"
 set "port=%2"
 set "user=%3"
 set "password=%4"
 set "database=%5"
 
-echo [INFO] Testing database connection...
-
-mysql -h%host% -P%port% -u%user% -p%password% -e "USE %database%;" >nul 2>&1
+mysql -h%host% -P%port% -u%user% -p%password% -e "SHOW DATABASES LIKE '%database%';" >temp_db_check.txt 2>&1
 if %errorlevel% equ 0 (
-    echo [SUCCESS] Database connection successful!
-    set DB_CONNECTION_OK=1
+    findstr /C:"%database%" temp_db_check.txt >nul 2>&1
+    if !errorlevel! equ 0 (
+        set DB_EXISTS=1
+    ) else (
+        set DB_EXISTS=0
+    )
 ) else (
-    echo [ERROR] Database connection failed!
-    set DB_CONNECTION_OK=0
+    set DB_EXISTS=0
 )
+del temp_db_check.txt >nul 2>&1
 goto :eof
 
-REM Function to create database and user
+REM Function to test database connection with detailed error reporting
+:test_db_connection
+set "host=%1"
+set "port=%2"
+set "user=%3"
+set "password=%4"
+set "database=%5"
+set "check_db_exists=%6"
+if "%check_db_exists%"=="" set check_db_exists=true
+
+echo [INFO] Testing database connection to %host%:%port%...
+
+REM Test basic connectivity first
+mysql -h%host% -P%port% -u%user% -p%password% -e "SELECT 1;" >temp_conn_test.txt 2>&1
+set conn_result=%errorlevel%
+
+if %conn_result% neq 0 (
+    echo [ERROR] Database connection failed!
+    
+    REM Analyze the error and provide specific feedback
+    findstr /C:"Access denied" temp_conn_test.txt >nul 2>&1
+    if !errorlevel! equ 0 (
+        echo [ERROR]   Access denied - Invalid username or password
+    ) else (
+        findstr /C:"Can't connect" temp_conn_test.txt >nul 2>&1
+        if !errorlevel! equ 0 (
+            echo [ERROR]   Cannot connect to database server
+            echo [ERROR]   Possible causes:
+            echo [ERROR]   - Database server is not running
+            echo [ERROR]   - Wrong host or port
+            echo [ERROR]   - Firewall blocking connection
+        ) else (
+            findstr /C:"Unknown database" temp_conn_test.txt >nul 2>&1
+            if !errorlevel! equ 0 (
+                echo [ERROR]   Database '%database%' does not exist
+            ) else (
+                echo [ERROR]   Connection error - check temp_conn_test.txt for details
+            )
+        )
+    )
+    set DB_CONNECTION_OK=0
+    set DB_CONNECTION_CODE=1
+) else (
+    REM Connection successful, now check database
+    if "%check_db_exists%"=="true" (
+        call :check_database_exists "%host%" "%port%" "%user%" "%password%" "%database%"
+        if !DB_EXISTS! equ 1 (
+            echo [SUCCESS] Database connection successful! Database '%database%' exists.
+            set DB_CONNECTION_OK=1
+            set DB_CONNECTION_CODE=0
+        ) else (
+            echo [WARNING] Database connection successful, but database '%database%' does not exist.
+            set DB_CONNECTION_OK=0
+            set DB_CONNECTION_CODE=2
+        )
+    ) else (
+        mysql -h%host% -P%port% -u%user% -p%password% -e "USE %database%;" >nul 2>&1
+        if !errorlevel! equ 0 (
+            echo [SUCCESS] Database connection successful! Database '%database%' is accessible.
+            set DB_CONNECTION_OK=1
+            set DB_CONNECTION_CODE=0
+        ) else (
+            echo [WARNING] Database connection successful, but cannot access database '%database%'.
+            echo [WARNING]   This might be due to missing permissions or the database not existing.
+            set DB_CONNECTION_OK=0
+            set DB_CONNECTION_CODE=2
+        )
+    )
+)
+
+del temp_conn_test.txt >nul 2>&1
+goto :eof
+
+REM Function to create database and user with detailed error handling
 :create_database
 set "host=%1"
 set "port=%2"
@@ -61,6 +136,32 @@ set "db_password=%4"
 
 echo [INFO] Creating database and user...
 
+REM Test root connection first
+echo [INFO] Testing root connection...
+mysql -h%host% -P%port% -uroot -p%root_password% -e "SELECT 1;" >temp_root_test.txt 2>&1
+
+if %errorlevel% neq 0 (
+    echo [ERROR] Cannot connect as root user!
+    findstr /C:"Access denied" temp_root_test.txt >nul 2>&1
+    if !errorlevel! equ 0 (
+        echo [ERROR]   Root password is incorrect
+    ) else (
+        echo [ERROR]   Check temp_root_test.txt for error details
+    )
+    set DB_CREATED=0
+    del temp_root_test.txt >nul 2>&1
+    goto :eof
+)
+del temp_root_test.txt >nul 2>&1
+
+REM Check if database already exists
+call :check_database_exists "%host%" "%port%" "root" "%root_password%" "%DB_NAME%"
+if !DB_EXISTS! equ 1 (
+    echo [WARNING] Database '%DB_NAME%' already exists.
+    echo [INFO] Ensuring user '%DB_USER%' has proper permissions...
+)
+
+REM Create database and user
 echo CREATE DATABASE IF NOT EXISTS %DB_NAME% CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; > temp_create_db.sql
 echo CREATE USER IF NOT EXISTS '%DB_USER%'@'localhost' IDENTIFIED BY '%db_password%'; >> temp_create_db.sql
 echo CREATE USER IF NOT EXISTS '%DB_USER%'@'%%' IDENTIFIED BY '%db_password%'; >> temp_create_db.sql
@@ -68,17 +169,30 @@ echo GRANT ALL PRIVILEGES ON %DB_NAME%.* TO '%DB_USER%'@'localhost'; >> temp_cre
 echo GRANT ALL PRIVILEGES ON %DB_NAME%.* TO '%DB_USER%'@'%%'; >> temp_create_db.sql
 echo FLUSH PRIVILEGES; >> temp_create_db.sql
 
-mysql -h%host% -P%port% -uroot -p%root_password% < temp_create_db.sql >nul 2>&1
+mysql -h%host% -P%port% -uroot -p%root_password% < temp_create_db.sql >temp_create_output.txt 2>&1
 set create_result=%errorlevel%
 del temp_create_db.sql >nul 2>&1
 
 if %create_result% equ 0 (
-    echo [SUCCESS] Database and user created successfully!
-    set DB_CREATED=1
+    echo [SUCCESS] Database and user created/updated successfully!
+    
+    REM Verify the setup by testing the new user connection
+    echo [INFO] Verifying new user connection...
+    call :test_db_connection "%host%" "%port%" "%DB_USER%" "%db_password%" "%DB_NAME%" "false"
+    if !DB_CONNECTION_OK! equ 1 (
+        echo [SUCCESS] User verification successful!
+        set DB_CREATED=1
+    ) else (
+        echo [WARNING] Database created but user verification failed. This might be normal for new installations.
+        set DB_CREATED=1
+    )
 ) else (
     echo [ERROR] Failed to create database and user!
+    echo [ERROR] Check temp_create_output.txt for error details
     set DB_CREATED=0
 )
+
+del temp_create_output.txt >nul 2>&1
 goto :eof
 
 REM Function to update application.properties
@@ -171,6 +285,16 @@ set /p choice="Please choose an option (1-3): "
 if "%choice%"=="1" (
     echo [INFO] Connecting to existing database...
     
+    set max_retries=3
+    set retry_count=0
+    set connection_successful=0
+    
+    :retry_connection
+    if !retry_count! gtr 0 (
+        echo.
+        echo [INFO] Retry attempt !retry_count! of !max_retries!...
+    )
+    
     set /p db_host="Database host (default: localhost): "
     if "!db_host!"=="" set db_host=localhost
     
@@ -187,23 +311,73 @@ if "%choice%"=="1" (
     
     call :test_db_connection "!db_host!" "!db_port!" "!db_user!" "!db_password!" "!db_name!"
     
-    if !DB_CONNECTION_OK! equ 1 (
+    if !DB_CONNECTION_CODE! equ 0 (
+        REM Success - database exists and is accessible
         call :update_application_properties "!db_host!" "!db_port!" "!db_user!" "!db_password!" "!db_name!"
-    ) else (
-        echo [WARNING] Connection failed. Would you like to create the database? (y/n)
-        set /p create_db=""
-        if /i "!create_db!"=="y" (
+        set connection_successful=1
+    ) else if !DB_CONNECTION_CODE! equ 2 (
+        REM Connection OK but database missing or inaccessible
+        echo.
+        echo [WARNING] The database connection works, but database '!db_name!' is not accessible.
+        echo [INFO] Options:
+        echo 1. Create the database (requires root access)
+        echo 2. Try different database credentials
+        echo 3. Use H2 fallback database
+        set /p db_option="Choose option (1-3): "
+        
+        if "!db_option!"=="1" (
             set /p root_password="Enter MySQL root password: "
             call :create_database "!db_host!" "!db_port!" "!root_password!" "!db_password!"
             if !DB_CREATED! equ 1 (
                 call :update_application_properties "!db_host!" "!db_port!" "!db_user!" "!db_password!" "!db_name!"
+                set connection_successful=1
             ) else (
-                echo [ERROR] Failed to create database. Using H2 fallback.
-                call :setup_h2_fallback
+                echo [ERROR] Database creation failed.
+                set /a retry_count=retry_count+1
             )
-        ) else (
+        ) else if "!db_option!"=="2" (
+            set /a retry_count=retry_count+1
+        ) else if "!db_option!"=="3" (
             echo [INFO] Using H2 fallback database.
             call :setup_h2_fallback
+            set connection_successful=1
+        ) else (
+            set /a retry_count=retry_count+1
+        )
+    ) else (
+        REM Connection failed entirely
+        set /a retry_count=retry_count+1
+        if !retry_count! lss !max_retries! (
+            echo.
+            set /p retry_choice="Would you like to retry with different settings? (y/n): "
+            if /i not "!retry_choice!"=="y" (
+                goto :connection_failed
+            )
+        )
+    )
+    
+    if !connection_successful! equ 0 (
+        if !retry_count! lss !max_retries! (
+            goto :retry_connection
+        )
+    )
+    
+    :connection_failed
+    if !connection_successful! equ 0 (
+        echo.
+        echo [ERROR] Maximum retry attempts reached or user chose not to retry.
+        echo [INFO] Options:
+        echo 1. Use H2 fallback database (recommended for development)
+        echo 2. Exit and configure database manually
+        set /p fallback_option="Choose option (1-2): "
+        
+        if "!fallback_option!"=="1" (
+            echo [INFO] Using H2 fallback database.
+            call :setup_h2_fallback
+        ) else (
+            echo [ERROR] Please configure the database manually and run the script again.
+            pause
+            exit /b 1
         )
     )
 ) else if "%choice%"=="2" (

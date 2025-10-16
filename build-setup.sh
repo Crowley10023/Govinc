@@ -49,26 +49,85 @@ check_mariadb_running() {
     fi
 }
 
-# Function to test database connection
-test_db_connection() {
+# Function to check if database exists
+check_database_exists() {
     local host="$1"
     local port="$2"
     local user="$3"
     local password="$4"
     local database="$5"
     
-    echo -e "${YELLOW}Testing database connection...${NC}"
+    local output
+    output=$(mysql -h"$host" -P"$port" -u"$user" -p"$password" -e "SHOW DATABASES LIKE '$database';" 2>/dev/null)
     
-    if mysql -h"$host" -P"$port" -u"$user" -p"$password" -e "USE $database;" 2>/dev/null; then
-        echo -e "${GREEN}✓ Database connection successful!${NC}"
-        return 0
+    if [[ -n "$output" && "$output" != *"Database"* ]]; then
+        return 0  # Database exists
     else
-        echo -e "${RED}✗ Database connection failed!${NC}"
-        return 1
+        return 1  # Database doesn't exist
     fi
 }
 
-# Function to create database and user
+# Function to test database connection with detailed error reporting
+test_db_connection() {
+    local host="$1"
+    local port="$2"
+    local user="$3"
+    local password="$4"
+    local database="$5"
+    local check_db_exists="${6:-true}"
+    
+    echo -e "${YELLOW}Testing database connection to $host:$port...${NC}"
+    
+    # Test basic connectivity first
+    local connection_test
+    connection_test=$(mysql -h"$host" -P"$port" -u"$user" -p"$password" -e "SELECT 1;" 2>&1)
+    local conn_result=$?
+    
+    if [ $conn_result -ne 0 ]; then
+        echo -e "${RED}✗ Database connection failed!${NC}"
+        
+        # Analyze the error and provide specific feedback
+        if echo "$connection_test" | grep -q "Access denied"; then
+            echo -e "${RED}  Error: Access denied - Invalid username or password${NC}"
+        elif echo "$connection_test" | grep -q "Can't connect to"; then
+            echo -e "${RED}  Error: Cannot connect to database server${NC}"
+            echo -e "${RED}  Possible causes:${NC}"
+            echo -e "${RED}  - Database server is not running${NC}"
+            echo -e "${RED}  - Wrong host or port${NC}"
+            echo -e "${RED}  - Firewall blocking connection${NC}"
+        elif echo "$connection_test" | grep -q "Unknown database"; then
+            echo -e "${RED}  Error: Database '$database' does not exist${NC}"
+        else
+            echo -e "${RED}  Error details: $connection_test${NC}"
+        fi
+        return 1
+    fi
+    
+    # If we should check database existence
+    if [[ "$check_db_exists" == "true" ]]; then
+        if check_database_exists "$host" "$port" "$user" "$password" "$database"; then
+            echo -e "${GREEN}✓ Database connection successful! Database '$database' exists.${NC}"
+            return 0
+        else
+            echo -e "${YELLOW}⚠ Database connection successful, but database '$database' does not exist.${NC}"
+            return 2  # Special return code for "connection OK but database missing"
+        fi
+    else
+        # Just test the connection without checking database existence
+        local db_test
+        db_test=$(mysql -h"$host" -P"$port" -u"$user" -p"$password" -e "USE $database;" 2>&1)
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}✓ Database connection successful! Database '$database' is accessible.${NC}"
+            return 0
+        else
+            echo -e "${YELLOW}⚠ Database connection successful, but cannot access database '$database'.${NC}"
+            echo -e "${YELLOW}  This might be due to missing permissions or the database not existing.${NC}"
+            return 2
+        fi
+    fi
+}
+
+# Function to create database and user with detailed error handling
 create_database() {
     local host="$1"
     local port="$2"
@@ -77,7 +136,30 @@ create_database() {
     
     echo -e "${YELLOW}Creating database and user...${NC}"
     
-    mysql -h"$host" -P"$port" -uroot -p"$root_password" << EOF
+    # Test root connection first
+    echo -e "${YELLOW}Testing root connection...${NC}"
+    local root_test
+    root_test=$(mysql -h"$host" -P"$port" -uroot -p"$root_password" -e "SELECT 1;" 2>&1)
+    
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}✗ Cannot connect as root user!${NC}"
+        if echo "$root_test" | grep -q "Access denied"; then
+            echo -e "${RED}  Error: Root password is incorrect${NC}"
+        else
+            echo -e "${RED}  Error details: $root_test${NC}"
+        fi
+        return 1
+    fi
+    
+    # Check if database already exists
+    if check_database_exists "$host" "$port" "root" "$root_password" "$DB_NAME"; then
+        echo -e "${YELLOW}Database '$DB_NAME' already exists.${NC}"
+        echo -e "${YELLOW}Ensuring user '$DB_USER' has proper permissions...${NC}"
+    fi
+    
+    # Create database and user
+    local create_output
+    create_output=$(mysql -h"$host" -P"$port" -uroot -p"$root_password" 2>&1 << EOF
 CREATE DATABASE IF NOT EXISTS $DB_NAME CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$db_password';
 CREATE USER IF NOT EXISTS '$DB_USER'@'%' IDENTIFIED BY '$db_password';
@@ -85,12 +167,23 @@ GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';
 GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'%';
 FLUSH PRIVILEGES;
 EOF
+)
     
     if [ $? -eq 0 ]; then
-        echo -e "${GREEN}✓ Database and user created successfully!${NC}"
-        return 0
+        echo -e "${GREEN}✓ Database and user created/updated successfully!${NC}"
+        
+        # Verify the setup by testing the new user connection
+        echo -e "${YELLOW}Verifying new user connection...${NC}"
+        if test_db_connection "$host" "$port" "$DB_USER" "$db_password" "$DB_NAME" "false"; then
+            echo -e "${GREEN}✓ User verification successful!${NC}"
+            return 0
+        else
+            echo -e "${YELLOW}⚠ Database created but user verification failed. This might be normal for new installations.${NC}"
+            return 0
+        fi
     else
         echo -e "${RED}✗ Failed to create database and user!${NC}"
+        echo -e "${RED}Error details: $create_output${NC}"
         return 1
     fi
 }
@@ -215,38 +308,97 @@ setup_database() {
         1)
             echo -e "${YELLOW}Connecting to existing database...${NC}"
             
-            read -p "Database host (default: localhost): " db_host
-            db_host=${db_host:-localhost}
+            local max_retries=3
+            local retry_count=0
+            local connection_successful=false
             
-            read -p "Database port (default: 3306): " db_port
-            db_port=${db_port:-3306}
-            
-            read -p "Database name (default: $DB_NAME): " db_name
-            db_name=${db_name:-$DB_NAME}
-            
-            read -p "Database user (default: $DB_USER): " db_user
-            db_user=${db_user:-$DB_USER}
-            
-            read -s -p "Database password: " db_password
-            echo
-            
-            if test_db_connection "$db_host" "$db_port" "$db_user" "$db_password" "$db_name"; then
-                update_application_properties "$db_host" "$db_port" "$db_user" "$db_password" "$db_name"
-            else
-                echo -e "${RED}Would you like to create the database? (y/n)${NC}"
-                read -p "" create_db
-                if [[ $create_db =~ ^[Yy]$ ]]; then
-                    read -s -p "Enter MySQL root password: " root_password
-                    echo
-                    if create_database "$db_host" "$db_port" "$root_password" "$db_password"; then
-                        update_application_properties "$db_host" "$db_port" "$db_user" "$db_password" "$db_name"
-                    else
-                        echo -e "${RED}Failed to create database. Using H2 fallback.${NC}"
-                        setup_h2_fallback
-                    fi
+            while [ $retry_count -lt $max_retries ] && [ "$connection_successful" = false ]; do
+                if [ $retry_count -gt 0 ]; then
+                    echo -e "${YELLOW}\nRetry attempt $retry_count of $((max_retries-1))...${NC}"
+                fi
+                
+                read -p "Database host (default: localhost): " db_host
+                db_host=${db_host:-localhost}
+                
+                read -p "Database port (default: 3306): " db_port
+                db_port=${db_port:-3306}
+                
+                read -p "Database name (default: $DB_NAME): " db_name
+                db_name=${db_name:-$DB_NAME}
+                
+                read -p "Database user (default: $DB_USER): " db_user
+                db_user=${db_user:-$DB_USER}
+                
+                read -s -p "Database password: " db_password
+                echo
+                
+                local conn_result
+                test_db_connection "$db_host" "$db_port" "$db_user" "$db_password" "$db_name"
+                conn_result=$?
+                
+                if [ $conn_result -eq 0 ]; then
+                    # Success - database exists and is accessible
+                    update_application_properties "$db_host" "$db_port" "$db_user" "$db_password" "$db_name"
+                    connection_successful=true
+                elif [ $conn_result -eq 2 ]; then
+                    # Connection OK but database missing or inaccessible
+                    echo -e "${YELLOW}\nThe database connection works, but database '$db_name' is not accessible.${NC}"
+                    echo -e "${YELLOW}Options:${NC}"
+                    echo "1. Create the database (requires root access)"
+                    echo "2. Try different database credentials"
+                    echo "3. Use H2 fallback database"
+                    read -p "Choose option (1-3): " db_option
+                    
+                    case $db_option in
+                        1)
+                            read -s -p "Enter MySQL root password: " root_password
+                            echo
+                            if create_database "$db_host" "$db_port" "$root_password" "$db_password"; then
+                                update_application_properties "$db_host" "$db_port" "$db_user" "$db_password" "$db_name"
+                                connection_successful=true
+                            else
+                                echo -e "${RED}Database creation failed.${NC}"
+                                retry_count=$((retry_count + 1))
+                            fi
+                            ;;
+                        2)
+                            retry_count=$((retry_count + 1))
+                            ;;
+                        3)
+                            echo -e "${YELLOW}Using H2 fallback database.${NC}"
+                            setup_h2_fallback
+                            connection_successful=true
+                            ;;
+                        *)
+                            retry_count=$((retry_count + 1))
+                            ;;
+                    esac
                 else
+                    # Connection failed entirely
+                    retry_count=$((retry_count + 1))
+                    if [ $retry_count -lt $max_retries ]; then
+                        echo -e "${YELLOW}\nWould you like to retry with different settings? (y/n)${NC}"
+                        read -p "" retry_choice
+                        if [[ ! $retry_choice =~ ^[Yy]$ ]]; then
+                            break
+                        fi
+                    fi
+                fi
+            done
+            
+            if [ "$connection_successful" = false ]; then
+                echo -e "${RED}\nMaximum retry attempts reached or user chose not to retry.${NC}"
+                echo -e "${YELLOW}Options:${NC}"
+                echo "1. Use H2 fallback database (recommended for development)"
+                echo "2. Exit and configure database manually"
+                read -p "Choose option (1-2): " fallback_option
+                
+                if [[ $fallback_option == "1" ]]; then
                     echo -e "${YELLOW}Using H2 fallback database.${NC}"
                     setup_h2_fallback
+                else
+                    echo -e "${RED}Please configure the database manually and run the script again.${NC}"
+                    exit 1
                 fi
             fi
             ;;
