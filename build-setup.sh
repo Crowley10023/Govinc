@@ -2,6 +2,11 @@
 
 # Build Setup Script for Theia01 Governance Tool
 # This script handles database setup and application build
+#
+# Password Handling Security Notes:
+# - Removed 'sudo' from mysql commands to fix password piping issues
+# - Using MYSQL_PWD environment variable instead of -p flag for better security
+# - This prevents passwords from appearing in process lists and command history
 
 set -e  # Exit on any error
 
@@ -22,6 +27,32 @@ echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}  Theia01 Governance Tool Build Setup  ${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo
+
+# Alternative secure password handling using temporary config file
+create_mysql_config_file() {
+    local user="$1"
+    local password="$2"
+    local host="$3"
+    local port="$4"
+    local config_file="$5"
+    
+    cat > "$config_file" << EOF
+[client]
+user=$user
+password=$password
+host=$host
+port=$port
+EOF
+    chmod 600 "$config_file"
+}
+
+# Function to clean up temporary config file
+cleanup_mysql_config() {
+    local config_file="$1"
+    if [ -f "$config_file" ]; then
+        rm -f "$config_file"
+    fi
+}
 
 # Function to check if MariaDB/MySQL is installed
 check_mariadb_installed() {
@@ -58,7 +89,8 @@ check_database_exists() {
     local database="$5"
     
     local output
-    output=$(sudo mysql -h"$host" -P"$port" -u"$user" -p"$password" -e "SHOW DATABASES LIKE '$database';" 2>/dev/null)
+    # Use environment variable to pass password securely
+    MYSQL_PWD="$password" output=$(mysql -h"$host" -P"$port" -u"$user" -e "SHOW DATABASES LIKE '$database';" 2>/dev/null)
     
     if [[ -n "$output" && "$output" != *"Database"* ]]; then
         return 0  # Database exists
@@ -88,9 +120,9 @@ test_db_connection() {
     # Test basic connectivity first with timeout
     local connection_test
     if [ -n "$timeout_cmd" ]; then
-        connection_test=$($timeout_cmd sudo mysql -h"$host" -P"$port" -u"$user" -p"$password" --connect-timeout=10 -e "SELECT 1;" 2>&1)
+        MYSQL_PWD="$password" connection_test=$($timeout_cmd mysql -h"$host" -P"$port" -u"$user" --connect-timeout=10 -e "SELECT 1;" 2>&1)
     else
-        connection_test=$(sudo mysql -h"$host" -P"$port" -u"$user" -p"$password" --connect-timeout=10 -e "SELECT 1;" 2>&1)
+        MYSQL_PWD="$password" connection_test=$(mysql -h"$host" -P"$port" -u"$user" --connect-timeout=10 -e "SELECT 1;" 2>&1)
     fi
     local conn_result=$?
     
@@ -132,9 +164,9 @@ test_db_connection() {
         # Just test the connection without checking database existence with timeout
         local db_test
         if [ -n "$timeout_cmd" ]; then
-            db_test=$($timeout_cmd sudo mysql -h"$host" -P"$port" -u"$user" -p"$password" --connect-timeout=10 -e "USE $database;" 2>&1)
+            MYSQL_PWD="$password" db_test=$($timeout_cmd mysql -h"$host" -P"$port" -u"$user" --connect-timeout=10 -e "USE $database;" 2>&1)
         else
-            db_test=$(sudo mysql -h"$host" -P"$port" -u"$user" -p"$password" --connect-timeout=10 -e "USE $database;" 2>&1)
+            MYSQL_PWD="$password" db_test=$(mysql -h"$host" -P"$port" -u"$user" --connect-timeout=10 -e "USE $database;" 2>&1)
         fi
         local db_result=$?
         
@@ -167,7 +199,7 @@ create_database() {
     # Test root connection first
     echo -e "${YELLOW}Testing root connection...${NC}"
     local root_test
-    root_test=$(sudo mysql -h"$host" -P"$port" -uroot -p"$root_password" -e "SELECT 1;" 2>&1)
+    MYSQL_PWD="$root_password" root_test=$(mysql -h"$host" -P"$port" -uroot -e "SELECT 1;" 2>&1)
     
     if [ $? -ne 0 ]; then
         echo -e "${RED}✗ Cannot connect as root user!${NC}"
@@ -189,7 +221,7 @@ create_database() {
     
     # Create database and user
     local create_output
-    create_output=$(sudo mysql -h"$host" -P"$port" -uroot -p"$root_password" 2>&1 << EOF
+    MYSQL_PWD="$root_password" create_output=$(mysql -h"$host" -P"$port" -uroot 2>&1 << EOF
 CREATE DATABASE IF NOT EXISTS $DB_NAME CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$db_password';
 CREATE USER IF NOT EXISTS '$DB_USER'@'%' IDENTIFIED BY '$db_password';
