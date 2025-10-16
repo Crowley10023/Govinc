@@ -188,6 +188,11 @@ test_db_connection() {
     echo -e "${BLUE}  Connection test result: $conn_result${NC}"
     if [ $conn_result -ne 0 ]; then
         echo -e "${BLUE}  Connection test output: $connection_test${NC}"
+        # Check for specific password-related issues
+        if echo "$connection_test" | grep -qi "using password: no"; then
+            echo -e "${RED}  Issue detected: MySQL client reports 'using password: no'${NC}"
+            echo -e "${YELLOW}  This suggests the password is not being passed correctly${NC}"
+        fi
     fi
     
     # Handle timeout or connection failure
@@ -304,7 +309,8 @@ create_database() {
     
     # Create database and user
     local create_output
-    MYSQL_PWD="$root_password" create_output=$(mysql -h"$host" -P"$port" -uroot 2>&1 << EOF
+    export MYSQL_PWD="$root_password"
+    create_output=$(mysql -h"$host" -P"$port" -uroot 2>&1 << EOF
 CREATE DATABASE IF NOT EXISTS $DB_NAME CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$db_password';
 CREATE USER IF NOT EXISTS '$DB_USER'@'%' IDENTIFIED BY '$db_password';
@@ -313,8 +319,10 @@ GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'%';
 FLUSH PRIVILEGES;
 EOF
 )
+    local create_result=$?
+    unset MYSQL_PWD
     
-    if [ $? -eq 0 ]; then
+    if [ $create_result -eq 0 ]; then
         echo -e "${GREEN}✓ Database and user created/updated successfully!${NC}"
         
         # Verify the setup by testing the new user connection with the same password used in testing
