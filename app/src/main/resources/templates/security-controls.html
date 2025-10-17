@@ -21,12 +21,14 @@
         
         .modal-content {
             background-color: #fefefe;
-            margin: 5% auto;
+            margin: 2% auto;
             padding: 30px;
             border: 1px solid #888;
             border-radius: 10px;
-            width: 80%;
-            max-width: 600px;
+            width: 90%;
+            max-width: 1000px;
+            max-height: 90vh;
+            overflow-y: auto;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
             animation: modalFadeIn 0.3s ease-out;
         }
@@ -144,6 +146,168 @@
             width: 100%;
             max-width: 400px;
         }
+        
+        .catalog-options {
+            background-color: #e8f5e8;
+            border: 1px solid #c3e6c3;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .catalog-options h4 {
+            margin-top: 0;
+            color: #2d5a2d;
+        }
+        
+        .radio-group {
+            margin: 10px 0;
+        }
+        
+        .radio-option {
+            margin: 8px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        
+        .radio-option:hover {
+            background-color: #f0f0f0;
+        }
+        
+        .radio-option input[type="radio"] {
+            margin-right: 10px;
+        }
+        
+        .new-catalog-fields {
+            display: none;
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        
+        .new-catalog-fields input, .new-catalog-fields textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .existing-catalog-select {
+            display: none;
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        
+        .existing-catalog-select select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .preview-section {
+            display: none;
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+        
+        .preview-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            font-size: 12px;
+        }
+        
+        .preview-table th, .preview-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        
+        .preview-table th {
+            background-color: #e9ecef;
+            font-weight: bold;
+        }
+        
+        .preview-table tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        
+        .preview-table td {
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .preview-stats {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        
+        .step-container {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin: 15px 0;
+            overflow: hidden;
+        }
+        
+        .step-header {
+            background-color: #e9ecef;
+            padding: 15px;
+            font-weight: bold;
+            color: #495057;
+        }
+        
+        .step-content {
+            padding: 20px;
+        }
+        
+        .step-number {
+            background-color: #007bff;
+            color: white;
+            border-radius: 50%;
+            width: 25px;
+            height: 25px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+            font-size: 14px;
+        }
+        
+        .warning-box {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            color: #856404;
+        }
+        
+        .error-row {
+            background-color: #f8d7da !important;
+            color: #721c24;
+        }
+        
+        .valid-row {
+            background-color: #d1eddd;
+            color: #155724;
+        }
     </style>
 </head>
 <body>
@@ -164,47 +328,155 @@
             <span class="close">&times;</span>
             <h2>Import Security Controls from CSV</h2>
             
-            <div class="csv-instructions">
-                <h4>📋 CSV Format Requirements</h4>
-                <p>Please ensure your CSV file follows the exact format specified below:</p>
-                
-                <div class="column-list">
-                    <h5>Required Columns (in this exact order):</h5>
-                    <ul>
-                        <li>name</li>
-                        <li>detail</li>
-                        <li>reference</li>
-                        <li>domain</li>
-                    </ul>
+            <!-- Step 1: Instructions and File Upload -->
+            <div class="step-container">
+                <div class="step-header">
+                    <span class="step-number">1</span>CSV Format Instructions & File Upload
                 </div>
-                
-                <div class="example-section">
-                    <h5>📝 Example CSV Format:</h5>
-                    <div class="example-csv">name,detail,reference,domain
+                <div class="step-content">
+                    <div class="csv-instructions">
+                        <h4>📋 CSV Format Requirements</h4>
+                        <p>Please ensure your CSV file follows the exact format specified below:</p>
+                        
+                        <div class="column-list">
+                            <h5>Required Columns (in this exact order):</h5>
+                            <ul>
+                                <li>name</li>
+                                <li>detail</li>
+                                <li>reference</li>
+                                <li>domain</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="example-section">
+                            <h5>📝 Example CSV Format:</h5>
+                            <div class="example-csv">name,detail,reference,domain
 "Access Control Policy","Implement comprehensive access control policies","AC-1","Access Control"
 "Account Management","Manage user accounts and access rights","AC-2","Access Control"
 "Network Segmentation","Implement proper network segmentation","SC-7","System and Communications Protection"</div>
+                        </div>
+                        
+                        <div style="background-color: #d1ecf1; border: 1px solid #bee5eb; border-radius: 4px; padding: 10px; margin: 10px 0;">
+                            <strong>💡 Important Notes:</strong>
+                            <ul style="margin: 8px 0; padding-left: 20px;">
+                                <li>The first row must contain the column headers exactly as shown</li>
+                                <li>Use double quotes around values that contain commas</li>
+                                <li>The domain column should match existing domain names or new ones will be created</li>
+                                <li>Empty fields are allowed but not recommended</li>
+                                <li>UTF-8 encoding is recommended for special characters</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="upload-section">
+                        <p><strong>Select your CSV file:</strong></p>
+                        <input type="file" id="csvFile" class="file-input" accept=".csv" required />
+                        <br/>
+                        <button type="button" id="previewBtn" class="import-button" disabled>Preview CSV Data</button>
+                    </div>
                 </div>
-                
-                <div style="background-color: #d1ecf1; border: 1px solid #bee5eb; border-radius: 4px; padding: 10px; margin: 10px 0;">
-                    <strong>💡 Important Notes:</strong>
-                    <ul style="margin: 8px 0; padding-left: 20px;">
-                        <li>The first row must contain the column headers exactly as shown</li>
-                        <li>Use double quotes around values that contain commas</li>
-                        <li>The domain column should match existing domain names or new ones will be created</li>
-                        <li>Empty fields are allowed but not recommended</li>
-                        <li>UTF-8 encoding is recommended for special characters</li>
-                    </ul>
+            </div>
+
+            <!-- Step 2: Preview -->
+            <div class="step-container preview-section" id="previewSection">
+                <div class="step-header">
+                    <span class="step-number">2</span>Preview CSV Data
+                </div>
+                <div class="step-content">
+                    <div class="preview-stats" id="previewStats"></div>
+                    <div class="warning-box" id="previewWarnings" style="display: none;"></div>
+                    <div style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px;">
+                        <table class="preview-table" id="previewTable">
+                            <thead>
+                                <tr>
+                                    <th>Row</th>
+                                    <th>Name</th>
+                                    <th>Detail</th>
+                                    <th>Reference</th>
+                                    <th>Domain</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="previewTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 3: Security Catalog Options -->
+            <div class="step-container catalog-options" id="catalogSection" style="display: none;">
+                <div class="step-header">
+                    <span class="step-number">3</span>Security Catalog Assignment
+                </div>
+                <div class="step-content">
+                    <h4>🔗 Link Security Controls to Catalog</h4>
+                    <p>Choose how you want to organize the imported security controls:</p>
+                    
+                    <div class="radio-group">
+                        <div class="radio-option">
+                            <input type="radio" id="noCatalog" name="catalogOption" value="none" checked />
+                            <label for="noCatalog">
+                                <strong>No Catalog Assignment</strong><br>
+                                <small>Import controls without linking to any security catalog</small>
+                            </label>
+                        </div>
+                        
+                        <div class="radio-option">
+                            <input type="radio" id="existingCatalog" name="catalogOption" value="existing" disabled />
+                            <label for="existingCatalog">
+                                <strong>Add to Existing Catalog</strong><br>
+                                <small id="existingCatalogStatus">Loading catalogs...</small>
+                            </label>
+                        </div>
+                        
+                        <div class="radio-option">
+                            <input type="radio" id="newCatalog" name="catalogOption" value="new" />
+                            <label for="newCatalog">
+                                <strong>Create New Catalog</strong><br>
+                                <small>Create a new security catalog and link all imported controls to it</small>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="existingCatalogFields" class="existing-catalog-select">
+                        <label for="catalogSelect"><strong>Select Existing Catalog:</strong></label>
+                        <select id="catalogSelect" name="existingCatalogId">
+                            <option value="">-- Select a Security Catalog --</option>
+                            <!-- Options will be populated by JavaScript -->
+                        </select>
+                    </div>
+
+                    <div id="newCatalogFields" class="new-catalog-fields">
+                        <label for="catalogName"><strong>Catalog Name:</strong></label>
+                        <input type="text" id="catalogName" name="catalogName" placeholder="Enter catalog name" />
+                        
+                        <label for="catalogDescription"><strong>Description:</strong></label>
+                        <textarea id="catalogDescription" name="catalogDescription" rows="3" placeholder="Enter catalog description"></textarea>
+                        
+                        <label for="catalogRevision"><strong>Revision:</strong></label>
+                        <input type="text" id="catalogRevision" name="catalogRevision" placeholder="Enter revision (e.g., v1.0)" />
+                    </div>
                 </div>
             </div>
             
-            <div class="upload-section">
-                <form id="csvUploadForm" th:action="@{/security-control/import}" method="post" enctype="multipart/form-data">
-                    <p><strong>Select your CSV file:</strong></p>
-                    <input type="file" name="file" id="csvFile" class="file-input" accept=".csv" required />
-                    <br/>
-                    <button type="submit" class="import-button">Upload and Import</button>
-                </form>
+            <!-- Step 4: Final Import -->
+            <div class="step-container" id="importSection" style="display: none;">
+                <div class="step-header">
+                    <span class="step-number">4</span>Import Security Controls
+                </div>
+                <div class="step-content">
+                    <form id="csvUploadForm" th:action="@{/security-control/import}" method="post" enctype="multipart/form-data">
+                        <input type="hidden" name="catalogOption" id="catalogOptionInput" />
+                        <input type="hidden" name="existingCatalogId" id="existingCatalogIdInput" />
+                        <input type="hidden" name="catalogName" id="catalogNameInput" />
+                        <input type="hidden" name="catalogDescription" id="catalogDescriptionInput" />
+                        <input type="hidden" name="catalogRevision" id="catalogRevisionInput" />
+                        
+                        <div id="importSummary"></div>
+                        <button type="submit" class="import-button">Import Security Controls</button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
@@ -241,27 +513,35 @@
 </div>
 
 <script>
+    // Global variables
+    let csvData = [];
+    let availableCatalogs = [];
+    
     // Get modal elements
     const modal = document.getElementById('csvImportModal');
     const importBtn = document.getElementById('importBtn');
     const closeBtn = document.getElementsByClassName('close')[0];
     const csvFile = document.getElementById('csvFile');
+    const previewBtn = document.getElementById('previewBtn');
     const uploadForm = document.getElementById('csvUploadForm');
 
     // Show modal when import button is clicked
     importBtn.onclick = function() {
         modal.style.display = 'block';
+        loadAvailableCatalogs();
     }
 
     // Close modal when X is clicked
     closeBtn.onclick = function() {
         modal.style.display = 'none';
+        resetForm();
     }
 
     // Close modal when clicking outside of it
     window.onclick = function(event) {
         if (event.target === modal) {
             modal.style.display = 'none';
+            resetForm();
         }
     }
 
@@ -269,46 +549,379 @@
     document.addEventListener('keydown', function(event) {
         if (event.key === 'Escape' && modal.style.display === 'block') {
             modal.style.display = 'none';
+            resetForm();
         }
     });
 
-    // File validation
+    // File selection handler
     csvFile.addEventListener('change', function(event) {
         const file = event.target.files[0];
+        previewBtn.disabled = !file;
+        
         if (file) {
             const fileName = file.name.toLowerCase();
             if (!fileName.endsWith('.csv')) {
                 alert('Please select a CSV file.');
                 event.target.value = '';
+                previewBtn.disabled = true;
                 return;
             }
             
-            // Optional: Check file size (e.g., max 10MB)
-            const maxSize = 10 * 1024 * 1024; // 10MB
+            // Check file size (max 10MB)
+            const maxSize = 10 * 1024 * 1024;
             if (file.size > maxSize) {
                 alert('File size must be less than 10MB.');
                 event.target.value = '';
+                previewBtn.disabled = true;
                 return;
             }
         }
     });
 
-    // Form submission handling
-    uploadForm.addEventListener('submit', function(event) {
-        const fileInput = csvFile.files[0];
-        if (!fileInput) {
-            event.preventDefault();
-            alert('Please select a CSV file before uploading.');
+    // Preview button handler
+    previewBtn.addEventListener('click', function() {
+        const file = csvFile.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const csvText = e.target.result;
+            parseCsvData(csvText);
+        };
+        reader.readAsText(file);
+    });
+
+    // CSV parsing function
+    function parseCsvData(csvText) {
+        const lines = csvText.split('\n').filter(line => line.trim());
+        if (lines.length < 2) {
+            alert('CSV file must contain at least a header row and one data row.');
             return;
         }
+
+        csvData = [];
+        const headers = parseCSVLine(lines[0]);
+        
+        // Validate headers
+        const expectedHeaders = ['name', 'detail', 'reference', 'domain'];
+        const headersValid = expectedHeaders.every((header, index) => 
+            headers[index] && headers[index].toLowerCase().trim() === header
+        );
+        
+        if (!headersValid) {
+            alert('CSV headers must be exactly: name,detail,reference,domain');
+            return;
+        }
+
+        // Parse data rows
+        for (let i = 1; i < lines.length; i++) {
+            const columns = parseCSVLine(lines[i]);
+            if (columns.length >= 4) {
+                const rowData = {
+                    rowNumber: i,
+                    name: columns[0]?.trim() || '',
+                    detail: columns[1]?.trim() || '',
+                    reference: columns[2]?.trim() || '',
+                    domain: columns[3]?.trim() || '',
+                    valid: true,
+                    errors: []
+                };
+                
+                // Validate required fields
+                if (!rowData.name) {
+                    rowData.valid = false;
+                    rowData.errors.push('Name is required');
+                }
+                if (!rowData.domain) {
+                    rowData.valid = false;
+                    rowData.errors.push('Domain is required');
+                }
+                
+                csvData.push(rowData);
+            }
+        }
+
+        displayPreview();
+        showCatalogOptions();
+    }
+
+    // Simple CSV parser that handles quoted fields
+    function parseCSVLine(line) {
+        const result = [];
+        let current = '';
+        let inQuotes = false;
+        
+        for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            
+            if (char === '"') {
+                inQuotes = !inQuotes;
+            } else if (char === ',' && !inQuotes) {
+                result.push(current);
+                current = '';
+            } else {
+                current += char;
+            }
+        }
+        result.push(current);
+        
+        return result.map(field => field.replace(/^"|"$/g, ''));
+    }
+
+    // Display preview
+    function displayPreview() {
+        const previewSection = document.getElementById('previewSection');
+        const previewStats = document.getElementById('previewStats');
+        const previewWarnings = document.getElementById('previewWarnings');
+        const previewTableBody = document.getElementById('previewTableBody');
+        
+        previewSection.style.display = 'block';
+        
+        const validRows = csvData.filter(row => row.valid).length;
+        const invalidRows = csvData.length - validRows;
+        const uniqueDomains = [...new Set(csvData.map(row => row.domain))].filter(d => d).length;
+        
+        previewStats.innerHTML = `
+            <strong>📊 Import Summary:</strong><br>
+            Total rows: ${csvData.length} | 
+            Valid rows: <span style="color: #28a745;">${validRows}</span> | 
+            Invalid rows: <span style="color: #dc3545;">${invalidRows}</span> | 
+            Unique domains: ${uniqueDomains}
+        `;
+        
+        if (invalidRows > 0) {
+            previewWarnings.style.display = 'block';
+            previewWarnings.innerHTML = `
+                <strong>⚠️ Warning:</strong> ${invalidRows} row(s) have validation errors and will be skipped during import.
+                Please review the data below and fix any issues in your CSV file if needed.
+            `;
+        } else {
+            previewWarnings.style.display = 'none';
+        }
+        
+        // Populate preview table
+        previewTableBody.innerHTML = '';
+        csvData.forEach(row => {
+            const tr = document.createElement('tr');
+            tr.className = row.valid ? 'valid-row' : 'error-row';
+            
+            const status = row.valid ? 
+                '<span style="color: #28a745;">✓ Valid</span>' : 
+                '<span style="color: #dc3545;">✗ ' + row.errors.join(', ') + '</span>';
+            
+            tr.innerHTML = `
+                <td>${row.rowNumber}</td>
+                <td title="${row.name}">${row.name.substring(0, 30)}${row.name.length > 30 ? '...' : ''}</td>
+                <td title="${row.detail}">${row.detail.substring(0, 40)}${row.detail.length > 40 ? '...' : ''}</td>
+                <td title="${row.reference}">${row.reference}</td>
+                <td title="${row.domain}">${row.domain}</td>
+                <td>${status}</td>
+            `;
+            previewTableBody.appendChild(tr);
+        });
+    }
+
+    // Show catalog options
+    function showCatalogOptions() {
+        document.getElementById('catalogSection').style.display = 'block';
+    }
+
+    // Load available catalogs
+    function loadAvailableCatalogs() {
+        console.log('Testing API endpoint connectivity...');
+        
+        // First test if the API endpoint is reachable
+        fetch('/api/security-catalogs/test')
+            .then(response => {
+                console.log('Test endpoint response:', response.status);
+                if (response.ok) {
+                    console.log('API endpoint is reachable, loading catalogs...');
+                    return loadCatalogsFromApi();
+                } else {
+                    throw new Error('API endpoint test failed');
+                }
+            })
+            .catch(error => {
+                console.error('API test failed, trying direct approach:', error);
+                // Try direct approach anyway
+                loadCatalogsFromApi();
+            });
+    }
+    
+    function loadCatalogsFromApi() {
+        console.log('Loading catalogs from /api/security-catalogs');
+        fetch('/api/security-catalogs', {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+        })
+            .then(response => {
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(catalogs => {
+                console.log('Received catalogs:', catalogs);
+                availableCatalogs = catalogs || [];
+                populateCatalogSelect();
+                
+                // Enable existing catalog option if we have catalogs
+                const existingCatalogRadio = document.getElementById('existingCatalog');
+                const existingCatalogStatus = document.getElementById('existingCatalogStatus');
+                
+                if (availableCatalogs.length === 0) {
+                    existingCatalogRadio.disabled = true;
+                    existingCatalogStatus.textContent = 'No catalogs available';
+                } else {
+                    existingCatalogRadio.disabled = false;
+                    existingCatalogStatus.textContent = 'Link imported controls to an existing security catalog';
+                }
+            })
+            .catch(error => {
+                console.error('Error loading catalogs:', error);
+                // Fallback - hide existing catalog option if API fails
+                document.getElementById('existingCatalog').disabled = true;
+                document.getElementById('existingCatalogStatus').textContent = `Error loading catalogs: ${error.message}`;
+            });
+    }
+
+    // Populate catalog select dropdown
+    function populateCatalogSelect() {
+        const select = document.getElementById('catalogSelect');
+        select.innerHTML = '<option value="">-- Select a Security Catalog --</option>';
+        
+        availableCatalogs.forEach(catalog => {
+            const option = document.createElement('option');
+            option.value = catalog.id;
+            option.textContent = `${catalog.name}${catalog.revision ? ' (' + catalog.revision + ')' : ''}`;
+            select.appendChild(option);
+        });
+    }
+
+    // Radio button change handlers
+    document.getElementsByName('catalogOption').forEach(radio => {
+        radio.addEventListener('change', function() {
+            const value = this.value;
+            
+            document.getElementById('existingCatalogFields').style.display = 
+                value === 'existing' ? 'block' : 'none';
+            document.getElementById('newCatalogFields').style.display = 
+                value === 'new' ? 'block' : 'none';
+                
+            if (csvData.length > 0) {
+                updateImportSection();
+            }
+        });
+    });
+
+    // Update import section with summary
+    function updateImportSection() {
+        const importSection = document.getElementById('importSection');
+        const importSummary = document.getElementById('importSummary');
+        const catalogOption = document.querySelector('input[name="catalogOption"]:checked').value;
+        
+        let summaryText = `<p><strong>Ready to import ${csvData.filter(row => row.valid).length} security controls</strong></p>`;
+        
+        if (catalogOption === 'existing') {
+            const selectedCatalog = document.getElementById('catalogSelect');
+            if (selectedCatalog.value) {
+                const catalogName = selectedCatalog.options[selectedCatalog.selectedIndex].text;
+                summaryText += `<p>Controls will be added to existing catalog: <strong>${catalogName}</strong></p>`;
+            } else {
+                summaryText += `<p style="color: #dc3545;">Please select a catalog from the dropdown above.</p>`;
+            }
+        } else if (catalogOption === 'new') {
+            const catalogName = document.getElementById('catalogName').value;
+            if (catalogName) {
+                summaryText += `<p>New catalog "<strong>${catalogName}</strong>" will be created and linked to all imported controls.</p>`;
+            } else {
+                summaryText += `<p style="color: #dc3545;">Please enter a name for the new catalog above.</p>`;
+            }
+        } else {
+            summaryText += `<p>Controls will be imported without catalog assignment.</p>`;
+        }
+        
+        importSummary.innerHTML = summaryText;
+        importSection.style.display = 'block';
+    }
+
+    // Monitor catalog fields for changes
+    document.getElementById('catalogSelect').addEventListener('change', updateImportSection);
+    document.getElementById('catalogName').addEventListener('input', updateImportSection);
+
+    // Form submission
+    uploadForm.addEventListener('submit', function(event) {
+        const catalogOption = document.querySelector('input[name="catalogOption"]:checked').value;
+        
+        // Validate based on catalog option
+        if (catalogOption === 'existing') {
+            const selectedCatalog = document.getElementById('catalogSelect').value;
+            if (!selectedCatalog) {
+                event.preventDefault();
+                alert('Please select an existing catalog.');
+                return;
+            }
+            document.getElementById('existingCatalogIdInput').value = selectedCatalog;
+        } else if (catalogOption === 'new') {
+            const catalogName = document.getElementById('catalogName').value.trim();
+            if (!catalogName) {
+                event.preventDefault();
+                alert('Please enter a name for the new catalog.');
+                return;
+            }
+            document.getElementById('catalogNameInput').value = catalogName;
+            document.getElementById('catalogDescriptionInput').value = document.getElementById('catalogDescription').value;
+            document.getElementById('catalogRevisionInput').value = document.getElementById('catalogRevision').value;
+        }
+        
+        document.getElementById('catalogOptionInput').value = catalogOption;
+        
+        // Add the file to the form
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.name = 'file';
+        fileInput.style.display = 'none';
+        
+        // Create a new FileList with the selected file
+        const dt = new DataTransfer();
+        dt.items.add(csvFile.files[0]);
+        fileInput.files = dt.files;
+        
+        uploadForm.appendChild(fileInput);
         
         // Show loading state
         const submitBtn = uploadForm.querySelector('button[type="submit"]');
         submitBtn.disabled = true;
-        submitBtn.textContent = 'Uploading...';
-        
-        // Note: The form will submit normally, the loading state will be reset on page reload
+        submitBtn.textContent = 'Importing...';
     });
+
+    // Reset form function
+    function resetForm() {
+        csvData = [];
+        csvFile.value = '';
+        previewBtn.disabled = true;
+        
+        // Hide sections
+        document.getElementById('previewSection').style.display = 'none';
+        document.getElementById('catalogSection').style.display = 'none';
+        document.getElementById('importSection').style.display = 'none';
+        
+        // Reset radio buttons
+        document.getElementById('noCatalog').checked = true;
+        document.getElementById('existingCatalogFields').style.display = 'none';
+        document.getElementById('newCatalogFields').style.display = 'none';
+        
+        // Clear form fields
+        document.getElementById('catalogSelect').value = '';
+        document.getElementById('catalogName').value = '';
+        document.getElementById('catalogDescription').value = '';
+        document.getElementById('catalogRevision').value = '';
+    }
 </script>
 </body>
 </html>

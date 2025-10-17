@@ -1,6 +1,7 @@
 package com.govinc.catalog;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -108,5 +109,32 @@ public class SecurityCatalogController {
         model.addAttribute("securityControlDomains", getAllDomainsWithAllControlsGrouped());
         model.addAttribute("maturityModels", maturityModelRepository.findAll());
         return "edit-security-catalog";
+    }
+
+    @GetMapping("/api")
+    @ResponseBody
+    public ResponseEntity<List<SecurityCatalogDto>> getSecurityCatalogsApi() {
+        try {
+            System.out.println("API endpoint called: /security-catalog/api");
+            List<SecurityCatalog> catalogs = service.findAll();
+            System.out.println("Found " + catalogs.size() + " catalogs");
+            
+            List<SecurityCatalogDto> catalogDtos = catalogs.stream()
+                .map(SecurityCatalogDto::fromEntity)
+                .collect(Collectors.toList());
+                
+            System.out.println("Returning DTO list with " + catalogDtos.size() + " items");
+            return ResponseEntity.ok(catalogDtos);
+        } catch (Exception e) {
+            System.err.println("Error in getSecurityCatalogsApi: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    @GetMapping("/api/test")
+    @ResponseBody
+    public ResponseEntity<String> testApi() {
+        return ResponseEntity.ok("API endpoint is working!");
     }
 }
