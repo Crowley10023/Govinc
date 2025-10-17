@@ -9,8 +9,11 @@ public class LayoutConfiguration {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /**
+     * Logo image data, maximum 5MB. Enforced at upload and (if DB supports) at schema.
+     */
     @Lob
-    @Column(nullable = true)
+    @Column(nullable = true, length = 5242880)
     private byte[] imageData;
 
     @Column(nullable = true, columnDefinition = "VARCHAR(50) DEFAULT 'image/png'")
