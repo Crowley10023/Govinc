@@ -35,6 +35,22 @@ public class LayoutConfigController {
         System.out.println("Incoming layoutConfig ID: " + layoutConfig.getId());
         System.out.println("Incoming primaryColor: " + layoutConfig.getPrimaryColor());
         System.out.println("Incoming primaryColorDark: " + layoutConfig.getPrimaryColorDark());
+        
+        // Special handling for image-only uploads (when FormData doesn't bind properly)
+        boolean isImageOnlyUpload = (imageFile != null && !imageFile.isEmpty()) && 
+                                   (layoutConfig.getId() == null || layoutConfig.getPrimaryColor() == null);
+        
+        if (isImageOnlyUpload) {
+            System.out.println("Detected image-only upload - skipping form field updates");
+            // For image-only uploads, just update the image data and return existing config
+            LayoutConfiguration existing = layoutConfigurationRepository.findAll().stream().findFirst().orElse(new LayoutConfiguration());
+            existing.setImageData(imageFile.getBytes());
+            existing.setImageType(imageFile.getContentType());
+            layoutConfigurationRepository.save(existing);
+            model.addAttribute("layoutConfig", existing);
+            model.addAttribute("saved", true);
+            return "layout-config";
+        }
         LayoutConfiguration persisted = layoutConfigurationRepository.findAll().stream().findFirst().orElse(new LayoutConfiguration());
 
         // If image uploaded, always replace

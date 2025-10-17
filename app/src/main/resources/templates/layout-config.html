@@ -148,7 +148,25 @@
         if(fileInput) {
             fileInput.addEventListener('change', function() {
                 if (fileInput.files.length > 0) {
-                    var formData = new FormData(form);
+                    // Create FormData and ensure all form fields are included properly
+                    var formData = new FormData();
+                    
+                    // Add the image file
+                    formData.append('imageFile', fileInput.files[0]);
+                    
+                    // Add all form inputs explicitly to ensure proper Thymeleaf binding
+                    var formElements = form.querySelectorAll('input, select, textarea');
+                    formElements.forEach(function(element) {
+                        if (element.name && element.name !== 'imageFile') {
+                            if (element.type === 'checkbox' || element.type === 'radio') {
+                                if (element.checked) {
+                                    formData.append(element.name, element.value);
+                                }
+                            } else if (element.type !== 'file') {
+                                formData.append(element.name, element.value || '');
+                            }
+                        }
+                    });
                     uploadResult.innerHTML = 'Uploading...';
                     fetch(form.getAttribute('action'), {
                         method: 'POST',
