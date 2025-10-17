@@ -5,6 +5,146 @@
     <title>Security Controls List</title>
     <meta charset="UTF-8">
     <link rel="stylesheet" href="/style.css">
+    <style>
+        /* Popup Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(2px);
+        }
+        
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 30px;
+            border: 1px solid #888;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 600px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            animation: modalFadeIn 0.3s ease-out;
+        }
+        
+        @keyframes modalFadeIn {
+            from { opacity: 0; transform: translateY(-50px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close:hover,
+        .close:focus {
+            color: #000;
+        }
+        
+        .csv-instructions {
+            background-color: #f9f9f9;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        
+        .csv-instructions h4 {
+            margin-top: 0;
+            color: #2196F3;
+        }
+        
+        .column-list {
+            background-color: #ffffff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        
+        .column-list ul {
+            margin: 5px 0;
+            padding-left: 20px;
+        }
+        
+        .column-list li {
+            margin: 5px 0;
+            font-family: monospace;
+            background-color: #f5f5f5;
+            padding: 3px 6px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+        
+        .example-section {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        
+        .example-section h5 {
+            margin-top: 0;
+            color: #856404;
+        }
+        
+        .example-csv {
+            font-family: monospace;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            overflow-x: auto;
+            white-space: pre;
+            font-size: 12px;
+        }
+        
+        .import-button {
+            background-color: #28a745;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 15px;
+        }
+        
+        .import-button:hover {
+            background-color: #218838;
+        }
+        
+        .import-button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        .upload-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .file-input {
+            margin: 10px 0;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 100%;
+            max-width: 400px;
+        }
+    </style>
 </head>
 <body>
 <div th:replace="~{navigation :: mainNav}"></div>
@@ -13,12 +153,61 @@
     <h1>Security Controls</h1>
     <a href="/security-control/create">Create New Security Control</a>
 
-    <h2>Import Security Controls from CSV</h2>
-    <form th:action="@{/security-control/import}" method="post" enctype="multipart/form-data">
-        <input type="file" name="file" accept=".csv" required />
-        <button type="submit">Import</button>
-    </form>
-    <br/>
+    <!-- Import Button -->
+    <div style="margin: 20px 0;">
+        <button id="importBtn" class="import-button">Import Security Controls from CSV</button>
+    </div>
+
+    <!-- CSV Import Modal -->
+    <div id="csvImportModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Import Security Controls from CSV</h2>
+            
+            <div class="csv-instructions">
+                <h4>📋 CSV Format Requirements</h4>
+                <p>Please ensure your CSV file follows the exact format specified below:</p>
+                
+                <div class="column-list">
+                    <h5>Required Columns (in this exact order):</h5>
+                    <ul>
+                        <li>name</li>
+                        <li>detail</li>
+                        <li>reference</li>
+                        <li>domain</li>
+                    </ul>
+                </div>
+                
+                <div class="example-section">
+                    <h5>📝 Example CSV Format:</h5>
+                    <div class="example-csv">name,detail,reference,domain
+"Access Control Policy","Implement comprehensive access control policies","AC-1","Access Control"
+"Account Management","Manage user accounts and access rights","AC-2","Access Control"
+"Network Segmentation","Implement proper network segmentation","SC-7","System and Communications Protection"</div>
+                </div>
+                
+                <div style="background-color: #d1ecf1; border: 1px solid #bee5eb; border-radius: 4px; padding: 10px; margin: 10px 0;">
+                    <strong>💡 Important Notes:</strong>
+                    <ul style="margin: 8px 0; padding-left: 20px;">
+                        <li>The first row must contain the column headers exactly as shown</li>
+                        <li>Use double quotes around values that contain commas</li>
+                        <li>The domain column should match existing domain names or new ones will be created</li>
+                        <li>Empty fields are allowed but not recommended</li>
+                        <li>UTF-8 encoding is recommended for special characters</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="upload-section">
+                <form id="csvUploadForm" th:action="@{/security-control/import}" method="post" enctype="multipart/form-data">
+                    <p><strong>Select your CSV file:</strong></p>
+                    <input type="file" name="file" id="csvFile" class="file-input" accept=".csv" required />
+                    <br/>
+                    <button type="submit" class="import-button">Upload and Import</button>
+                </form>
+            </div>
+        </div>
+    </div>
 
     <table border="1">
         <thead>
@@ -50,5 +239,76 @@
     </table>
     <a href="/">Back to main</a>
 </div>
+
+<script>
+    // Get modal elements
+    const modal = document.getElementById('csvImportModal');
+    const importBtn = document.getElementById('importBtn');
+    const closeBtn = document.getElementsByClassName('close')[0];
+    const csvFile = document.getElementById('csvFile');
+    const uploadForm = document.getElementById('csvUploadForm');
+
+    // Show modal when import button is clicked
+    importBtn.onclick = function() {
+        modal.style.display = 'block';
+    }
+
+    // Close modal when X is clicked
+    closeBtn.onclick = function() {
+        modal.style.display = 'none';
+    }
+
+    // Close modal when clicking outside of it
+    window.onclick = function(event) {
+        if (event.target === modal) {
+            modal.style.display = 'none';
+        }
+    }
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape' && modal.style.display === 'block') {
+            modal.style.display = 'none';
+        }
+    });
+
+    // File validation
+    csvFile.addEventListener('change', function(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const fileName = file.name.toLowerCase();
+            if (!fileName.endsWith('.csv')) {
+                alert('Please select a CSV file.');
+                event.target.value = '';
+                return;
+            }
+            
+            // Optional: Check file size (e.g., max 10MB)
+            const maxSize = 10 * 1024 * 1024; // 10MB
+            if (file.size > maxSize) {
+                alert('File size must be less than 10MB.');
+                event.target.value = '';
+                return;
+            }
+        }
+    });
+
+    // Form submission handling
+    uploadForm.addEventListener('submit', function(event) {
+        const fileInput = csvFile.files[0];
+        if (!fileInput) {
+            event.preventDefault();
+            alert('Please select a CSV file before uploading.');
+            return;
+        }
+        
+        // Show loading state
+        const submitBtn = uploadForm.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Uploading...';
+        
+        // Note: The form will submit normally, the loading state will be reset on page reload
+    });
+</script>
 </body>
 </html>
