@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Navigation Logo Upload</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .upload-container {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background: var(--background-light);
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .upload-area {
+            border: 3px dashed var(--border);
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            background: var(--shine-glare);
+            margin: 1rem 0;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-area:hover {
+            border-color: var(--primary-blue);
+            background: var(--nav-violet);
+        }
+        
+        .upload-area.drag-over {
+            border-color: var(--accent-orange);
+            background: var(--modal-beige1);
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .upload-button {
+            background: var(--primary-blue);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.3s ease;
+        }
+        
+        .upload-button:hover {
+            background: var(--primary-blue-dark);
+        }
+        
+        .current-image {
+            text-align: center;
+            margin: 2rem 0;
+            padding: 1rem;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        
+        .preview-image {
+            max-width: 300px;
+            max-height: 150px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            margin: 1rem 0;
+        }
+        
+        .message {
+            padding: 1rem;
+            border-radius: 6px;
+            margin: 1rem 0;
+            font-weight: bold;
+        }
+        
+        .message.success {
+            background: var(--alert-bg1);
+            color: var(--success-green);
+            border: 1px solid var(--success-green);
+        }
+        
+        .message.error {
+            background: #fee;
+            color: var(--error-red);
+            border: 1px solid var(--error-red);
+        }
+        
+        .delete-button {
+            background: var(--error-red);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 1rem;
+        }
+        
+        .delete-button:hover {
+            background: darkred;
+        }
+        
+        .info-box {
+            background: var(--modal-beige1);
+            padding: 1rem;
+            border-radius: 6px;
+            margin: 1rem 0;
+            border-left: 4px solid var(--label-gold);
+        }
+        
+        .upload-instructions {
+            color: var(--text-main);
+            margin: 1rem 0;
+        }
+        
+        .file-requirements {
+            font-size: 0.9em;
+            color: var(--gray-777);
+            margin-top: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div th:replace="~{navigation :: mainNav}"></div>
+    
+    <div class="container">
+        <div class="upload-container">
+            <h2>Navigation Logo Upload</h2>
+            <p>Upload a custom logo image for the navigation bar. This image will appear in the top-left corner of all pages.</p>
+            
+            <!-- Success/Error Messages -->
+            <div th:if="${success}" class="message success" th:text="${success}"></div>
+            <div th:if="${error}" class="message error" th:text="${error}"></div>
+            
+            <!-- Current Image Display -->
+            <div th:if="${hasImage}" class="current-image">
+                <h3>Current Navigation Logo</h3>
+                <img src="/config/image-upload/preview" alt="Current Navigation Logo" class="preview-image">
+                <br>
+                <form th:action="@{/config/image-upload/delete}" method="post" style="display: inline;">
+                    <button type="submit" class="delete-button" 
+                            onclick="return confirm('Are you sure you want to delete the current logo?')">
+                        🗑️ Delete Current Logo
+                    </button>
+                </form>
+            </div>
+            
+            <!-- Upload Form -->
+            <form id="uploadForm" th:action="@{/config/image-upload}" method="post" enctype="multipart/form-data">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-instructions">
+                        <h3>📁 Upload New Logo</h3>
+                        <p>Click to select an image file or drag and drop it here</p>
+                        <button type="button" class="upload-button" onclick="document.getElementById('imageFile').click()">
+                            Choose Image File
+                        </button>
+                        <input type="file" id="imageFile" name="imageFile" class="file-input" 
+                               accept="image/*" onchange="handleFileSelect(this)">
+                    </div>
+                    <div class="file-requirements">
+                        <strong>Requirements:</strong><br>
+                        • Supported formats: PNG, JPG, GIF, SVG<br>
+                        • Maximum file size: 5MB<br>
+                        • Recommended dimensions: 180x80 pixels (will be auto-resized)<br>
+                        • For best results, use a transparent PNG background
+                    </div>
+                </div>
+                
+                <div id="fileInfo" style="display: none; margin: 1rem 0; text-align: center;">
+                    <p><strong>Selected file:</strong> <span id="fileName"></span></p>
+                    <p><strong>File size:</strong> <span id="fileSize"></span></p>
+                    <button type="submit" class="upload-button">
+                        🚀 Upload Logo
+                    </button>
+                </div>
+            </form>
+            
+            <!-- Information Box -->
+            <div class="info-box">
+                <h4>💡 Tips for Best Results:</h4>
+                <ul>
+                    <li><strong>Logo Design:</strong> Use a horizontal layout logo that fits well in the navigation bar</li>
+                    <li><strong>Background:</strong> Transparent PNG backgrounds work best for seamless integration</li>
+                    <li><strong>Size:</strong> The logo will be automatically resized to fit the navigation (max 180x80px)</li>
+                    <li><strong>Colors:</strong> Consider how your logo looks with your current theme colors</li>
+                    <li><strong>Testing:</strong> After upload, check how it appears across different pages</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('imageFile');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        
+        // Drag and Drop functionality
+        uploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            uploadArea.classList.add('drag-over');
+        });
+        
+        uploadArea.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-over');
+        });
+        
+        uploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-over');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                handleFileSelect(fileInput);
+            }
+        });
+        
+        function handleFileSelect(input) {
+            const file = input.files[0];
+            if (file) {
+                fileName.textContent = file.name;
+                fileSize.textContent = formatFileSize(file.size);
+                fileInfo.style.display = 'block';
+                
+                // Validate file type
+                if (!file.type.startsWith('image/')) {
+                    alert('Please select a valid image file.');
+                    return;
+                }
+                
+                // Validate file size (5MB limit)
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('File size must be less than 5MB.');
+                    return;
+                }
+            }
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+    </script>
+</body>
+</html>

@@ -1,22 +1,20 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
-    <title>Layout Configuration</title>
+    <title>Layout & Theme Configuration</title>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
     <div th:replace="~{navigation :: mainNav}"></div>
     <div class="container">
-        <h2>Layout Configuration</h2>
-        <form id="layoutConfigForm" th:action="@{/config/layout}" method="post" enctype="multipart/form-data" th:object="${layoutConfig}">
+        <h2>Layout & Theme Configuration</h2>
+        <p>Configure the color scheme, fonts, and visual styling for your application. For logo upload, use the <a href="/config/image-upload" style="color: var(--primary-blue); text-decoration: underline;">Logo Upload</a> page.</p>
+        
+        <form id="layoutConfigForm" th:action="@{/config/layout}" method="post" th:object="${layoutConfig}">
             <input type="hidden" th:field="*{id}" />
-            <label>Navigation Bar Image:</label><br>
-            <input type="file" name="imageFile" id="imageFileInput" accept="image/*" /><br>
-            <div th:if="${layoutConfig.imageData != null}">
-                <img src="/config/layout/image" alt="Current NavBar Logo" style="max-width:180px; max-height:80px; margin-top:8px;"><br>
-            </div>
-
+            
+            <h3>Primary Colors</h3>
             <label for="primaryColor">Primary color:</label><br>
             <input type="color" th:field="*{primaryColor}" id="primaryColor"><br>
 
@@ -39,8 +37,9 @@
             <input type="color" th:field="*{textMain}" id="textMain"><br>
 
             <label for="secondaryColor">Secondary color:</label><br>
-            <input type="color" th:field="*{secondaryColor}" id="secondaryColor"><br>
+            <input type="color" th:field="*{secondaryColor}" id="secondaryColor"><br><br>
 
+            <h3>Typography</h3>
             <label for="fontFamily">Font Family (CSS, optional):</label><br>
             <input type="text" th:field="*{fontFamily}" id="fontFamily" placeholder="Segoe UI, Arial, sans-serif"><br>
 
@@ -48,7 +47,7 @@
             <input type="text" th:field="*{fontSizeNav}" id="fontSizeNav" placeholder="1em"><br>
 
             <label for="fontSizeHeadline">Headline Font Size (CSS):</label><br>
-            <input type="text" th:field="*{fontSizeHeadline}" id="fontSizeHeadline" placeholder="1.5em"><br>
+            <input type="text" th:field="*{fontSizeHeadline}" id="fontSizeHeadline" placeholder="1.5em"><br><br>
 
             <!-- Organisation and Tool name color/font config -->
             <fieldset style="margin-top:14px; margin-bottom:16px; border:1px solid var(--border); padding:0.8em 1.2em; border-radius:7px;">
@@ -69,17 +68,28 @@
                 </div>
             </fieldset>
 
+            <h3>Visual Effects</h3>
             <label for="shineGlare">Shine Glare (RGBA):</label>
             <input type="text" th:field="*{shineGlare}" id="shineGlare" placeholder="rgba(255,255,255,0.60)"><br>
 
             <label for="shineHighlight">Shine Highlight (RGBA):</label>
             <input type="text" th:field="*{shineHighlight}" id="shineHighlight" placeholder="rgba(255,255,255,0.33)"><br><br>
 
+            <h3>Status & Alert Colors</h3>
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
             <label for="successGreen">Success Green:</label><br>
             <input type="color" th:field="*{successGreen}" id="successGreen"><br>
             <label for="errorRed">Error Red:</label><br>
             <input type="color" th:field="*{errorRed}" id="errorRed"><br>
+            
+            <label for="alertBg1">Alert BG 1:</label><br>
+            <input type="color" th:field="*{alertBg1}" id="alertBg1"><br>
+            <label for="alertBg2">Alert BG 2:</label><br>
+            <input type="color" th:field="*{alertBg2}" id="alertBg2"><br>
+            <label for="alertColor">Alert Text Color:</label><br>
+            <input type="color" th:field="*{alertColor}" id="alertColor"><br><br>
+
+            <h3>Modal & Dialog Colors</h3>
             <label for="modalBeige1">Modal Beige 1:</label><br>
             <input type="color" th:field="*{modalBeige1}" id="modalBeige1"><br>
             <label for="modalBeige2">Modal Beige 2:</label><br>
@@ -87,13 +97,9 @@
             <label for="modalBeige3">Modal Beige 3:</label><br>
             <input type="color" th:field="*{modalBeige3}" id="modalBeige3"><br>
             <label for="modalBeige4">Modal Beige 4:</label><br>
-            <input type="color" th:field="*{modalBeige4}" id="modalBeige4"><br>
-            <label for="labelGold">Label Gold:</label><br>
-            <input type="color" th:field="*{labelGold}" id="labelGold"><br>
-            <label for="gray777">Gray 777:</label><br>
-            <input type="color" th:field="*{gray777}" id="gray777"><br>
-            <label for="gray888">Gray 888:</label><br>
-            <input type="color" th:field="*{gray888}" id="gray888"><br>
+            <input type="color" th:field="*{modalBeige4}" id="modalBeige4"><br><br>
+
+            <h3>Table & Data Colors</h3>
             <label for="tableBg1">Table BG 1:</label><br>
             <input type="color" th:field="*{tableBg1}" id="tableBg1"><br>
             <label for="tableBg2">Table BG 2:</label><br>
@@ -104,173 +110,49 @@
             <input type="color" th:field="*{tableBg4}" id="tableBg4"><br>
             <label for="tableBg5">Table BG 5:</label><br>
             <input type="color" th:field="*{tableBg5}" id="tableBg5"><br>
-            <label for="headerGradHighlight">Header Highlight:</label><br>
-            <input type="color" th:field="*{headerGradHighlight}" id="headerGradHighlight"><br>
-            <label for="yellowHighlight">Yellow Highlight:</label><br>
-            <input type="color" th:field="*{yellowHighlight}" id="yellowHighlight"><br>
             <label for="tableHover1">Table Hover 1:</label><br>
             <input type="color" th:field="*{tableHover1}" id="tableHover1"><br>
             <label for="tableHover2">Table Hover 2:</label><br>
-            <input type="color" th:field="*{tableHover2}" id="tableHover2"><br>
-            <label for="alertBg1">Alert BG 1:</label><br>
-            <input type="color" th:field="*{alertBg1}" id="alertBg1"><br>
-            <label for="alertBg2">Alert BG 2:</label><br>
-            <input type="color" th:field="*{alertBg2}" id="alertBg2"><br>
-            <label for="alertColor">Alert Text Color:</label><br>
-            <input type="color" th:field="*{alertColor}" id="alertColor"><br>
-            <label for="takenOverBg">Taken Over BG:</label><br>
-            <input type="color" th:field="*{takenOverBg}" id="takenOverBg"><br>
-            <label for="dropdownBgHover">Dropdown BG Hover:</label><br>
-            <input type="color" th:field="*{dropdownBgHover}" id="dropdownBgHover"><br>
+            <input type="color" th:field="*{tableHover2}" id="tableHover2"><br><br>
+
+            <h3>Navigation & UI Colors</h3>
             <label for="secondaryNavBg">Secondary Nav BG:</label><br>
             <input type="color" th:field="*{secondaryNavBg}" id="secondaryNavBg"><br>
             <label for="secondaryNavBorder">Secondary Nav Border:</label><br>
             <input type="color" th:field="*{secondaryNavBorder}" id="secondaryNavBorder"><br>
-            <label for="logoBorder">Logo Border:</label><br>
-            <input type="color" th:field="*{logoBorder}" id="logoBorder"><br>
-            <label for="dropdownHoverBlue">Dropdown Hover Blue:</label><br>
-            <input type="color" th:field="*{dropdownHoverBlue}" id="dropdownHoverBlue"><br>
             <label for="mainNavBorder">Main Nav Border:</label><br>
             <input type="color" th:field="*{mainNavBorder}" id="mainNavBorder"><br>
+            <label for="logoBorder">Logo Border:</label><br>
+            <input type="color" th:field="*{logoBorder}" id="logoBorder"><br>
+            <label for="dropdownBgHover">Dropdown BG Hover:</label><br>
+            <input type="color" th:field="*{dropdownBgHover}" id="dropdownBgHover"><br>
+            <label for="dropdownHoverBlue">Dropdown Hover Blue:</label><br>
+            <input type="color" th:field="*{dropdownHoverBlue}" id="dropdownHoverBlue"><br><br>
+
+            <h3>Utility Colors</h3>
+            <label for="labelGold">Label Gold:</label><br>
+            <input type="color" th:field="*{labelGold}" id="labelGold"><br>
+            <label for="gray777">Gray 777:</label><br>
+            <input type="color" th:field="*{gray777}" id="gray777"><br>
+            <label for="gray888">Gray 888:</label><br>
+            <input type="color" th:field="*{gray888}" id="gray888"><br>
+            <label for="headerGradHighlight">Header Highlight:</label><br>
+            <input type="color" th:field="*{headerGradHighlight}" id="headerGradHighlight"><br>
+            <label for="yellowHighlight">Yellow Highlight:</label><br>
+            <input type="color" th:field="*{yellowHighlight}" id="yellowHighlight"><br>
+            <label for="takenOverBg">Taken Over BG:</label><br>
+            <input type="color" th:field="*{takenOverBg}" id="takenOverBg"><br>
             <label for="faintBlue1">Faint Blue 1:</label><br>
-            <input type="color" th:field="*{faintBlue1}" id="faintBlue1"><br>
-            <button type="submit">Save</button>
-            <span th:if="${saved}"><b>✔ Saved!</b></span>
+            <input type="color" th:field="*{faintBlue1}" id="faintBlue1"><br><br>
+
+            <button type="submit" style="background: var(--primary-blue); color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer;">Save Theme Configuration</button>
+            <span th:if="${saved}" style="color: var(--success-green); font-weight: bold; margin-left: 1rem;">✔ Saved!</span>
         </form>
-        <button id="suggestBtn" type="button" style="margin-top: 18px;">Suggest</button>
-        <div id="uploadResult"></div>
+        
+        <div style="margin-top: 2rem; padding: 1rem; background: var(--modal-beige1); border-radius: 8px; border-left: 4px solid var(--primary-blue);">
+            <h4>🎨 AI Theme Suggestions</h4>
+            <p>Want AI to suggest colors based on your logo? Use the <strong>Suggest</strong> button on the <a href="/config/image-upload" style="color: var(--primary-blue);">Logo Upload</a> page after uploading an image.</p>
+        </div>
     </div>
-    <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        var fileInput = document.getElementById('imageFileInput');
-        var form = document.getElementById('layoutConfigForm');
-        var uploadResult = document.getElementById('uploadResult');
-        if(fileInput) {
-            fileInput.addEventListener('change', function() {
-                if (fileInput.files.length > 0) {
-                    // Create FormData and ensure all form fields are included properly
-                    var formData = new FormData();
-                    
-                    // Add the image file
-                    formData.append('imageFile', fileInput.files[0]);
-                    
-                    // Add all form inputs explicitly to ensure proper Thymeleaf binding
-                    var formElements = form.querySelectorAll('input, select, textarea');
-                    formElements.forEach(function(element) {
-                        if (element.name && element.name !== 'imageFile') {
-                            if (element.type === 'checkbox' || element.type === 'radio') {
-                                if (element.checked) {
-                                    formData.append(element.name, element.value);
-                                }
-                            } else if (element.type !== 'file') {
-                                formData.append(element.name, element.value || '');
-                            }
-                        }
-                    });
-                    uploadResult.innerHTML = 'Uploading...';
-                    fetch(form.getAttribute('action'), {
-                        method: 'POST',
-                        body: formData
-                    })
-                    .then(r => r.text()).then(html => {
-                        document.open(); document.write(html); document.close();
-                    })
-                    .catch(e => {
-                        uploadResult.innerHTML = '<b style=\"color:red\">Upload failed.</b>';
-                    });
-                }
-            });
-        }
-    });
-    </script>
-    <script>
-    document.getElementById('suggestBtn').addEventListener('click', async function() {
-        const fileInput = document.getElementById('imageFileInput');
-        const suggestBtn = document.getElementById('suggestBtn');
-        let imageBlob, imageName, imageType;
-
-        if (fileInput && fileInput.files.length > 0) {
-            const file = fileInput.files[0];
-            imageBlob = file;
-            imageName = file.name;
-            imageType = file.type;
-        } else {
-            // Fetch the current logo image from the DB (as blob)
-            const resp = await fetch('/config/layout/image');
-            if (!resp.ok) {
-                alert('No image selected/uploaded and no logo configured in the database.');
-                return;
-            }
-            imageBlob = await resp.blob();
-            imageName = 'current-logo';
-            imageType = imageBlob.type || 'image/png';
-        }
-
-        const formData = new FormData();
-        formData.append('imageFile', imageBlob, imageName);
-
-        suggestBtn.disabled = true;
-        suggestBtn.textContent = 'Thinking...';
-        try {
-            const resp = await fetch('/config/openai/suggest-theme', {
-                method: 'POST',
-                body: formData
-            });
-            if (!resp.ok) throw new Error('Failed to get suggestion');
-            const data = await resp.json();
-
-            const assign = (id, val) => { if (val && document.getElementById(id)) document.getElementById(id).value = val; };
-            assign('primaryColor', data.primaryColor);
-            assign('primaryColorDark', data.primaryColorDark);
-            assign('accentColor', data.accentColor);
-            assign('backgroundColor', data.backgroundColor);
-            assign('borderColor', data.borderColor);
-            assign('navViolet', data.navViolet);
-            assign('textMain', data.textMain);
-            assign('shineGlare', data.shineGlare);
-            assign('shineHighlight', data.shineHighlight);
-            assign('secondaryColor', data.secondaryColor);
-            assign('fontFamily', data.fontFamily);
-            assign('fontSizeNav', data.fontSizeNav);
-            assign('fontSizeHeadline', data.fontSizeHeadline);
-            assign('successGreen', data.successGreen);
-            assign('errorRed', data.errorRed);
-            assign('modalBeige1', data.modalBeige1);
-            assign('modalBeige2', data.modalBeige2);
-            assign('modalBeige3', data.modalBeige3);
-            assign('modalBeige4', data.modalBeige4);
-            assign('labelGold', data.labelGold);
-            assign('gray777', data.gray777);
-            assign('gray888', data.gray888);
-            assign('tableBg1', data.tableBg1);
-            assign('tableBg2', data.tableBg2);
-            assign('tableBg3', data.tableBg3);
-            assign('tableBg4', data.tableBg4);
-            assign('tableBg5', data.tableBg5);
-            assign('headerGradHighlight', data.headerGradHighlight);
-            assign('yellowHighlight', data.yellowHighlight);
-            assign('tableHover1', data.tableHover1);
-            assign('tableHover2', data.tableHover2);
-            assign('alertBg1', data.alertBg1);
-            assign('alertBg2', data.alertBg2);
-            assign('alertColor', data.alertColor);
-            assign('takenOverBg', data.takenOverBg);
-            assign('dropdownBgHover', data.dropdownBgHover);
-            assign('secondaryNavBg', data.secondaryNavBg);
-            assign('secondaryNavBorder', data.secondaryNavBorder);
-            assign('logoBorder', data.logoBorder);
-            assign('dropdownHoverBlue', data.dropdownHoverBlue);
-            assign('mainNavBorder', data.mainNavBorder);
-            assign('faintBlue1', data.faintBlue1);
-
-            suggestBtn.textContent = 'Suggest';
-            suggestBtn.disabled = false;
-        } catch(e) {
-            suggestBtn.textContent = 'Suggest';
-            suggestBtn.disabled = false;
-            alert('Failed to get suggestion: ' + e);
-        }
-    });
-    </script>
 </body>
 </html>

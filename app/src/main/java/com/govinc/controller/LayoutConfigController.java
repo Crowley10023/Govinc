@@ -27,39 +27,16 @@ public class LayoutConfigController {
     @PostMapping
     public String saveLayoutConfig(
             @ModelAttribute LayoutConfiguration layoutConfig,
-            @RequestParam(value = "imageFile", required = false) MultipartFile imageFile,
             Model model) throws IOException {
         
         System.out.println("=== DEBUG: saveLayoutConfig called ===");
-        System.out.println("Image file present: " + (imageFile != null && !imageFile.isEmpty()));
         System.out.println("Incoming layoutConfig ID: " + layoutConfig.getId());
         System.out.println("Incoming primaryColor: " + layoutConfig.getPrimaryColor());
         System.out.println("Incoming primaryColorDark: " + layoutConfig.getPrimaryColorDark());
         
-        // Special handling for image-only uploads (when FormData doesn't bind properly)
-        boolean isImageOnlyUpload = (imageFile != null && !imageFile.isEmpty()) && 
-                                   (layoutConfig.getId() == null || layoutConfig.getPrimaryColor() == null);
-        
-        if (isImageOnlyUpload) {
-            System.out.println("Detected image-only upload - skipping form field updates");
-            // For image-only uploads, just update the image data and return existing config
-            LayoutConfiguration existing = layoutConfigurationRepository.findAll().stream().findFirst().orElse(new LayoutConfiguration());
-            existing.setImageData(imageFile.getBytes());
-            existing.setImageType(imageFile.getContentType());
-            layoutConfigurationRepository.save(existing);
-            model.addAttribute("layoutConfig", existing);
-            model.addAttribute("saved", true);
-            return "layout-config";
-        }
         LayoutConfiguration persisted = layoutConfigurationRepository.findAll().stream().findFirst().orElse(new LayoutConfiguration());
 
-        // If image uploaded, always replace
-        if (imageFile != null && !imageFile.isEmpty()) {
-            persisted.setImageData(imageFile.getBytes());
-            persisted.setImageType(imageFile.getContentType());
-        }
-
-        // For all color/theme fields: overwrite with user value if present, else keep old
+        // Update all color/theme fields from the form
         if (layoutConfig.getPrimaryColor() != null && !layoutConfig.getPrimaryColor().trim().isEmpty()) {
             persisted.setPrimaryColor(layoutConfig.getPrimaryColor());
         }
@@ -100,7 +77,7 @@ public class LayoutConfigController {
             persisted.setFontSizeHeadline(layoutConfig.getFontSizeHeadline());
         }
 
-        // New fields:
+        // Organisation/Tool styling fields
         if (layoutConfig.getOrgNameColor() != null && !layoutConfig.getOrgNameColor().trim().isEmpty()) {
             persisted.setOrgNameColor(layoutConfig.getOrgNameColor());
         }
@@ -114,7 +91,7 @@ public class LayoutConfigController {
             persisted.setToolNameFontSize(layoutConfig.getToolNameFontSize());
         }
 
-        // All theme color fields:
+        // All theme color fields
         if (layoutConfig.getSuccessGreen() != null && !layoutConfig.getSuccessGreen().trim().isEmpty()) {
             persisted.setSuccessGreen(layoutConfig.getSuccessGreen());
         }
@@ -219,15 +196,5 @@ public class LayoutConfigController {
         return "layout-config";
     }
 
-    @GetMapping("/image")
-    @ResponseBody
-    public ResponseEntity<byte[]> getNavBarImage() {
-        LayoutConfiguration config = layoutConfigurationRepository.findAll().stream().findFirst().orElse(null);
-        if (config != null && config.getImageData() != null && config.getImageType() != null) {
-            return ResponseEntity.ok()
-                    .contentType(MediaType.parseMediaType(config.getImageType()))
-                    .body(config.getImageData());
-        }
-        return ResponseEntity.notFound().build();
-    }
+
 }

@@ -6,9 +6,9 @@
 
     <div class="nav-row">
       <div class="landing-image">
-        <img th:if="${layoutConfig != null and layoutConfig.imageData != null}" src="/config/layout/image"
+        <img th:if="${layoutConfig != null and layoutConfig.imageData != null and layoutConfig.imageData.length > 0}" src="/config/image-upload/preview"
           alt="Compliance Incubator Logo" class="ci-logo-img-visible" />
-        <img th:if="${layoutConfig == null or layoutConfig.imageData == null}" src="/title.png"
+        <img th:unless="${layoutConfig != null and layoutConfig.imageData != null and layoutConfig.imageData.length > 0}" src="/title.png"
           alt="Default Compliance Incubator Logo" class="ci-logo-img-visible" />
       </div>
       <div class="org-details">
@@ -79,7 +79,8 @@
           <button type="button" class="dropdown-button btn-nav shiny">Config</button>
           <div class="dropdown-content">
             <a href="/config/openai"><button type="button" class="dropdown-menu-btn">Open AI</button></a>
-            <a href="/config/layout"><button type="button" class="dropdown-menu-btn">Layout</button></a>
+            <a href="/config/layout"><button type="button" class="dropdown-menu-btn">Layout & Theme</button></a>
+            <a href="/config/image-upload"><button type="button" class="dropdown-menu-btn">Logo Upload</button></a>
             <a href="/config/organisation-details"><button type="button" class="dropdown-menu-btn">Organisation
                 Details</button></a>
             <a href="/admin/auth-config"><button type="button" class="dropdown-menu-btn">Authentication</button></a>
