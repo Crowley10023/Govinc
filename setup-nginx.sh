@@ -561,21 +561,21 @@ main() {
 }
 
 # Parse command line arguments
-while [[ \$# -gt 0 ]]; do
-    case \$1 in
+while [[ $# -gt 0 ]]; do
+    case $1 in
         -d|--domain)
-            DOMAIN_NAME="\$2"
+            DOMAIN_NAME="$2"
             shift 2
             ;;
         -h|--help)
-            echo "Usage: \$0 [OPTIONS]"
+            echo "Usage: $0 [OPTIONS]"
             echo "Options:"
             echo "  -d, --domain DOMAIN    Domain name for the application"
             echo "  -h, --help            Show this help message"
             exit 0
             ;;
         *)
-            log_error "Unknown option: \$1"
+            log_error "Unknown option: $1"
             exit 1
             ;;
     esac

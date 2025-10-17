@@ -14,7 +14,7 @@ public class GlobalOrganisationDetailsAdvice {
 
     @ModelAttribute
     public void addOrganisationDetails(Model model) {
-        OrganisationDetails details = organisationDetailsRepository.findAll().stream().findFirst().orElse(null);
+        OrganisationDetails details = organisationDetailsRepository.findAll().stream().findFirst().orElse(new OrganisationDetails());
         model.addAttribute("organisationDetails", details);
     }
 }

@@ -58,6 +58,37 @@ public class LayoutConfigController {
         persisted.setToolNameColor(layoutConfig.getToolNameColor());
         persisted.setToolNameFontSize(layoutConfig.getToolNameFontSize());
 
+        // All theme color fields:
+        persisted.setSuccessGreen(layoutConfig.getSuccessGreen());
+        persisted.setErrorRed(layoutConfig.getErrorRed());
+        persisted.setModalBeige1(layoutConfig.getModalBeige1());
+        persisted.setModalBeige2(layoutConfig.getModalBeige2());
+        persisted.setModalBeige3(layoutConfig.getModalBeige3());
+        persisted.setModalBeige4(layoutConfig.getModalBeige4());
+        persisted.setLabelGold(layoutConfig.getLabelGold());
+        persisted.setGray777(layoutConfig.getGray777());
+        persisted.setGray888(layoutConfig.getGray888());
+        persisted.setTableBg1(layoutConfig.getTableBg1());
+        persisted.setTableBg2(layoutConfig.getTableBg2());
+        persisted.setTableBg3(layoutConfig.getTableBg3());
+        persisted.setTableBg4(layoutConfig.getTableBg4());
+        persisted.setTableBg5(layoutConfig.getTableBg5());
+        persisted.setHeaderGradHighlight(layoutConfig.getHeaderGradHighlight());
+        persisted.setYellowHighlight(layoutConfig.getYellowHighlight());
+        persisted.setTableHover1(layoutConfig.getTableHover1());
+        persisted.setTableHover2(layoutConfig.getTableHover2());
+        persisted.setAlertBg1(layoutConfig.getAlertBg1());
+        persisted.setAlertBg2(layoutConfig.getAlertBg2());
+        persisted.setAlertColor(layoutConfig.getAlertColor());
+        persisted.setTakenOverBg(layoutConfig.getTakenOverBg());
+        persisted.setDropdownBgHover(layoutConfig.getDropdownBgHover());
+        persisted.setSecondaryNavBg(layoutConfig.getSecondaryNavBg());
+        persisted.setSecondaryNavBorder(layoutConfig.getSecondaryNavBorder());
+        persisted.setLogoBorder(layoutConfig.getLogoBorder());
+        persisted.setDropdownHoverBlue(layoutConfig.getDropdownHoverBlue());
+        persisted.setMainNavBorder(layoutConfig.getMainNavBorder());
+        persisted.setFaintBlue1(layoutConfig.getFaintBlue1());
+
         layoutConfigurationRepository.save(persisted);
         model.addAttribute("layoutConfig", persisted);
         model.addAttribute("saved", true);
