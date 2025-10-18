@@ -11,6 +11,7 @@ import com.govinc.maturity.MaturityModelRepository;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import org.springframework.http.HttpStatus;
 
 @Controller
 @RequestMapping("/security-catalog")
@@ -98,9 +99,36 @@ public class SecurityCatalogController {
     }
 
     @PostMapping("/delete")
-    public String deleteSecurityCatalog(@RequestParam Long id) {
-        service.deleteById(id);
-        return "redirect:/security-catalog/list";
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> deleteSecurityCatalog(
+            @RequestParam Long id,
+            @RequestParam(value = "deleteControls", required = false) Boolean deleteControls) {
+        try {
+            SecurityCatalogDeletionResult result = service.deleteByIdWithResult(id, deleteControls != null && deleteControls);
+            Map<String, Object> response = new HashMap<>();
+            
+            if (result.isSuccess()) {
+                response.put("status", "success");
+                response.put("message", result.getMessage());
+                response.put("detailedMessage", result.getDetailedMessage());
+                response.put("controlsDeleted", result.getControlsDeleted());
+                response.put("controlsSkipped", result.getControlsSkipped());
+                response.put("warnings", result.getWarnings());
+                return ResponseEntity.ok(response);
+            } else {
+                response.put("status", "error");
+                response.put("message", result.getMessage());
+                response.put("detailedMessage", result.getDetailedMessage());
+                response.put("warnings", result.getWarnings());
+                return ResponseEntity.badRequest().body(response);
+            }
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "Failed to delete security catalog: " + e.getMessage());
+            response.put("technicalError", e.getClass().getSimpleName());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
     }
 
     @GetMapping("/create")
