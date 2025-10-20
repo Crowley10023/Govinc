@@ -6,6 +6,7 @@ import java.util.HashSet;
 import java.util.ArrayList;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -88,30 +89,57 @@ public class SecurityCatalogService {
             SecurityCatalog catalog = catalogOpt.get();
             
             if (deleteAssociatedControls && !catalog.getSecurityControls().isEmpty()) {
+                // Create a copy of controls to avoid modification during iteration
+                List<SecurityControl> controlsToProcess = new ArrayList<>(catalog.getSecurityControls());
+                
                 // Only delete controls that are ONLY used by this catalog
-                for (SecurityControl control : catalog.getSecurityControls()) {
-                    // Check if this control is used by other catalogs
-                    long catalogCount = control.getSecurityCatalogs().size();
-                    if (catalogCount <= 1) {
+                for (SecurityControl control : controlsToProcess) {
+                    // Check if this control is used by other catalogs (excluding current catalog)
+                    long otherCatalogCount = control.getSecurityCatalogs().stream()
+                        .filter(cat -> !cat.getId().equals(id))
+                        .count();
+                    
+                    if (otherCatalogCount == 0) {
                         // Control is only used by this catalog, safe to delete
                         try {
+                            // First remove from current catalog to avoid constraint issues
+                            catalog.getSecurityControls().remove(control);
+                            control.getSecurityCatalogs().remove(catalog);
+                            
                             securityControlService.deleteById(control.getId());
                             result.addControlDeleted(control.getName());
+                        } catch (DataIntegrityViolationException e) {
+                            result.addWarning("Could not delete security control '" + control.getName() + 
+                                "': Control is referenced by other entities (assessments, etc.). Skipping deletion.");
+                            result.addControlSkipped(control.getName());
                         } catch (Exception e) {
                             result.addWarning("Could not delete security control '" + control.getName() + "': " + e.getMessage());
                             result.addControlSkipped(control.getName());
                         }
                     } else {
-                        // Control is used by other catalogs, don't delete
+                        // Control is used by other catalogs, don't delete - just remove association
+                        catalog.getSecurityControls().remove(control);
+                        control.getSecurityCatalogs().remove(catalog);
                         result.addControlSkipped(control.getName());
                     }
                 }
+                
+                // Save catalog with updated associations
+                repository.save(catalog);
             } else {
                 // Just clear the associations without deleting the controls
-                catalog.getSecurityControls().clear();
-                repository.save(catalog);
+                if (!catalog.getSecurityControls().isEmpty()) {
+                    // Properly remove bidirectional associations
+                    List<SecurityControl> controlsToRemove = new ArrayList<>(catalog.getSecurityControls());
+                    for (SecurityControl control : controlsToRemove) {
+                        catalog.getSecurityControls().remove(control);
+                        control.getSecurityCatalogs().remove(catalog);
+                    }
+                    repository.save(catalog);
+                }
             }
             
+            // Now delete the catalog
             repository.deleteById(id);
             result.setSuccess(true);
             
@@ -128,6 +156,16 @@ public class SecurityCatalogService {
                 result.setMessage("Security catalog deleted successfully");
             }
             
+        } catch (DataIntegrityViolationException e) {
+            result.setSuccess(false);
+            String detailedError = "Cannot delete security catalog due to database constraints. ";
+            if (e.getMessage().toLowerCase().contains("foreign key") || e.getMessage().toLowerCase().contains("constraint")) {
+                detailedError += "This catalog is still referenced by other entities (assessments, controls, etc.). " +
+                               "Please remove or reassign these references first.";
+            } else {
+                detailedError += "Database constraint violation: " + e.getMessage();
+            }
+            result.setMessage(detailedError);
         } catch (Exception e) {
             result.setSuccess(false);
             result.setMessage("Failed to delete security catalog: " + e.getMessage());

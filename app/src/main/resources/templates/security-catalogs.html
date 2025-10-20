@@ -110,10 +110,20 @@
             color: #c62828;
             font-size: 0.9em;
             line-height: 1.4;
+            max-height: 150px;
+            overflow-y: auto;
         }
         .modal-error-message::before {
             content: "⚠ ";
             font-weight: bold;
+        }
+        .modal-error-message.constraint-error {
+            background: #fff3e0;
+            border-color: #ff9800;
+            color: #e65100;
+        }
+        .modal-error-message.constraint-error::before {
+            content: "🔒 ";
         }
         .modal-success-message {
             display: none;
@@ -213,13 +223,24 @@
                 })
                 .then(function(response) {
                     if (!response.ok) {
-                        // If response is not JSON, throw a generic error
+                        // Handle different HTTP status codes with specific messages
                         return response.text().then(function(text) {
                             try {
                                 const data = JSON.parse(text);
-                                throw new Error(data.message || 'Failed to delete catalog');
-                            } catch (e) {
-                                throw new Error('Server error occurred while deleting catalog');
+                                // Use the detailed message from backend if available
+                                const errorMessage = data.detailedMessage || data.message || 'Failed to delete catalog';
+                                throw new Error(errorMessage);
+                            } catch (parseError) {
+                                // Handle non-JSON error responses based on status
+                                if (response.status === 409) {
+                                    throw new Error('Cannot delete catalog: It has dependencies that must be removed first (assessments, referenced controls, etc.)');
+                                } else if (response.status === 500) {
+                                    throw new Error('Server error: Database constraints prevent deletion. The catalog may be referenced by other entities.');
+                                } else if (response.status >= 400 && response.status < 500) {
+                                    throw new Error('Cannot delete catalog: ' + (text || 'Client error occurred'));
+                                } else {
+                                    throw new Error('Server error occurred while deleting catalog (Status: ' + response.status + ')');
+                                }
                             }
                         });
                     }
@@ -245,8 +266,19 @@
                     confirmBtn.disabled = false;
                     confirmBtn.textContent = 'Yes, delete';
                     
-                    // Show error message in modal
-                    showErrorInModal(error.message || 'An unexpected error occurred');
+                    // Process and show more specific error messages
+                    let errorMessage = error.message || 'An unexpected error occurred';
+                    
+                    // Handle specific error patterns for better user experience
+                    if (errorMessage.toLowerCase().includes('constraint') || errorMessage.toLowerCase().includes('foreign key')) {
+                        errorMessage = 'Cannot delete catalog: It is still referenced by other entities (assessments, controls, etc.). Please remove these references first.';
+                    } else if (errorMessage.toLowerCase().includes('assessment')) {
+                        // This is already handled well by the backend message
+                    } else if (errorMessage.toLowerCase().includes('database') && errorMessage.toLowerCase().includes('constraint')) {
+                        errorMessage = 'Cannot delete catalog: Database constraints prevent deletion. Please check for dependent assessments or control references.';
+                    }
+                    
+                    showErrorInModal(errorMessage);
                 });
             };
         }
@@ -255,7 +287,17 @@
             const errorContainer = document.getElementById('modal-error-message');
             const errorText = document.getElementById('modal-error-text');
             errorText.textContent = errorMessage;
-            errorContainer.className = 'modal-error-message';
+            
+            // Add specific styling for constraint errors
+            if (errorMessage.toLowerCase().includes('constraint') || 
+                errorMessage.toLowerCase().includes('foreign key') ||
+                errorMessage.toLowerCase().includes('referenced by') ||
+                errorMessage.toLowerCase().includes('assessment')) {
+                errorContainer.className = 'modal-error-message constraint-error';
+            } else {
+                errorContainer.className = 'modal-error-message';
+            }
+            
             errorContainer.style.display = 'block';
         }
 

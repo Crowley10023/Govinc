@@ -1,6 +1,7 @@
 package com.govinc.catalog;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -120,8 +121,25 @@ public class SecurityCatalogController {
                 response.put("message", result.getMessage());
                 response.put("detailedMessage", result.getDetailedMessage());
                 response.put("warnings", result.getWarnings());
-                return ResponseEntity.badRequest().body(response);
+                
+                // Return 409 Conflict for constraint violations (assessments dependency)
+                if (result.getMessage().toLowerCase().contains("assessment") ||
+                    result.getMessage().toLowerCase().contains("referenced by")) {
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+                } else {
+                    return ResponseEntity.badRequest().body(response);
+                }
             }
+        } catch (DataIntegrityViolationException e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            String errorMessage = "Cannot delete security catalog due to database constraints. " +
+                                 "This catalog is still referenced by other entities (assessments, controls, etc.). " +
+                                 "Please remove or reassign these references first.";
+            response.put("message", errorMessage);
+            response.put("detailedMessage", errorMessage + " Technical details: " + e.getMessage());
+            response.put("technicalError", e.getClass().getSimpleName());
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
         } catch (Exception e) {
             Map<String, Object> response = new HashMap<>();
             response.put("status", "error");
