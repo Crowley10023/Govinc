@@ -33,7 +33,7 @@
                 </thead>
                 <tbody>
                     <tr th:each="control,stat : ${controls}">
-                        <td th:text="${control.securityControl.name}"></td>
+                        <td><div th:text="${control.securityControl.name}"></div><div style="font-size: smaller; color: gray;" th:text="${control.securityControl.detail}"></div></td>
                         <td>
                             <input type="checkbox" th:name="'controls[' + ${stat.index} + '].applicable'"
                                    th:checked="${control.applicable}"
