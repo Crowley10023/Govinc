@@ -28,24 +28,16 @@ public class SecurityControlSimilarityAnalyzer {
      * @return AnalysisResult containing similarity matches and recommendations
      */
     public SimilarityAnalysisResult analyzeControl(SecurityControlImportDTO importControl) {
-        System.out.println("\n================================================");
-        System.out.println("[ANALYZER] analyzeControl() called for: " + importControl.getName());
-        System.out.println("[ANALYZER] Detail: " + (importControl.getDetail() != null ? importControl.getDetail().substring(0, Math.min(50, importControl.getDetail().length())) : "N/A"));
-        System.out.println("[ANALYZER] Fetching all existing controls from database...");
-        
         List<SecurityControl> existingControls = securityControlService.findAll();
-        System.out.println("[ANALYZER] Found " + existingControls.size() + " existing controls in database");
         
         SimilarityAnalysisResult result = new SimilarityAnalysisResult();
         result.setImportedControl(importControl);
         
         if (existingControls.isEmpty()) {
-            System.out.println("[ANALYZER] No existing controls, returning 'new' action");
             result.setHasSimilarControls(false);
             result.setRecommendedAction("new");
             result.setMatchingRate("none");
             result.setAiAnalysis("No existing controls to compare against");
-            System.out.println("================================================\n");
             return result;
         }
         
@@ -65,7 +57,6 @@ public class SecurityControlSimilarityAnalyzer {
         // Sort by similarity score (highest first)
         allMatches.sort((a, b) -> Double.compare(b.getTextSimilarityScore(), a.getTextSimilarityScore()));
         
-        System.out.println("[ANALYZER] Text similarity calculated. Top 3 matches:");
         for (int i = 0; i < Math.min(3, allMatches.size()); i++) {
             System.out.println("[ANALYZER]   " + (i+1) + ". " + allMatches.get(i).getExistingControlName() + " (score: " + String.format("%.2f", allMatches.get(i).getTextSimilarityScore()) + ")");
         }

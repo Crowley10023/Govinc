@@ -30,6 +30,7 @@ public class OpenAIUtil {
      * Main method to ask AI using the active provider
      */
     public String askAI(String prompt) {
+        System.out.println("prompt: " + prompt);
         OpenAIConfiguration config = configRepository.findAll().stream().findFirst().orElse(null);
         
         if (config == null || config.getActiveProvider() == null) {
@@ -42,7 +43,9 @@ public class OpenAIUtil {
             return "The configured AI provider (" + provider.getDisplayName() + ") is not active.";
         }
 
-        return routeToProvider(prompt, provider);
+        String result = routeToProvider(prompt, provider);
+        System.out.println("... --> " + result);
+        return result;
     }
 
     /**

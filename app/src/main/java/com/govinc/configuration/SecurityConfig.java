@@ -60,6 +60,8 @@ public class SecurityConfig {
             "/admin/auth-config/**", // Allow auth config interface
             "/admin/auth-config",
             "/api/security-control/import/**", // Allow security control import API endpoints
+            "/api/security-control/translate", // Allow security control translation API endpoint
+            "/security-control/import", // Allow security control import form submission - CSRF exempt
             "/api/security-catalogs" // Allow catalog listing API endpoint
     };
 

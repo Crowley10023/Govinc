@@ -5,6 +5,9 @@
     <title>Security Controls List</title>
     <meta charset="UTF-8">
     <link rel="stylesheet" href="/style.css">
+    <!-- CSRF Token Meta Tags for JS Access -->
+    <meta name="_csrf" th:content="${_csrf.token}" />
+    <meta name="_csrf_header" th:content="${_csrf.headerName}" />
     <style>
         /* Popup Modal Styles */
         .modal {
@@ -499,7 +502,7 @@
                 <div class="step-header">
                     <span class="step-number">1</span>CSV Format Instructions & File Upload & Translation
                 </div>
-                <div class="step-content">
+                <div class="step-content" id="step1-content">
                     <div class="csv-instructions">
                         <h4>📋 CSV Format Requirements</h4>
                         <p>Please ensure your CSV file follows the exact format specified below:</p>
@@ -545,16 +548,23 @@ network segmentation","SC-7","Network"</div>
                         <br/>
                     </div>
 
+                    <button type="button" id="previewBtn" class="import-button" disabled>Preview CSV Data</button>
+                    
                     <div class="translation-section">
-                        <h5>🌐 Translate Content (Optional)</h5>
-                        <p style="font-size: 12px; color: #666; margin: 5px 0;">Automatically translate security control name and detail fields to selected languages using AI before importing</p>
-                        <div class="translation-checkbox">
-                            <input type="checkbox" id="translateDE" name="languages" value="de" />
-                            <label for="translateDE">German (Deutsch)</label>
-                        </div>
-                        <div class="translation-checkbox">
-                            <input type="checkbox" id="translateEN" name="languages" value="en" />
-                            <label for="translateEN">English</label>
+                        <h5>🌐 Translation Options (Optional - Apply After Preview)</h5>
+                        <p style="font-size: 12px; color: #666; margin: 5px 0;">After previewing the data, you can optionally translate content to selected languages</p>
+                        <div style="margin: 10px 0;">
+                            <label for="languageCheckbox"><strong>Languages to translate to:</strong></label>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px;">
+                                <div class="translation-checkbox">
+                                    <input type="checkbox" id="translateDE" name="languages" value="de" />
+                                    <label for="translateDE">German (Deutsch)</label>
+                                </div>
+                                <div class="translation-checkbox">
+                                    <input type="checkbox" id="translateEN" name="languages" value="en" />
+                                    <label for="translateEN">English</label>
+                                </div>
+                            </div>
                         </div>
                         <div id="translationProgress" style="display: none; margin: 15px 0; padding: 10px; background-color: #e3f2fd; border: 1px solid #90caf9; border-radius: 4px;">
                             <p style="margin: 0; font-size: 12px;"><strong>🔄 Translating content...</strong></p>
@@ -564,29 +574,20 @@ network segmentation","SC-7","Network"</div>
                             <p style="margin: 5px 0; font-size: 11px; color: #666;"><span id="translationProgressText">0/0</span> items translated...</p>
                         </div>
                     </div>
-
-                    <button type="button" id="previewBtn" class="import-button" disabled>Preview CSV Data</button>
                 </div>
             </div>
 
             <!-- Step 2: Preview with AI Analysis -->
             <div class="step-container preview-section" id="previewSection">
                 <div class="step-header">
-                    <span class="step-number">2</span>Preview CSV Data & Intelligent Similarity Analysis
+                    <span class="step-number">2</span>Preview CSV Data
                 </div>
                 <div class="step-content">
-                    <div class="preview-stats" id="previewStats"></div>
+                    <div style="margin-bottom: 15px;">
+                        <div class="preview-stats" id="previewStats"></div>
+                    </div>
                     <div class="error-box" id="previewError" style="display: none;"></div>
                     <div class="warning-box" id="previewWarnings" style="display: none;"></div>
-                    
-                    <!-- Analysis Progress -->
-                    <div id="analysisProgress" class="analysis-progress">
-                        <p><strong>🤖 Analyzing controls for similarity with AI...</strong></p>
-                        <div class="progress-bar-container">
-                            <div id="progressBar" class="progress-bar"></div>
-                        </div>
-                        <p style="font-size: 12px; color: #666;"><span id="progressText">0/0</span> controls analyzed...</p>
-                    </div>
                     
                     <div style="max-height: 600px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px;">
                         <table class="preview-table" id="previewTable">
@@ -597,8 +598,6 @@ network segmentation","SC-7","Network"</div>
                                     <th style="width: 150px;">Detail</th>
                                     <th style="width: 80px;">Reference</th>
                                     <th style="width: 80px;">Domain</th>
-                                    <th style="width: 70px;">Match <span class="tooltip">? <span class="tooltip-content">Similarity level to existing controls. High: Very similar, Medium: Somewhat similar, Low: Slightly similar, None: No match found</span></span></th>
-                                    <th style="width: 110px;">Action <span class="tooltip">? <span class="tooltip-content">Choose: Merge (combine with existing), New (create new control)</span></span></th>
                                     <th style="width: 70px;">Status</th>
                                 </tr>
                             </thead>
@@ -609,13 +608,54 @@ network segmentation","SC-7","Network"</div>
                             ℹ️ Preview table will appear here once CSV is loaded
                         </div>
                     </div>
+                    
+                    <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button type="button" id="translateInPlaceBtn" class="import-button" style="background-color: #17a2b8;">
+                            🌐 Translate Content In-Place
+                        </button>
+                        <button type="button" id="startAnalysisBtn" class="import-button" style="background-color: #007bff;">
+                            🤖 Start AI Similarity Analysis
+                        </button>
+                    </div>
+                    
+                    <!-- Analysis Progress -->
+                    <div id="analysisProgress" class="analysis-progress">
+                        <p><strong>🤖 Analyzing controls for similarity with AI...</strong></p>
+                        <div class="progress-bar-container">
+                            <div id="progressBar" class="progress-bar"></div>
+                        </div>
+                        <p style="font-size: 12px; color: #666;"><span id="progressText">0/0</span> controls analyzed...</p>
+                    </div>
+                    
+                    <!-- Analysis Results Table -->
+                    <div id="analysisResultsSection" style="display: none; margin-top: 20px;">
+                        <h5>Analysis Results with Merge/New Options</h5>
+                        <div style="max-height: 600px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px;">
+                            <table class="preview-table" id="analysisResultsTable">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 30px;">Row</th>
+                                        <th style="width: 150px;">Name</th>
+                                        <th style="width: 150px;">Detail</th>
+                                        <th style="width: 80px;">Reference</th>
+                                        <th style="width: 80px;">Domain</th>
+                                        <th style="width: 70px;">Match <span class="tooltip">? <span class="tooltip-content">Similarity level to existing controls. High: Very similar, Medium: Somewhat similar, Low: Slightly similar, None: No match found</span></span></th>
+                                        <th style="width: 110px;">Action <span class="tooltip">? <span class="tooltip-content">Choose: Merge (combine with existing), New (create new control)</span></span></th>
+                                        <th style="width: 70px;">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="analysisResultsTableBody">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Step 3: Security Catalog Options -->
+            <!-- Step 3b: Original Catalog Options -->
             <div class="step-container catalog-options" id="catalogSection" style="display: none;">
                 <div class="step-header">
-                    <span class="step-number">3</span>Security Catalog Assignment
+                    <span class="step-number">4</span>Security Catalog Assignment
                 </div>
                 <div class="step-content">
                     <h4>🔗 Link Security Controls to Catalog</h4>
@@ -667,23 +707,14 @@ network segmentation","SC-7","Network"</div>
                 </div>
             </div>
             
-            <!-- Step 4: Final Import -->
+            <!-- Step 5: Final Import -->
             <div class="step-container" id="importSection" style="display: none;">
                 <div class="step-header">
-                    <span class="step-number">4</span>Import Security Controls
+                    <span class="step-number">5</span>Import Security Controls
                 </div>
                 <div class="step-content">
-                    <form id="csvUploadForm" th:action="@{/security-control/import}" method="post" enctype="multipart/form-data">
-                        <input type="hidden" name="catalogOption" id="catalogOptionInput" />
-                        <input type="hidden" name="existingCatalogId" id="existingCatalogIdInput" />
-                        <input type="hidden" name="catalogName" id="catalogNameInput" />
-                        <input type="hidden" name="catalogDescription" id="catalogDescriptionInput" />
-                        <input type="hidden" name="catalogRevision" id="catalogRevisionInput" />
-                        <input type="hidden" name="mergeActions" id="mergeActionsInput" />
-                        
-                        <div id="importSummary"></div>
-                        <button type="submit" class="import-button">Import Security Controls</button>
-                    </form>
+                    <div id="importSummary"></div>
+                    <button type="button" id="submitImportBtn" class="import-button">Import Security Controls</button>
                 </div>
             </div>
         </div>
@@ -733,7 +764,16 @@ network segmentation","SC-7","Network"</div>
     const closeBtn = document.getElementsByClassName('close')[0];
     const csvFile = document.getElementById('csvFile');
     const previewBtn = document.getElementById('previewBtn');
-    const uploadForm = document.getElementById('csvUploadForm');
+    const submitImportBtn = document.getElementById('submitImportBtn');
+    
+    // CSRF Helper Functions
+    function getCsrfToken() {
+        return document.querySelector('meta[name="_csrf"]')?.getAttribute('content') || '';
+    }
+    
+    function getCsrfHeaderName() {
+        return document.querySelector('meta[name="_csrf_header"]')?.getAttribute('content') || 'X-CSRF-TOKEN';
+    }
 
     // Show modal when import button is clicked
     importBtn.onclick = function() {
@@ -746,6 +786,28 @@ network segmentation","SC-7","Network"</div>
         modal.style.display = 'none';
         resetForm();
     }
+
+    // Translate in-place button
+    document.getElementById('translateInPlaceBtn').addEventListener('click', function() {
+        const selectedLanguages = Array.from(document.querySelectorAll('input[name="languages"]:checked'))
+            .map(cb => cb.value);
+        
+        console.log('Translate button clicked. Selected languages:', selectedLanguages);
+        console.log('CSRF Token present:', !!getCsrfToken());
+        
+        if (selectedLanguages.length === 0) {
+            alert('Please select at least one language to translate.');
+            return;
+        }
+        
+        translateInPlace(selectedLanguages);
+    });
+    
+    // Start AI analysis button
+    document.getElementById('startAnalysisBtn').addEventListener('click', function() {
+        console.log('Starting AI similarity analysis');
+        analyzeControlsSimilarity();
+    });
 
     // Close modal when clicking outside of it
     window.onclick = function(event) {
@@ -777,7 +839,6 @@ network segmentation","SC-7","Network"</div>
                 return;
             }
             
-            // Check file size (max 10MB)
             const maxSize = 10 * 1024 * 1024;
             if (file.size > maxSize) {
                 alert('File size must be less than 10MB.');
@@ -796,23 +857,12 @@ network segmentation","SC-7","Network"</div>
         const reader = new FileReader();
         reader.onload = function(e) {
             const csvText = e.target.result;
-            
-            // Check if translation is requested
-            const selectedLanguages = Array.from(document.querySelectorAll('input[name="languages"]:checked'))
-                .map(cb => cb.value);
-            
-            if (selectedLanguages.length > 0) {
-                // Translate before parsing
-                translateAndParseCsv(csvText, selectedLanguages);
-            } else {
-                // Parse directly without translation
-                parseCsvData(csvText);
-            }
+            parseCsvData(csvText);
         };
         reader.readAsText(file);
     });
 
-    // RFC4180 compliant CSV parser - handles multi-line quoted fields
+    // RFC4180 CSV parser
     function parseCSVData(csvText) {
         const rows = [];
         let currentRow = [];
@@ -826,12 +876,10 @@ network segmentation","SC-7","Network"</div>
             
             if (char === '"') {
                 if (inQuotes && nextChar === '"') {
-                    // Escaped quote - add one quote to field
                     currentField += '"';
                     i += 2;
                     continue;
                 } else {
-                    // Toggle quote mode
                     inQuotes = !inQuotes;
                     i++;
                     continue;
@@ -839,7 +887,6 @@ network segmentation","SC-7","Network"</div>
             }
             
             if (char === ',' && !inQuotes) {
-                // Field separator
                 currentRow.push(currentField);
                 currentField = '';
                 i++;
@@ -847,7 +894,6 @@ network segmentation","SC-7","Network"</div>
             }
             
             if ((char === '\n' || char === '\r') && !inQuotes) {
-                // Row separator - add current field and row
                 if (currentField || currentRow.length > 0) {
                     currentRow.push(currentField);
                     if (currentRow.some(f => f.trim())) {
@@ -856,7 +902,6 @@ network segmentation","SC-7","Network"</div>
                     currentRow = [];
                     currentField = '';
                 }
-                // Skip CRLF
                 if (char === '\r' && nextChar === '\n') {
                     i += 2;
                 } else {
@@ -869,7 +914,6 @@ network segmentation","SC-7","Network"</div>
             i++;
         }
         
-        // Add last field and row
         if (currentField || currentRow.length > 0) {
             currentRow.push(currentField);
             if (currentRow.some(f => f.trim())) {
@@ -880,90 +924,404 @@ network segmentation","SC-7","Network"</div>
         return rows;
     }
 
-    // Translate CSV data using AI
-    function translateAndParseCsv(csvText, languages) {
-        const progressDiv = document.getElementById('translationProgress');
-        progressDiv.style.display = 'block';
+    // CSV parsing with validation
+    function parseCsvData(csvText) {
+        try {
+            const allRows = parseCSVData(csvText);
+            
+            if (allRows.length < 2) {
+                showParseError('CSV file must contain at least a header row and one data row.');
+                return;
+            }
+
+            const headers = allRows[0];
+            const expectedHeaders = ['name', 'detail', 'reference', 'domain'];
+            
+            const headersValid = expectedHeaders.every((header, index) => 
+                headers[index] && headers[index].toLowerCase().trim() === header
+            );
+            
+            if (!headersValid) {
+                showParseError('CSV headers must start with: name,detail,reference,domain');
+                return;
+            }
+
+            csvData = [];
+            for (let i = 1; i < allRows.length; i++) {
+                const columns = allRows[i];
+                if (columns.length === 0 || (columns.length === 1 && columns[0].trim() === '')) {
+                    continue;
+                }
+                
+                if (columns.length < 4) {
+                    continue;
+                }
+                
+                const rowData = {
+                    rowNumber: i,
+                    name: columns[0]?.trim() || '',
+                    detail: columns[1]?.trim() || '',
+                    reference: columns[2]?.trim() || '',
+                    domain: columns[3]?.trim() || '',
+                    valid: true,
+                    errors: [],
+                    action: 'new',
+                    matchingRate: 'none',
+                    suggestedMatch: null,
+                    analyzed: false,
+                    translatedName: null,
+                    translatedDetail: null
+                };
+                
+                if (!rowData.name) {
+                    rowData.valid = false;
+                    rowData.errors.push('Name is required');
+                }
+                if (!rowData.domain) {
+                    rowData.valid = false;
+                    rowData.errors.push('Domain is required');
+                }
+                
+                csvData.push(rowData);
+            }
+            
+            if (csvData.length === 0) {
+                showParseError('No valid data rows found in CSV file.');
+                return;
+            }
+
+            displayPreview();
+            showCatalogOptions();
+        } catch (error) {
+            showParseError('Error parsing CSV: ' + error.message);
+        }
+    }
+    
+    function showParseError(message) {
+        const previewSection = document.getElementById('previewSection');
+        const previewStats = document.getElementById('previewStats');
+        const previewError = document.getElementById('previewError');
+        const previewTableBody = document.getElementById('previewTableBody');
+        const previewEmpty = document.getElementById('previewEmpty');
         
-        const rows = parseCSVData(csvText);
-        if (rows.length < 2) {
-            showParseError('CSV file must contain at least a header row and one data row.');
-            progressDiv.style.display = 'none';
+        previewSection.style.display = 'block';
+        previewStats.innerHTML = '<span style="color: #dc3545;">❌ Parse Error</span>';
+        previewError.style.display = 'block';
+        previewError.innerHTML = `<strong>❌ CSV Parse Error:</strong><br>${message}`;
+        
+        previewTableBody.innerHTML = '';
+        previewEmpty.style.display = 'block';
+        
+        document.getElementById('catalogSection').style.display = 'none';
+        document.getElementById('importSection').style.display = 'none';
+    }
+
+    function analyzeControlsSimilarity() {
+        const progressDiv = document.getElementById('analysisProgress');
+        const validControls = csvData.filter(row => row.valid);
+        
+        if (validControls.length === 0) {
             return;
         }
         
-        const headers = rows[0];
-        const dataRows = rows.slice(1);
-        const totalTranslations = dataRows.length * languages.length;
+        progressDiv.style.display = 'block';
+        analysisResults = {};
+        analysisInProgress = {};
+        let completedCount = 0;
+        const totalCount = validControls.length;
+        
+        updateAnalysisResults();
+        
+        for (let i = 0; i < validControls.length; i++) {
+            const control = validControls[i];
+            let analysisName = control.translatedName || control.name;
+            let analysisDetail = control.translatedDetail || control.detail;
+            
+            const controlDTO = {
+                name: analysisName,
+                detail: analysisDetail,
+                reference: control.reference,
+                domain: control.domain
+            };
+            
+            analysisInProgress[control.rowNumber] = true;
+            updateAnalysisResults();
+            
+            (function(ctrl) {
+                fetch('/api/security-control/import/analyze-single', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(controlDTO)
+                })
+                    .then(response => response.json())
+                    .then(result => {
+                        analysisResults[ctrl.rowNumber] = result;
+                        completedCount++;
+                        analysisInProgress[ctrl.rowNumber] = false;
+                        
+                        const progressBar = document.getElementById('progressBar');
+                        const progressText = document.getElementById('progressText');
+                        const progress = (completedCount / totalCount) * 100;
+                        progressBar.style.width = progress + '%';
+                        progressText.textContent = completedCount + '/' + totalCount;
+                        
+                        updateAnalysisResults();
+                        
+                        if (completedCount === totalCount) {
+                            setTimeout(() => {
+                                progressDiv.style.display = 'none';
+                                updateImportSection();
+                            }, 500);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error analyzing control:', error);
+                        completedCount++;
+                        analysisInProgress[ctrl.rowNumber] = false;
+                        
+                        const progressBar = document.getElementById('progressBar');
+                        const progressText = document.getElementById('progressText');
+                        const progress = (completedCount / totalCount) * 100;
+                        progressBar.style.width = progress + '%';
+                        progressText.textContent = completedCount + '/' + totalCount;
+                        
+                        updateAnalysisResults();
+                        
+                        if (completedCount === totalCount) {
+                            setTimeout(() => {
+                                progressDiv.style.display = 'none';
+                                updateImportSection();
+                            }, 500);
+                        }
+                    });
+            })(control);
+        }
+    }
+
+    function displayPreviewAfterTranslation() {
+        const previewTableBody = document.getElementById('previewTableBody');
+        previewTableBody.innerHTML = '';
+        for (let i = 0; i < csvData.length; i++) {
+            const row = csvData[i];
+            const tr = document.createElement('tr');
+            if (!row.valid) tr.className = 'error-row';
+            const displayName = row.translatedName || row.name;
+            const displayDetail = row.translatedDetail || row.detail;
+            const statusHtml = !row.valid ? '<span style="color: #dc3545;">✗ ' + row.errors.join(', ') + '</span>' : '<span style="color: #28a745;">✓ Valid</span>';
+            tr.innerHTML = `<td>${row.rowNumber}</td><td title="${displayName}">${displayName.substring(0, 30)}${displayName.length > 30 ? '...' : ''}</td><td title="${displayDetail}">${displayDetail.substring(0, 35)}${displayDetail.length > 35 ? '...' : ''}</td><td>${row.reference}</td><td>${row.domain}</td><td>${statusHtml}</td>`;
+            previewTableBody.appendChild(tr);
+        }
+        document.getElementById('previewEmpty').style.display = 'none';
+    }
+    
+    function displayInitialPreview() {
+        const previewTableBody = document.getElementById('previewTableBody');
+        previewTableBody.innerHTML = '';
+        
+        for (let i = 0; i < csvData.length; i++) {
+            const row = csvData[i];
+            const tr = document.createElement('tr');
+            if (!row.valid) tr.className = 'error-row';
+            
+            let statusHtml = !row.valid ? 
+                '<span style="color: #dc3545;">✗ ' + row.errors.join(', ') + '</span>' :
+                '<span style="color: #28a745;">✓ Valid</span>';
+            
+            tr.innerHTML = `
+                <td>${row.rowNumber}</td>
+                <td title="${row.name}">${row.name.substring(0, 30)}${row.name.length > 30 ? '...' : ''}</td>
+                <td title="${row.detail}">${row.detail.substring(0, 35)}${row.detail.length > 35 ? '...' : ''}</td>
+                <td>${row.reference}</td>
+                <td>${row.domain}</td>
+                <td>${statusHtml}</td>
+            `;
+            
+            previewTableBody.appendChild(tr);
+        }
+        
+        document.getElementById('previewEmpty').style.display = 'none';
+        document.getElementById('analysisResultsSection').style.display = 'none';
+    }
+    
+    function updateAnalysisResults() {
+        const analysisResultsTableBody = document.getElementById('analysisResultsTableBody');
+        analysisResultsTableBody.innerHTML = '';
+        
+        for (let idx = 0; idx < csvData.length; idx++) {
+            const row = csvData[idx];
+            const tr = document.createElement('tr');
+            
+            if (!row.valid) {
+                tr.className = 'error-row';
+            } else {
+                if (analysisResults[row.rowNumber]) {
+                    const analysis = analysisResults[row.rowNumber];
+                    row.matchingRate = analysis.matchingRate;
+                    row.action = analysis.recommendedAction;
+                    if (analysis.suggestedMergeControl) {
+                        row.suggestedMatch = analysis.suggestedMergeControl;
+                    }
+                    row.analyzed = true;
+                }
+                
+                if (analysisInProgress[row.rowNumber]) {
+                    tr.className = 'row-analyzing';
+                } else {
+                    if (row.matchingRate === 'high') tr.className = 'match-high';
+                    else if (row.matchingRate === 'medium') tr.className = 'match-medium';
+                    else if (row.matchingRate === 'low') tr.className = 'match-low';
+                    else tr.className = 'match-none';
+                }
+            }
+            
+            let displayName = row.name;
+            let displayDetail = row.detail;
+            
+            if (row.translatedName) {
+                displayName = row.translatedName;
+                displayDetail = row.translatedDetail || row.detail;
+            }
+            
+            let statusHtml;
+            if (!row.valid) {
+                statusHtml = '<span style="color: #dc3545;">✗ ' + row.errors.join(', ') + '</span>';
+            } else if (analysisInProgress[row.rowNumber]) {
+                statusHtml = '<span style="color: #007bff;">⏳ Analyzing...</span>';
+            } else {
+                statusHtml = '<span style="color: #28a745;">✓ Valid</span>';
+            }
+            
+            let matchBadge = '';
+            if (row.matchingRate === 'high') matchBadge = '<span class="match-badge-high">High</span>';
+            else if (row.matchingRate === 'medium') matchBadge = '<span class="match-badge-medium">Medium</span>';
+            else if (row.matchingRate === 'low') matchBadge = '<span class="match-badge-low">Low</span>';
+            else if (row.analyzed) matchBadge = '<span class="match-badge-none">None</span>';
+            else matchBadge = '<span style="color: #999; font-size: 11px;">Pending...</span>';
+            
+            let actionSelect = '<select class="action-select action-selector" data-row="' + row.rowNumber + '"' + (row.valid ? '' : ' disabled') + '>';
+            if (row.matchingRate !== 'none' && row.suggestedMatch) {
+                actionSelect += '<option value="merge:' + row.suggestedMatch.existingControlId + '" selected>Merge</option>';
+                actionSelect += '<option value="new">Create New</option>';
+                actionSelect += '<option value="skip">Skip</option>';
+            } else {
+                actionSelect += '<option value="new" selected>Create New</option>';
+                actionSelect += '<option value="skip">Skip</option>';
+            }
+            actionSelect += '</select>';
+            
+            const suggestionInfo = row.suggestedMatch ? 
+                ' (' + row.suggestedMatch.existingControlName.substring(0, 30) + ')' : '';
+            
+            tr.innerHTML = `
+                <td>${row.rowNumber}</td>
+                <td title="${displayName}">${displayName.substring(0, 30)}${displayName.length > 30 ? '...' : ''}</td>
+                <td title="${displayDetail}">${displayDetail.substring(0, 35)}${displayDetail.length > 35 ? '...' : ''}</td>
+                <td>${row.reference}</td>
+                <td>${row.domain}</td>
+                <td>${matchBadge}${suggestionInfo ? '<br><small>' + suggestionInfo + '</small>' : ''}</td>
+                <td>${actionSelect}</td>
+                <td>${statusHtml}</td>
+            `;
+            
+            analysisResultsTableBody.appendChild(tr);
+        }
+        
+        const selectors = document.querySelectorAll('.action-selector');
+        for (let i = 0; i < selectors.length; i++) {
+            selectors[i].addEventListener('change', function() {
+                const rowNumber = parseInt(this.dataset.row);
+                for (let j = 0; j < csvData.length; j++) {
+                    if (csvData[j].rowNumber === rowNumber) {
+                        csvData[j].action = this.value;
+                        break;
+                    }
+                }
+                updateImportSection();
+            });
+        }
+        
+        document.getElementById('analysisResultsSection').style.display = 'block';
+        updateImportSection();
+    }
+    
+    function translateInPlace(languages) {
+        console.log('Starting in-place translation for languages:', languages);
+        
+        const progressDiv = document.getElementById('translationProgress');
+        progressDiv.style.display = 'block';
+        
+        const validRows = csvData.filter(row => row.valid);
+        const totalTranslations = validRows.length * languages.length;
         let completedTranslations = 0;
         
-        // Create translated data structure
-        const translatedRows = dataRows.map(row => [...row]);
-        
-        // Process each row-language combination
         const allTasks = [];
-        dataRows.forEach((row, rowIdx) => {
-            languages.forEach(lang => {
-                allTasks.push({ rowIdx, lang, row });
-            });
-        });
+        for (let i = 0; i < validRows.length; i++) {
+            const row = validRows[i];
+            for (let j = 0; j < languages.length; j++) {
+                const lang = languages[j];
+                allTasks.push({ row: row, lang: lang });
+            }
+        }
         
-        // Process translations sequentially
         const processTranslations = () => {
             if (allTasks.length === 0) {
                 progressDiv.style.display = 'none';
-                
-                // Now parse the translated data
-                let translatedCsv = headers.join(',') + '\n';
-                translatedRows.forEach(row => {
-                    translatedCsv += '"' + row.map(col => (col || '').replace(/"/g, '""')).join('","') + '"\n';
-                });
-                
-                parseCsvData(translatedCsv);
+                console.log('All translations completed');
+                displayPreviewAfterTranslation();
                 return;
             }
             
             const task = allTasks.shift();
-            const languageLabel = task.lang === 'de' ? 'German' : 'English';
+            
+            const requestBody = {
+                language: task.lang,
+                name: task.row.name || '',
+                detail: task.row.detail || ''
+            };
+            
+            const headers = {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            };
+            
+            const csrfToken = getCsrfToken();
+            if (csrfToken) {
+                headers[getCsrfHeaderName()] = csrfToken;
+            }
+            
+            console.log('Sending translation request:', {task: task, hasCSRF: !!csrfToken});
             
             fetch('/api/security-control/translate', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify({
-                    language: task.lang,
-                    name: task.row[0] || '',
-                    detail: task.row[1] || ''
-                })
+                headers: headers,
+                body: JSON.stringify(requestBody),
+                credentials: 'same-origin'
             })
-                .then(response => response.json())
+                .then(response => {
+                    console.log('Response status:', response.status);
+                    if (!response.ok) {
+                        throw new Error('HTTP ' + response.status);
+                    }
+                    return response.json();
+                })
                 .then(result => {
                     completedTranslations++;
+                    console.log('Translation result:', result);
                     
-                    // Add translated columns
                     if (result.success && result.translated) {
-                        translatedRows[task.rowIdx].push(result.translated.detail || task.row[1] || '');
-                        translatedRows[task.rowIdx].push(result.translated.name || task.row[0] || '');
-                        
-                        // Update headers if first translation
-                        if (completedTranslations === 1) {
-                            languages.forEach(lang => {
-                                headers.push('detail_' + lang);
-                                headers.push('name_' + lang);
-                            });
-                        }
+                        task.row.translatedName = result.translated.name || task.row.name;
+                        task.row.translatedDetail = result.translated.detail || task.row.detail;
                     }
                     
-                    // Update progress
                     const progressBar = document.getElementById('translationProgressBar');
                     const progressText = document.getElementById('translationProgressText');
                     const progress = (completedTranslations / totalTranslations) * 100;
                     progressBar.style.width = progress + '%';
                     progressText.textContent = completedTranslations + '/' + totalTranslations;
                     
-                    // Continue with next translation
                     setTimeout(processTranslations, 100);
                 })
                 .catch(error => {
@@ -983,320 +1341,6 @@ network segmentation","SC-7","Network"</div>
         processTranslations();
     }
 
-    // CSV parsing function with proper error handling
-    function parseCsvData(csvText) {
-        try {
-            // Parse all rows (including multi-line quoted fields)
-            const allRows = parseCSVData(csvText);
-            
-            if (allRows.length < 2) {
-                showParseError('CSV file must contain at least a header row and one data row.');
-                return;
-            }
-
-            // Parse headers
-            const headers = allRows[0];
-            const expectedHeaders = ['name', 'detail', 'reference', 'domain'];
-            
-            // Validate headers (at minimum, first 4 columns should match)
-            const headersValid = expectedHeaders.every((header, index) => 
-                headers[index] && headers[index].toLowerCase().trim() === header
-            );
-            
-            if (!headersValid) {
-                showParseError('CSV headers must start with: name,detail,reference,domain (in order). Found: ' + headers.slice(0, 4).map(h => '"' + h + '"').join(', '));
-                return;
-            }
-
-            // Parse data rows
-            csvData = [];
-            for (let i = 1; i < allRows.length; i++) {
-                const columns = allRows[i];
-                if (columns.length === 0 || (columns.length === 1 && columns[0].trim() === '')) {
-                    continue; // Skip empty rows
-                }
-                
-                if (columns.length < 4) {
-                    console.warn(`Row ${i}: has only ${columns.length} columns (need 4), skipping`);
-                    continue;
-                }
-                
-                const rowData = {
-                    rowNumber: i,
-                    name: columns[0]?.trim() || '',
-                    detail: columns[1]?.trim() || '',
-                    reference: columns[2]?.trim() || '',
-                    domain: columns[3]?.trim() || '',
-                    valid: true,
-                    errors: [],
-                    action: 'new',
-                    matchingRate: 'none',
-                    suggestedMatch: null,
-                    analyzed: false
-                };
-                
-                // Validate required fields
-                if (!rowData.name) {
-                    rowData.valid = false;
-                    rowData.errors.push('Name is required');
-                }
-                if (!rowData.domain) {
-                    rowData.valid = false;
-                    rowData.errors.push('Domain is required');
-                }
-                
-                csvData.push(rowData);
-            }
-            
-            if (csvData.length === 0) {
-                showParseError('No valid data rows found in CSV file.');
-                return;
-            }
-
-            displayPreview();
-            analyzeControlsSimilarity();
-            showCatalogOptions();
-        } catch (error) {
-            showParseError('Error parsing CSV: ' + error.message);
-            console.error('CSV Parse Error:', error);
-        }
-    }
-    
-    // Show parse error with visual feedback
-    function showParseError(message) {
-        const previewSection = document.getElementById('previewSection');
-        const previewStats = document.getElementById('previewStats');
-        const previewError = document.getElementById('previewError');
-        const previewTableBody = document.getElementById('previewTableBody');
-        const previewEmpty = document.getElementById('previewEmpty');
-        
-        previewSection.style.display = 'block';
-        previewStats.innerHTML = '<span style="color: #dc3545;">❌ Parse Error</span>';
-        previewError.style.display = 'block';
-        previewError.innerHTML = `
-            <strong>❌ CSV Parse Error:</strong><br>
-            ${message}<br><br>
-            <small>Please ensure your CSV file:</small>
-            <ul style="margin: 8px 0; padding-left: 20px;">
-                <li>Has headers: name,detail,reference,domain</li>
-                <li>Uses double quotes for fields with commas or newlines</li>
-                <li>Escapes quotes inside quoted fields by doubling them ("")</li>
-                <li>Uses standard line breaks (LF or CRLF)</li>
-                <li>Is saved as UTF-8 encoding</li>
-            </ul>
-        `;
-        
-        // Clear table
-        previewTableBody.innerHTML = '';
-        previewEmpty.style.display = 'block';
-        
-        // Hide other sections
-        document.getElementById('catalogSection').style.display = 'none';
-        document.getElementById('importSection').style.display = 'none';
-    }
-
-    // Analyze controls for similarity using AI - streaming results as they arrive
-    function analyzeControlsSimilarity() {
-        const progressDiv = document.getElementById('analysisProgress');
-        const validControls = csvData.filter(row => row.valid);
-        
-        if (validControls.length === 0) {
-            return; // Nothing to analyze
-        }
-        
-        progressDiv.style.display = 'block';
-        analysisResults = {};
-        analysisInProgress = {};
-        let completedCount = 0;
-        const totalCount = validControls.length;
-        
-        // Display initial table
-        updatePreviewWithAnalysis();
-        
-        // Analyze each control independently and stream results
-        validControls.forEach((control, index) => {
-            const controlDTO = {
-                name: control.name,
-                detail: control.detail,
-                reference: control.reference,
-                domain: control.domain
-            };
-            
-            // Mark as in progress
-            analysisInProgress[control.rowNumber] = true;
-            updatePreviewWithAnalysis();
-            
-            fetch('/api/security-control/import/analyze-single', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify(controlDTO)
-            })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                    }
-                    return response.json();
-                })
-                .then(result => {
-                    // Store result
-                    analysisResults[control.rowNumber] = result;
-                    completedCount++;
-                    
-                    // Clear in progress flag
-                    analysisInProgress[control.rowNumber] = false;
-                    
-                    // Update progress bar
-                    const progressBar = document.getElementById('progressBar');
-                    const progressText = document.getElementById('progressText');
-                    const progress = (completedCount / totalCount) * 100;
-                    progressBar.style.width = progress + '%';
-                    progressText.textContent = completedCount + '/' + totalCount;
-                    
-                    // Update preview with new result immediately
-                    updatePreviewWithAnalysis();
-                    
-                    // Hide progress when done
-                    if (completedCount === totalCount) {
-                        setTimeout(() => {
-                            progressDiv.style.display = 'none';
-                        }, 500);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error analyzing control:', control.name, error);
-                    completedCount++;
-                    
-                    // Clear in progress flag
-                    analysisInProgress[control.rowNumber] = false;
-                    
-                    // Still update progress even on error
-                    const progressBar = document.getElementById('progressBar');
-                    const progressText = document.getElementById('progressText');
-                    const progress = (completedCount / totalCount) * 100;
-                    progressBar.style.width = progress + '%';
-                    progressText.textContent = completedCount + '/' + totalCount;
-                    
-                    // Update preview with partial results
-                    updatePreviewWithAnalysis();
-                    
-                    // Hide progress when done
-                    if (completedCount === totalCount) {
-                        setTimeout(() => {
-                            progressDiv.style.display = 'none';
-                            console.warn('Analysis completed with some errors');
-                        }, 500);
-                    }
-                });
-        });
-    }
-
-    // Update preview table with analysis results
-    function updatePreviewWithAnalysis() {
-        const previewTableBody = document.getElementById('previewTableBody');
-        previewTableBody.innerHTML = '';
-        
-        csvData.forEach(row => {
-            const tr = document.createElement('tr');
-            
-            if (!row.valid) {
-                tr.className = 'error-row';
-            } else {
-                // Get analysis result for this control if available
-                if (analysisResults[row.rowNumber]) {
-                    const analysis = analysisResults[row.rowNumber];
-                    row.matchingRate = analysis.matchingRate;
-                    row.action = analysis.recommendedAction;
-                    if (analysis.suggestedMergeControl) {
-                        row.suggestedMatch = analysis.suggestedMergeControl;
-                    }
-                    row.analyzed = true;
-                }
-                
-                // Check if currently being analyzed
-                if (analysisInProgress[row.rowNumber]) {
-                    tr.className = 'row-analyzing';
-                } else {
-                    // Apply styling based on matching rate
-                    if (row.matchingRate === 'high') {
-                        tr.className = 'match-high';
-                    } else if (row.matchingRate === 'medium') {
-                        tr.className = 'match-medium';
-                    } else if (row.matchingRate === 'low') {
-                        tr.className = 'match-low';
-                    } else {
-                        tr.className = 'match-none';
-                    }
-                }
-            }
-            
-            // Build row HTML
-            let statusHtml;
-            if (!row.valid) {
-                statusHtml = '<span style="color: #dc3545;">✗ ' + row.errors.join(', ') + '</span>';
-            } else if (analysisInProgress[row.rowNumber]) {
-                statusHtml = '<span style="color: #007bff;">⏳ Analyzing...</span>';
-            } else {
-                statusHtml = '<span style="color: #28a745;">✓ Valid</span>';
-            }
-            
-            let matchBadge = row.analyzed ? '' : '<span style="color: #999; font-size: 11px;">Pending...</span>';
-            if (row.matchingRate === 'high') {
-                matchBadge = '<span class="match-badge-high">High</span>';
-            } else if (row.matchingRate === 'medium') {
-                matchBadge = '<span class="match-badge-medium">Medium</span>';
-            } else if (row.matchingRate === 'low') {
-                matchBadge = '<span class="match-badge-low">Low</span>';
-            } else if (row.analyzed) {
-                matchBadge = '<span class="match-badge-none">None</span>';
-            }
-            
-            let actionSelect = '<select class="action-select action-selector" data-row="' + row.rowNumber + '"' + (row.valid ? '' : ' disabled') + '>';
-            if (row.matchingRate !== 'none' && row.suggestedMatch) {
-                actionSelect += '<option value="merge:' + row.suggestedMatch.existingControlId + '" selected>Merge</option>';
-                actionSelect += '<option value="new">Create New</option>';
-                actionSelect += '<option value="skip">Skip</option>';
-            } else {
-                actionSelect += '<option value="new" selected>Create New</option>';
-                actionSelect += '<option value="skip">Skip</option>';
-            }
-            actionSelect += '</select>';
-            
-            const suggestionInfo = row.suggestedMatch ? 
-                ' (' + row.suggestedMatch.existingControlName.substring(0, 30) + ')' : '';
-            
-            tr.innerHTML = `
-                <td>${row.rowNumber}</td>
-                <td title="${row.name}">${row.name.substring(0, 30)}${row.name.length > 30 ? '...' : ''}</td>
-                <td title="${row.detail.replace(/\n/g, ' ')}">${row.detail.substring(0, 35).replace(/\n/g, ' ')}${row.detail.length > 35 ? '...' : ''}</td>
-                <td title="${row.reference}">${row.reference}</td>
-                <td title="${row.domain}">${row.domain}</td>
-                <td>${matchBadge}${suggestionInfo ? '<br><small>' + suggestionInfo + '</small>' : ''}</td>
-                <td>${actionSelect}</td>
-                <td>${statusHtml}</td>
-            `;
-            
-            previewTableBody.appendChild(tr);
-        });
-        
-        // Add event listeners to action selectors
-        document.querySelectorAll('.action-selector').forEach(select => {
-            select.addEventListener('change', function() {
-                const rowNumber = parseInt(this.dataset.row);
-                const row = csvData.find(r => r.rowNumber === rowNumber);
-                if (row) {
-                    row.action = this.value;
-                }
-            });
-        });
-        
-        // Hide empty message
-        document.getElementById('previewEmpty').style.display = 'none';
-    }
-
-    // Display preview
     function displayPreview() {
         const previewSection = document.getElementById('previewSection');
         const previewStats = document.getElementById('previewStats');
@@ -1321,22 +1365,20 @@ network segmentation","SC-7","Network"</div>
         if (invalidRows > 0) {
             previewWarnings.style.display = 'block';
             previewWarnings.innerHTML = `
-                <strong>⚠️ Warning:</strong> ${invalidRows} row(s) have validation errors and will be skipped during import.
-                Please review the data below and fix any issues in your CSV file if needed.
+                <strong>⚠️ Warning:</strong> ${invalidRows} row(s) have validation errors.
             `;
         } else {
             previewWarnings.style.display = 'none';
         }
+        
+        displayInitialPreview();
     }
 
-    // Show catalog options
     function showCatalogOptions() {
         document.getElementById('catalogSection').style.display = 'block';
     }
 
-    // Load available catalogs
     function loadAvailableCatalogs() {
-        console.log('Loading catalogs from /api/security-catalogs');
         fetch('/api/security-catalogs', {
             method: 'GET',
             headers: {
@@ -1344,18 +1386,11 @@ network segmentation","SC-7","Network"</div>
                 'Content-Type': 'application/json'
             }
         })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                return response.json();
-            })
+            .then(response => response.json())
             .then(catalogs => {
-                console.log('Received catalogs:', catalogs);
                 availableCatalogs = catalogs || [];
                 populateCatalogSelect();
                 
-                // Enable existing catalog option if we have catalogs
                 const existingCatalogRadio = document.getElementById('existingCatalog');
                 const existingCatalogStatus = document.getElementById('existingCatalogStatus');
                 
@@ -1364,143 +1399,214 @@ network segmentation","SC-7","Network"</div>
                     existingCatalogStatus.textContent = 'No catalogs available';
                 } else {
                     existingCatalogRadio.disabled = false;
-                    existingCatalogStatus.textContent = 'Link imported controls to an existing security catalog';
+                    existingCatalogStatus.textContent = 'Link to existing catalog';
                 }
             })
             .catch(error => {
                 console.error('Error loading catalogs:', error);
-                document.getElementById('existingCatalog').disabled = true;
-                document.getElementById('existingCatalogStatus').textContent = `Error loading catalogs: ${error.message}`;
             });
     }
 
-    // Populate catalog select dropdown
     function populateCatalogSelect() {
         const select = document.getElementById('catalogSelect');
         select.innerHTML = '<option value="">-- Select a Security Catalog --</option>';
         
-        availableCatalogs.forEach(catalog => {
+        for (let i = 0; i < availableCatalogs.length; i++) {
+            const catalog = availableCatalogs[i];
             const option = document.createElement('option');
             option.value = catalog.id;
             option.textContent = `${catalog.name}${catalog.revision ? ' (' + catalog.revision + ')' : ''}`;
             select.appendChild(option);
-        });
+        }
     }
 
-    // Radio button change handlers
-    document.getElementsByName('catalogOption').forEach(radio => {
-        radio.addEventListener('change', function() {
+    const catalogRadios = document.getElementsByName('catalogOption');
+    for (let i = 0; i < catalogRadios.length; i++) {
+        catalogRadios[i].addEventListener('change', function() {
             const value = this.value;
+            document.getElementById('existingCatalogFields').style.display = value === 'existing' ? 'block' : 'none';
+            document.getElementById('newCatalogFields').style.display = value === 'new' ? 'block' : 'none';
             
-            document.getElementById('existingCatalogFields').style.display = 
-                value === 'existing' ? 'block' : 'none';
-            document.getElementById('newCatalogFields').style.display = 
-                value === 'new' ? 'block' : 'none';
-                
             if (csvData.length > 0) {
                 updateImportSection();
             }
         });
-    });
+    }
 
-    // Update import section with summary
     function updateImportSection() {
         const importSection = document.getElementById('importSection');
         const importSummary = document.getElementById('importSummary');
         const catalogOption = document.querySelector('input[name="catalogOption"]:checked').value;
         
         let validCount = csvData.filter(row => row.valid && row.action !== 'skip').length;
-        let mergeCount = csvData.filter(row => row.valid && row.action.startsWith('merge:')).length;
+        let mergeCount = 0;
+        for (let i = 0; i < csvData.length; i++) {
+            if (csvData[i].valid && csvData[i].action && csvData[i].action.startsWith('merge:')) {
+                mergeCount++;
+            }
+        }
         let newCount = validCount - mergeCount;
         
-        let summaryText = `<p><strong>📋 Import Plan:</strong><br>`;
-        summaryText += `Total: ${validCount} controls | `;
-        summaryText += `<span style="color: #007bff;">Merge: ${mergeCount}</span> | `;
-        summaryText += `<span style="color: #28a745;">New: ${newCount}</span></p>`;
+        let summaryText = `<p><strong>📋 Import Plan:</strong><br>
+            Total: ${validCount} controls | 
+            <span style="color: #007bff;">Merge: ${mergeCount}</span> | 
+            <span style="color: #28a745;">New: ${newCount}</span></p>`;
         
         if (catalogOption === 'existing') {
             const selectedCatalog = document.getElementById('catalogSelect');
             if (selectedCatalog.value) {
                 const catalogName = selectedCatalog.options[selectedCatalog.selectedIndex].text;
-                summaryText += `<p>Controls will be added to existing catalog: <strong>${catalogName}</strong></p>`;
-            } else {
-                summaryText += `<p style="color: #dc3545;">Please select a catalog from the dropdown above.</p>`;
+                summaryText += `<p>Catalog: <strong>${catalogName}</strong></p>`;
             }
-        } else if (catalogOption === 'new') {
-            const catalogName = document.getElementById('catalogName').value;
-            if (catalogName) {
-                summaryText += `<p>New catalog "<strong>${catalogName}</strong>" will be created and linked to all imported controls.</p>`;
-            } else {
-                summaryText += `<p style="color: #dc3545;">Please enter a name for the new catalog above.</p>`;
-            }
-        } else {
-            summaryText += `<p>Controls will be imported without catalog assignment.</p>`;
         }
         
         importSummary.innerHTML = summaryText;
         importSection.style.display = 'block';
     }
 
-    // Monitor catalog fields for changes
     document.getElementById('catalogSelect').addEventListener('change', updateImportSection);
     document.getElementById('catalogName').addEventListener('input', updateImportSection);
 
-    // Form submission
-    uploadForm.addEventListener('submit', function(event) {
+    // Submit import button handler
+    submitImportBtn.addEventListener('click', function() {
+        // Validate that a file was selected
+        if (!csvFile.files || csvFile.files.length === 0) {
+            alert('Please select a CSV file to import.');
+            return;
+        }
+        
         const catalogOption = document.querySelector('input[name="catalogOption"]:checked').value;
         
-        // Validate based on catalog option
+        // Validate selections
         if (catalogOption === 'existing') {
             const selectedCatalog = document.getElementById('catalogSelect').value;
             if (!selectedCatalog) {
-                event.preventDefault();
-                alert('Please select an existing catalog.');
+                alert('Please select a catalog.');
                 return;
             }
-            document.getElementById('existingCatalogIdInput').value = selectedCatalog;
-        } else if (catalogOption === 'new') {
-            const catalogName = document.getElementById('catalogName').value.trim();
-            if (!catalogName) {
-                event.preventDefault();
-                alert('Please enter a name for the new catalog.');
-                return;
-            }
-            document.getElementById('catalogNameInput').value = catalogName;
-            document.getElementById('catalogDescriptionInput').value = document.getElementById('catalogDescription').value;
-            document.getElementById('catalogRevisionInput').value = document.getElementById('catalogRevision').value;
         }
         
-        document.getElementById('catalogOptionInput').value = catalogOption;
-        
-        // Build merge actions object
-        const mergeActions = {};
-        csvData.forEach(row => {
-            if (row.valid && row.action !== 'skip') {
-                mergeActions[row.name] = row.action;
+        if (catalogOption === 'new') {
+            const catalogName = document.getElementById('catalogName').value;
+            if (!catalogName) {
+                alert('Please enter a catalog name.');
+                return;
             }
-        });
-        document.getElementById('mergeActionsInput').value = JSON.stringify(mergeActions);
+        }
         
-        // Add the file to the form
-        const fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.name = 'file';
-        fileInput.style.display = 'none';
+        // Prepare form data
+        const formData = new FormData();
+        formData.append('file', csvFile.files[0]);
+        formData.append('catalogOption', catalogOption);
         
-        // Create a new FileList with the selected file
-        const dt = new DataTransfer();
-        dt.items.add(csvFile.files[0]);
-        fileInput.files = dt.files;
+        if (catalogOption === 'existing') {
+            formData.append('existingCatalogId', document.getElementById('catalogSelect').value);
+        }
         
-        uploadForm.appendChild(fileInput);
+        if (catalogOption === 'new') {
+            formData.append('catalogName', document.getElementById('catalogName').value);
+            formData.append('catalogDescription', document.getElementById('catalogDescription').value);
+            formData.append('catalogRevision', document.getElementById('catalogRevision').value);
+        }
         
-        // Show loading state
-        const submitBtn = uploadForm.querySelector('button[type="submit"]');
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Importing...';
+        // Build merge actions with translated data
+        const mergeActions = {};
+        let newCount = 0;
+        let mergeCount = 0;
+        
+        for (let i = 0; i < csvData.length; i++) {
+            const row = csvData[i];
+            if (row.valid && row.action !== 'skip') {
+                mergeActions[row.name] = {
+                    action: row.action,
+                    translatedName: row.translatedName,
+                    translatedDetail: row.translatedDetail
+                };
+                if (row.action.startsWith('merge:')) {
+                    mergeCount++;
+                } else {
+                    newCount++;
+                }
+            }
+        }
+        
+        // Create summary for confirmation
+        let summary = '=== IMPORT SUMMARY ===\n\n';
+        summary += 'File: ' + csvFile.files[0].name + '\n';
+        summary += 'File Size: ' + Math.round(csvFile.files[0].size / 1024) + ' KB\n';
+        summary += 'Total Rows to Import: ' + Object.keys(mergeActions).length + '\n';
+        summary += '  - New Controls: ' + newCount + '\n';
+        summary += '  - Merge with Existing: ' + mergeCount + '\n\n';
+        
+        summary += 'Catalog Option: ' + catalogOption.toUpperCase() + '\n';
+        if (catalogOption === 'existing') {
+            const selectedCatalog = document.getElementById('catalogSelect');
+            summary += 'Selected Catalog: ' + selectedCatalog.options[selectedCatalog.selectedIndex].text + '\n';
+        } else if (catalogOption === 'new') {
+            summary += 'New Catalog Name: ' + document.getElementById('catalogName').value + '\n';
+        }
+        summary += '\n=== CONTROLS TO IMPORT ===\n\n';
+        
+        let rowNum = 1;
+        for (const controlName in mergeActions) {
+            const action = mergeActions[controlName];
+            summary += rowNum + '. ' + controlName + '\n';
+            summary += '   Action: ' + (action.action.startsWith('merge:') ? 'MERGE' : 'NEW') + '\n';
+            if (action.translatedName) {
+                summary += '   Translated Name: ' + action.translatedName + '\n';
+            }
+            summary += '\n';
+            rowNum++;
+        }
+        
+        console.log('Import Summary:\n' + summary);
+        console.log('Merge Actions JSON:', mergeActions);
+        
+        // Show confirmation dialog
+        if (!confirm(summary + '\n\nDo you want to proceed with this import?')) {
+            console.log('Import cancelled by user');
+            return;
+        }
+        
+        formData.append('mergeActions', JSON.stringify(mergeActions));
+        
+        console.log('Submitting import with CSRF token included');
+        
+        // Get CSRF headers
+        const headers = {};
+        const csrfToken = getCsrfToken();
+        const csrfHeaderName = getCsrfHeaderName();
+        if (csrfToken && csrfHeaderName) {
+            headers[csrfHeaderName] = csrfToken;
+            console.log('CSRF token added to headers:', csrfHeaderName);
+        }
+        
+        // Submit import
+        fetch('/security-control/import', {
+            method: 'POST',
+            headers: headers,
+            body: formData,
+            credentials: 'same-origin'
+        })
+            .then(response => {
+                console.log('Response received - status:', response.status, 'redirected:', response.redirected);
+                if (response.ok || response.redirected) {
+                    // Success - redirect
+                    if (response.redirected) {
+                        window.location.href = response.url;
+                    } else {
+                        window.location.href = '/security-control/list';
+                    }
+                } else {
+                    throw new Error('HTTP ' + response.status);
+                }
+            })
+            .catch(error => {
+                console.error('Import error:', error);
+                alert('Error importing security controls: ' + error.message);
+            });
     });
 
-    // Reset form function
     function resetForm() {
         csvData = [];
         analysisResults = {};
@@ -1508,25 +1614,13 @@ network segmentation","SC-7","Network"</div>
         csvFile.value = '';
         previewBtn.disabled = true;
         
-        // Hide sections
         document.getElementById('previewSection').style.display = 'none';
         document.getElementById('catalogSection').style.display = 'none';
         document.getElementById('importSection').style.display = 'none';
-        
-        // Clear errors
         document.getElementById('previewError').style.display = 'none';
-        document.getElementById('previewEmpty').style.display = 'none';
-        
-        // Reset radio buttons
         document.getElementById('noCatalog').checked = true;
-        document.getElementById('existingCatalogFields').style.display = 'none';
-        document.getElementById('newCatalogFields').style.display = 'none';
-        
-        // Clear form fields
         document.getElementById('catalogSelect').value = '';
         document.getElementById('catalogName').value = '';
-        document.getElementById('catalogDescription').value = '';
-        document.getElementById('catalogRevision').value = '';
     }
 </script>
 </body>
