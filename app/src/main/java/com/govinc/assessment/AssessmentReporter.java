@@ -7,7 +7,7 @@ import com.govinc.user.User;
 import com.govinc.organization.OrgUnit;
 
 import com.govinc.entity.OpenAIConfiguration;
-import com.govinc.entity.OpenAIConfigurationRepository;
+import com.govinc.repository.OpenAIConfigurationRepository;
 import com.govinc.util.OpenAIUtil;
 
 import com.itextpdf.text.*;

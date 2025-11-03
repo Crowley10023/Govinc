@@ -1,7 +1,9 @@
 package com.govinc.util;
 
+import com.govinc.entity.AIProvider;
 import com.govinc.entity.OpenAIConfiguration;
-import com.govinc.entity.OpenAIConfigurationRepository;
+import com.govinc.repository.AIProviderRepository;
+import com.govinc.repository.OpenAIConfigurationRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
@@ -9,44 +11,95 @@ import org.springframework.http.*;
 import org.json.JSONObject;
 import java.util.*;
 
+/**
+ * OpenAIUtil handles AI requests by routing them to the configured active provider.
+ * Supports multiple providers: OpenAI, Ollama, etc.
+ */
 @Component
 public class OpenAIUtil {
     private final OpenAIConfigurationRepository configRepository;
+    private final AIProviderRepository providerRepository;
 
     @Autowired
-    public OpenAIUtil(OpenAIConfigurationRepository configRepository) {
+    public OpenAIUtil(OpenAIConfigurationRepository configRepository, AIProviderRepository providerRepository) {
         this.configRepository = configRepository;
+        this.providerRepository = providerRepository;
     }
 
     /**
-     * Sends a prompt to OpenAI API using saved configuration.
-     * @param prompt The user's prompt.
-     * @return The response from OpenAI API, or error.
+     * Main method to ask AI using the active provider
      */
     public String askAI(String prompt) {
-        Optional<OpenAIConfiguration> configOpt = configRepository.findAll().stream().findFirst();
-        if (!configOpt.isPresent()) {
-            return "No OpenAI configuration found.";
+        OpenAIConfiguration config = configRepository.findAll().stream().findFirst().orElse(null);
+        
+        if (config == null || config.getActiveProvider() == null) {
+            return "No AI provider configured. Please configure a provider in AI settings.";
         }
-        OpenAIConfiguration config = configOpt.get();
-        String apiKey = config.getApiKey();
-        String model = config.getDefaultModel() != null ? config.getDefaultModel() : "gpt-3.5-turbo";
-        if (apiKey == null || apiKey.trim().isEmpty()) {
-            return "No OpenAI API key is configured. Please set the API key and save.";
-        } else if (!apiKey.trim().startsWith("sk-")) {
-            return "The OpenAI API key must start with 'sk-'. Please check your key.";
+
+        AIProvider provider = config.getActiveProvider();
+        
+        if (!provider.isActive()) {
+            return "The configured AI provider (" + provider.getDisplayName() + ") is not active.";
         }
+
+        return routeToProvider(prompt, provider);
+    }
+
+    /**
+     * Routes the AI request to the appropriate provider based on the provider type
+     */
+    private String routeToProvider(String prompt, AIProvider provider) {
+        String providerName = provider.getName();
+
+        if ("openai".equalsIgnoreCase(providerName)) {
+            return askOpenAI(prompt, provider);
+        } else if ("ollama".equalsIgnoreCase(providerName)) {
+            return askOllama(prompt, provider);
+        } else if ("anthropic".equalsIgnoreCase(providerName)) {
+            return askAnthropic(prompt, provider);
+        } else {
+            return "Unsupported AI provider: " + providerName;
+        }
+    }
+
+    /**
+     * Call OpenAI API
+     */
+    private String askOpenAI(String prompt, AIProvider provider) {
         try {
+            String apiKey = provider.getSetting("apiKey");
+            String model = provider.getSetting("model");
+            String baseUrl = provider.getSetting("baseUrl");
+
+            if (apiKey == null || apiKey.trim().isEmpty()) {
+                return "No OpenAI API key configured. Please set the API key in provider settings.";
+            }
+
+            if (!apiKey.trim().startsWith("sk-")) {
+                return "The OpenAI API key must start with 'sk-'. Please check your key.";
+            }
+
+            if (model == null || model.trim().isEmpty()) {
+                model = "gpt-3.5-turbo";
+            }
+
+            if (baseUrl == null || baseUrl.trim().isEmpty()) {
+                baseUrl = "https://api.openai.com/v1";
+            }
+
             RestTemplate restTemplate = new RestTemplate();
-            String url = "https://api.openai.com/v1/chat/completions";
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.setBearerAuth(apiKey.trim());
+
             JSONObject requestObj = new JSONObject();
             requestObj.put("model", model);
             requestObj.put("messages", List.of(Map.of("role", "user", "content", prompt)));
+
+            String url = baseUrl + "/chat/completions";
             HttpEntity<String> entity = new HttpEntity<>(requestObj.toString(), headers);
             ResponseEntity<String> response = restTemplate.postForEntity(url, entity, String.class);
+
             if (response.getStatusCode().is2xxSuccessful()) {
                 JSONObject body = new JSONObject(response.getBody());
                 return body.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
@@ -55,8 +108,91 @@ public class OpenAIUtil {
             } else {
                 return "OpenAI returned code: " + response.getStatusCode();
             }
-        } catch(Exception e) {
+        } catch (Exception e) {
             return "Error calling OpenAI: " + e.getMessage();
         }
+    }
+
+    /**
+     * Call Ollama API
+     */
+    private String askOllama(String prompt, AIProvider provider) {
+        try {
+            String model = provider.getSetting("model");
+            String baseUrl = provider.getSetting("baseUrl");
+
+            if (model == null || model.trim().isEmpty()) {
+                return "No Ollama model configured. Please set the model in provider settings.";
+            }
+
+            if (baseUrl == null || baseUrl.trim().isEmpty()) {
+                baseUrl = "http://localhost:11434";
+            }
+
+            RestTemplate restTemplate = new RestTemplate();
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            JSONObject requestObj = new JSONObject();
+            requestObj.put("model", model);
+            requestObj.put("messages", List.of(Map.of("role", "user", "content", prompt)));
+            // Set stream to false to get the complete response in one go, not streaming tokens
+            requestObj.put("stream", false);
+
+            String url = baseUrl + "/api/chat";
+            HttpEntity<String> entity = new HttpEntity<>(requestObj.toString(), headers);
+            ResponseEntity<String> response = restTemplate.postForEntity(url, entity, String.class);
+
+            if (response.getStatusCode().is2xxSuccessful()) {
+                JSONObject body = new JSONObject(response.getBody());
+                if (body.has("message") && body.getJSONObject("message").has("content")) {
+                    return body.getJSONObject("message").getString("content");
+                } else if (body.has("message") && body.getJSONObject("message").has("text")) {
+                    return body.getJSONObject("message").getString("text");
+                }
+            } else {
+                return "Ollama returned code: " + response.getStatusCode();
+            }
+        } catch (Exception e) {
+            return "Error calling Ollama: " + e.getMessage();
+        }
+        return "";
+    }
+
+    /**
+     * Call Anthropic API (placeholder for future implementation)
+     */
+    private String askAnthropic(String prompt, AIProvider provider) {
+        try {
+            String apiKey = provider.getSetting("apiKey");
+            String model = provider.getSetting("model");
+
+            if (apiKey == null || apiKey.trim().isEmpty()) {
+                return "No Anthropic API key configured.";
+            }
+
+            if (model == null || model.trim().isEmpty()) {
+                model = "claude-3-sonnet-20240229";
+            }
+
+            // TODO: Implement Anthropic API call similar to OpenAI
+            return "Anthropic provider not yet fully implemented.";
+        } catch (Exception e) {
+            return "Error calling Anthropic: " + e.getMessage();
+        }
+    }
+
+    /**
+     * Get the currently active provider
+     */
+    public AIProvider getActiveProvider() {
+        return providerRepository.findFirstByActiveTrue().orElse(null);
+    }
+
+    /**
+     * Get all configured providers
+     */
+    public List<AIProvider> getAllProviders() {
+        return providerRepository.findAll();
     }
 }

@@ -9,14 +9,9 @@ public class OpenAIConfiguration {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = true, length = 2000)
-    private String apiKey;
-
-    @Column(nullable = true)
-    private String organization;
-
-    @Column(nullable = true)
-    private String defaultModel;
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "active_provider_id", nullable = true)
+    private AIProvider activeProvider;
 
     @Column(nullable = true, length = 2000)
     private String summaryPrompt;
@@ -24,43 +19,41 @@ public class OpenAIConfiguration {
     public OpenAIConfiguration() {
     }
 
-    public Long getId() {
-        return id;
+    public Long getId() { 
+        return id; 
+    }
+    
+    public void setId(Long id) { 
+        this.id = id; 
     }
 
-    public void setId(Long id) {
-        this.id = id;
+    public AIProvider getActiveProvider() { 
+        return activeProvider; 
+    }
+    
+    public void setActiveProvider(AIProvider activeProvider) { 
+        this.activeProvider = activeProvider; 
     }
 
-    public String getApiKey() {
-        return apiKey;
+    public String getSummaryPrompt() { 
+        return summaryPrompt; 
+    }
+    
+    public void setSummaryPrompt(String summaryPrompt) { 
+        this.summaryPrompt = summaryPrompt; 
     }
 
-    public void setApiKey(String apiKey) {
-        this.apiKey = apiKey;
+    /**
+     * Convenience method to get the provider name
+     */
+    public String getProviderName() {
+        return activeProvider != null ? activeProvider.getName() : null;
     }
 
-    public String getOrganization() {
-        return organization;
-    }
-
-    public void setOrganization(String organization) {
-        this.organization = organization;
-    }
-
-    public String getDefaultModel() {
-        return defaultModel;
-    }
-
-    public void setDefaultModel(String defaultModel) {
-        this.defaultModel = defaultModel;
-    }
-
-    public String getSummaryPrompt() {
-        return summaryPrompt;
-    }
-
-    public void setSummaryPrompt(String summaryPrompt) {
-        this.summaryPrompt = summaryPrompt;
+    /**
+     * Convenience method to get the provider display name
+     */
+    public String getProviderDisplayName() {
+        return activeProvider != null ? activeProvider.getDisplayName() : "No Provider Selected";
     }
 }

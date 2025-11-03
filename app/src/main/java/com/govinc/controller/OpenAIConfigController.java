@@ -1,71 +1,290 @@
 package com.govinc.controller;
 
+import com.govinc.entity.AIProvider;
 import com.govinc.entity.OpenAIConfiguration;
-import com.govinc.entity.OpenAIConfigurationRepository;
-import com.govinc.entity.LayoutConfiguration; // <-- ADD THIS
-import com.govinc.entity.LayoutConfigurationRepository; // <-- ADD THIS
+import com.govinc.repository.OpenAIConfigurationRepository;
+import com.govinc.repository.AIProviderRepository;
+import com.govinc.entity.LayoutConfiguration;
+import com.govinc.entity.LayoutConfigurationRepository;
 import com.govinc.util.OpenAIUtil;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.MediaType; // <-- ADD THIS
-import org.springframework.http.ResponseEntity; // <-- ADD THIS
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import java.util.List;
 
 @Controller
 @RequestMapping("/config/openai")
 public class OpenAIConfigController {
     private final OpenAIConfigurationRepository openAIConfigurationRepository;
+    private final AIProviderRepository providerRepository;
     private final OpenAIUtil openAIUtil;
     private final LayoutConfigurationRepository layoutConfigurationRepository;
 
     @Autowired
-    public OpenAIConfigController(OpenAIConfigurationRepository repo,
+    public OpenAIConfigController(
+            OpenAIConfigurationRepository repo,
+            AIProviderRepository providerRepository,
             LayoutConfigurationRepository layoutConfigRepo,
             OpenAIUtil openAIUtil) {
         this.openAIConfigurationRepository = repo;
+        this.providerRepository = providerRepository;
         this.layoutConfigurationRepository = layoutConfigRepo;
         this.openAIUtil = openAIUtil;
     }
 
     @GetMapping
     public String getConfigPage(Model model, @RequestParam(required = false) String testResult) {
-        OpenAIConfiguration config = openAIConfigurationRepository.findAll().stream().findFirst()
+        // Get or create main configuration
+        OpenAIConfiguration config = openAIConfigurationRepository.findAll().stream()
+                .findFirst()
                 .orElse(new OpenAIConfiguration());
+
+        // Get all available providers
+        List<AIProvider> allProviders = providerRepository.findAll();
+        AIProvider activeProvider = config.getActiveProvider();
+
+        // If no active provider is set, try to find one that's marked as active
+        if (activeProvider == null) {
+            activeProvider = providerRepository.findFirstByActiveTrue().orElse(null);
+            if (activeProvider != null) {
+                config.setActiveProvider(activeProvider);
+                openAIConfigurationRepository.save(config);
+            }
+        }
+
         model.addAttribute("config", config);
+        model.addAttribute("allProviders", allProviders);
+        model.addAttribute("activeProvider", activeProvider);
+
         if (testResult != null) {
             model.addAttribute("testResult", testResult);
         }
+
         return "openai-config";
     }
 
-    @PostMapping
-    public String saveConfig(@ModelAttribute OpenAIConfiguration config, Model model) {
-        // Only one config row: update if exists, insert if not
-        OpenAIConfiguration persisted = openAIConfigurationRepository.findAll().stream().findFirst().orElse(null);
-        if (persisted != null) {
-            persisted.setApiKey(config.getApiKey());
-            persisted.setOrganization(config.getOrganization());
-            persisted.setDefaultModel(config.getDefaultModel());
-            persisted.setSummaryPrompt(config.getSummaryPrompt());
-            openAIConfigurationRepository.save(persisted);
-            model.addAttribute("config", persisted);
-        } else {
+    @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public ResponseEntity<?> saveConfig(@RequestBody java.util.Map<String, Object> configData) {
+        try {
+            // Load existing configuration or create new one
+            OpenAIConfiguration config = openAIConfigurationRepository.findAll()
+                    .stream()
+                    .findFirst()
+                    .orElse(new OpenAIConfiguration());
+
+            // Set active provider
+            Object activeProviderIdObj = configData.get("activeProviderId");
+            if (activeProviderIdObj != null) {
+                Long activeProviderId = null;
+                if (activeProviderIdObj instanceof Number) {
+                    activeProviderId = ((Number) activeProviderIdObj).longValue();
+                } else if (activeProviderIdObj instanceof String && !((String) activeProviderIdObj).isEmpty()) {
+                    try {
+                        activeProviderId = Long.parseLong((String) activeProviderIdObj);
+                    } catch (NumberFormatException e) {
+                        // Ignore, activeProviderId stays null
+                    }
+                }
+                
+                if (activeProviderId != null && activeProviderId > 0) {
+                    AIProvider provider = providerRepository.findById(activeProviderId).orElse(null);
+                    config.setActiveProvider(provider);
+                }
+            }
+
+            // Set summary prompt
+            Object summaryPromptObj = configData.get("summaryPrompt");
+            if (summaryPromptObj != null) {
+                config.setSummaryPrompt(summaryPromptObj.toString());
+            }
+
             openAIConfigurationRepository.save(config);
-            model.addAttribute("config", config);
+            return ResponseEntity.ok(java.util.Map.of("success", true, "message", "Configuration saved"));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(
+                java.util.Map.of("success", false, "error", e.getMessage())
+            );
         }
-        model.addAttribute("saved", true);
-        return "openai-config";
+    }
+
+    @PostMapping(path = "/provider/create", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public ResponseEntity<?> createProvider(@RequestBody AIProvider provider) {
+        try {
+            // Note: Display name uniqueness is enforced by database constraint
+            // Provider name (type) can be duplicated to allow multiple instances of same provider type
+            // (e.g., two different Ollama instances with different models)
+
+            // Ensure only one active provider
+            if (provider.isActive()) {
+                List<AIProvider> allProviders = providerRepository.findAll();
+                for (AIProvider p : allProviders) {
+                    if (p.isActive()) {
+                        p.setActive(false);
+                        providerRepository.save(p);
+                    }
+                }
+            }
+
+            AIProvider saved = providerRepository.save(provider);
+            return ResponseEntity.ok(java.util.Map.of("success", true, "provider", saved));
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            // Handle unique constraint violation on displayName
+            if (e.getMessage() != null && e.getMessage().contains("displayName")) {
+                return ResponseEntity.badRequest().body(
+                    java.util.Map.of("success", false, "error", "A provider with this display name already exists. Please use a different name.")
+                );
+            }
+            return ResponseEntity.status(500).body(
+                java.util.Map.of("success", false, "error", "Database error: " + e.getMessage())
+            );
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(
+                java.util.Map.of("success", false, "error", e.getMessage())
+            );
+        }
+    }
+
+    @PutMapping(path = "/provider/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public ResponseEntity<?> updateProvider(@PathVariable Long id, @RequestBody AIProvider providerData) {
+        try {
+            AIProvider provider = providerRepository.findById(id)
+                .orElseThrow(() -> new Exception("Provider not found"));
+
+            // Don't allow name change
+            provider.setDisplayName(providerData.getDisplayName());
+            provider.setDescription(providerData.getDescription());
+            provider.setSettings(providerData.getSettings());
+
+            // If setting to active, deactivate others
+            if (providerData.isActive() && !provider.isActive()) {
+                List<AIProvider> allProviders = providerRepository.findAll();
+                for (AIProvider p : allProviders) {
+                    if (!p.getId().equals(id) && p.isActive()) {
+                        p.setActive(false);
+                        providerRepository.save(p);
+                    }
+                }
+            }
+
+            provider.setActive(providerData.isActive());
+            AIProvider saved = providerRepository.save(provider);
+            return ResponseEntity.ok(java.util.Map.of("success", true, "provider", saved));
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            // Handle unique constraint violation on displayName
+            if (e.getMessage() != null && e.getMessage().contains("displayName")) {
+                return ResponseEntity.badRequest().body(
+                    java.util.Map.of("success", false, "error", "A provider with this display name already exists. Please use a different name.")
+                );
+            }
+            return ResponseEntity.status(500).body(
+                java.util.Map.of("success", false, "error", "Database error: " + e.getMessage())
+            );
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(
+                java.util.Map.of("success", false, "error", e.getMessage())
+            );
+        }
+    }
+
+    @PostMapping(path = "/provider/{id}/activate", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public ResponseEntity<?> activateProvider(@PathVariable Long id) {
+        try {
+            AIProvider provider = providerRepository.findById(id)
+                .orElseThrow(() -> new Exception("Provider not found"));
+
+            // Deactivate all other providers
+            List<AIProvider> allProviders = providerRepository.findAll();
+            for (AIProvider p : allProviders) {
+                if (!p.getId().equals(id) && p.isActive()) {
+                    p.setActive(false);
+                    providerRepository.save(p);
+                }
+            }
+
+            // Activate this provider
+            provider.setActive(true);
+            AIProvider saved = providerRepository.save(provider);
+
+            // Update main configuration to use this provider
+            OpenAIConfiguration config = openAIConfigurationRepository.findAll()
+                    .stream()
+                    .findFirst()
+                    .orElse(new OpenAIConfiguration());
+            config.setActiveProvider(saved);
+            openAIConfigurationRepository.save(config);
+
+            return ResponseEntity.ok(java.util.Map.of("success", true, "message", "Provider activated"));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(
+                java.util.Map.of("success", false, "error", e.getMessage())
+            );
+        }
+    }
+
+    @DeleteMapping(path = "/provider/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public ResponseEntity<?> deleteProvider(@PathVariable Long id) {
+        try {
+            AIProvider provider = providerRepository.findById(id)
+                .orElseThrow(() -> new Exception("Provider not found"));
+
+            // Don't allow deletion if it's the active provider
+            if (provider.isActive()) {
+                return ResponseEntity.badRequest().body(
+                    java.util.Map.of("success", false, "error", "Cannot delete active provider. Please deactivate it first.")
+                );
+            }
+
+            providerRepository.deleteById(id);
+            return ResponseEntity.ok(java.util.Map.of("success", true, "message", "Provider deleted"));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(
+                java.util.Map.of("success", false, "error", e.getMessage())
+            );
+        }
+    }
+
+    @GetMapping(path = "/provider/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public ResponseEntity<?> getProvider(@PathVariable Long id) {
+        try {
+            AIProvider provider = providerRepository.findById(id)
+                .orElseThrow(() -> new Exception("Provider not found"));
+            return ResponseEntity.ok(java.util.Map.of("success", true, "provider", provider));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(
+                java.util.Map.of("success", false, "error", e.getMessage())
+            );
+        }
     }
 
     @PostMapping("/test")
     public String testOpenAI(@RequestParam String testPrompt, Model model) {
-        String response = openAIUtil.askAI(testPrompt);
-        OpenAIConfiguration config = openAIConfigurationRepository.findAll().stream().findFirst()
+        try {
+            String response = openAIUtil.askAI(testPrompt);
+            model.addAttribute("testResult", response);
+        } catch (Exception e) {
+            model.addAttribute("testResult", "Error: " + e.getMessage());
+        }
+
+        OpenAIConfiguration config = openAIConfigurationRepository.findAll()
+                .stream()
+                .findFirst()
                 .orElse(new OpenAIConfiguration());
+
         model.addAttribute("config", config);
-        model.addAttribute("testResult", response);
+        List<AIProvider> allProviders = providerRepository.findAll();
+        model.addAttribute("allProviders", allProviders);
+        model.addAttribute("activeProvider", config.getActiveProvider());
+
         return "openai-config";
     }
 
@@ -76,6 +295,7 @@ public class OpenAIConfigController {
             if (imageFile == null || imageFile.isEmpty()) {
                 return ResponseEntity.badRequest().body("No image uploaded.");
             }
+
             byte[] imageBytes = imageFile.getBytes();
             String base64Image = java.util.Base64.getEncoder().encodeToString(imageBytes);
 
@@ -99,10 +319,8 @@ public class OpenAIConfigController {
             Logo image (base64): %s
             """.formatted(base64Image);
 
-
             String raw = openAIUtil.askAI(prompt);
 
-            // Extract only the JSON part if the response is wrapped in ```json ... ```
             String json = raw;
             int start = raw.indexOf('{');
             int end = raw.lastIndexOf('}');
@@ -110,61 +328,57 @@ public class OpenAIConfigController {
                 json = raw.substring(start, end + 1);
             }
 
-            // Use Jackson or org.json for safety
             com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
             java.util.Map<String, String> map = mapper.readValue(json, java.util.Map.class);
 
-            // Persist to database (update theme fields in LayoutConfiguration)
-            LayoutConfiguration config = layoutConfigurationRepository.findAll().stream()
+            LayoutConfiguration cfg = layoutConfigurationRepository.findAll().stream()
                     .findFirst().orElse(new LayoutConfiguration());
 
-            // Assign if present; fallback to null if missing (safe for all fields)
-            config.setPrimaryColor(map.get("primaryColor"));
-            config.setPrimaryColorDark(map.get("primaryColorDark"));
-            config.setAccentColor(map.get("accentColor"));
-            config.setBackgroundColor(map.get("backgroundColor"));
-            config.setBorderColor(map.get("borderColor"));
-            config.setNavViolet(map.get("navViolet"));
-            config.setTextMain(map.get("textMain"));
-            config.setShineGlare(map.get("shineGlare"));
-            config.setShineHighlight(map.get("shineHighlight"));
-            config.setSecondaryColor(map.get("secondaryColor"));
-            config.setFontFamily(map.get("fontFamily"));
-            config.setFontSizeNav(map.get("fontSizeNav"));
-            config.setFontSizeHeadline(map.get("fontSizeHeadline"));
+            cfg.setPrimaryColor(map.get("primaryColor"));
+            cfg.setPrimaryColorDark(map.get("primaryColorDark"));
+            cfg.setAccentColor(map.get("accentColor"));
+            cfg.setBackgroundColor(map.get("backgroundColor"));
+            cfg.setBorderColor(map.get("borderColor"));
+            cfg.setNavViolet(map.get("navViolet"));
+            cfg.setTextMain(map.get("textMain"));
+            cfg.setShineGlare(map.get("shineGlare"));
+            cfg.setShineHighlight(map.get("shineHighlight"));
+            cfg.setSecondaryColor(map.get("secondaryColor"));
+            cfg.setFontFamily(map.get("fontFamily"));
+            cfg.setFontSizeNav(map.get("fontSizeNav"));
+            cfg.setFontSizeHeadline(map.get("fontSizeHeadline"));
 
-            config.setSuccessGreen(map.get("successGreen"));
-        config.setErrorRed(map.get("errorRed"));
-        config.setModalBeige1(map.get("modalBeige1"));
-        config.setModalBeige2(map.get("modalBeige2"));
-        config.setModalBeige3(map.get("modalBeige3"));
-        config.setModalBeige4(map.get("modalBeige4"));
-        config.setLabelGold(map.get("labelGold"));
-        config.setGray777(map.get("gray777"));
-        config.setGray888(map.get("gray888"));
-        config.setTableBg1(map.get("tableBg1"));
-        config.setTableBg2(map.get("tableBg2"));
-        config.setTableBg3(map.get("tableBg3"));
-        config.setTableBg4(map.get("tableBg4"));
-        config.setTableBg5(map.get("tableBg5"));
-        config.setHeaderGradHighlight(map.get("headerGradHighlight"));
-        config.setYellowHighlight(map.get("yellowHighlight"));
-        config.setTableHover1(map.get("tableHover1"));
-        config.setTableHover2(map.get("tableHover2"));
-        config.setAlertBg1(map.get("alertBg1"));
-        config.setAlertBg2(map.get("alertBg2"));
-        config.setAlertColor(map.get("alertColor"));
-        config.setTakenOverBg(map.get("takenOverBg"));
-        config.setDropdownBgHover(map.get("dropdownBgHover"));
-        config.setSecondaryNavBg(map.get("secondaryNavBg"));
-        config.setSecondaryNavBorder(map.get("secondaryNavBorder"));
-        config.setLogoBorder(map.get("logoBorder"));
-        config.setDropdownHoverBlue(map.get("dropdownHoverBlue"));
-        config.setMainNavBorder(map.get("mainNavBorder"));
-        config.setFaintBlue1(map.get("faintBlue1"));
-        layoutConfigurationRepository.save(config);
+            cfg.setSuccessGreen(map.get("successGreen"));
+            cfg.setErrorRed(map.get("errorRed"));
+            cfg.setModalBeige1(map.get("modalBeige1"));
+            cfg.setModalBeige2(map.get("modalBeige2"));
+            cfg.setModalBeige3(map.get("modalBeige3"));
+            cfg.setModalBeige4(map.get("modalBeige4"));
+            cfg.setLabelGold(map.get("labelGold"));
+            cfg.setGray777(map.get("gray777"));
+            cfg.setGray888(map.get("gray888"));
+            cfg.setTableBg1(map.get("tableBg1"));
+            cfg.setTableBg2(map.get("tableBg2"));
+            cfg.setTableBg3(map.get("tableBg3"));
+            cfg.setTableBg4(map.get("tableBg4"));
+            cfg.setTableBg5(map.get("tableBg5"));
+            cfg.setHeaderGradHighlight(map.get("headerGradHighlight"));
+            cfg.setYellowHighlight(map.get("yellowHighlight"));
+            cfg.setTableHover1(map.get("tableHover1"));
+            cfg.setTableHover2(map.get("tableHover2"));
+            cfg.setAlertBg1(map.get("alertBg1"));
+            cfg.setAlertBg2(map.get("alertBg2"));
+            cfg.setAlertColor(map.get("alertColor"));
+            cfg.setTakenOverBg(map.get("takenOverBg"));
+            cfg.setDropdownBgHover(map.get("dropdownBgHover"));
+            cfg.setSecondaryNavBg(map.get("secondaryNavBg"));
+            cfg.setSecondaryNavBorder(map.get("secondaryNavBorder"));
+            cfg.setLogoBorder(map.get("logoBorder"));
+            cfg.setDropdownHoverBlue(map.get("dropdownHoverBlue"));
+            cfg.setMainNavBorder(map.get("mainNavBorder"));
+            cfg.setFaintBlue1(map.get("faintBlue1"));
+            layoutConfigurationRepository.save(cfg);
 
-            // Respond with suggested theme JSON (so frontend can fill form immediately)
             return ResponseEntity.ok()
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(map);
