@@ -443,6 +443,37 @@
         .row-analyzing {
             opacity: 0.6;
         }
+        
+        .translation-section {
+            background-color: #f0f8ff;
+            border: 1px solid #bee5eb;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .translation-section h5 {
+            margin-top: 0;
+            color: #004085;
+        }
+        
+        .translation-checkbox {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+        }
+        
+        .translation-checkbox input[type="checkbox"] {
+            margin-right: 10px;
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+        
+        .translation-checkbox label {
+            margin: 0;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -466,7 +497,7 @@
             <!-- Step 1: Instructions and File Upload -->
             <div class="step-container">
                 <div class="step-header">
-                    <span class="step-number">1</span>CSV Format Instructions & File Upload
+                    <span class="step-number">1</span>CSV Format Instructions & File Upload & Translation
                 </div>
                 <div class="step-content">
                     <div class="csv-instructions">
@@ -512,8 +543,29 @@ network segmentation","SC-7","Network"</div>
                         <p><strong>Select your CSV file:</strong></p>
                         <input type="file" id="csvFile" class="file-input" accept=".csv" required />
                         <br/>
-                        <button type="button" id="previewBtn" class="import-button" disabled>Preview CSV Data</button>
                     </div>
+
+                    <div class="translation-section">
+                        <h5>🌐 Translate Content (Optional)</h5>
+                        <p style="font-size: 12px; color: #666; margin: 5px 0;">Automatically translate security control name and detail fields to selected languages using AI before importing</p>
+                        <div class="translation-checkbox">
+                            <input type="checkbox" id="translateDE" name="languages" value="de" />
+                            <label for="translateDE">German (Deutsch)</label>
+                        </div>
+                        <div class="translation-checkbox">
+                            <input type="checkbox" id="translateEN" name="languages" value="en" />
+                            <label for="translateEN">English</label>
+                        </div>
+                        <div id="translationProgress" style="display: none; margin: 15px 0; padding: 10px; background-color: #e3f2fd; border: 1px solid #90caf9; border-radius: 4px;">
+                            <p style="margin: 0; font-size: 12px;"><strong>🔄 Translating content...</strong></p>
+                            <div class="progress-bar-container" style="margin-top: 5px;">
+                                <div id="translationProgressBar" class="progress-bar" style="width: 0%;"></div>
+                            </div>
+                            <p style="margin: 5px 0; font-size: 11px; color: #666;"><span id="translationProgressText">0/0</span> items translated...</p>
+                        </div>
+                    </div>
+
+                    <button type="button" id="previewBtn" class="import-button" disabled>Preview CSV Data</button>
                 </div>
             </div>
 
@@ -744,7 +796,18 @@ network segmentation","SC-7","Network"</div>
         const reader = new FileReader();
         reader.onload = function(e) {
             const csvText = e.target.result;
-            parseCsvData(csvText);
+            
+            // Check if translation is requested
+            const selectedLanguages = Array.from(document.querySelectorAll('input[name="languages"]:checked'))
+                .map(cb => cb.value);
+            
+            if (selectedLanguages.length > 0) {
+                // Translate before parsing
+                translateAndParseCsv(csvText, selectedLanguages);
+            } else {
+                // Parse directly without translation
+                parseCsvData(csvText);
+            }
         };
         reader.readAsText(file);
     });
@@ -817,6 +880,109 @@ network segmentation","SC-7","Network"</div>
         return rows;
     }
 
+    // Translate CSV data using AI
+    function translateAndParseCsv(csvText, languages) {
+        const progressDiv = document.getElementById('translationProgress');
+        progressDiv.style.display = 'block';
+        
+        const rows = parseCSVData(csvText);
+        if (rows.length < 2) {
+            showParseError('CSV file must contain at least a header row and one data row.');
+            progressDiv.style.display = 'none';
+            return;
+        }
+        
+        const headers = rows[0];
+        const dataRows = rows.slice(1);
+        const totalTranslations = dataRows.length * languages.length;
+        let completedTranslations = 0;
+        
+        // Create translated data structure
+        const translatedRows = dataRows.map(row => [...row]);
+        
+        // Process each row-language combination
+        const allTasks = [];
+        dataRows.forEach((row, rowIdx) => {
+            languages.forEach(lang => {
+                allTasks.push({ rowIdx, lang, row });
+            });
+        });
+        
+        // Process translations sequentially
+        const processTranslations = () => {
+            if (allTasks.length === 0) {
+                progressDiv.style.display = 'none';
+                
+                // Now parse the translated data
+                let translatedCsv = headers.join(',') + '\n';
+                translatedRows.forEach(row => {
+                    translatedCsv += '"' + row.map(col => (col || '').replace(/"/g, '""')).join('","') + '"\n';
+                });
+                
+                parseCsvData(translatedCsv);
+                return;
+            }
+            
+            const task = allTasks.shift();
+            const languageLabel = task.lang === 'de' ? 'German' : 'English';
+            
+            fetch('/api/security-control/translate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    language: task.lang,
+                    name: task.row[0] || '',
+                    detail: task.row[1] || ''
+                })
+            })
+                .then(response => response.json())
+                .then(result => {
+                    completedTranslations++;
+                    
+                    // Add translated columns
+                    if (result.success && result.translated) {
+                        translatedRows[task.rowIdx].push(result.translated.detail || task.row[1] || '');
+                        translatedRows[task.rowIdx].push(result.translated.name || task.row[0] || '');
+                        
+                        // Update headers if first translation
+                        if (completedTranslations === 1) {
+                            languages.forEach(lang => {
+                                headers.push('detail_' + lang);
+                                headers.push('name_' + lang);
+                            });
+                        }
+                    }
+                    
+                    // Update progress
+                    const progressBar = document.getElementById('translationProgressBar');
+                    const progressText = document.getElementById('translationProgressText');
+                    const progress = (completedTranslations / totalTranslations) * 100;
+                    progressBar.style.width = progress + '%';
+                    progressText.textContent = completedTranslations + '/' + totalTranslations;
+                    
+                    // Continue with next translation
+                    setTimeout(processTranslations, 100);
+                })
+                .catch(error => {
+                    console.error('Translation error:', error);
+                    completedTranslations++;
+                    
+                    const progressBar = document.getElementById('translationProgressBar');
+                    const progressText = document.getElementById('translationProgressText');
+                    const progress = (completedTranslations / totalTranslations) * 100;
+                    progressBar.style.width = progress + '%';
+                    progressText.textContent = completedTranslations + '/' + totalTranslations;
+                    
+                    setTimeout(processTranslations, 100);
+                });
+        };
+        
+        processTranslations();
+    }
+
     // CSV parsing function with proper error handling
     function parseCsvData(csvText) {
         try {
@@ -832,13 +998,13 @@ network segmentation","SC-7","Network"</div>
             const headers = allRows[0];
             const expectedHeaders = ['name', 'detail', 'reference', 'domain'];
             
-            // Validate headers
+            // Validate headers (at minimum, first 4 columns should match)
             const headersValid = expectedHeaders.every((header, index) => 
                 headers[index] && headers[index].toLowerCase().trim() === header
             );
             
             if (!headersValid) {
-                showParseError('CSV headers must be exactly: name,detail,reference,domain (in order). Found: ' + headers.map(h => '"' + h + '"').join(', '));
+                showParseError('CSV headers must start with: name,detail,reference,domain (in order). Found: ' + headers.slice(0, 4).map(h => '"' + h + '"').join(', '));
                 return;
             }
 
