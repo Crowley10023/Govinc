@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
@@ -11,6 +12,8 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
+import org.springframework.dao.DataIntegrityViolationException;
 
 @Controller
 @RequestMapping("/security-control")
@@ -51,9 +54,58 @@ public class SecurityControlController {
     }
 
     @PostMapping("/delete")
-    public String deleteSecurityControl(@RequestParam Long id) {
-        service.deleteById(id);
+    public String deleteSecurityControl(@RequestParam Long id, RedirectAttributes redirectAttributes) {
+        try {
+            service.deleteById(id);
+            redirectAttributes.addFlashAttribute("message", "Security control deleted successfully.");
+            redirectAttributes.addFlashAttribute("messageType", "success");
+        } catch (SecurityControlService.SecurityControlInUseException e) {
+            redirectAttributes.addFlashAttribute("message", e.getMessage());
+            redirectAttributes.addFlashAttribute("messageType", "error");
+        }
         return "redirect:/security-control/list";
+    }
+    
+    @PostMapping("/delete/api")
+    @ResponseBody
+    public Map<String, Object> deleteSecurityControlApi(@RequestParam Long id) {
+        Map<String, Object> response = new java.util.HashMap<>();
+        try {
+            service.deleteById(id);
+            response.put("success", true);
+            response.put("message", "Security control deleted successfully.");
+        } catch (SecurityControlService.SecurityControlInUseException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            response.put("errorType", "IN_USE");
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            // Handle foreign key constraint violations
+            String message = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+            String userMessage;
+            
+            if (message.contains("foreign key constraint") || message.contains("constraint")) {
+                userMessage = "Cannot delete this security control because it is currently linked to one or more catalogs or used in assessments. " +
+                             "Please unlink it from all catalogs and remove it from all assessments first.";
+            } else {
+                userMessage = "Cannot delete this security control due to a data constraint. " +
+                             "It may be referenced elsewhere in the system.";
+            }
+            
+            response.put("success", false);
+            response.put("message", userMessage);
+            response.put("errorType", "CONSTRAINT_VIOLATION");
+            System.err.println("[DELETE] DataIntegrityViolationException: " + e.getMessage());
+            e.printStackTrace();
+        } catch (Exception e) {
+            response.put("success", false);
+            String userMessage = "An unexpected error occurred while deleting the security control. " +
+                               "Please try again or contact support if the problem persists.";
+            response.put("message", userMessage);
+            response.put("errorType", "GENERAL_ERROR");
+            System.err.println("[DELETE] Unexpected error: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return response;
     }
 
     @GetMapping("/create")

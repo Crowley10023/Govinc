@@ -21,6 +21,18 @@
             background-color: rgba(0, 0, 0, 0.5);
             backdrop-filter: blur(2px);
         }
+
+        .modalLevel2 {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(2px);
+        }        
         
         .modal-content {
             background-color: #fefefe;
@@ -374,6 +386,12 @@
             border-radius: 3px;
             font-size: 11px;
             font-weight: bold;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+        
+        .match-badge-high:hover {
+            background-color: #ffb300;
         }
         
         .match-badge-medium {
@@ -383,6 +401,12 @@
             border-radius: 3px;
             font-size: 11px;
             font-weight: bold;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+        
+        .match-badge-medium:hover {
+            background-color: #138496;
         }
         
         .match-badge-low {
@@ -392,6 +416,12 @@
             border-radius: 3px;
             font-size: 11px;
             font-weight: bold;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+        
+        .match-badge-low:hover {
+            background-color: #5a6268;
         }
         
         .match-badge-none {
@@ -533,6 +563,257 @@
         .button-secondary:hover {
             background-color: #5a6268;
         }
+
+        /* Delete Confirmation Modal */
+        .delete-modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(3px);
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        .delete-modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 30px;
+            border: 1px solid #dc3545;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 8px 32px rgba(220, 53, 69, 0.3);
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .delete-modal-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #dc3545;
+        }
+
+        .delete-modal-header .icon {
+            font-size: 32px;
+            color: #dc3545;
+        }
+
+        .delete-modal-header h3 {
+            margin: 0;
+            color: #dc3545;
+            flex: 1;
+        }
+
+        .delete-modal-body {
+            margin: 20px 0;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .delete-modal-body .control-name {
+            font-weight: bold;
+            color: #495057;
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            word-break: break-word;
+        }
+
+        .delete-modal-body .error-message {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 5px;
+            color: #721c24;
+            padding: 15px;
+            margin: 15px 0;
+            display: none;
+        }
+
+        .delete-modal-body .error-message.show {
+            display: block;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .delete-modal-body .error-icon {
+            font-size: 20px;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+
+        .delete-modal-footer {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 25px;
+            padding-top: 15px;
+            border-top: 1px solid #dee2e6;
+        }
+
+        .delete-modal-footer button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .delete-modal-footer .btn-cancel {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .delete-modal-footer .btn-cancel:hover {
+            background-color: #5a6268;
+        }
+
+        .delete-modal-footer .btn-confirm {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .delete-modal-footer .btn-confirm:hover:not(:disabled) {
+            background-color: #c82333;
+            transform: scale(1.02);
+        }
+
+        .delete-modal-footer .btn-confirm:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        .delete-modal-footer .btn-confirm .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid #ffffff;
+            border-top: 2px solid transparent;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Action Buttons Styling */
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            text-decoration: none;
+            transition: all 0.2s;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+
+        /* Success/Error Messages */
+        .alert {
+            padding: 15px;
+            margin: 20px 0;
+            border: 1px solid transparent;
+            border-radius: 5px;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        .alert-success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+
+        .alert-error {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+
+        .alert-close {
+            float: right;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
+            color: inherit;
+            opacity: 0.7;
+        }
+
+        .alert-close:hover {
+            opacity: 1;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        table th {
+            background-color: #f8f9fa;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        table td {
+            padding: 12px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        table tr:hover {
+            background-color: #f8f9fa;
+        }
     </style>
 </head>
 <body>
@@ -545,6 +826,24 @@
     <!-- Import Button -->
     <div style="margin: 20px 0;">
         <button id="importBtn" class="import-button">Import Security Controls from CSV</button>
+    </div>
+
+    <!-- Match Detail Modal Popup -->
+    <div id="matchDetailModal" class="modalLevel2">
+        <div class="modal-content">
+            <span class="close" onclick="closeMatchDetailModal()">&times;</span>
+            <h2>Matched Security Control Details</h2>
+            <div id="matchDetailContent" style="padding: 20px; background-color: #f9f9f9; border-radius: 8px;">
+                <!-- Match details will be populated here -->
+            </div>
+            <div style="margin-top: 20px; padding: 20px; border-top: 1px solid #ddd; text-align: right;">
+                <p style="font-size: 12px; color: #666; margin: 0 0 10px 0; text-align: left;">
+                    💡 <strong>This is the suggested control to merge with your imported control.</strong> 
+                    You can confirm this action in the import wizard.
+                </p>
+                <button type="button" onclick="closeMatchDetailModal()" class="import-button button-secondary">Close</button>
+            </div>
+        </div>
     </div>
 
     <!-- CSV Import Modal with 5-Step Wizard -->
@@ -712,8 +1011,8 @@ network segmentation","SC-7","Network"</div>
                                         <th style="width: 150px;">Detail</th>
                                         <th style="width: 80px;">Reference</th>
                                         <th style="width: 80px;">Domain</th>
-                                        <th style="width: 100px;">Match <span class="tooltip">? <span class="tooltip-content">Similarity level to existing controls. Hover over match badges to see details about matched controls. High: Very similar, Medium: Somewhat similar, Low: Slightly similar, None: No match found</span></span></th>
-                                        <th style="width: 110px;">Action <span class="tooltip">? <span class="tooltip-content">Choose: Merge (combine with existing), New (create new control)</span></span></th>
+                                        <th style="width: 100px;">Match <span class="tooltip">? <span class="tooltip-content">Similarity level to existing controls. Click on match badges to see details. High: Very similar, Medium: Somewhat similar, Low: Slightly similar, None: No match found</span></span></th>
+                                        <th style="width: 110px;">Action <span class="tooltip">? <span class="tooltip-content">Choose: Merge (combine with existing), New (create new control). Default is Merge when any match is found (high, medium, or low), New when no match is found.</span></span></th>
                                         <th style="width: 70px;">Status</th>
                                     </tr>
                                 </thead>
@@ -811,7 +1110,37 @@ network segmentation","SC-7","Network"</div>
         </div>
     </div>
 
-    <table border="1">
+    <!-- Success/Error Messages -->
+    <div th:if="${message}" class="alert" th:classappend="${messageType == 'error' ? 'alert-error' : 'alert-success'}" id="messageAlert">
+        <span class="alert-close" onclick="this.parentElement.style.display='none';">&times;</span>
+        <strong th:if="${messageType == 'error'}">⚠️ Error:</strong>
+        <strong th:if="${messageType != 'error'}">✓ Success:</strong>
+        <span th:text="${message}"></span>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" class="delete-modal">
+        <div class="delete-modal-content">
+            <div class="delete-modal-header">
+                <span class="icon">🗑️</span>
+                <h3>Delete Security Control</h3>
+            </div>
+            <div class="delete-modal-body">
+                <p>Are you sure you want to delete this security control?</p>
+                <div class="control-name" id="controlName"></div>
+                <p style="color: #6c757d; font-size: 14px; margin: 15px 0 0 0;">This action cannot be undone.</p>
+                <div class="error-message" id="deleteError"></div>
+            </div>
+            <div class="delete-modal-footer">
+                <button class="btn-cancel" onclick="closeDeleteModal()">Cancel</button>
+                <button class="btn-confirm" id="confirmDeleteBtn" onclick="confirmDelete()">
+                    <span id="btnText">Delete</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <table>
         <thead>
             <tr>
                 <th>ID</th>
@@ -830,11 +1159,10 @@ network segmentation","SC-7","Network"</div>
                 <td th:text="${control.reference}"></td>
                 <td th:text="${control.securityControlDomain != null ? control.securityControlDomain.name : ''}"></td>
                 <td>
-                    <a th:href="@{'/security-control/edit'(id=${control.id})}">Edit</a>
-                    <form th:action="@{/security-control/delete}" method="post" style="display:inline">
-                        <input type="hidden" name="id" th:value="${control.id}" />
-                        <button type="submit" onclick="return confirm('Are you sure?')">Delete</button>
-                    </form>
+                    <div class="action-buttons">
+                        <a class="btn btn-primary" th:href="@{'/security-control/edit'(id=${control.id})}">Edit</a>
+                        <button class="btn btn-danger" type="button" th:data-id="${control.id}" th:data-name="${control.name}" onclick="openDeleteModalFromBtn(this)">Delete</button>
+                    </div>
                 </td>
             </tr>
         </tbody>
@@ -843,6 +1171,144 @@ network segmentation","SC-7","Network"</div>
 </div>
 
 <script>
+    // Delete Modal Functionality
+    let currentDeleteId = null;
+
+    function openDeleteModalFromBtn(btn) {
+        const id = btn.getAttribute('data-id');
+        const name = btn.getAttribute('data-name');
+        openDeleteModal(id, name);
+    }
+
+    function openDeleteModal(id, name) {
+        currentDeleteId = id;
+        document.getElementById('controlName').textContent = name;
+        document.getElementById('deleteError').textContent = '';
+        document.getElementById('deleteError').classList.remove('show');
+        document.getElementById('confirmDeleteBtn').disabled = false;
+        document.getElementById('confirmDeleteBtn').innerHTML = '<span id="btnText">Delete</span>';
+        document.getElementById('deleteModal').style.display = 'block';
+    }
+
+    function closeDeleteModal() {
+        document.getElementById('deleteModal').style.display = 'none';
+        currentDeleteId = null;
+    }
+
+    function confirmDelete() {
+        if (!currentDeleteId) return;
+
+        const btn = document.getElementById('confirmDeleteBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span><span id="btnText">Deleting...</span>';
+
+        fetch('/security-control/delete/api?id=' + currentDeleteId, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="_csrf"]')?.getAttribute('content') || ''
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success message and reload
+                    showAlert(data.message, 'success');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    // Show error message in modal
+                    const errorDiv = document.getElementById('deleteError');
+                    const tempDiv = document.createElement('div');
+                    tempDiv.textContent = data.message;
+                    const safeMsgHtml = tempDiv.innerHTML;
+                    let errorHtml = '<span class="error-icon">⚠️</span><strong>Cannot Delete This Security Control</strong><p>' + safeMsgHtml + '</p>';
+                    if (data.errorType === 'IN_USE') {
+                        errorHtml += '<p style="margin-top: 10px; font-size: 13px; font-style: italic; color: #555;">💡 <strong>Tip:</strong> Remove this control from all assessments before attempting to delete.</p>';
+                    } else if (data.errorType === 'CONSTRAINT_VIOLATION') {
+                        errorHtml += '<p style="margin-top: 10px; font-size: 13px; font-style: italic; color: #555;">💡 <strong>Tip:</strong> Unlink this control from all catalogs, then try deleting again.</p>';
+                    } else if (data.errorType === 'GENERAL_ERROR') {
+                        errorHtml += '<p style="margin-top: 10px; font-size: 13px; font-style: italic; color: #555;">💡 <strong>Tip:</strong> Please try again or contact system administrator if the issue persists.</p>';
+                    }
+                    errorDiv.innerHTML = errorHtml;
+                    errorDiv.classList.add('show');
+                    btn.disabled = false;
+                    btn.innerHTML = '<span id="btnText">Delete</span>';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                const errorDiv = document.getElementById('deleteError');
+                let errorHtml = '<span class="error-icon">⚠️</span><strong>Unexpected Error</strong><p>An unexpected error occurred while deleting the security control. Please try again.</p>';
+                errorHtml += '<p style="margin-top: 10px; font-size: 13px; font-style: italic; color: #555;">If the problem persists, please contact your system administrator.</p>';
+                errorDiv.innerHTML = errorHtml;
+                errorDiv.classList.add('show');
+                btn.disabled = false;
+                btn.innerHTML = '<span id="btnText">Delete</span>';
+            });
+    }
+
+    function showAlert(message, type) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert ' + (type === 'error' ? 'alert-error' : 'alert-success');
+        alertDiv.innerHTML = '<span class="alert-close" onclick="this.parentElement.style.display=\'none\';">&times;</span>' +
+            '<strong>' + (type === 'error' ? '⚠️ Error:' : '✓ Success:') + '</strong> ' + message;
+        const container = document.querySelector('.container');
+        const firstElement = container.querySelector('h1');
+        container.insertBefore(alertDiv, firstElement.nextElementSibling);
+        
+        setTimeout(() => {
+            alertDiv.style.display = 'none';
+        }, 5000);
+    }
+
+    // Close modals when clicking outside
+    window.addEventListener('click', function(event) {
+        const deleteModal = document.getElementById('deleteModal');
+        const importModal = document.getElementById('csvImportModal');
+        const matchModal = document.getElementById('matchDetailModal');
+        if (event.target === deleteModal) {
+            closeDeleteModal();
+        }
+        if (event.target === importModal) {
+            importModal.style.display = 'none';
+            resetForm();
+        }
+        if (event.target === matchModal) {
+            matchModal.style.display = 'none';
+        }
+    });
+
+    // Close modals on Escape key
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            const deleteModal = document.getElementById('deleteModal');
+            const importModal = document.getElementById('csvImportModal');
+            const matchModal = document.getElementById('matchDetailModal');
+            if (deleteModal.style.display === 'block') {
+                closeDeleteModal();
+            }
+            if (importModal.style.display === 'block') {
+                importModal.style.display = 'none';
+                resetForm();
+            }
+            if (matchModal.style.display === 'block') {
+                matchModal.style.display = 'none';
+            }
+        }
+    });
+
+    // Auto-hide success messages after 5 seconds
+    window.addEventListener('load', function() {
+        const msgAlert = document.getElementById('messageAlert');
+        if (msgAlert && msgAlert.className.includes('alert-success')) {
+            setTimeout(() => {
+                msgAlert.style.display = 'none';
+            }, 5000);
+        }
+    });
+
     // Global variables
     let csvData = [];
     let availableCatalogs = [];
@@ -870,9 +1336,10 @@ network segmentation","SC-7","Network"</div>
     // Wizard Navigation
     function goToStep(stepNum) {
         // Hide all steps
-        document.querySelectorAll('.step-container').forEach(step => {
-            step.classList.remove('active');
-        });
+        const steps = document.querySelectorAll('.step-container');
+        for (let i = 0; i < steps.length; i++) {
+            steps[i].classList.remove('active');
+        }
         // Show current step
         const step = document.getElementById('step' + stepNum);
         if (step) {
@@ -892,14 +1359,6 @@ network segmentation","SC-7","Network"</div>
     closeBtn.onclick = function() {
         modal.style.display = 'none';
         resetForm();
-    }
-
-    // Close modal when clicking outside of it
-    window.onclick = function(event) {
-        if (event.target === modal) {
-            modal.style.display = 'none';
-            resetForm();
-        }
     }
 
     // Close modal on Escape key
@@ -1167,7 +1626,8 @@ network segmentation","SC-7","Network"</div>
                     suggestedMatch: null,
                     analyzed: false,
                     translatedName: null,
-                    translatedDetail: null
+                    translatedDetail: null,
+                    translatedDomain: null
                 };
                 
                 if (!rowData.name) {
@@ -1287,13 +1747,14 @@ network segmentation","SC-7","Network"</div>
             
             const displayName = row.translatedName || row.name;
             const displayDetail = row.translatedDetail || row.detail;
+            const displayDomain = row.translatedDomain || row.domain;
             
             tr.innerHTML = `
                 <td>${row.rowNumber}</td>
                 <td title="${displayName}">${displayName.substring(0, 30)}${displayName.length > 30 ? '...' : ''}</td>
                 <td title="${displayDetail}">${displayDetail.substring(0, 35)}${displayDetail.length > 35 ? '...' : ''}</td>
                 <td>${row.reference}</td>
-                <td>${row.domain}</td>
+                <td>${displayDomain}</td>
                 <td>${statusHtml}</td>
             `;
             
@@ -1333,7 +1794,8 @@ network segmentation","SC-7","Network"</div>
             const requestBody = {
                 language: task.lang,
                 name: task.row.name || '',
-                detail: task.row.detail || ''
+                detail: task.row.detail || '',
+                domain: task.row.domain || ''
             };
             
             const headers = {
@@ -1362,6 +1824,7 @@ network segmentation","SC-7","Network"</div>
                     if (result.success && result.translated) {
                         task.row.translatedName = result.translated.name || task.row.name;
                         task.row.translatedDetail = result.translated.detail || task.row.detail;
+                        task.row.translatedDomain = result.translated.domain || task.row.domain;
                     }
                     
                     const progressBar = document.getElementById('translationProgressBar');
@@ -1484,7 +1947,12 @@ network segmentation","SC-7","Network"</div>
             if (analysisResults[row.rowNumber]) {
                 const analysis = analysisResults[row.rowNumber];
                 row.matchingRate = analysis.matchingRate;
-                row.action = analysis.recommendedAction;
+                // Set default action based on match: merge for every match, new for no match
+                if (analysis.matchingRate !== 'none' && analysis.suggestedMergeControl) {
+                    row.action = 'merge:' + analysis.suggestedMergeControl.existingControlId;
+                } else {
+                    row.action = 'new';
+                }
                 if (analysis.suggestedMergeControl) {
                     row.suggestedMatch = analysis.suggestedMergeControl;
                 }
@@ -1502,6 +1970,7 @@ network segmentation","SC-7","Network"</div>
             
             let displayName = row.translatedName || row.name;
             let displayDetail = row.translatedDetail || row.detail;
+            let displayDomain = row.translatedDomain || row.domain;
             
             let statusHtml;
             if (analysisInProgress[row.rowNumber]) {
@@ -1517,18 +1986,11 @@ network segmentation","SC-7","Network"</div>
             else if (row.analyzed) matchBadge = '<span class="match-badge-none">None</span>';
             else matchBadge = '<span style="color: #999; font-size: 11px;">Pending...</span>';
             
-            // Build match cell with tooltip if there's a match
+            // Build match cell with popup trigger - match badges are now clickable buttons
             let matchCell = '';
             if (row.suggestedMatch && row.matchingRate !== 'none') {
-                const tooltipContent = buildMatchTooltip(row.suggestedMatch);
-                matchCell = `
-                    <div class="match-tooltip" style="display: inline-block; position: relative;">
-                        ${matchBadge}
-                        <div class="tooltip-content" style="display: none; visibility: hidden; opacity: 0;">
-                            ${tooltipContent}
-                        </div>
-                    </div>
-                `;
+                const rowNum = row.rowNumber;
+                matchCell = '<span style="cursor: pointer;" onclick="openMatchDetailModal(' + rowNum + ')">' + matchBadge + '</span>';
             } else {
                 matchCell = matchBadge;
             }
@@ -1536,6 +1998,7 @@ network segmentation","SC-7","Network"</div>
             let actionSelect = '<select class="action-select action-selector" data-row="' + row.rowNumber + '">';
             if (row.matchingRate !== 'none' && row.suggestedMatch) {
                 const mergeValue = 'merge:' + row.suggestedMatch.existingControlId;
+                // Default to 'merge' when there's a match
                 actionSelect += '<option value="' + mergeValue + '" selected>Merge</option>';
                 actionSelect += '<option value="new">Create New</option>';
                 actionSelect += '<option value="skip">Skip</option>';
@@ -1550,35 +2013,31 @@ network segmentation","SC-7","Network"</div>
                 <td title="${displayName}">${displayName.substring(0, 30)}${displayName.length > 30 ? '...' : ''}</td>
                 <td title="${displayDetail}">${displayDetail.substring(0, 35)}${displayDetail.length > 35 ? '...' : ''}</td>
                 <td>${row.reference}</td>
-                <td>${row.domain}</td>
+                <td>${displayDomain}</td>
                 <td>${matchCell}</td>
                 <td>${actionSelect}</td>
                 <td>${statusHtml}</td>
             `;
             
             analysisResultsTableBody.appendChild(tr);
-            
-            // Attach tooltip event listeners with fixed positioning
-            const matchTooltips = tr.querySelectorAll('.match-tooltip');
-            matchTooltips.forEach(tooltip => {
-                const tooltipContent = tooltip.querySelector('.tooltip-content');
-                if (tooltipContent) {
-                    tooltip.addEventListener('mouseenter', function() {
-                        tooltipContent.style.display = 'block';
-                        tooltipContent.style.visibility = 'visible';
-                        tooltipContent.style.opacity = '1';
-                    });
-                    tooltip.addEventListener('mouseleave', function() {
-                        tooltipContent.style.display = 'none';
-                        tooltipContent.style.visibility = 'hidden';
-                        tooltipContent.style.opacity = '0';
-                    });
-                }
-            });
         }
         
         const selectors = document.querySelectorAll('.action-selector');
         selectors.forEach(sel => {
+            const rowNumber = parseInt(sel.dataset.row);
+            // Find the corresponding row and sync the initial value
+            for (let j = 0; j < csvData.length; j++) {
+                if (csvData[j].rowNumber === rowNumber) {
+                    // Set the dropdown value to match the current action in csvData
+                    sel.value = csvData[j].action;
+                    // If no match found, ensure 'new' is selected
+                    if (csvData[j].matchingRate === 'none' && csvData[j].action === 'new') {
+                        sel.value = 'new';
+                    }
+                    break;
+                }
+            }
+            
             sel.addEventListener('change', function() {
                 const rowNumber = parseInt(this.dataset.row);
                 for (let j = 0; j < csvData.length; j++) {
@@ -1594,53 +2053,108 @@ network segmentation","SC-7","Network"</div>
         });
     }
     
-    function buildMatchTooltip(suggestedMatch) {
-        if (!suggestedMatch) {
-            return '<p style="color: #bdc3c7;">No match information available</p>';
-        }
-        
-        let tooltipHtml = '<div style="font-size: 12px;">';
-        tooltipHtml += '<p style="margin: 0 0 8px 0; font-weight: bold; color: #3498db; border-bottom: 1px solid #555; padding-bottom: 5px;">📋 Matched Control</p>';
-        
-        if (suggestedMatch.existingControlName) {
-            tooltipHtml += '<div class="match-info">';
-            tooltipHtml += '<div class="match-info-label">Name:</div>';
-            tooltipHtml += '<div class="match-info-value">' + escapeHtml(suggestedMatch.existingControlName) + '</div>';
-            tooltipHtml += '</div>';
-        }
-        
-        if (suggestedMatch.existingControlDetail) {
-            tooltipHtml += '<div class="match-info">';
-            tooltipHtml += '<div class="match-info-label">Detail:</div>';
-            tooltipHtml += '<div class="match-info-value">' + escapeHtml(suggestedMatch.existingControlDetail) + '</div>';
-            tooltipHtml += '</div>';
-        }
-        
-        if (suggestedMatch.matchPercentage !== undefined) {
-            tooltipHtml += '<div class="match-info">';
-            tooltipHtml += '<div class="match-info-label">Match Confidence:</div>';
-            tooltipHtml += '<div class="match-info-value">' + Math.round(suggestedMatch.matchPercentage) + '%</div>';
-            tooltipHtml += '</div>';
-        }
-        
-        if (suggestedMatch.existingControlId) {
-            tooltipHtml += '<div class="match-info" style="border-left-color: #95a5a6;">';
-            tooltipHtml += '<div class="match-info-label">Control ID:</div>';
-            tooltipHtml += '<div class="match-info-value">#' + suggestedMatch.existingControlId + '</div>';
-            tooltipHtml += '</div>';
-        }
-        
-        tooltipHtml += '<p style="margin: 8px 0 0 0; font-size: 10px; color: #95a5a6; font-style: italic;">💡 Select "Merge" to link with this control</p>';
-        tooltipHtml += '</div>';
-        
-        return tooltipHtml;
-    }
-    
     function escapeHtml(text) {
         if (!text) return '';
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+    
+    /**
+     * Open modal popup showing matched control details
+     * Triggered by clicking on the match badge (high/medium/low)
+     */
+    function openMatchDetailModal(rowNumber) {
+        // Find the row data
+        let rowData = null;
+        for (let i = 0; i < csvData.length; i++) {
+            if (csvData[i].rowNumber === rowNumber) {
+                rowData = csvData[i];
+                break;
+            }
+        }
+        
+        if (!rowData || !rowData.suggestedMatch) {
+            console.error('No match data found for row ' + rowNumber);
+            return;
+        }
+        
+        const match = rowData.suggestedMatch;
+        const analysisResult = analysisResults[rowNumber];
+        
+        // Build detailed match information
+        let detailHtml = '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;\">';
+        
+        // Left column: Imported Control
+        detailHtml += '<div>';
+        detailHtml += '<h4 style="color: #007bff; border-bottom: 2px solid #007bff; padding-bottom: 10px; margin-bottom: 15px;">📥 Imported Control</h4>';
+        detailHtml += '<div class="match-info" style="margin: 10px 0;">';
+        detailHtml += '<div class="match-info-label">Name:</div>';
+        const importedName = rowData.translatedName || rowData.name;
+        detailHtml += '<div class="match-info-value" style="font-weight: 500; color: #ecf0f1;">' + escapeHtml(importedName) + '</div>';
+        detailHtml += '</div>';
+        
+        if (rowData.translatedDetail || rowData.detail) {
+            detailHtml += '<div class="match-info" style="margin: 10px 0;">';
+            detailHtml += '<div class="match-info-label">Detail:</div>';
+            const importedDetail = rowData.translatedDetail || rowData.detail;
+            detailHtml += '<div class="match-info-value" style="word-break: break-word;">' + escapeHtml(importedDetail) + '</div>';
+            detailHtml += '</div>';
+        }
+        
+        detailHtml += '<div class="match-info" style="margin: 10px 0;">';
+        detailHtml += '<div class="match-info-label">Domain:</div>';
+        const importedDomain = rowData.translatedDomain || rowData.domain;
+        detailHtml += '<div class="match-info-value">' + escapeHtml(importedDomain) + '</div>';
+        detailHtml += '</div>';
+        detailHtml += '</div>';
+        
+        // Right column: Matched Control
+        detailHtml += '<div>';
+        detailHtml += '<h4 style="color: #28a745; border-bottom: 2px solid #28a745; padding-bottom: 10px; margin-bottom: 15px;">🎯 Matched Existing Control</h4>';
+        detailHtml += '<div class="match-info" style="margin: 10px 0;">';
+        detailHtml += '<div class="match-info-label">Name:</div>';
+        detailHtml += '<div class="match-info-value" style="font-weight: 500; color: #ecf0f1;">' + escapeHtml(match.existingControlName) + '</div>';
+        detailHtml += '</div>';
+        
+        if (match.existingControlDetail) {
+            detailHtml += '<div class="match-info" style="margin: 10px 0;">';
+            detailHtml += '<div class="match-info-label">Detail:</div>';
+            detailHtml += '<div class="match-info-value" style="word-break: break-word;">' + escapeHtml(match.existingControlDetail) + '</div>';
+            detailHtml += '</div>';
+        }
+        
+        detailHtml += '<div class="match-info" style="margin: 10px 0;">';
+        detailHtml += '<div class="match-info-label">Control ID:</div>';
+        detailHtml += '<div class="match-info-value">#' + match.existingControlId + '</div>';
+        detailHtml += '</div>';
+        
+        // Add match confidence/analysis info
+        if (analysisResult && analysisResult.matchingRate) {
+            detailHtml += '<div class="match-info" style="margin: 10px 0;">';
+            detailHtml += '<div class="match-info-label">Match Level:</div>';
+            let matchBadgeClass = 'match-badge-' + analysisResult.matchingRate;
+            detailHtml += '<div class="match-info-value"><span class="' + matchBadgeClass + '">' + analysisResult.matchingRate.toUpperCase() + '</span></div>';
+            detailHtml += '</div>';
+        }
+        
+        detailHtml += '</div>';
+        detailHtml += '</div>';
+        
+        // Add AI Analysis if available
+        if (analysisResult && analysisResult.aiAnalysis) {
+            detailHtml += '<div style="margin-top: 20px; padding: 15px; background-color: #e3f2fd; border-left: 4px solid #2196F3; border-radius: 4px;">';
+            detailHtml += '<h4 style="color: #1976d2; margin-top: 0;">🤖 AI Analysis</h4>';
+            detailHtml += '<div style="color: #333; white-space: pre-wrap; font-size: 12px;">' + escapeHtml(analysisResult.aiAnalysis) + '</div>';
+            detailHtml += '</div>';
+        }
+        
+        document.getElementById('matchDetailContent').innerHTML = detailHtml;
+        document.getElementById('matchDetailModal').style.display = 'block';
+    }
+    
+    function closeMatchDetailModal() {
+        document.getElementById('matchDetailModal').style.display = 'none';
     }
 
     function updateStep4Summary() {
@@ -1867,13 +2381,17 @@ network segmentation","SC-7","Network"</div>
         csvFile.value = '';
         
         // Reset all steps to hidden except step 1
-        document.querySelectorAll('.step-container').forEach(step => {
-            step.classList.remove('active');
-        });
+        const steps = document.querySelectorAll('.step-container');
+        for (let i = 0; i < steps.length; i++) {
+            steps[i].classList.remove('active');
+        }
         document.getElementById('step1').classList.add('active');
         
         // Reset form fields
-        document.querySelectorAll('input[name="languages"]').forEach(cb => cb.checked = false);
+        const languageCheckboxes = document.querySelectorAll('input[name="languages"]');
+        for (let i = 0; i < languageCheckboxes.length; i++) {
+            languageCheckboxes[i].checked = false;
+        }
         document.getElementById('noCatalog').checked = true;
         document.getElementById('catalogSelect').value = '';
         document.getElementById('catalogName').value = '';
@@ -1883,6 +2401,12 @@ network segmentation","SC-7","Network"</div>
         document.getElementById('analysisResultsSection').style.display = 'none';
         document.getElementById('previewTableSection').style.display = 'block';
         document.getElementById('previewButtonGroup').style.display = 'flex';
+        
+        // Close match modal if open
+        const matchModal = document.getElementById('matchDetailModal');
+        if (matchModal) {
+            matchModal.style.display = 'none';
+        }
     }
 </script>
 </body>

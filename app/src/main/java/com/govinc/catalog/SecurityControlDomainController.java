@@ -31,9 +31,10 @@ public class SecurityControlDomainController {
     }
 
     @PostMapping("/delete")
+    @ResponseBody
     public String deleteDomain(@RequestParam Long id) {
         service.deleteById(id);
-        return "redirect:/security-control-domain/list";
+        return "success";
     }
 
     @GetMapping("/create")
