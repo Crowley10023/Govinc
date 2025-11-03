@@ -19,6 +19,58 @@ public class SecurityControlTranslationRestController {
     private OpenAIUtil openAIUtil;
     
     /**
+     * Detect the language of security control content
+     */
+    @PostMapping("/detect-language")
+    public ResponseEntity<Map<String, Object>> detectLanguage(
+            @RequestBody LanguageDetectionRequest request) {
+        
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            System.out.println("\n========================================");
+            System.out.println("[DETECT-LANGUAGE] Detection request received");
+            System.out.println("[DETECT-LANGUAGE] Content length: " + (request.getContent() != null ? request.getContent().length() : 0));
+            System.out.println("========================================");
+            
+            if (request.getContent() == null || request.getContent().isEmpty()) {
+                response.put("success", false);
+                response.put("error", "Content is required for language detection");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // Build language detection prompt
+            String prompt = buildLanguageDetectionPrompt(request.getContent());
+            
+            System.out.println("[DETECT-LANGUAGE] Calling AI for language detection...");
+            String aiResponse = openAIUtil.askAI(prompt);
+            System.out.println("[DETECT-LANGUAGE] AI Response received, length: " + aiResponse.length());
+            
+            // Parse AI response
+            Map<String, Object> detectionResult = parseLanguageDetectionResponse(aiResponse);
+            
+            response.put("success", true);
+            response.putAll(detectionResult);
+            
+            System.out.println("[DETECT-LANGUAGE] Detected language: " + detectionResult.get("detectedLanguage"));
+            System.out.println("[DETECT-LANGUAGE] Confidence: " + detectionResult.get("confidence"));
+            System.out.println("========================================\n");
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            System.err.println("\n========================================");
+            System.err.println("[DETECT-LANGUAGE ERROR] Detection failed: " + e.getMessage());
+            System.err.println("========================================");
+            e.printStackTrace();
+            
+            response.put("success", false);
+            response.put("error", "Language detection failed: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+    
+    /**
      * Translate security control content to specified language using AI
      */
     @PostMapping("/translate")
@@ -178,6 +230,72 @@ public class SecurityControlTranslationRestController {
     }
     
     /**
+     * Build language detection prompt for AI
+     */
+    private String buildLanguageDetectionPrompt(String content) {
+        StringBuilder prompt = new StringBuilder();
+        prompt.append("Detect the primary language of the following text.\n");
+        prompt.append("Respond ONLY with a valid JSON object containing 'detectedLanguage' (language code like 'en', 'de', 'fr'), ");
+        prompt.append("'languageName' (full name like 'English'), and 'confidence' (0.0 to 1.0) keys.\n");
+        prompt.append("Do not include markdown or any other text.\n\n");
+        
+        prompt.append("Text to analyze:\n");
+        prompt.append(content).append("\n\n");
+        
+        prompt.append("Return format (valid JSON only):\n");
+        prompt.append("{\"detectedLanguage\": \"en\", \"languageName\": \"English\", \"confidence\": 0.95}\n\n");
+        prompt.append("Important: Return ONLY the JSON object, no explanations or markdown code blocks.");
+        
+        return prompt.toString();
+    }
+    
+    /**
+     * Parse AI language detection response
+     */
+    private Map<String, Object> parseLanguageDetectionResponse(String response) throws JSONException {
+        Map<String, Object> result = new HashMap<>();
+        
+        try {
+            // Try to parse as JSON directly
+            JSONObject json = new JSONObject(response);
+            result.put("detectedLanguage", json.optString("detectedLanguage", "unknown"));
+            result.put("languageName", json.optString("languageName", "Unknown"));
+            result.put("confidence", json.optDouble("confidence", 0.0));
+        } catch (JSONException e1) {
+            // Try to extract JSON from response (in case AI wrapped it in markdown)
+            String json = response;
+            
+            // Remove markdown code blocks if present
+            if (json.contains("```json")) {
+                json = json.substring(json.indexOf("```json") + 7);
+                if (json.contains("```")) {
+                    json = json.substring(0, json.indexOf("```"));
+                }
+            } else if (json.contains("```")) {
+                json = json.substring(json.indexOf("```") + 3);
+                if (json.contains("```")) {
+                    json = json.substring(0, json.indexOf("```"));
+                }
+            }
+            
+            json = json.trim();
+            
+            // Try again with cleaned JSON
+            try {
+                JSONObject jsonObj = new JSONObject(json);
+                result.put("detectedLanguage", jsonObj.optString("detectedLanguage", "unknown"));
+                result.put("languageName", jsonObj.optString("languageName", "Unknown"));
+                result.put("confidence", jsonObj.optDouble("confidence", 0.0));
+            } catch (JSONException e2) {
+                System.err.println("[DETECT-LANGUAGE] Failed to parse AI response as JSON: " + response);
+                throw new JSONException("Invalid language detection response format: " + e2.getMessage());
+            }
+        }
+        
+        return result;
+    }
+    
+    /**
      * Translation request DTO
      */
     public static class TranslationRequest {
@@ -208,6 +326,31 @@ public class SecurityControlTranslationRestController {
         
         public void setDetail(String detail) {
             this.detail = detail;
+        }
+    }
+    
+    /**
+     * Language detection request DTO
+     */
+    public static class LanguageDetectionRequest {
+        private String content;
+        private String method;
+        
+        // Getters and Setters
+        public String getContent() {
+            return content;
+        }
+        
+        public void setContent(String content) {
+            this.content = content;
+        }
+        
+        public String getMethod() {
+            return method;
+        }
+        
+        public void setMethod(String method) {
+            this.method = method;
         }
     }
 }

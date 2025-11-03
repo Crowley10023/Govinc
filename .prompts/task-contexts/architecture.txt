@@ -1,0 +1,6 @@
+this app is for doing security assessments along security controls and security catalogs. the base technology is spring boot with thymeleaf for frontend, mixed with javascript api 
+call when responsive ui is needed.
+Javascript always should go into a separate .js file. CSS always in the sentral CSS.
+There is a security context.
+Be sure to split html templates, java classes before the grow too big. approx 15-20 methods are a good limit.
+create helper classes as needed.

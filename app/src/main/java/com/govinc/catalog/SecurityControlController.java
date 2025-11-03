@@ -10,6 +10,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 @Controller
 @RequestMapping("/security-control")
@@ -141,20 +142,29 @@ public class SecurityControlController {
             try (BufferedReader br = new BufferedReader(new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
                 String line;
                 boolean isHeader = true;
-                int lineNumber = 0;
+                int rowNumber = 0;
                 
-                while ((line = br.readLine()) != null) {
-                    lineNumber++;
+                // Parse the entire CSV file properly (handling multiline quoted fields)
+                String csvContent = readAllContent(br);
+                List<String[]> allRows = parseCSVContent(csvContent);
+                System.out.println("[IMPORT] Total rows parsed: " + allRows.size());
+                
+                for (int rowIdx = 0; rowIdx < allRows.size(); rowIdx++) {
                     if (isHeader) {
                         isHeader = false; // skip CSV header
+                        System.out.println("[IMPORT] Skipping header row");
                         continue;
                     }
                     
+                    rowNumber = rowIdx; // Data row number (after header)
+                    
                     try {
-                        String[] columns = parseCSVLine(line);
+                        String[] columns = allRows.get(rowIdx);
+                        System.out.println("[IMPORT] Processing row " + rowNumber + ": " + columns.length + " columns");
+                        
                         if (columns.length < 4) {
                             errorCount++;
-                            System.out.println("[IMPORT] Row " + lineNumber + ": Skipped (insufficient columns)");
+                            System.out.println("[IMPORT] Row " + rowNumber + ": Skipped (insufficient columns)");
                             continue;
                         }
                         
@@ -165,7 +175,7 @@ public class SecurityControlController {
                         
                         if (name.isEmpty() || domainName.isEmpty()) {
                             errorCount++;
-                            System.out.println("[IMPORT] Row " + lineNumber + ": Skipped (missing required fields)");
+                            System.out.println("[IMPORT] Row " + rowNumber + ": Skipped (missing required fields)");
                             continue; // must have required fields
                         }
                         
@@ -188,7 +198,7 @@ public class SecurityControlController {
                         // Check if this control should be skipped
                         if ("skip".equals(mergeAction)) {
                             skipCount++;
-                            System.out.println("[IMPORT] Row " + lineNumber + ": Skipped (user action) - " + name);
+                            System.out.println("[IMPORT] Row " + rowNumber + ": Skipped (user action) - " + name);
                             continue;
                         }
                         
@@ -210,7 +220,7 @@ public class SecurityControlController {
                                 java.util.Optional<SecurityControl> existingOpt = service.findById(existingControlId);
                                 if (existingOpt.isPresent()) {
                                     sc = existingOpt.get();
-                                    System.out.println("[IMPORT] Row " + lineNumber + ": Merging with existing control ID " + existingControlId);
+                                    System.out.println("[IMPORT] Row " + rowNumber + ": Merging with existing control ID " + existingControlId);
                                     // Update with imported data if empty or merge information
                                     if (sc.getDetail() == null || sc.getDetail().isEmpty()) {
                                         sc.setDetail(description);
@@ -221,7 +231,7 @@ public class SecurityControlController {
                                     sc = service.save(sc);
                                 } else {
                                     // Merge target not found, create new
-                                    System.out.println("[IMPORT] Row " + lineNumber + ": Merge target not found, creating new");
+                                    System.out.println("[IMPORT] Row " + rowNumber + ": Merge target not found, creating new");
                                     sc = new SecurityControl();
                                     sc.setName(name);
                                     sc.setDetail(description);
@@ -231,7 +241,7 @@ public class SecurityControlController {
                                 }
                             } catch (Exception mergeEx) {
                                 // If merge fails, create new
-                                System.err.println("[IMPORT] Row " + lineNumber + ": Merge failed, creating new control");
+                                System.err.println("[IMPORT] Row " + rowNumber + ": Merge failed, creating new control");
                                 sc = new SecurityControl();
                                 sc.setName(name);
                                 sc.setDetail(description);
@@ -241,7 +251,7 @@ public class SecurityControlController {
                             }
                         } else {
                             // Create new control
-                            System.out.println("[IMPORT] Row " + lineNumber + ": Creating new control: " + name);
+                            System.out.println("[IMPORT] Row " + rowNumber + ": Creating new control: " + name);
                             sc = new SecurityControl();
                             sc.setName(name);
                             sc.setDetail(description);
@@ -256,7 +266,7 @@ public class SecurityControlController {
                     } catch (Exception rowEx) {
                         errorCount++;
                         // Log the error but continue processing other rows
-                        System.err.println("[IMPORT] Error processing row " + lineNumber + ": " + rowEx.getMessage());
+                        System.err.println("[IMPORT] Error processing row " + rowNumber + ": " + rowEx.getMessage());
                         rowEx.printStackTrace();
                     }
                 }
@@ -355,7 +365,86 @@ public class SecurityControlController {
         return null;
     }
     
-    // Helper method to parse CSV line with proper quote handling
+    // Helper method to read all content from BufferedReader
+    private String readAllContent(BufferedReader br) throws java.io.IOException {
+        StringBuilder content = new StringBuilder();
+        String line;
+        while ((line = br.readLine()) != null) {
+            content.append(line).append("\n");
+        }
+        return content.toString();
+    }
+    
+    // Helper method to parse CSV content with proper quote handling (RFC 4180)
+    // Handles quoted fields that can contain newlines, commas, and escaped quotes
+    private java.util.List<String[]> parseCSVContent(String csvContent) {
+        java.util.List<String[]> rows = new java.util.ArrayList<>();
+        java.util.List<String> fields = new java.util.ArrayList<>();
+        StringBuilder currentField = new StringBuilder();
+        boolean inQuotes = false;
+        
+        int i = 0;
+        while (i < csvContent.length()) {
+            char c = csvContent.charAt(i);
+            
+            if (c == '"') {
+                if (inQuotes && i + 1 < csvContent.length() && csvContent.charAt(i + 1) == '"') {
+                    // Escaped quote ("")
+                    currentField.append('"');
+                    i += 2;
+                    continue;
+                } else {
+                    // Toggle quote state
+                    inQuotes = !inQuotes;
+                    i++;
+                    continue;
+                }
+            }
+            
+            if (c == ',' && !inQuotes) {
+                // End of field
+                fields.add(currentField.toString().trim());
+                currentField = new StringBuilder();
+                i++;
+                continue;
+            }
+            
+            if ((c == '\n' || c == '\r') && !inQuotes) {
+                // End of row
+                if (!currentField.toString().isEmpty() || fields.size() > 0) {
+                    fields.add(currentField.toString().trim());
+                    if (fields.size() > 0 && fields.stream().anyMatch(f -> !f.isEmpty())) {
+                        rows.add(fields.toArray(new String[0]));
+                    }
+                    fields = new java.util.ArrayList<>();
+                    currentField = new StringBuilder();
+                }
+                // Skip both \r and \n for Windows line endings
+                if (c == '\r' && i + 1 < csvContent.length() && csvContent.charAt(i + 1) == '\n') {
+                    i += 2;
+                } else {
+                    i++;
+                }
+                continue;
+            }
+            
+            currentField.append(c);
+            i++;
+        }
+        
+        // Add last field and row if content doesn't end with newline
+        if (!currentField.toString().isEmpty() || fields.size() > 0) {
+            fields.add(currentField.toString().trim());
+            if (fields.size() > 0 && fields.stream().anyMatch(f -> !f.isEmpty())) {
+                rows.add(fields.toArray(new String[0]));
+            }
+        }
+        
+        System.out.println("[PARSE] CSV parsing complete: " + rows.size() + " rows parsed");
+        return rows;
+    }
+    
+    // Helper method to parse CSV line with proper quote handling (kept for reference/legacy)
     private String[] parseCSVLine(String line) {
         java.util.List<String> result = new java.util.ArrayList<>();
         StringBuilder current = new StringBuilder();

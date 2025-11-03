@@ -276,6 +276,11 @@
             border-radius: 8px;
             margin: 15px 0;
             overflow: hidden;
+            display: none;
+        }
+        
+        .step-container.active {
+            display: block;
         }
         
         .step-header {
@@ -414,26 +419,62 @@
         
         .tooltip-content {
             visibility: hidden;
-            width: 250px;
+            width: 350px;
             background-color: #333;
             color: #fff;
             text-align: left;
             border-radius: 6px;
-            padding: 8px;
+            padding: 12px;
             position: absolute;
-            z-index: 1;
+            z-index: 1001;
             bottom: 125%;
             left: 50%;
-            margin-left: -125px;
+            margin-left: -175px;
             opacity: 0;
             transition: opacity 0.3s;
-            font-size: 11px;
+            font-size: 12px;
             font-weight: normal;
+            white-space: normal;
+            word-wrap: break-word;
+            max-height: 300px;
+            overflow-y: auto;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
         }
         
         .tooltip:hover .tooltip-content {
             visibility: visible;
             opacity: 1;
+        }
+
+        .match-tooltip {
+            display: inline-block;
+            cursor: help;
+            position: relative;
+        }
+        
+        .match-tooltip .tooltip-content {
+            position: fixed !important;
+            z-index: 2000 !important;
+        }
+        
+        .match-info {
+            background-color: #2c3e50;
+            border-left: 3px solid #3498db;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 3px;
+        }
+        
+        .match-info-label {
+            font-weight: bold;
+            color: #ecf0f1;
+            margin-bottom: 3px;
+        }
+        
+        .match-info-value {
+            color: #bdc3c7;
+            font-size: 11px;
+            word-break: break-word;
         }
 
         .empty-message {
@@ -477,6 +518,21 @@
             margin: 0;
             cursor: pointer;
         }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .button-secondary {
+            background-color: #6c757d;
+        }
+        
+        .button-secondary:hover {
+            background-color: #5a6268;
+        }
     </style>
 </head>
 <body>
@@ -491,18 +547,18 @@
         <button id="importBtn" class="import-button">Import Security Controls from CSV</button>
     </div>
 
-    <!-- CSV Import Modal -->
+    <!-- CSV Import Modal with 5-Step Wizard -->
     <div id="csvImportModal" class="modal">
         <div class="modal-content">
             <span class="close">&times;</span>
-            <h2>Import Security Controls from CSV</h2>
+            <h2>Import Security Controls from CSV - Wizard</h2>
             
-            <!-- Step 1: Instructions and File Upload -->
-            <div class="step-container">
+            <!-- Step 1: File Selection -->
+            <div class="step-container active" id="step1">
                 <div class="step-header">
-                    <span class="step-number">1</span>CSV Format Instructions & File Upload & Translation
+                    <span class="step-number">1</span>Choose File to Import
                 </div>
-                <div class="step-content" id="step1-content">
+                <div class="step-content">
                     <div class="csv-instructions">
                         <h4>📋 CSV Format Requirements</h4>
                         <p>Please ensure your CSV file follows the exact format specified below:</p>
@@ -545,17 +601,32 @@ network segmentation","SC-7","Network"</div>
                     <div class="upload-section">
                         <p><strong>Select your CSV file:</strong></p>
                         <input type="file" id="csvFile" class="file-input" accept=".csv" required />
-                        <br/>
                     </div>
 
-                    <button type="button" id="previewBtn" class="import-button" disabled>Preview CSV Data</button>
-                    
+                    <div class="button-group">
+                        <button type="button" id="step1NextBtn" class="import-button" disabled>Next: Detect Language</button>
+                        <button type="button" id="cancelBtn" class="import-button button-secondary">Cancel</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2: Language Detection & Translation Offer -->
+            <div class="step-container" id="step2">
+                <div class="step-header">
+                    <span class="step-number">2</span>Language Detection & Translation Offer
+                </div>
+                <div class="step-content">
                     <div class="translation-section">
-                        <h5>🌐 Translation Options (Optional - Apply After Preview)</h5>
-                        <p style="font-size: 12px; color: #666; margin: 5px 0;">After previewing the data, you can optionally translate content to selected languages</p>
-                        <div style="margin: 10px 0;">
-                            <label for="languageCheckbox"><strong>Languages to translate to:</strong></label>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px;">
+                        <h5>🌐 Detect Language & Offer Translation</h5>
+                        <div id="languageDetectionResult" style="background-color: #f0f8ff; padding: 15px; border-radius: 4px; margin: 10px 0;">
+                            <p><strong>Detected CSV Language:</strong> <span id="detectedLanguage" style="font-weight: bold; color: #0066cc;">Detecting...</span></p>
+                            <p id="confidenceText" style="font-size: 12px; color: #666; margin: 5px 0;"></p>
+                        </div>
+                        
+                        <div style="margin: 20px 0;">
+                            <p><strong>Would you like to translate the content to other languages?</strong></p>
+                            <p style="font-size: 12px; color: #666; margin: 5px 0;">Select languages to translate to. If none are selected, content will be used as-is.</p>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
                                 <div class="translation-checkbox">
                                     <input type="checkbox" id="translateDE" name="languages" value="de" />
                                     <label for="translateDE">German (Deutsch)</label>
@@ -566,21 +637,27 @@ network segmentation","SC-7","Network"</div>
                                 </div>
                             </div>
                         </div>
+                        
                         <div id="translationProgress" style="display: none; margin: 15px 0; padding: 10px; background-color: #e3f2fd; border: 1px solid #90caf9; border-radius: 4px;">
-                            <p style="margin: 0; font-size: 12px;"><strong>🔄 Translating content...</strong></p>
+                            <p style="margin: 0; font-size: 12px;"><strong>🔄 Translating content with AI...</strong></p>
                             <div class="progress-bar-container" style="margin-top: 5px;">
                                 <div id="translationProgressBar" class="progress-bar" style="width: 0%;"></div>
                             </div>
                             <p style="margin: 5px 0; font-size: 11px; color: #666;"><span id="translationProgressText">0/0</span> items translated...</p>
                         </div>
                     </div>
+                    
+                    <div class="button-group">
+                        <button type="button" id="step2NextBtn" class="import-button">Next: Preview Data</button>
+                        <button type="button" id="step2BackBtn" class="import-button button-secondary">Back</button>
+                    </div>
                 </div>
             </div>
 
-            <!-- Step 2: Preview with AI Analysis -->
-            <div class="step-container preview-section" id="previewSection">
+            <!-- Step 3: Preview with Applied Translation -->
+            <div class="step-container" id="step3">
                 <div class="step-header">
-                    <span class="step-number">2</span>Preview CSV Data
+                    <span class="step-number">3</span>Review Data with Applied Translation
                 </div>
                 <div class="step-content">
                     <div style="margin-bottom: 15px;">
@@ -589,7 +666,8 @@ network segmentation","SC-7","Network"</div>
                     <div class="error-box" id="previewError" style="display: none;"></div>
                     <div class="warning-box" id="previewWarnings" style="display: none;"></div>
                     
-                    <div style="max-height: 600px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px;">
+                    <!-- Preview Table (shown initially, hidden during analysis) -->
+                    <div id="previewTableSection" style="max-height: 600px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px;">
                         <table class="preview-table" id="previewTable">
                             <thead>
                                 <tr>
@@ -604,18 +682,13 @@ network segmentation","SC-7","Network"</div>
                             <tbody id="previewTableBody">
                             </tbody>
                         </table>
-                        <div id="previewEmpty" class="empty-message" style="display: none;">
-                            ℹ️ Preview table will appear here once CSV is loaded
-                        </div>
                     </div>
                     
-                    <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
-                        <button type="button" id="translateInPlaceBtn" class="import-button" style="background-color: #17a2b8;">
-                            🌐 Translate Content In-Place
-                        </button>
-                        <button type="button" id="startAnalysisBtn" class="import-button" style="background-color: #007bff;">
-                            🤖 Start AI Similarity Analysis
-                        </button>
+                    <!-- Buttons for initial preview state -->
+                    <div id="previewButtonGroup" class="button-group">
+                        <button type="button" id="step3AnalysisBtn" class="import-button" style="background-color: #007bff;">🤖 Perform AI Similarity Check</button>
+                        <button type="button" id="step3SkipBtn" class="import-button button-secondary">Skip Similarity Check</button>
+                        <button type="button" id="step3BackBtn" class="import-button button-secondary">Back</button>
                     </div>
                     
                     <!-- Analysis Progress -->
@@ -627,7 +700,7 @@ network segmentation","SC-7","Network"</div>
                         <p style="font-size: 12px; color: #666;"><span id="progressText">0/0</span> controls analyzed...</p>
                     </div>
                     
-                    <!-- Analysis Results Table -->
+                    <!-- Analysis Results Table (only shown after analysis complete) -->
                     <div id="analysisResultsSection" style="display: none; margin-top: 20px;">
                         <h5>Analysis Results with Merge/New Options</h5>
                         <div style="max-height: 600px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px;">
@@ -639,7 +712,7 @@ network segmentation","SC-7","Network"</div>
                                         <th style="width: 150px;">Detail</th>
                                         <th style="width: 80px;">Reference</th>
                                         <th style="width: 80px;">Domain</th>
-                                        <th style="width: 70px;">Match <span class="tooltip">? <span class="tooltip-content">Similarity level to existing controls. High: Very similar, Medium: Somewhat similar, Low: Slightly similar, None: No match found</span></span></th>
+                                        <th style="width: 100px;">Match <span class="tooltip">? <span class="tooltip-content">Similarity level to existing controls. Hover over match badges to see details about matched controls. High: Very similar, Medium: Somewhat similar, Low: Slightly similar, None: No match found</span></span></th>
                                         <th style="width: 110px;">Action <span class="tooltip">? <span class="tooltip-content">Choose: Merge (combine with existing), New (create new control)</span></span></th>
                                         <th style="width: 70px;">Status</th>
                                     </tr>
@@ -648,17 +721,26 @@ network segmentation","SC-7","Network"</div>
                                 </tbody>
                             </table>
                         </div>
+                        
+                        <!-- Buttons after analysis completes -->
+                        <div id="analysisButtonGroup" class="button-group">
+                            <button type="button" id="step3ContinueBtn" class="import-button" style="background-color: #007bff;">Next: Catalog & Approve</button>
+                            <button type="button" id="step3BackFromAnalysisBtn" class="import-button button-secondary">Back</button>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Step 3b: Original Catalog Options -->
-            <div class="step-container catalog-options" id="catalogSection" style="display: none;">
+            <!-- Step 4: Final Review & Catalog Assignment -->
+            <div class="step-container catalog-options" id="step4">
                 <div class="step-header">
-                    <span class="step-number">4</span>Security Catalog Assignment
+                    <span class="step-number">4</span>Final Review & Catalog Assignment
                 </div>
                 <div class="step-content">
-                    <h4>🔗 Link Security Controls to Catalog</h4>
+                    <h5>📋 Final Import Summary</h5>
+                    <div id="step4Summary"></div>
+
+                    <h4 style="margin-top: 30px;">🔗 Link Security Controls to Catalog</h4>
                     <p>Choose how you want to organize the imported security controls:</p>
                     
                     <div class="radio-group">
@@ -704,17 +786,26 @@ network segmentation","SC-7","Network"</div>
                         <label for="catalogRevision"><strong>Revision:</strong></label>
                         <input type="text" id="catalogRevision" name="catalogRevision" placeholder="Enter revision (e.g., v1.0)" />
                     </div>
+                    
+                    <div class="button-group">
+                        <button type="button" id="step4NextBtn" class="import-button">Next: Confirm & Import</button>
+                        <button type="button" id="step4BackBtn" class="import-button button-secondary">Back</button>
+                    </div>
                 </div>
             </div>
-            
-            <!-- Step 5: Final Import -->
-            <div class="step-container" id="importSection" style="display: none;">
+
+            <!-- Step 5: Approve & Import -->
+            <div class="step-container" id="step5">
                 <div class="step-header">
-                    <span class="step-number">5</span>Import Security Controls
+                    <span class="step-number">5</span>Approve & Import
                 </div>
                 <div class="step-content">
-                    <div id="importSummary"></div>
-                    <button type="button" id="submitImportBtn" class="import-button">Import Security Controls</button>
+                    <h5>✓ Ready to Import</h5>
+                    <div id="step5Summary"></div>
+                    <div class="button-group">
+                        <button type="button" id="submitImportBtn" class="import-button" style="background-color: #28a745;">✓ Confirm & Import</button>
+                        <button type="button" id="step5BackBtn" class="import-button button-secondary">Back</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -757,13 +848,14 @@ network segmentation","SC-7","Network"</div>
     let availableCatalogs = [];
     let analysisResults = {};
     let analysisInProgress = {};
+    let currentStep = 1;
+    let detectedLanguage = null;
     
     // Get modal elements
     const modal = document.getElementById('csvImportModal');
     const importBtn = document.getElementById('importBtn');
     const closeBtn = document.getElementsByClassName('close')[0];
     const csvFile = document.getElementById('csvFile');
-    const previewBtn = document.getElementById('previewBtn');
     const submitImportBtn = document.getElementById('submitImportBtn');
     
     // CSRF Helper Functions
@@ -775,9 +867,24 @@ network segmentation","SC-7","Network"</div>
         return document.querySelector('meta[name="_csrf_header"]')?.getAttribute('content') || 'X-CSRF-TOKEN';
     }
 
+    // Wizard Navigation
+    function goToStep(stepNum) {
+        // Hide all steps
+        document.querySelectorAll('.step-container').forEach(step => {
+            step.classList.remove('active');
+        });
+        // Show current step
+        const step = document.getElementById('step' + stepNum);
+        if (step) {
+            step.classList.add('active');
+        }
+        currentStep = stepNum;
+    }
+
     // Show modal when import button is clicked
     importBtn.onclick = function() {
         modal.style.display = 'block';
+        goToStep(1);
         loadAvailableCatalogs();
     }
 
@@ -786,28 +893,6 @@ network segmentation","SC-7","Network"</div>
         modal.style.display = 'none';
         resetForm();
     }
-
-    // Translate in-place button
-    document.getElementById('translateInPlaceBtn').addEventListener('click', function() {
-        const selectedLanguages = Array.from(document.querySelectorAll('input[name="languages"]:checked'))
-            .map(cb => cb.value);
-        
-        console.log('Translate button clicked. Selected languages:', selectedLanguages);
-        console.log('CSRF Token present:', !!getCsrfToken());
-        
-        if (selectedLanguages.length === 0) {
-            alert('Please select at least one language to translate.');
-            return;
-        }
-        
-        translateInPlace(selectedLanguages);
-    });
-    
-    // Start AI analysis button
-    document.getElementById('startAnalysisBtn').addEventListener('click', function() {
-        console.log('Starting AI similarity analysis');
-        analyzeControlsSimilarity();
-    });
 
     // Close modal when clicking outside of it
     window.onclick = function(event) {
@@ -828,14 +913,15 @@ network segmentation","SC-7","Network"</div>
     // File selection handler
     csvFile.addEventListener('change', function(event) {
         const file = event.target.files[0];
-        previewBtn.disabled = !file;
+        const nextBtn = document.getElementById('step1NextBtn');
+        nextBtn.disabled = !file;
         
         if (file) {
             const fileName = file.name.toLowerCase();
             if (!fileName.endsWith('.csv')) {
                 alert('Please select a CSV file.');
                 event.target.value = '';
-                previewBtn.disabled = true;
+                nextBtn.disabled = true;
                 return;
             }
             
@@ -843,27 +929,139 @@ network segmentation","SC-7","Network"</div>
             if (file.size > maxSize) {
                 alert('File size must be less than 10MB.');
                 event.target.value = '';
-                previewBtn.disabled = true;
+                nextBtn.disabled = true;
                 return;
             }
         }
     });
 
-    // Preview button handler
-    previewBtn.addEventListener('click', function() {
+    // STEP 1 -> STEP 2: File selection to language detection
+    document.getElementById('step1NextBtn').addEventListener('click', function() {
         const file = csvFile.files[0];
         if (!file) return;
 
         const reader = new FileReader();
         reader.onload = function(e) {
             const csvText = e.target.result;
-            parseCsvData(csvText);
+            // Parse CSV data silently
+            if (parseCSVSilent(csvText)) {
+                goToStep(2);
+                detectLanguage();
+            }
         };
         reader.readAsText(file);
     });
 
-    // RFC4180 CSV parser
-    function parseCSVData(csvText) {
+    // STEP 2 -> STEP 3: Language detection to preview
+    document.getElementById('step2NextBtn').addEventListener('click', function() {
+        const selectedLanguages = Array.from(document.querySelectorAll('input[name="languages"]:checked'))
+            .map(cb => cb.value);
+        
+        if (selectedLanguages.length === 0) {
+            // No translation, just proceed to preview
+            displayPreview();
+            goToStep(3);
+        } else {
+            // Perform translation first
+            translateInPlace(selectedLanguages, function() {
+                displayPreview();
+                goToStep(3);
+            });
+        }
+    });
+
+    // STEP 2 Back
+    document.getElementById('step2BackBtn').addEventListener('click', function() {
+        goToStep(1);
+    });
+
+    // STEP 3: Start AI Analysis
+    document.getElementById('step3AnalysisBtn').addEventListener('click', function() {
+        // Hide preview table and initial buttons
+        document.getElementById('previewTableSection').style.display = 'none';
+        document.getElementById('previewButtonGroup').style.display = 'none';
+        
+        // Show progress
+        document.getElementById('analysisProgress').style.display = 'block';
+        
+        analyzeControlsSimilarity();
+    });
+
+    // STEP 3: Skip AI Analysis
+    document.getElementById('step3SkipBtn').addEventListener('click', function() {
+        // Mark all as 'new' action
+        for (let i = 0; i < csvData.length; i++) {
+            if (csvData[i].valid) {
+                csvData[i].action = 'new';
+            }
+        }
+        goToStep(4);
+        updateStep4Summary();
+    });
+
+    // STEP 3 Back
+    document.getElementById('step3BackBtn').addEventListener('click', function() {
+        goToStep(2);
+    });
+    
+    // STEP 3 Continue from Analysis
+    document.getElementById('step3ContinueBtn').addEventListener('click', function() {
+        goToStep(4);
+        updateStep4Summary();
+    });
+    
+    // STEP 3 Back from Analysis
+    document.getElementById('step3BackFromAnalysisBtn').addEventListener('click', function() {
+        // Reset to preview state
+        document.getElementById('previewTableSection').style.display = 'block';
+        document.getElementById('previewButtonGroup').style.display = 'flex';
+        document.getElementById('analysisProgress').style.display = 'none';
+        document.getElementById('analysisResultsSection').style.display = 'none';
+    });
+
+    // STEP 4 -> STEP 5: Catalog selection to final approval
+    document.getElementById('step4NextBtn').addEventListener('click', function() {
+        const catalogOption = document.querySelector('input[name="catalogOption"]:checked').value;
+        
+        if (catalogOption === 'existing') {
+            const selectedCatalog = document.getElementById('catalogSelect').value;
+            if (!selectedCatalog) {
+                alert('Please select a catalog.');
+                return;
+            }
+        }
+        
+        if (catalogOption === 'new') {
+            const catalogName = document.getElementById('catalogName').value;
+            if (!catalogName) {
+                alert('Please enter a catalog name.');
+                return;
+            }
+        }
+        
+        goToStep(5);
+        updateStep5Summary();
+    });
+
+    // STEP 4 Back
+    document.getElementById('step4BackBtn').addEventListener('click', function() {
+        goToStep(3);
+    });
+
+    // STEP 5 Back
+    document.getElementById('step5BackBtn').addEventListener('click', function() {
+        goToStep(4);
+    });
+
+    // Cancel button
+    document.getElementById('cancelBtn').addEventListener('click', function() {
+        modal.style.display = 'none';
+        resetForm();
+    });
+
+    // PARSING AND DISPLAY FUNCTIONS
+
+    function parseCSVRaw(csvText) {
         const rows = [];
         let currentRow = [];
         let currentField = '';
@@ -924,14 +1122,13 @@ network segmentation","SC-7","Network"</div>
         return rows;
     }
 
-    // CSV parsing with validation
-    function parseCsvData(csvText) {
+    function parseCSVSilent(csvText) {
         try {
-            const allRows = parseCSVData(csvText);
+            const allRows = parseCSVRaw(csvText);
             
             if (allRows.length < 2) {
-                showParseError('CSV file must contain at least a header row and one data row.');
-                return;
+                alert('CSV file must contain at least a header row and one data row.');
+                return false;
             }
 
             const headers = allRows[0];
@@ -942,8 +1139,8 @@ network segmentation","SC-7","Network"</div>
             );
             
             if (!headersValid) {
-                showParseError('CSV headers must start with: name,detail,reference,domain');
-                return;
+                alert('CSV headers must start with: name,detail,reference,domain');
+                return false;
             }
 
             csvData = [];
@@ -986,138 +1183,96 @@ network segmentation","SC-7","Network"</div>
             }
             
             if (csvData.length === 0) {
-                showParseError('No valid data rows found in CSV file.');
-                return;
+                alert('No valid data rows found in CSV file.');
+                return false;
             }
 
-            displayPreview();
-            showCatalogOptions();
+            return true;
         } catch (error) {
-            showParseError('Error parsing CSV: ' + error.message);
+            alert('Error parsing CSV: ' + error.message);
+            return false;
         }
     }
-    
-    function showParseError(message) {
-        const previewSection = document.getElementById('previewSection');
+
+    function detectLanguage() {
+        // Send sample content to AI to detect language
+        const sampleContent = csvData.slice(0, 3).map(row => row.name + ' ' + row.detail).join(' ');
+        
+        const requestBody = {
+            content: sampleContent,
+            method: 'detect'
+        };
+        
+        const headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        };
+        
+        const csrfToken = getCsrfToken();
+        if (csrfToken) {
+            headers[getCsrfHeaderName()] = csrfToken;
+        }
+        
+        console.log('Detecting language...');
+        
+        fetch('/api/security-control/detect-language', {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify(requestBody),
+            credentials: 'same-origin'
+        })
+            .then(response => {
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return response.json();
+            })
+            .then(result => {
+                console.log('Language detection result:', result);
+                detectedLanguage = result.detectedLanguage || 'unknown';
+                const confidence = result.confidence ? Math.round(result.confidence * 100) : 'N/A';
+                
+                document.getElementById('detectedLanguage').textContent = 
+                    detectedLanguage.charAt(0).toUpperCase() + detectedLanguage.slice(1);
+                document.getElementById('confidenceText').innerHTML = 
+                    `<strong>Confidence:</strong> ${confidence}%`;
+            })
+            .catch(error => {
+                console.error('Language detection error:', error);
+                document.getElementById('detectedLanguage').textContent = 'Unable to detect';
+                document.getElementById('confidenceText').innerHTML = 
+                    '<span style="color: #dc3545;">Error: Could not detect language</span>';
+            });
+    }
+
+    function displayPreview() {
         const previewStats = document.getElementById('previewStats');
+        const previewWarnings = document.getElementById('previewWarnings');
         const previewError = document.getElementById('previewError');
-        const previewTableBody = document.getElementById('previewTableBody');
-        const previewEmpty = document.getElementById('previewEmpty');
         
-        previewSection.style.display = 'block';
-        previewStats.innerHTML = '<span style="color: #dc3545;">❌ Parse Error</span>';
-        previewError.style.display = 'block';
-        previewError.innerHTML = `<strong>❌ CSV Parse Error:</strong><br>${message}`;
+        previewError.style.display = 'none';
         
-        previewTableBody.innerHTML = '';
-        previewEmpty.style.display = 'block';
+        const validRows = csvData.filter(row => row.valid).length;
+        const invalidRows = csvData.length - validRows;
+        const uniqueDomains = [...new Set(csvData.map(row => row.domain))].filter(d => d).length;
         
-        document.getElementById('catalogSection').style.display = 'none';
-        document.getElementById('importSection').style.display = 'none';
+        previewStats.innerHTML = `
+            <strong>📊 Import Summary:</strong><br>
+            Total rows: ${csvData.length} | 
+            Valid rows: <span style="color: #28a745;">${validRows}</span> | 
+            Invalid rows: <span style="color: #dc3545;">${invalidRows}</span> | 
+            Unique domains: ${uniqueDomains}
+        `;
+        
+        if (invalidRows > 0) {
+            previewWarnings.style.display = 'block';
+            previewWarnings.innerHTML = `<strong>⚠️ Warning:</strong> ${invalidRows} row(s) have validation errors.`;
+        } else {
+            previewWarnings.style.display = 'none';
+        }
+        
+        displayPreviewTable();
     }
 
-    function analyzeControlsSimilarity() {
-        const progressDiv = document.getElementById('analysisProgress');
-        const validControls = csvData.filter(row => row.valid);
-        
-        if (validControls.length === 0) {
-            return;
-        }
-        
-        progressDiv.style.display = 'block';
-        analysisResults = {};
-        analysisInProgress = {};
-        let completedCount = 0;
-        const totalCount = validControls.length;
-        
-        updateAnalysisResults();
-        
-        for (let i = 0; i < validControls.length; i++) {
-            const control = validControls[i];
-            let analysisName = control.translatedName || control.name;
-            let analysisDetail = control.translatedDetail || control.detail;
-            
-            const controlDTO = {
-                name: analysisName,
-                detail: analysisDetail,
-                reference: control.reference,
-                domain: control.domain
-            };
-            
-            analysisInProgress[control.rowNumber] = true;
-            updateAnalysisResults();
-            
-            (function(ctrl) {
-                fetch('/api/security-control/import/analyze-single', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify(controlDTO)
-                })
-                    .then(response => response.json())
-                    .then(result => {
-                        analysisResults[ctrl.rowNumber] = result;
-                        completedCount++;
-                        analysisInProgress[ctrl.rowNumber] = false;
-                        
-                        const progressBar = document.getElementById('progressBar');
-                        const progressText = document.getElementById('progressText');
-                        const progress = (completedCount / totalCount) * 100;
-                        progressBar.style.width = progress + '%';
-                        progressText.textContent = completedCount + '/' + totalCount;
-                        
-                        updateAnalysisResults();
-                        
-                        if (completedCount === totalCount) {
-                            setTimeout(() => {
-                                progressDiv.style.display = 'none';
-                                updateImportSection();
-                            }, 500);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error analyzing control:', error);
-                        completedCount++;
-                        analysisInProgress[ctrl.rowNumber] = false;
-                        
-                        const progressBar = document.getElementById('progressBar');
-                        const progressText = document.getElementById('progressText');
-                        const progress = (completedCount / totalCount) * 100;
-                        progressBar.style.width = progress + '%';
-                        progressText.textContent = completedCount + '/' + totalCount;
-                        
-                        updateAnalysisResults();
-                        
-                        if (completedCount === totalCount) {
-                            setTimeout(() => {
-                                progressDiv.style.display = 'none';
-                                updateImportSection();
-                            }, 500);
-                        }
-                    });
-            })(control);
-        }
-    }
-
-    function displayPreviewAfterTranslation() {
-        const previewTableBody = document.getElementById('previewTableBody');
-        previewTableBody.innerHTML = '';
-        for (let i = 0; i < csvData.length; i++) {
-            const row = csvData[i];
-            const tr = document.createElement('tr');
-            if (!row.valid) tr.className = 'error-row';
-            const displayName = row.translatedName || row.name;
-            const displayDetail = row.translatedDetail || row.detail;
-            const statusHtml = !row.valid ? '<span style="color: #dc3545;">✗ ' + row.errors.join(', ') + '</span>' : '<span style="color: #28a745;">✓ Valid</span>';
-            tr.innerHTML = `<td>${row.rowNumber}</td><td title="${displayName}">${displayName.substring(0, 30)}${displayName.length > 30 ? '...' : ''}</td><td title="${displayDetail}">${displayDetail.substring(0, 35)}${displayDetail.length > 35 ? '...' : ''}</td><td>${row.reference}</td><td>${row.domain}</td><td>${statusHtml}</td>`;
-            previewTableBody.appendChild(tr);
-        }
-        document.getElementById('previewEmpty').style.display = 'none';
-    }
-    
-    function displayInitialPreview() {
+    function displayPreviewTable() {
         const previewTableBody = document.getElementById('previewTableBody');
         previewTableBody.innerHTML = '';
         
@@ -1130,90 +1285,8 @@ network segmentation","SC-7","Network"</div>
                 '<span style="color: #dc3545;">✗ ' + row.errors.join(', ') + '</span>' :
                 '<span style="color: #28a745;">✓ Valid</span>';
             
-            tr.innerHTML = `
-                <td>${row.rowNumber}</td>
-                <td title="${row.name}">${row.name.substring(0, 30)}${row.name.length > 30 ? '...' : ''}</td>
-                <td title="${row.detail}">${row.detail.substring(0, 35)}${row.detail.length > 35 ? '...' : ''}</td>
-                <td>${row.reference}</td>
-                <td>${row.domain}</td>
-                <td>${statusHtml}</td>
-            `;
-            
-            previewTableBody.appendChild(tr);
-        }
-        
-        document.getElementById('previewEmpty').style.display = 'none';
-        document.getElementById('analysisResultsSection').style.display = 'none';
-    }
-    
-    function updateAnalysisResults() {
-        const analysisResultsTableBody = document.getElementById('analysisResultsTableBody');
-        analysisResultsTableBody.innerHTML = '';
-        
-        for (let idx = 0; idx < csvData.length; idx++) {
-            const row = csvData[idx];
-            const tr = document.createElement('tr');
-            
-            if (!row.valid) {
-                tr.className = 'error-row';
-            } else {
-                if (analysisResults[row.rowNumber]) {
-                    const analysis = analysisResults[row.rowNumber];
-                    row.matchingRate = analysis.matchingRate;
-                    row.action = analysis.recommendedAction;
-                    if (analysis.suggestedMergeControl) {
-                        row.suggestedMatch = analysis.suggestedMergeControl;
-                    }
-                    row.analyzed = true;
-                }
-                
-                if (analysisInProgress[row.rowNumber]) {
-                    tr.className = 'row-analyzing';
-                } else {
-                    if (row.matchingRate === 'high') tr.className = 'match-high';
-                    else if (row.matchingRate === 'medium') tr.className = 'match-medium';
-                    else if (row.matchingRate === 'low') tr.className = 'match-low';
-                    else tr.className = 'match-none';
-                }
-            }
-            
-            let displayName = row.name;
-            let displayDetail = row.detail;
-            
-            if (row.translatedName) {
-                displayName = row.translatedName;
-                displayDetail = row.translatedDetail || row.detail;
-            }
-            
-            let statusHtml;
-            if (!row.valid) {
-                statusHtml = '<span style="color: #dc3545;">✗ ' + row.errors.join(', ') + '</span>';
-            } else if (analysisInProgress[row.rowNumber]) {
-                statusHtml = '<span style="color: #007bff;">⏳ Analyzing...</span>';
-            } else {
-                statusHtml = '<span style="color: #28a745;">✓ Valid</span>';
-            }
-            
-            let matchBadge = '';
-            if (row.matchingRate === 'high') matchBadge = '<span class="match-badge-high">High</span>';
-            else if (row.matchingRate === 'medium') matchBadge = '<span class="match-badge-medium">Medium</span>';
-            else if (row.matchingRate === 'low') matchBadge = '<span class="match-badge-low">Low</span>';
-            else if (row.analyzed) matchBadge = '<span class="match-badge-none">None</span>';
-            else matchBadge = '<span style="color: #999; font-size: 11px;">Pending...</span>';
-            
-            let actionSelect = '<select class="action-select action-selector" data-row="' + row.rowNumber + '"' + (row.valid ? '' : ' disabled') + '>';
-            if (row.matchingRate !== 'none' && row.suggestedMatch) {
-                actionSelect += '<option value="merge:' + row.suggestedMatch.existingControlId + '" selected>Merge</option>';
-                actionSelect += '<option value="new">Create New</option>';
-                actionSelect += '<option value="skip">Skip</option>';
-            } else {
-                actionSelect += '<option value="new" selected>Create New</option>';
-                actionSelect += '<option value="skip">Skip</option>';
-            }
-            actionSelect += '</select>';
-            
-            const suggestionInfo = row.suggestedMatch ? 
-                ' (' + row.suggestedMatch.existingControlName.substring(0, 30) + ')' : '';
+            const displayName = row.translatedName || row.name;
+            const displayDetail = row.translatedDetail || row.detail;
             
             tr.innerHTML = `
                 <td>${row.rowNumber}</td>
@@ -1221,34 +1294,15 @@ network segmentation","SC-7","Network"</div>
                 <td title="${displayDetail}">${displayDetail.substring(0, 35)}${displayDetail.length > 35 ? '...' : ''}</td>
                 <td>${row.reference}</td>
                 <td>${row.domain}</td>
-                <td>${matchBadge}${suggestionInfo ? '<br><small>' + suggestionInfo + '</small>' : ''}</td>
-                <td>${actionSelect}</td>
                 <td>${statusHtml}</td>
             `;
             
-            analysisResultsTableBody.appendChild(tr);
+            previewTableBody.appendChild(tr);
         }
-        
-        const selectors = document.querySelectorAll('.action-selector');
-        for (let i = 0; i < selectors.length; i++) {
-            selectors[i].addEventListener('change', function() {
-                const rowNumber = parseInt(this.dataset.row);
-                for (let j = 0; j < csvData.length; j++) {
-                    if (csvData[j].rowNumber === rowNumber) {
-                        csvData[j].action = this.value;
-                        break;
-                    }
-                }
-                updateImportSection();
-            });
-        }
-        
-        document.getElementById('analysisResultsSection').style.display = 'block';
-        updateImportSection();
     }
-    
-    function translateInPlace(languages) {
-        console.log('Starting in-place translation for languages:', languages);
+
+    function translateInPlace(languages, callback) {
+        console.log('Starting translation for languages:', languages);
         
         const progressDiv = document.getElementById('translationProgress');
         progressDiv.style.display = 'block';
@@ -1270,7 +1324,7 @@ network segmentation","SC-7","Network"</div>
             if (allTasks.length === 0) {
                 progressDiv.style.display = 'none';
                 console.log('All translations completed');
-                displayPreviewAfterTranslation();
+                if (callback) callback();
                 return;
             }
             
@@ -1292,8 +1346,6 @@ network segmentation","SC-7","Network"</div>
                 headers[getCsrfHeaderName()] = csrfToken;
             }
             
-            console.log('Sending translation request:', {task: task, hasCSRF: !!csrfToken});
-            
             fetch('/api/security-control/translate', {
                 method: 'POST',
                 headers: headers,
@@ -1301,15 +1353,11 @@ network segmentation","SC-7","Network"</div>
                 credentials: 'same-origin'
             })
                 .then(response => {
-                    console.log('Response status:', response.status);
-                    if (!response.ok) {
-                        throw new Error('HTTP ' + response.status);
-                    }
+                    if (!response.ok) throw new Error('HTTP ' + response.status);
                     return response.json();
                 })
                 .then(result => {
                     completedTranslations++;
-                    console.log('Translation result:', result);
                     
                     if (result.success && result.translated) {
                         task.row.translatedName = result.translated.name || task.row.name;
@@ -1341,42 +1389,341 @@ network segmentation","SC-7","Network"</div>
         processTranslations();
     }
 
-    function displayPreview() {
-        const previewSection = document.getElementById('previewSection');
-        const previewStats = document.getElementById('previewStats');
-        const previewWarnings = document.getElementById('previewWarnings');
-        const previewError = document.getElementById('previewError');
+    function analyzeControlsSimilarity() {
+        const validControls = csvData.filter(row => row.valid);
         
-        previewSection.style.display = 'block';
-        previewError.style.display = 'none';
-        
-        const validRows = csvData.filter(row => row.valid).length;
-        const invalidRows = csvData.length - validRows;
-        const uniqueDomains = [...new Set(csvData.map(row => row.domain))].filter(d => d).length;
-        
-        previewStats.innerHTML = `
-            <strong>📊 Import Summary:</strong><br>
-            Total rows: ${csvData.length} | 
-            Valid rows: <span style="color: #28a745;">${validRows}</span> | 
-            Invalid rows: <span style="color: #dc3545;">${invalidRows}</span> | 
-            Unique domains: ${uniqueDomains}
-        `;
-        
-        if (invalidRows > 0) {
-            previewWarnings.style.display = 'block';
-            previewWarnings.innerHTML = `
-                <strong>⚠️ Warning:</strong> ${invalidRows} row(s) have validation errors.
-            `;
-        } else {
-            previewWarnings.style.display = 'none';
+        if (validControls.length === 0) {
+            return;
         }
         
-        displayInitialPreview();
+        analysisResults = {};
+        analysisInProgress = {};
+        let completedCount = 0;
+        const totalCount = validControls.length;
+        
+        for (let i = 0; i < validControls.length; i++) {
+            const control = validControls[i];
+            let analysisName = control.translatedName || control.name;
+            let analysisDetail = control.translatedDetail || control.detail;
+            
+            const controlDTO = {
+                name: analysisName,
+                detail: analysisDetail,
+                reference: control.reference,
+                domain: control.domain
+            };
+            
+            analysisInProgress[control.rowNumber] = true;
+            
+            (function(ctrl) {
+                fetch('/api/security-control/import/analyze-single', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(controlDTO)
+                })
+                    .then(response => response.json())
+                    .then(result => {
+                        analysisResults[ctrl.rowNumber] = result;
+                        completedCount++;
+                        analysisInProgress[ctrl.rowNumber] = false;
+                        
+                        const progressBar = document.getElementById('progressBar');
+                        const progressText = document.getElementById('progressText');
+                        const progress = (completedCount / totalCount) * 100;
+                        progressBar.style.width = progress + '%';
+                        progressText.textContent = completedCount + '/' + totalCount;
+                        
+                        updateAnalysisResultsTable();
+                        
+                        if (completedCount === totalCount) {
+                            setTimeout(() => {
+                                document.getElementById('analysisProgress').style.display = 'none';
+                                document.getElementById('analysisResultsSection').style.display = 'block';
+                            }, 500);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error analyzing control:', error);
+                        completedCount++;
+                        analysisInProgress[ctrl.rowNumber] = false;
+                        
+                        const progressBar = document.getElementById('progressBar');
+                        const progressText = document.getElementById('progressText');
+                        const progress = (completedCount / totalCount) * 100;
+                        progressBar.style.width = progress + '%';
+                        progressText.textContent = completedCount + '/' + totalCount;
+                        
+                        updateAnalysisResultsTable();
+                        
+                        if (completedCount === totalCount) {
+                            setTimeout(() => {
+                                document.getElementById('analysisProgress').style.display = 'none';
+                                document.getElementById('previewTableSection').style.display = 'none';
+                                document.getElementById('previewButtonGroup').style.display = 'none';
+                                document.getElementById('analysisResultsSection').style.display = 'block';
+                            }, 500);
+                        }
+                    });
+            })(control);
+        }
     }
 
-    function showCatalogOptions() {
-        document.getElementById('catalogSection').style.display = 'block';
+    function updateAnalysisResultsTable() {
+        const analysisResultsTableBody = document.getElementById('analysisResultsTableBody');
+        analysisResultsTableBody.innerHTML = '';
+        
+        for (let idx = 0; idx < csvData.length; idx++) {
+            const row = csvData[idx];
+            if (!row.valid) continue;
+            
+            const tr = document.createElement('tr');
+            
+            if (analysisResults[row.rowNumber]) {
+                const analysis = analysisResults[row.rowNumber];
+                row.matchingRate = analysis.matchingRate;
+                row.action = analysis.recommendedAction;
+                if (analysis.suggestedMergeControl) {
+                    row.suggestedMatch = analysis.suggestedMergeControl;
+                }
+                row.analyzed = true;
+            }
+            
+            if (analysisInProgress[row.rowNumber]) {
+                tr.className = 'row-analyzing';
+            } else {
+                if (row.matchingRate === 'high') tr.className = 'match-high';
+                else if (row.matchingRate === 'medium') tr.className = 'match-medium';
+                else if (row.matchingRate === 'low') tr.className = 'match-low';
+                else tr.className = 'match-none';
+            }
+            
+            let displayName = row.translatedName || row.name;
+            let displayDetail = row.translatedDetail || row.detail;
+            
+            let statusHtml;
+            if (analysisInProgress[row.rowNumber]) {
+                statusHtml = '<span style="color: #007bff;">⏳ Analyzing...</span>';
+            } else {
+                statusHtml = '<span style="color: #28a745;">✓ Valid</span>';
+            }
+            
+            let matchBadge = '';
+            if (row.matchingRate === 'high') matchBadge = '<span class="match-badge-high">High</span>';
+            else if (row.matchingRate === 'medium') matchBadge = '<span class="match-badge-medium">Medium</span>';
+            else if (row.matchingRate === 'low') matchBadge = '<span class="match-badge-low">Low</span>';
+            else if (row.analyzed) matchBadge = '<span class="match-badge-none">None</span>';
+            else matchBadge = '<span style="color: #999; font-size: 11px;">Pending...</span>';
+            
+            // Build match cell with tooltip if there's a match
+            let matchCell = '';
+            if (row.suggestedMatch && row.matchingRate !== 'none') {
+                const tooltipContent = buildMatchTooltip(row.suggestedMatch);
+                matchCell = `
+                    <div class="match-tooltip" style="display: inline-block; position: relative;">
+                        ${matchBadge}
+                        <div class="tooltip-content" style="display: none; visibility: hidden; opacity: 0;">
+                            ${tooltipContent}
+                        </div>
+                    </div>
+                `;
+            } else {
+                matchCell = matchBadge;
+            }
+            
+            let actionSelect = '<select class="action-select action-selector" data-row="' + row.rowNumber + '">';
+            if (row.matchingRate !== 'none' && row.suggestedMatch) {
+                const mergeValue = 'merge:' + row.suggestedMatch.existingControlId;
+                actionSelect += '<option value="' + mergeValue + '" selected>Merge</option>';
+                actionSelect += '<option value="new">Create New</option>';
+                actionSelect += '<option value="skip">Skip</option>';
+            } else {
+                actionSelect += '<option value="new" selected>Create New</option>';
+                actionSelect += '<option value="skip">Skip</option>';
+            }
+            actionSelect += '</select>';
+            
+            tr.innerHTML = `
+                <td>${row.rowNumber}</td>
+                <td title="${displayName}">${displayName.substring(0, 30)}${displayName.length > 30 ? '...' : ''}</td>
+                <td title="${displayDetail}">${displayDetail.substring(0, 35)}${displayDetail.length > 35 ? '...' : ''}</td>
+                <td>${row.reference}</td>
+                <td>${row.domain}</td>
+                <td>${matchCell}</td>
+                <td>${actionSelect}</td>
+                <td>${statusHtml}</td>
+            `;
+            
+            analysisResultsTableBody.appendChild(tr);
+            
+            // Attach tooltip event listeners with fixed positioning
+            const matchTooltips = tr.querySelectorAll('.match-tooltip');
+            matchTooltips.forEach(tooltip => {
+                const tooltipContent = tooltip.querySelector('.tooltip-content');
+                if (tooltipContent) {
+                    tooltip.addEventListener('mouseenter', function() {
+                        tooltipContent.style.display = 'block';
+                        tooltipContent.style.visibility = 'visible';
+                        tooltipContent.style.opacity = '1';
+                    });
+                    tooltip.addEventListener('mouseleave', function() {
+                        tooltipContent.style.display = 'none';
+                        tooltipContent.style.visibility = 'hidden';
+                        tooltipContent.style.opacity = '0';
+                    });
+                }
+            });
+        }
+        
+        const selectors = document.querySelectorAll('.action-selector');
+        selectors.forEach(sel => {
+            sel.addEventListener('change', function() {
+                const rowNumber = parseInt(this.dataset.row);
+                for (let j = 0; j < csvData.length; j++) {
+                    if (csvData[j].rowNumber === rowNumber) {
+                        const selectedValue = this.value;
+                        csvData[j].action = selectedValue;
+                        break;
+                    }
+                }
+                // Recalculate summary when action changes
+                updateStep4Summary();
+            });
+        });
     }
+    
+    function buildMatchTooltip(suggestedMatch) {
+        if (!suggestedMatch) {
+            return '<p style="color: #bdc3c7;">No match information available</p>';
+        }
+        
+        let tooltipHtml = '<div style="font-size: 12px;">';
+        tooltipHtml += '<p style="margin: 0 0 8px 0; font-weight: bold; color: #3498db; border-bottom: 1px solid #555; padding-bottom: 5px;">📋 Matched Control</p>';
+        
+        if (suggestedMatch.existingControlName) {
+            tooltipHtml += '<div class="match-info">';
+            tooltipHtml += '<div class="match-info-label">Name:</div>';
+            tooltipHtml += '<div class="match-info-value">' + escapeHtml(suggestedMatch.existingControlName) + '</div>';
+            tooltipHtml += '</div>';
+        }
+        
+        if (suggestedMatch.existingControlDetail) {
+            tooltipHtml += '<div class="match-info">';
+            tooltipHtml += '<div class="match-info-label">Detail:</div>';
+            tooltipHtml += '<div class="match-info-value">' + escapeHtml(suggestedMatch.existingControlDetail) + '</div>';
+            tooltipHtml += '</div>';
+        }
+        
+        if (suggestedMatch.matchPercentage !== undefined) {
+            tooltipHtml += '<div class="match-info">';
+            tooltipHtml += '<div class="match-info-label">Match Confidence:</div>';
+            tooltipHtml += '<div class="match-info-value">' + Math.round(suggestedMatch.matchPercentage) + '%</div>';
+            tooltipHtml += '</div>';
+        }
+        
+        if (suggestedMatch.existingControlId) {
+            tooltipHtml += '<div class="match-info" style="border-left-color: #95a5a6;">';
+            tooltipHtml += '<div class="match-info-label">Control ID:</div>';
+            tooltipHtml += '<div class="match-info-value">#' + suggestedMatch.existingControlId + '</div>';
+            tooltipHtml += '</div>';
+        }
+        
+        tooltipHtml += '<p style="margin: 8px 0 0 0; font-size: 10px; color: #95a5a6; font-style: italic;">💡 Select "Merge" to link with this control</p>';
+        tooltipHtml += '</div>';
+        
+        return tooltipHtml;
+    }
+    
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function updateStep4Summary() {
+        const summaryDiv = document.getElementById('step4Summary');
+        
+        // Count controls that will be imported (not skipped)
+        let totalImport = 0;
+        let mergeCount = 0;
+        
+        for (let i = 0; i < csvData.length; i++) {
+            const row = csvData[i];
+            if (row.valid && row.action !== 'skip') {
+                totalImport++;
+                if (row.action && row.action.startsWith('merge:')) {
+                    mergeCount++;
+                }
+            }
+        }
+        
+        let newCount = totalImport - mergeCount;
+        
+        let summaryText = `
+            <div style="background-color: #e8f5e9; border: 1px solid #c3e6c3; border-radius: 4px; padding: 15px; margin: 10px 0;">
+            <p><strong>Controls to Import:</strong> ${totalImport}</p>
+            <ul style="margin: 5px 0; padding-left: 20px;">
+            <li><span style="color: #28a745;">📝 New Controls:</span> ${newCount}</li>
+            <li><span style="color: #007bff;">🔗 Merge with Existing:</span> ${mergeCount}</li>
+            </ul>
+            </div>
+        `;
+        
+        summaryDiv.innerHTML = summaryText;
+    }
+
+    function updateStep5Summary() {
+        const summaryDiv = document.getElementById('step5Summary');
+        const catalogOption = document.querySelector('input[name="catalogOption"]:checked').value;
+        
+        // Count controls that will be imported (not skipped)
+        let totalImport = 0;
+        let mergeCount = 0;
+        
+        for (let i = 0; i < csvData.length; i++) {
+            const row = csvData[i];
+            if (row.valid && row.action !== 'skip') {
+                totalImport++;
+                if (row.action && row.action.startsWith('merge:')) {
+                    mergeCount++;
+                }
+            }
+        }
+        
+        let newCount = totalImport - mergeCount;
+        
+        let summaryText = `
+            <div style="background-color: #e8f5e9; border: 1px solid #c3e6c3; border-radius: 4px; padding: 15px; margin: 10px 0;">
+            <p><strong>📋 Import Plan:</strong></p>
+            <ul style="margin: 5px 0; padding-left: 20px;">
+            <li><strong>Total Controls:</strong> ${totalImport}</li>
+            <li><span style="color: #28a745;">📝 New Controls:</span> ${newCount}</li>
+            <li><span style="color: #007bff;">🔗 Merge with Existing:</span> ${mergeCount}</li>
+        `;
+        
+        if (catalogOption === 'existing') {
+            const selectedCatalog = document.getElementById('catalogSelect');
+            if (selectedCatalog.value) {
+                const catalogName = selectedCatalog.options[selectedCatalog.selectedIndex].text;
+                summaryText += `<li><strong>Catalog:</strong> ${catalogName}</li>`;
+            }
+        } else if (catalogOption === 'new') {
+            const catalogName = document.getElementById('catalogName').value;
+            summaryText += `<li><strong>New Catalog:</strong> ${catalogName}</li>`;
+        }
+        
+        summaryText += `
+            </ul>
+            </div>
+        `;
+        
+        summaryDiv.innerHTML = summaryText;
+    }
+
+    // Catalog Functions
 
     function loadAvailableCatalogs() {
         fetch('/api/security-catalogs', {
@@ -1426,73 +1773,17 @@ network segmentation","SC-7","Network"</div>
             const value = this.value;
             document.getElementById('existingCatalogFields').style.display = value === 'existing' ? 'block' : 'none';
             document.getElementById('newCatalogFields').style.display = value === 'new' ? 'block' : 'none';
-            
-            if (csvData.length > 0) {
-                updateImportSection();
-            }
         });
     }
 
-    function updateImportSection() {
-        const importSection = document.getElementById('importSection');
-        const importSummary = document.getElementById('importSummary');
-        const catalogOption = document.querySelector('input[name="catalogOption"]:checked').value;
-        
-        let validCount = csvData.filter(row => row.valid && row.action !== 'skip').length;
-        let mergeCount = 0;
-        for (let i = 0; i < csvData.length; i++) {
-            if (csvData[i].valid && csvData[i].action && csvData[i].action.startsWith('merge:')) {
-                mergeCount++;
-            }
-        }
-        let newCount = validCount - mergeCount;
-        
-        let summaryText = `<p><strong>📋 Import Plan:</strong><br>
-            Total: ${validCount} controls | 
-            <span style="color: #007bff;">Merge: ${mergeCount}</span> | 
-            <span style="color: #28a745;">New: ${newCount}</span></p>`;
-        
-        if (catalogOption === 'existing') {
-            const selectedCatalog = document.getElementById('catalogSelect');
-            if (selectedCatalog.value) {
-                const catalogName = selectedCatalog.options[selectedCatalog.selectedIndex].text;
-                summaryText += `<p>Catalog: <strong>${catalogName}</strong></p>`;
-            }
-        }
-        
-        importSummary.innerHTML = summaryText;
-        importSection.style.display = 'block';
-    }
-
-    document.getElementById('catalogSelect').addEventListener('change', updateImportSection);
-    document.getElementById('catalogName').addEventListener('input', updateImportSection);
-
     // Submit import button handler
     submitImportBtn.addEventListener('click', function() {
-        // Validate that a file was selected
         if (!csvFile.files || csvFile.files.length === 0) {
             alert('Please select a CSV file to import.');
             return;
         }
         
         const catalogOption = document.querySelector('input[name="catalogOption"]:checked').value;
-        
-        // Validate selections
-        if (catalogOption === 'existing') {
-            const selectedCatalog = document.getElementById('catalogSelect').value;
-            if (!selectedCatalog) {
-                alert('Please select a catalog.');
-                return;
-            }
-        }
-        
-        if (catalogOption === 'new') {
-            const catalogName = document.getElementById('catalogName').value;
-            if (!catalogName) {
-                alert('Please enter a catalog name.');
-                return;
-            }
-        }
         
         // Prepare form data
         const formData = new FormData();
@@ -1509,68 +1800,31 @@ network segmentation","SC-7","Network"</div>
             formData.append('catalogRevision', document.getElementById('catalogRevision').value);
         }
         
-        // Build merge actions with translated data
+        // Build merge actions with translated data and candidate control information
         const mergeActions = {};
-        let newCount = 0;
-        let mergeCount = 0;
-        
         for (let i = 0; i < csvData.length; i++) {
             const row = csvData[i];
             if (row.valid && row.action !== 'skip') {
-                mergeActions[row.name] = {
+                const actionData = {
                     action: row.action,
                     translatedName: row.translatedName,
                     translatedDetail: row.translatedDetail
                 };
-                if (row.action.startsWith('merge:')) {
-                    mergeCount++;
-                } else {
-                    newCount++;
+                
+                // If merging, include the candidate control information
+                if (row.action && row.action.startsWith('merge:') && row.suggestedMatch) {
+                    actionData.candidateControlId = row.suggestedMatch.existingControlId;
+                    actionData.candidateControlName = row.suggestedMatch.existingControlName;
+                    actionData.candidateControlDetail = row.suggestedMatch.existingControlDetail;
+                    actionData.matchConfidence = row.suggestedMatch.matchPercentage;
                 }
+                
+                mergeActions[row.name] = actionData;
             }
         }
         
-        // Create summary for confirmation
-        let summary = '=== IMPORT SUMMARY ===\n\n';
-        summary += 'File: ' + csvFile.files[0].name + '\n';
-        summary += 'File Size: ' + Math.round(csvFile.files[0].size / 1024) + ' KB\n';
-        summary += 'Total Rows to Import: ' + Object.keys(mergeActions).length + '\n';
-        summary += '  - New Controls: ' + newCount + '\n';
-        summary += '  - Merge with Existing: ' + mergeCount + '\n\n';
-        
-        summary += 'Catalog Option: ' + catalogOption.toUpperCase() + '\n';
-        if (catalogOption === 'existing') {
-            const selectedCatalog = document.getElementById('catalogSelect');
-            summary += 'Selected Catalog: ' + selectedCatalog.options[selectedCatalog.selectedIndex].text + '\n';
-        } else if (catalogOption === 'new') {
-            summary += 'New Catalog Name: ' + document.getElementById('catalogName').value + '\n';
-        }
-        summary += '\n=== CONTROLS TO IMPORT ===\n\n';
-        
-        let rowNum = 1;
-        for (const controlName in mergeActions) {
-            const action = mergeActions[controlName];
-            summary += rowNum + '. ' + controlName + '\n';
-            summary += '   Action: ' + (action.action.startsWith('merge:') ? 'MERGE' : 'NEW') + '\n';
-            if (action.translatedName) {
-                summary += '   Translated Name: ' + action.translatedName + '\n';
-            }
-            summary += '\n';
-            rowNum++;
-        }
-        
-        console.log('Import Summary:\n' + summary);
-        console.log('Merge Actions JSON:', mergeActions);
-        
-        // Show confirmation dialog
-        if (!confirm(summary + '\n\nDo you want to proceed with this import?')) {
-            console.log('Import cancelled by user');
-            return;
-        }
-        
+        console.log('Prepared merge actions with candidate controls:', mergeActions);
         formData.append('mergeActions', JSON.stringify(mergeActions));
-        
-        console.log('Submitting import with CSRF token included');
         
         // Get CSRF headers
         const headers = {};
@@ -1578,7 +1832,6 @@ network segmentation","SC-7","Network"</div>
         const csrfHeaderName = getCsrfHeaderName();
         if (csrfToken && csrfHeaderName) {
             headers[csrfHeaderName] = csrfToken;
-            console.log('CSRF token added to headers:', csrfHeaderName);
         }
         
         // Submit import
@@ -1589,9 +1842,7 @@ network segmentation","SC-7","Network"</div>
             credentials: 'same-origin'
         })
             .then(response => {
-                console.log('Response received - status:', response.status, 'redirected:', response.redirected);
                 if (response.ok || response.redirected) {
-                    // Success - redirect
                     if (response.redirected) {
                         window.location.href = response.url;
                     } else {
@@ -1611,16 +1862,27 @@ network segmentation","SC-7","Network"</div>
         csvData = [];
         analysisResults = {};
         analysisInProgress = {};
+        currentStep = 1;
+        detectedLanguage = null;
         csvFile.value = '';
-        previewBtn.disabled = true;
         
-        document.getElementById('previewSection').style.display = 'none';
-        document.getElementById('catalogSection').style.display = 'none';
-        document.getElementById('importSection').style.display = 'none';
-        document.getElementById('previewError').style.display = 'none';
+        // Reset all steps to hidden except step 1
+        document.querySelectorAll('.step-container').forEach(step => {
+            step.classList.remove('active');
+        });
+        document.getElementById('step1').classList.add('active');
+        
+        // Reset form fields
+        document.querySelectorAll('input[name="languages"]').forEach(cb => cb.checked = false);
         document.getElementById('noCatalog').checked = true;
         document.getElementById('catalogSelect').value = '';
         document.getElementById('catalogName').value = '';
+        document.getElementById('catalogDescription').value = '';
+        document.getElementById('catalogRevision').value = '';
+        document.getElementById('analysisProgress').style.display = 'none';
+        document.getElementById('analysisResultsSection').style.display = 'none';
+        document.getElementById('previewTableSection').style.display = 'block';
+        document.getElementById('previewButtonGroup').style.display = 'flex';
     }
 </script>
 </body>
