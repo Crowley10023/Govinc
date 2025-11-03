@@ -70,11 +70,24 @@ public class SecurityControlController {
             @RequestParam(value = "catalogName", required = false) String catalogName,
             @RequestParam(value = "catalogDescription", required = false) String catalogDescription,
             @RequestParam(value = "catalogRevision", required = false) String catalogRevision,
+            @RequestParam(value = "mergeActions", required = false) String mergeActionsJson,
             RedirectAttributes redirectAttributes) {
         
         if (file.isEmpty()) {
             redirectAttributes.addFlashAttribute("message", "Please select a CSV file to upload.");
             return "redirect:/security-control/list";
+        }
+        
+        // Parse merge actions if provided
+        java.util.Map<String, String> mergeActions = new java.util.HashMap<>();
+        if (mergeActionsJson != null && !mergeActionsJson.isEmpty()) {
+            try {
+                // Simple JSON parsing for merge actions
+                // Format: {"controlName": "action:mergeId" or "new"}
+                mergeActions = parseJsonMergeActions(mergeActionsJson);
+            } catch (Exception e) {
+                System.err.println("Error parsing merge actions: " + e.getMessage());
+            }
         }
         
         try {
@@ -135,12 +148,52 @@ public class SecurityControlController {
                             domain = securityControlDomainService.save(domain);
                         }
                         
-                        SecurityControl sc = new SecurityControl();
-                        sc.setName(name);
-                        sc.setDetail(description);
-                        sc.setReference(reference);
-                        sc.setSecurityControlDomain(domain);
-                        sc = service.save(sc);
+                        // Check if this control should be merged with existing control
+                        String mergeAction = mergeActions.get(name);
+                        SecurityControl sc = null;
+                        
+                        if (mergeAction != null && mergeAction.startsWith("merge:")) {
+                            // Merge with existing control
+                            try {
+                                Long existingControlId = Long.parseLong(mergeAction.substring(6));
+                                java.util.Optional<SecurityControl> existingOpt = service.findById(existingControlId);
+                                if (existingOpt.isPresent()) {
+                                    sc = existingOpt.get();
+                                    // Update with imported data if empty or merge information
+                                    if (sc.getDetail() == null || sc.getDetail().isEmpty()) {
+                                        sc.setDetail(description);
+                                    }
+                                    if (sc.getReference() == null || sc.getReference().isEmpty()) {
+                                        sc.setReference(reference);
+                                    }
+                                    sc = service.save(sc);
+                                } else {
+                                    // Merge target not found, create new
+                                    sc = new SecurityControl();
+                                    sc.setName(name);
+                                    sc.setDetail(description);
+                                    sc.setReference(reference);
+                                    sc.setSecurityControlDomain(domain);
+                                    sc = service.save(sc);
+                                }
+                            } catch (Exception mergeEx) {
+                                // If merge fails, create new
+                                sc = new SecurityControl();
+                                sc.setName(name);
+                                sc.setDetail(description);
+                                sc.setReference(reference);
+                                sc.setSecurityControlDomain(domain);
+                                sc = service.save(sc);
+                            }
+                        } else {
+                            // Create new control
+                            sc = new SecurityControl();
+                            sc.setName(name);
+                            sc.setDetail(description);
+                            sc.setReference(reference);
+                            sc.setSecurityControlDomain(domain);
+                            sc = service.save(sc);
+                        }
                         
                         importedControls.add(sc);
                         successCount++;
@@ -178,6 +231,25 @@ public class SecurityControlController {
         }
         
         return "redirect:/security-control/list";
+    }
+    
+    // Helper method to parse merge actions from JSON
+    private java.util.Map<String, String> parseJsonMergeActions(String json) {
+        java.util.Map<String, String> actions = new java.util.HashMap<>();
+        // Simple parsing without external JSON library
+        try {
+            // Remove curly braces
+            String content = json.replaceAll("^\\{|\\}$", "");
+            // Use regex to extract key-value pairs
+            java.util.regex.Pattern p = java.util.regex.Pattern.compile("\"([^\"]*?)\":\"([^\"]*?)\"");
+            java.util.regex.Matcher m = p.matcher(content);
+            while (m.find()) {
+                actions.put(m.group(1), m.group(2));
+            }
+        } catch (Exception e) {
+            System.err.println("Error parsing JSON merge actions: " + e.getMessage());
+        }
+        return actions;
     }
     
     // Helper method to parse CSV line with proper quote handling

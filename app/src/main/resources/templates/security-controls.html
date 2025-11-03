@@ -26,7 +26,7 @@
             border: 1px solid #888;
             border-radius: 10px;
             width: 90%;
-            max-width: 1000px;
+            max-width: 1200px;
             max-height: 90vh;
             overflow-y: auto;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
@@ -226,12 +226,12 @@
             width: 100%;
             border-collapse: collapse;
             margin: 10px 0;
-            font-size: 12px;
+            font-size: 11px;
         }
         
         .preview-table th, .preview-table td {
             border: 1px solid #ddd;
-            padding: 8px;
+            padding: 6px;
             text-align: left;
         }
         
@@ -245,7 +245,7 @@
         }
         
         .preview-table td {
-            max-width: 200px;
+            max-width: 150px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
@@ -257,6 +257,15 @@
             border-radius: 4px;
             padding: 10px;
             margin: 10px 0;
+        }
+        
+        .error-box {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            color: #721c24;
         }
         
         .step-container {
@@ -308,6 +317,132 @@
             background-color: #d1eddd;
             color: #155724;
         }
+        
+        .match-high {
+            background-color: #fff3cd;
+        }
+        
+        .match-medium {
+            background-color: #d1ecf1;
+        }
+        
+        .match-low {
+            background-color: #f0f0f0;
+        }
+        
+        .match-none {
+            background-color: #ffffff;
+        }
+        
+        .analysis-progress {
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            border-radius: 4px;
+            display: none;
+        }
+        
+        .progress-bar-container {
+            width: 100%;
+            height: 20px;
+            background-color: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background-color: #007bff;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        .match-badge-high {
+            background-color: #ffc107;
+            color: #333;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        
+        .match-badge-medium {
+            background-color: #17a2b8;
+            color: #fff;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        
+        .match-badge-low {
+            background-color: #6c757d;
+            color: #fff;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        
+        .match-badge-none {
+            background-color: #28a745;
+            color: #fff;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        
+        .action-select {
+            padding: 4px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            font-size: 11px;
+        }
+        
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            cursor: help;
+            border-bottom: 1px dotted #333;
+        }
+        
+        .tooltip-content {
+            visibility: hidden;
+            width: 250px;
+            background-color: #333;
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 8px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -125px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 11px;
+            font-weight: normal;
+        }
+        
+        .tooltip:hover .tooltip-content {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .empty-message {
+            text-align: center;
+            padding: 40px 20px;
+            color: #6c757d;
+            font-size: 14px;
+        }
+        
+        .row-analyzing {
+            opacity: 0.6;
+        }
     </style>
 </head>
 <body>
@@ -349,18 +484,23 @@
                         </div>
                         
                         <div class="example-section">
-                            <h5>📝 Example CSV Format:</h5>
+                            <h5>📝 Example CSV Format (supports newlines in quoted fields):</h5>
                             <div class="example-csv">name,detail,reference,domain
-"Access Control Policy","Implement comprehensive access control policies","AC-1","Access Control"
-"Account Management","Manage user accounts and access rights","AC-2","Access Control"
-"Network Segmentation","Implement proper network segmentation","SC-7","System and Communications Protection"</div>
+"Access Control Policy","Implement comprehensive 
+access control policies","AC-1","Access Control"
+"Account Management","Manage user accounts
+and access rights","AC-2","Access Control"
+"Network Segmentation","Implement proper
+network segmentation","SC-7","Network"</div>
                         </div>
                         
                         <div style="background-color: #d1ecf1; border: 1px solid #bee5eb; border-radius: 4px; padding: 10px; margin: 10px 0;">
                             <strong>💡 Important Notes:</strong>
                             <ul style="margin: 8px 0; padding-left: 20px;">
                                 <li>The first row must contain the column headers exactly as shown</li>
-                                <li>Use double quotes around values that contain commas</li>
+                                <li>Use double quotes around values that contain commas or newlines</li>
+                                <li>You CAN include newlines (line breaks) within quoted fields</li>
+                                <li>Escape quotes inside quoted fields by doubling them: "" becomes one quote</li>
                                 <li>The domain column should match existing domain names or new ones will be created</li>
                                 <li>Empty fields are allowed but not recommended</li>
                                 <li>UTF-8 encoding is recommended for special characters</li>
@@ -377,29 +517,45 @@
                 </div>
             </div>
 
-            <!-- Step 2: Preview -->
+            <!-- Step 2: Preview with AI Analysis -->
             <div class="step-container preview-section" id="previewSection">
                 <div class="step-header">
-                    <span class="step-number">2</span>Preview CSV Data
+                    <span class="step-number">2</span>Preview CSV Data & Intelligent Similarity Analysis
                 </div>
                 <div class="step-content">
                     <div class="preview-stats" id="previewStats"></div>
+                    <div class="error-box" id="previewError" style="display: none;"></div>
                     <div class="warning-box" id="previewWarnings" style="display: none;"></div>
-                    <div style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px;">
+                    
+                    <!-- Analysis Progress -->
+                    <div id="analysisProgress" class="analysis-progress">
+                        <p><strong>🤖 Analyzing controls for similarity with AI...</strong></p>
+                        <div class="progress-bar-container">
+                            <div id="progressBar" class="progress-bar"></div>
+                        </div>
+                        <p style="font-size: 12px; color: #666;"><span id="progressText">0/0</span> controls analyzed...</p>
+                    </div>
+                    
+                    <div style="max-height: 600px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px;">
                         <table class="preview-table" id="previewTable">
                             <thead>
                                 <tr>
-                                    <th>Row</th>
-                                    <th>Name</th>
-                                    <th>Detail</th>
-                                    <th>Reference</th>
-                                    <th>Domain</th>
-                                    <th>Status</th>
+                                    <th style="width: 30px;">Row</th>
+                                    <th style="width: 150px;">Name</th>
+                                    <th style="width: 150px;">Detail</th>
+                                    <th style="width: 80px;">Reference</th>
+                                    <th style="width: 80px;">Domain</th>
+                                    <th style="width: 70px;">Match <span class="tooltip">? <span class="tooltip-content">Similarity level to existing controls. High: Very similar, Medium: Somewhat similar, Low: Slightly similar, None: No match found</span></span></th>
+                                    <th style="width: 110px;">Action <span class="tooltip">? <span class="tooltip-content">Choose: Merge (combine with existing), New (create new control)</span></span></th>
+                                    <th style="width: 70px;">Status</th>
                                 </tr>
                             </thead>
                             <tbody id="previewTableBody">
                             </tbody>
                         </table>
+                        <div id="previewEmpty" class="empty-message" style="display: none;">
+                            ℹ️ Preview table will appear here once CSV is loaded
+                        </div>
                     </div>
                 </div>
             </div>
@@ -443,7 +599,6 @@
                         <label for="catalogSelect"><strong>Select Existing Catalog:</strong></label>
                         <select id="catalogSelect" name="existingCatalogId">
                             <option value="">-- Select a Security Catalog --</option>
-                            <!-- Options will be populated by JavaScript -->
                         </select>
                     </div>
 
@@ -472,6 +627,7 @@
                         <input type="hidden" name="catalogName" id="catalogNameInput" />
                         <input type="hidden" name="catalogDescription" id="catalogDescriptionInput" />
                         <input type="hidden" name="catalogRevision" id="catalogRevisionInput" />
+                        <input type="hidden" name="mergeActions" id="mergeActionsInput" />
                         
                         <div id="importSummary"></div>
                         <button type="submit" class="import-button">Import Security Controls</button>
@@ -516,6 +672,8 @@
     // Global variables
     let csvData = [];
     let availableCatalogs = [];
+    let analysisResults = {};
+    let analysisInProgress = {};
     
     // Get modal elements
     const modal = document.getElementById('csvImportModal');
@@ -591,32 +749,112 @@
         reader.readAsText(file);
     });
 
-    // CSV parsing function
+    // RFC4180 compliant CSV parser - handles multi-line quoted fields
+    function parseCSVData(csvText) {
+        const rows = [];
+        let currentRow = [];
+        let currentField = '';
+        let inQuotes = false;
+        let i = 0;
+        
+        while (i < csvText.length) {
+            const char = csvText[i];
+            const nextChar = i + 1 < csvText.length ? csvText[i + 1] : '';
+            
+            if (char === '"') {
+                if (inQuotes && nextChar === '"') {
+                    // Escaped quote - add one quote to field
+                    currentField += '"';
+                    i += 2;
+                    continue;
+                } else {
+                    // Toggle quote mode
+                    inQuotes = !inQuotes;
+                    i++;
+                    continue;
+                }
+            }
+            
+            if (char === ',' && !inQuotes) {
+                // Field separator
+                currentRow.push(currentField);
+                currentField = '';
+                i++;
+                continue;
+            }
+            
+            if ((char === '\n' || char === '\r') && !inQuotes) {
+                // Row separator - add current field and row
+                if (currentField || currentRow.length > 0) {
+                    currentRow.push(currentField);
+                    if (currentRow.some(f => f.trim())) {
+                        rows.push(currentRow);
+                    }
+                    currentRow = [];
+                    currentField = '';
+                }
+                // Skip CRLF
+                if (char === '\r' && nextChar === '\n') {
+                    i += 2;
+                } else {
+                    i++;
+                }
+                continue;
+            }
+            
+            currentField += char;
+            i++;
+        }
+        
+        // Add last field and row
+        if (currentField || currentRow.length > 0) {
+            currentRow.push(currentField);
+            if (currentRow.some(f => f.trim())) {
+                rows.push(currentRow);
+            }
+        }
+        
+        return rows;
+    }
+
+    // CSV parsing function with proper error handling
     function parseCsvData(csvText) {
-        const lines = csvText.split('\n').filter(line => line.trim());
-        if (lines.length < 2) {
-            alert('CSV file must contain at least a header row and one data row.');
-            return;
-        }
+        try {
+            // Parse all rows (including multi-line quoted fields)
+            const allRows = parseCSVData(csvText);
+            
+            if (allRows.length < 2) {
+                showParseError('CSV file must contain at least a header row and one data row.');
+                return;
+            }
 
-        csvData = [];
-        const headers = parseCSVLine(lines[0]);
-        
-        // Validate headers
-        const expectedHeaders = ['name', 'detail', 'reference', 'domain'];
-        const headersValid = expectedHeaders.every((header, index) => 
-            headers[index] && headers[index].toLowerCase().trim() === header
-        );
-        
-        if (!headersValid) {
-            alert('CSV headers must be exactly: name,detail,reference,domain');
-            return;
-        }
+            // Parse headers
+            const headers = allRows[0];
+            const expectedHeaders = ['name', 'detail', 'reference', 'domain'];
+            
+            // Validate headers
+            const headersValid = expectedHeaders.every((header, index) => 
+                headers[index] && headers[index].toLowerCase().trim() === header
+            );
+            
+            if (!headersValid) {
+                showParseError('CSV headers must be exactly: name,detail,reference,domain (in order). Found: ' + headers.map(h => '"' + h + '"').join(', '));
+                return;
+            }
 
-        // Parse data rows
-        for (let i = 1; i < lines.length; i++) {
-            const columns = parseCSVLine(lines[i]);
-            if (columns.length >= 4) {
+            // Parse data rows
+            csvData = [];
+            for (let i = 1; i < allRows.length; i++) {
+                const columns = allRows[i];
+                if (columns.length === 0 || (columns.length === 1 && columns[0].trim() === '')) {
+                    continue; // Skip empty rows
+                }
+                
+                if (columns.length < 4) {
+                    console.warn(`Row ${i}: has only ${columns.length} columns (need 4), skipping`);
+                    continue;
+                }
+                
                 const rowData = {
                     rowNumber: i,
                     name: columns[0]?.trim() || '',
@@ -624,7 +862,11 @@
                     reference: columns[2]?.trim() || '',
                     domain: columns[3]?.trim() || '',
                     valid: true,
-                    errors: []
+                    errors: [],
+                    action: 'new',
+                    matchingRate: 'none',
+                    suggestedMatch: null,
+                    analyzed: false
                 };
                 
                 // Validate required fields
@@ -639,33 +881,253 @@
                 
                 csvData.push(rowData);
             }
-        }
+            
+            if (csvData.length === 0) {
+                showParseError('No valid data rows found in CSV file.');
+                return;
+            }
 
-        displayPreview();
-        showCatalogOptions();
+            displayPreview();
+            analyzeControlsSimilarity();
+            showCatalogOptions();
+        } catch (error) {
+            showParseError('Error parsing CSV: ' + error.message);
+            console.error('CSV Parse Error:', error);
+        }
+    }
+    
+    // Show parse error with visual feedback
+    function showParseError(message) {
+        const previewSection = document.getElementById('previewSection');
+        const previewStats = document.getElementById('previewStats');
+        const previewError = document.getElementById('previewError');
+        const previewTableBody = document.getElementById('previewTableBody');
+        const previewEmpty = document.getElementById('previewEmpty');
+        
+        previewSection.style.display = 'block';
+        previewStats.innerHTML = '<span style="color: #dc3545;">❌ Parse Error</span>';
+        previewError.style.display = 'block';
+        previewError.innerHTML = `
+            <strong>❌ CSV Parse Error:</strong><br>
+            ${message}<br><br>
+            <small>Please ensure your CSV file:</small>
+            <ul style="margin: 8px 0; padding-left: 20px;">
+                <li>Has headers: name,detail,reference,domain</li>
+                <li>Uses double quotes for fields with commas or newlines</li>
+                <li>Escapes quotes inside quoted fields by doubling them ("")</li>
+                <li>Uses standard line breaks (LF or CRLF)</li>
+                <li>Is saved as UTF-8 encoding</li>
+            </ul>
+        `;
+        
+        // Clear table
+        previewTableBody.innerHTML = '';
+        previewEmpty.style.display = 'block';
+        
+        // Hide other sections
+        document.getElementById('catalogSection').style.display = 'none';
+        document.getElementById('importSection').style.display = 'none';
     }
 
-    // Simple CSV parser that handles quoted fields
-    function parseCSVLine(line) {
-        const result = [];
-        let current = '';
-        let inQuotes = false;
+    // Analyze controls for similarity using AI - streaming results as they arrive
+    function analyzeControlsSimilarity() {
+        const progressDiv = document.getElementById('analysisProgress');
+        const validControls = csvData.filter(row => row.valid);
         
-        for (let i = 0; i < line.length; i++) {
-            const char = line[i];
-            
-            if (char === '"') {
-                inQuotes = !inQuotes;
-            } else if (char === ',' && !inQuotes) {
-                result.push(current);
-                current = '';
-            } else {
-                current += char;
-            }
+        if (validControls.length === 0) {
+            return; // Nothing to analyze
         }
-        result.push(current);
         
-        return result.map(field => field.replace(/^"|"$/g, ''));
+        progressDiv.style.display = 'block';
+        analysisResults = {};
+        analysisInProgress = {};
+        let completedCount = 0;
+        const totalCount = validControls.length;
+        
+        // Display initial table
+        updatePreviewWithAnalysis();
+        
+        // Analyze each control independently and stream results
+        validControls.forEach((control, index) => {
+            const controlDTO = {
+                name: control.name,
+                detail: control.detail,
+                reference: control.reference,
+                domain: control.domain
+            };
+            
+            // Mark as in progress
+            analysisInProgress[control.rowNumber] = true;
+            updatePreviewWithAnalysis();
+            
+            fetch('/api/security-control/import/analyze-single', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(controlDTO)
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(result => {
+                    // Store result
+                    analysisResults[control.rowNumber] = result;
+                    completedCount++;
+                    
+                    // Clear in progress flag
+                    analysisInProgress[control.rowNumber] = false;
+                    
+                    // Update progress bar
+                    const progressBar = document.getElementById('progressBar');
+                    const progressText = document.getElementById('progressText');
+                    const progress = (completedCount / totalCount) * 100;
+                    progressBar.style.width = progress + '%';
+                    progressText.textContent = completedCount + '/' + totalCount;
+                    
+                    // Update preview with new result immediately
+                    updatePreviewWithAnalysis();
+                    
+                    // Hide progress when done
+                    if (completedCount === totalCount) {
+                        setTimeout(() => {
+                            progressDiv.style.display = 'none';
+                        }, 500);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error analyzing control:', control.name, error);
+                    completedCount++;
+                    
+                    // Clear in progress flag
+                    analysisInProgress[control.rowNumber] = false;
+                    
+                    // Still update progress even on error
+                    const progressBar = document.getElementById('progressBar');
+                    const progressText = document.getElementById('progressText');
+                    const progress = (completedCount / totalCount) * 100;
+                    progressBar.style.width = progress + '%';
+                    progressText.textContent = completedCount + '/' + totalCount;
+                    
+                    // Update preview with partial results
+                    updatePreviewWithAnalysis();
+                    
+                    // Hide progress when done
+                    if (completedCount === totalCount) {
+                        setTimeout(() => {
+                            progressDiv.style.display = 'none';
+                            console.warn('Analysis completed with some errors');
+                        }, 500);
+                    }
+                });
+        });
+    }
+
+    // Update preview table with analysis results
+    function updatePreviewWithAnalysis() {
+        const previewTableBody = document.getElementById('previewTableBody');
+        previewTableBody.innerHTML = '';
+        
+        csvData.forEach(row => {
+            const tr = document.createElement('tr');
+            
+            if (!row.valid) {
+                tr.className = 'error-row';
+            } else {
+                // Get analysis result for this control if available
+                if (analysisResults[row.rowNumber]) {
+                    const analysis = analysisResults[row.rowNumber];
+                    row.matchingRate = analysis.matchingRate;
+                    row.action = analysis.recommendedAction;
+                    if (analysis.suggestedMergeControl) {
+                        row.suggestedMatch = analysis.suggestedMergeControl;
+                    }
+                    row.analyzed = true;
+                }
+                
+                // Check if currently being analyzed
+                if (analysisInProgress[row.rowNumber]) {
+                    tr.className = 'row-analyzing';
+                } else {
+                    // Apply styling based on matching rate
+                    if (row.matchingRate === 'high') {
+                        tr.className = 'match-high';
+                    } else if (row.matchingRate === 'medium') {
+                        tr.className = 'match-medium';
+                    } else if (row.matchingRate === 'low') {
+                        tr.className = 'match-low';
+                    } else {
+                        tr.className = 'match-none';
+                    }
+                }
+            }
+            
+            // Build row HTML
+            let statusHtml;
+            if (!row.valid) {
+                statusHtml = '<span style="color: #dc3545;">✗ ' + row.errors.join(', ') + '</span>';
+            } else if (analysisInProgress[row.rowNumber]) {
+                statusHtml = '<span style="color: #007bff;">⏳ Analyzing...</span>';
+            } else {
+                statusHtml = '<span style="color: #28a745;">✓ Valid</span>';
+            }
+            
+            let matchBadge = row.analyzed ? '' : '<span style="color: #999; font-size: 11px;">Pending...</span>';
+            if (row.matchingRate === 'high') {
+                matchBadge = '<span class="match-badge-high">High</span>';
+            } else if (row.matchingRate === 'medium') {
+                matchBadge = '<span class="match-badge-medium">Medium</span>';
+            } else if (row.matchingRate === 'low') {
+                matchBadge = '<span class="match-badge-low">Low</span>';
+            } else if (row.analyzed) {
+                matchBadge = '<span class="match-badge-none">None</span>';
+            }
+            
+            let actionSelect = '<select class="action-select action-selector" data-row="' + row.rowNumber + '"' + (row.valid ? '' : ' disabled') + '>';
+            if (row.matchingRate !== 'none' && row.suggestedMatch) {
+                actionSelect += '<option value="merge:' + row.suggestedMatch.existingControlId + '" selected>Merge</option>';
+                actionSelect += '<option value="new">Create New</option>';
+                actionSelect += '<option value="skip">Skip</option>';
+            } else {
+                actionSelect += '<option value="new" selected>Create New</option>';
+                actionSelect += '<option value="skip">Skip</option>';
+            }
+            actionSelect += '</select>';
+            
+            const suggestionInfo = row.suggestedMatch ? 
+                ' (' + row.suggestedMatch.existingControlName.substring(0, 30) + ')' : '';
+            
+            tr.innerHTML = `
+                <td>${row.rowNumber}</td>
+                <td title="${row.name}">${row.name.substring(0, 30)}${row.name.length > 30 ? '...' : ''}</td>
+                <td title="${row.detail.replace(/\n/g, ' ')}">${row.detail.substring(0, 35).replace(/\n/g, ' ')}${row.detail.length > 35 ? '...' : ''}</td>
+                <td title="${row.reference}">${row.reference}</td>
+                <td title="${row.domain}">${row.domain}</td>
+                <td>${matchBadge}${suggestionInfo ? '<br><small>' + suggestionInfo + '</small>' : ''}</td>
+                <td>${actionSelect}</td>
+                <td>${statusHtml}</td>
+            `;
+            
+            previewTableBody.appendChild(tr);
+        });
+        
+        // Add event listeners to action selectors
+        document.querySelectorAll('.action-selector').forEach(select => {
+            select.addEventListener('change', function() {
+                const rowNumber = parseInt(this.dataset.row);
+                const row = csvData.find(r => r.rowNumber === rowNumber);
+                if (row) {
+                    row.action = this.value;
+                }
+            });
+        });
+        
+        // Hide empty message
+        document.getElementById('previewEmpty').style.display = 'none';
     }
 
     // Display preview
@@ -673,9 +1135,10 @@
         const previewSection = document.getElementById('previewSection');
         const previewStats = document.getElementById('previewStats');
         const previewWarnings = document.getElementById('previewWarnings');
-        const previewTableBody = document.getElementById('previewTableBody');
+        const previewError = document.getElementById('previewError');
         
         previewSection.style.display = 'block';
+        previewError.style.display = 'none';
         
         const validRows = csvData.filter(row => row.valid).length;
         const invalidRows = csvData.length - validRows;
@@ -698,27 +1161,6 @@
         } else {
             previewWarnings.style.display = 'none';
         }
-        
-        // Populate preview table
-        previewTableBody.innerHTML = '';
-        csvData.forEach(row => {
-            const tr = document.createElement('tr');
-            tr.className = row.valid ? 'valid-row' : 'error-row';
-            
-            const status = row.valid ? 
-                '<span style="color: #28a745;">✓ Valid</span>' : 
-                '<span style="color: #dc3545;">✗ ' + row.errors.join(', ') + '</span>';
-            
-            tr.innerHTML = `
-                <td>${row.rowNumber}</td>
-                <td title="${row.name}">${row.name.substring(0, 30)}${row.name.length > 30 ? '...' : ''}</td>
-                <td title="${row.detail}">${row.detail.substring(0, 40)}${row.detail.length > 40 ? '...' : ''}</td>
-                <td title="${row.reference}">${row.reference}</td>
-                <td title="${row.domain}">${row.domain}</td>
-                <td>${status}</td>
-            `;
-            previewTableBody.appendChild(tr);
-        });
     }
 
     // Show catalog options
@@ -728,27 +1170,6 @@
 
     // Load available catalogs
     function loadAvailableCatalogs() {
-        console.log('Testing API endpoint connectivity...');
-        
-        // First test if the API endpoint is reachable
-        fetch('/api/security-catalogs/test')
-            .then(response => {
-                console.log('Test endpoint response:', response.status);
-                if (response.ok) {
-                    console.log('API endpoint is reachable, loading catalogs...');
-                    return loadCatalogsFromApi();
-                } else {
-                    throw new Error('API endpoint test failed');
-                }
-            })
-            .catch(error => {
-                console.error('API test failed, trying direct approach:', error);
-                // Try direct approach anyway
-                loadCatalogsFromApi();
-            });
-    }
-    
-    function loadCatalogsFromApi() {
         console.log('Loading catalogs from /api/security-catalogs');
         fetch('/api/security-catalogs', {
             method: 'GET',
@@ -758,8 +1179,6 @@
             }
         })
             .then(response => {
-                console.log('Response status:', response.status);
-                console.log('Response headers:', response.headers);
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
@@ -784,7 +1203,6 @@
             })
             .catch(error => {
                 console.error('Error loading catalogs:', error);
-                // Fallback - hide existing catalog option if API fails
                 document.getElementById('existingCatalog').disabled = true;
                 document.getElementById('existingCatalogStatus').textContent = `Error loading catalogs: ${error.message}`;
             });
@@ -825,7 +1243,14 @@
         const importSummary = document.getElementById('importSummary');
         const catalogOption = document.querySelector('input[name="catalogOption"]:checked').value;
         
-        let summaryText = `<p><strong>Ready to import ${csvData.filter(row => row.valid).length} security controls</strong></p>`;
+        let validCount = csvData.filter(row => row.valid && row.action !== 'skip').length;
+        let mergeCount = csvData.filter(row => row.valid && row.action.startsWith('merge:')).length;
+        let newCount = validCount - mergeCount;
+        
+        let summaryText = `<p><strong>📋 Import Plan:</strong><br>`;
+        summaryText += `Total: ${validCount} controls | `;
+        summaryText += `<span style="color: #007bff;">Merge: ${mergeCount}</span> | `;
+        summaryText += `<span style="color: #28a745;">New: ${newCount}</span></p>`;
         
         if (catalogOption === 'existing') {
             const selectedCatalog = document.getElementById('catalogSelect');
@@ -881,6 +1306,15 @@
         
         document.getElementById('catalogOptionInput').value = catalogOption;
         
+        // Build merge actions object
+        const mergeActions = {};
+        csvData.forEach(row => {
+            if (row.valid && row.action !== 'skip') {
+                mergeActions[row.name] = row.action;
+            }
+        });
+        document.getElementById('mergeActionsInput').value = JSON.stringify(mergeActions);
+        
         // Add the file to the form
         const fileInput = document.createElement('input');
         fileInput.type = 'file';
@@ -903,6 +1337,8 @@
     // Reset form function
     function resetForm() {
         csvData = [];
+        analysisResults = {};
+        analysisInProgress = {};
         csvFile.value = '';
         previewBtn.disabled = true;
         
@@ -910,6 +1346,10 @@
         document.getElementById('previewSection').style.display = 'none';
         document.getElementById('catalogSection').style.display = 'none';
         document.getElementById('importSection').style.display = 'none';
+        
+        // Clear errors
+        document.getElementById('previewError').style.display = 'none';
+        document.getElementById('previewEmpty').style.display = 'none';
         
         // Reset radio buttons
         document.getElementById('noCatalog').checked = true;

@@ -58,7 +58,9 @@ public class SecurityConfig {
             "/layoutConfig",
             "/login", // Allow login page
             "/admin/auth-config/**", // Allow auth config interface
-            "/admin/auth-config"
+            "/admin/auth-config",
+            "/api/security-control/import/**", // Allow security control import API endpoints
+            "/api/security-catalogs" // Allow catalog listing API endpoint
     };
 
     private static final Logger logger = Logger.getLogger(SecurityConfig.class.getName());
