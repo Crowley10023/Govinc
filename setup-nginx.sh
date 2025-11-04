@@ -64,7 +64,25 @@ get_domain_name() {
 }
 
 create_ssl_certificate() {
-    log_info "Creating SSL certificate directories..."
+    log_info "Checking for existing certificates in current directory..."
+    # Look for cert and key files matching domain name
+    if [[ -f "./$DOMAIN_NAME.crt" && -f "./$DOMAIN_NAME.key" ]]; then
+        read -p "Found $DOMAIN_NAME.crt and $DOMAIN_NAME.key in current directory. Use them? (y/n) " choice
+        case "$choice" in
+            y|Y|yes|YES)
+                SSL_CERT_PATH="$PWD"
+                SSL_KEY_PATH="$PWD"
+                log_info "Using existing certificates from current directory."
+                ;;
+            *)
+                log_info "Will create certificates in default locations."
+                ;;
+        esac
+    else
+        log_info "No certificates found in current directory."
+    fi
+
+    log_info "Creating SSL certificate directories if needed..."
     mkdir -p "$SSL_CERT_PATH"
     mkdir -p "$SSL_KEY_PATH"
     
