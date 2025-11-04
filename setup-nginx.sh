@@ -64,22 +64,46 @@ get_domain_name() {
 }
 
 create_ssl_certificate() {
-    log_info "Checking for existing certificates in current directory..."
-    # Look for cert and key files matching domain name
-    if [[ -f "./$DOMAIN_NAME.crt" && -f "./$DOMAIN_NAME.key" ]]; then
-        read -p "Found $DOMAIN_NAME.crt and $DOMAIN_NAME.key in current directory. Use them? (y/n) " choice
+    log_info "Searching for existing certificate and key files in the current directory..."
+    # Look for any .crt and .key files in the current directory
+    cert_files=("$(find . -maxdepth 1 -type f -name "*.crt" 2>/dev/null | tr "\n" " ")")
+    key_files=("$(find . -maxdepth 1 -type f -name "*.key" 2>/dev/null | tr "\n" " ")")
+    
+    if [[ ${#cert_files[@]} -gt 0 && ${#key_files[@]} -gt 0 ]]; then
+        # Prefer files that match the domain name if available
+        selected_cert=""
+        selected_key=""
+        for c in ${cert_files[@]}; do
+            if [[ "$c" == *"$DOMAIN_NAME.crt" ]]; then
+                selected_cert="$c"
+                break
+            fi
+        done
+        for k in ${key_files[@]}; do
+            if [[ "$k" == *"$DOMAIN_NAME.key" ]]; then
+                selected_key="$k"
+                break
+            fi
+        done
+        # If no exact match, pick the first
+        if [[ -z "$selected_cert" ]]; then selected_cert="${cert_files[0]}"; fi
+        if [[ -z "$selected_key" ]]; then selected_key="${key_files[0]}"; fi
+        
+        echo "Found the following certificate files:"; echo ${cert_files[@]}
+        echo "Found the following key files:"; echo ${key_files[@]}
+        read -p "Use $selected_cert and $selected_key? (y/n) " choice
         case "$choice" in
             y|Y|yes|YES)
-                SSL_CERT_PATH="$PWD"
-                SSL_KEY_PATH="$PWD"
-                log_info "Using existing certificates from current directory."
+                SSL_CERT_PATH=$(dirname "$selected_cert")
+                SSL_KEY_PATH=$(dirname "$selected_key")
+                log_info "Using existing certificates from $(pwd)."
                 ;;
             *)
                 log_info "Will create certificates in default locations."
                 ;;
         esac
     else
-        log_info "No certificates found in current directory."
+        log_info "No matching certificate/key pair found in the current directory."
     fi
 
     log_info "Creating SSL certificate directories if needed..."
