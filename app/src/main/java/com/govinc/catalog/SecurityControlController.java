@@ -35,7 +35,8 @@ public class SecurityControlController {
 
     @GetMapping("/edit")
     public String editSecurityControl(@RequestParam(required = false) Long id, Model model) {
-        SecurityControl control = id != null ? service.findById(id).orElse(new SecurityControl()) : new SecurityControl();
+        SecurityControl control = id != null ? service.findById(id).orElse(new SecurityControl())
+                : new SecurityControl();
         model.addAttribute("securityControl", control);
         model.addAttribute("securityControlDomains", securityControlDomainService.findAll());
         return "edit-security-control";
@@ -44,7 +45,8 @@ public class SecurityControlController {
     @PostMapping("/edit")
     public String saveSecurityControl(@ModelAttribute SecurityControl control) {
         if (control.getSecurityControlDomain() != null && control.getSecurityControlDomain().getId() != null) {
-            SecurityControlDomain domain = securityControlDomainService.findById(control.getSecurityControlDomain().getId()).orElse(null);
+            SecurityControlDomain domain = securityControlDomainService
+                    .findById(control.getSecurityControlDomain().getId()).orElse(null);
             control.setSecurityControlDomain(domain);
         } else {
             control.setSecurityControlDomain(null);
@@ -65,7 +67,7 @@ public class SecurityControlController {
         }
         return "redirect:/security-control/list";
     }
-    
+
     @PostMapping("/delete/api")
     @ResponseBody
     public Map<String, Object> deleteSecurityControlApi(@RequestParam Long id) {
@@ -82,15 +84,16 @@ public class SecurityControlController {
             // Handle foreign key constraint violations
             String message = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
             String userMessage;
-            
+
             if (message.contains("foreign key constraint") || message.contains("constraint")) {
-                userMessage = "Cannot delete this security control because it is currently linked to one or more catalogs or used in assessments. " +
-                             "Please unlink it from all catalogs and remove it from all assessments first.";
+                userMessage = "Cannot delete this security control because it is currently linked to one or more catalogs or used in assessments. "
+                        +
+                        "Please unlink it from all catalogs and remove it from all assessments first.";
             } else {
                 userMessage = "Cannot delete this security control due to a data constraint. " +
-                             "It may be referenced elsewhere in the system.";
+                        "It may be referenced elsewhere in the system.";
             }
-            
+
             response.put("success", false);
             response.put("message", userMessage);
             response.put("errorType", "CONSTRAINT_VIOLATION");
@@ -99,7 +102,7 @@ public class SecurityControlController {
         } catch (Exception e) {
             response.put("success", false);
             String userMessage = "An unexpected error occurred while deleting the security control. " +
-                               "Please try again or contact support if the problem persists.";
+                    "Please try again or contact support if the problem persists.";
             response.put("message", userMessage);
             response.put("errorType", "GENERAL_ERROR");
             System.err.println("[DELETE] Unexpected error: " + e.getMessage());
@@ -125,19 +128,19 @@ public class SecurityControlController {
             @RequestParam(value = "catalogRevision", required = false) String catalogRevision,
             @RequestParam(value = "mergeActions", required = false) String mergeActionsJson,
             RedirectAttributes redirectAttributes) {
-        
+
         System.out.println("\n========================================");
         System.out.println("[IMPORT] POST /security-control/import called");
         System.out.println("[IMPORT] File: " + (file != null ? file.getOriginalFilename() : "null"));
         System.out.println("[IMPORT] Catalog Option: " + catalogOption);
         System.out.println("[IMPORT] Merge Actions JSON: " + mergeActionsJson);
         System.out.println("========================================");
-        
+
         if (file.isEmpty()) {
             redirectAttributes.addFlashAttribute("message", "Please select a CSV file to upload.");
             return "redirect:/security-control/list";
         }
-        
+
         // Parse merge actions if provided
         java.util.Map<String, java.util.Map<String, String>> mergeActions = new java.util.HashMap<>();
         if (mergeActionsJson != null && !mergeActionsJson.isEmpty() && !mergeActionsJson.equals("{}")) {
@@ -152,7 +155,7 @@ public class SecurityControlController {
                 e.printStackTrace();
             }
         }
-        
+
         // Parse existingCatalogId
         Long existingCatalogId = null;
         if (existingCatalogIdStr != null && !existingCatalogIdStr.isEmpty()) {
@@ -162,10 +165,10 @@ public class SecurityControlController {
                 System.err.println("[IMPORT] Invalid catalog ID: " + existingCatalogIdStr);
             }
         }
-        
+
         try {
             System.out.println("[IMPORT] Starting import process");
-            
+
             // Handle catalog creation/selection
             SecurityCatalog targetCatalog = null;
             if ("existing".equals(catalogOption) && existingCatalogId != null) {
@@ -184,53 +187,54 @@ public class SecurityControlController {
                 targetCatalog = securityCatalogService.save(targetCatalog);
                 System.out.println("[IMPORT] Created new catalog: " + targetCatalog.getName());
             }
-            
+
             // Import security controls
             java.util.List<SecurityControl> importedControls = new java.util.ArrayList<>();
             int successCount = 0;
             int errorCount = 0;
             int skipCount = 0;
-            
-            try (BufferedReader br = new BufferedReader(new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
+
+            try (BufferedReader br = new BufferedReader(
+                    new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
                 String line;
                 boolean isHeader = true;
                 int rowNumber = 0;
-                
+
                 // Parse the entire CSV file properly (handling multiline quoted fields)
                 String csvContent = readAllContent(br);
                 List<String[]> allRows = parseCSVContent(csvContent);
                 System.out.println("[IMPORT] Total rows parsed: " + allRows.size());
-                
+
                 for (int rowIdx = 0; rowIdx < allRows.size(); rowIdx++) {
                     if (isHeader) {
                         isHeader = false; // skip CSV header
                         System.out.println("[IMPORT] Skipping header row");
                         continue;
                     }
-                    
+
                     rowNumber = rowIdx; // Data row number (after header)
-                    
+
                     try {
                         String[] columns = allRows.get(rowIdx);
                         System.out.println("[IMPORT] Processing row " + rowNumber + ": " + columns.length + " columns");
-                        
+
                         if (columns.length < 4) {
                             errorCount++;
                             System.out.println("[IMPORT] Row " + rowNumber + ": Skipped (insufficient columns)");
                             continue;
                         }
-                        
+
                         String name = columns[0].trim().replaceAll("^\"|\"$", "");
                         String description = columns[1].trim().replaceAll("^\"|\"$", "");
                         String reference = columns[2].trim().replaceAll("^\"|\"$", "");
                         String domainName = columns[3].trim().replaceAll("^\"|\"$", "");
-                        
+
                         if (name.isEmpty() || domainName.isEmpty()) {
                             errorCount++;
                             System.out.println("[IMPORT] Row " + rowNumber + ": Skipped (missing required fields)");
                             continue; // must have required fields
                         }
-                        
+
                         // Check merge actions and get translated data if available
                         java.util.Map<String, String> actionInfo = mergeActions.get(name);
                         String mergeAction = null;
@@ -244,27 +248,31 @@ public class SecurityControlController {
                             }
                             if (translatedDetail != null && !translatedDetail.isEmpty()) {
                                 description = translatedDetail;
+                                String translatedDomainName = actionInfo.get("translatedDomainName");
+                                if (translatedDomainName != null && !translatedDomainName.isEmpty()) {
+                                    domainName = translatedDomainName;
+                                }
                             }
                         }
-                        
+
                         // Check if this control should be skipped
                         if ("skip".equals(mergeAction)) {
                             skipCount++;
                             System.out.println("[IMPORT] Row " + rowNumber + ": Skipped (user action) - " + name);
                             continue;
                         }
-                        
+
                         SecurityControlDomain domain = securityControlDomainService.findAll().stream()
-                            .filter(d -> d.getName().equalsIgnoreCase(domainName)).findFirst().orElse(null);
+                                .filter(d -> d.getName().equalsIgnoreCase(domainName)).findFirst().orElse(null);
                         if (domain == null) {
                             domain = new SecurityControlDomain(domainName, "");
                             domain = securityControlDomainService.save(domain);
                             System.out.println("[IMPORT]   Created new domain: " + domainName);
                         }
-                        
+
                         // Check if this control should be merged with existing control
                         SecurityControl sc = null;
-                        
+
                         if (mergeAction != null && mergeAction.startsWith("merge:")) {
                             // Merge with existing control
                             try {
@@ -272,7 +280,8 @@ public class SecurityControlController {
                                 java.util.Optional<SecurityControl> existingOpt = service.findById(existingControlId);
                                 if (existingOpt.isPresent()) {
                                     sc = existingOpt.get();
-                                    System.out.println("[IMPORT] Row " + rowNumber + ": Merging with existing control ID " + existingControlId);
+                                    System.out.println("[IMPORT] Row " + rowNumber
+                                            + ": Merging with existing control ID " + existingControlId);
                                     // Update with imported data if empty or merge information
                                     if (sc.getDetail() == null || sc.getDetail().isEmpty()) {
                                         sc.setDetail(description);
@@ -283,7 +292,8 @@ public class SecurityControlController {
                                     sc = service.save(sc);
                                 } else {
                                     // Merge target not found, create new
-                                    System.out.println("[IMPORT] Row " + rowNumber + ": Merge target not found, creating new");
+                                    System.out.println(
+                                            "[IMPORT] Row " + rowNumber + ": Merge target not found, creating new");
                                     sc = new SecurityControl();
                                     sc.setName(name);
                                     sc.setDetail(description);
@@ -293,7 +303,8 @@ public class SecurityControlController {
                                 }
                             } catch (Exception mergeEx) {
                                 // If merge fails, create new
-                                System.err.println("[IMPORT] Row " + rowNumber + ": Merge failed, creating new control");
+                                System.err
+                                        .println("[IMPORT] Row " + rowNumber + ": Merge failed, creating new control");
                                 sc = new SecurityControl();
                                 sc.setName(name);
                                 sc.setDetail(description);
@@ -311,10 +322,10 @@ public class SecurityControlController {
                             sc.setSecurityControlDomain(domain);
                             sc = service.save(sc);
                         }
-                        
+
                         importedControls.add(sc);
                         successCount++;
-                        
+
                     } catch (Exception rowEx) {
                         errorCount++;
                         // Log the error but continue processing other rows
@@ -323,18 +334,21 @@ public class SecurityControlController {
                     }
                 }
             }
-            
+
             // Link imported controls to catalog if specified
             if (targetCatalog != null && !importedControls.isEmpty()) {
-                java.util.Set<SecurityControl> catalogControls = new java.util.HashSet<>(targetCatalog.getSecurityControls());
+                java.util.Set<SecurityControl> catalogControls = new java.util.HashSet<>(
+                        targetCatalog.getSecurityControls());
                 catalogControls.addAll(importedControls);
                 targetCatalog.setSecurityControls(catalogControls);
                 securityCatalogService.save(targetCatalog);
-                System.out.println("[IMPORT] Linked " + importedControls.size() + " controls to catalog: " + targetCatalog.getName());
+                System.out.println("[IMPORT] Linked " + importedControls.size() + " controls to catalog: "
+                        + targetCatalog.getName());
             }
-            
+
             // Prepare success message
-            String message = String.format("Import completed! Successfully imported %d security controls.", successCount);
+            String message = String.format("Import completed! Successfully imported %d security controls.",
+                    successCount);
             if (skipCount > 0) {
                 message += String.format(" %d rows were skipped.", skipCount);
             }
@@ -344,21 +358,21 @@ public class SecurityControlController {
             if (targetCatalog != null) {
                 message += String.format(" All controls linked to catalog '%s'.", targetCatalog.getName());
             }
-            
+
             System.out.println("[IMPORT] " + message);
             redirectAttributes.addFlashAttribute("message", message);
-            
+
         } catch (Exception ex) {
             System.err.println("[IMPORT] Import failed with exception: " + ex.getMessage());
             ex.printStackTrace();
             redirectAttributes.addFlashAttribute("message", "Import failed: " + ex.getMessage());
         }
-        
+
         System.out.println("[IMPORT] Redirecting to /security-control/list");
         System.out.println("========================================\n");
         return "redirect:/security-control/list";
     }
-    
+
     // Helper method to parse merge actions from JSON (with translation data)
     private java.util.Map<String, java.util.Map<String, String>> parseJsonMergeActions(String json) {
         java.util.Map<String, java.util.Map<String, String>> actions = new java.util.HashMap<>();
@@ -367,19 +381,18 @@ public class SecurityControlController {
             System.out.println("[PARSE] Parsing merge actions JSON: " + json);
             // Extract each control entry
             java.util.regex.Pattern controlPattern = java.util.regex.Pattern.compile(
-                "\"([^\"]+?)\":\\s*\\{([^}]+)\\}"
-            );
+                    "\"([^\"]+?)\":\\s*\\{([^}]+)\\}");
             java.util.regex.Matcher controlMatcher = controlPattern.matcher(json);
-            
+
             while (controlMatcher.find()) {
                 String controlName = controlMatcher.group(1);
                 String controlData = controlMatcher.group(2);
-                
+
                 // Parse action, translatedName, translatedDetail from controlData
                 String action = extractJsonValue(controlData, "action");
                 String translatedName = extractJsonValue(controlData, "translatedName");
                 String translatedDetail = extractJsonValue(controlData, "translatedDetail");
-                
+
                 java.util.Map<String, String> controlInfo = new java.util.HashMap<>();
                 controlInfo.put("action", action);
                 if (translatedName != null && !translatedName.isEmpty()) {
@@ -388,10 +401,10 @@ public class SecurityControlController {
                 if (translatedDetail != null && !translatedDetail.isEmpty()) {
                     controlInfo.put("translatedDetail", translatedDetail);
                 }
-                
+
                 actions.put(controlName, controlInfo);
-                System.out.println("[PARSE]   " + controlName + " -> action: " + action + 
-                    ", translated: " + (translatedName != null && !translatedName.isEmpty()));
+                System.out.println("[PARSE]   " + controlName + " -> action: " + action +
+                        ", translated: " + (translatedName != null && !translatedName.isEmpty()));
             }
             System.out.println("[PARSE] Total actions parsed: " + actions.size());
         } catch (Exception e) {
@@ -400,13 +413,12 @@ public class SecurityControlController {
         }
         return actions;
     }
-    
+
     // Helper to extract JSON string value
     private String extractJsonValue(String json, String key) {
         try {
             java.util.regex.Pattern p = java.util.regex.Pattern.compile(
-                "\"" + key + "\":\\s*\"([^\"]*?)\""
-            );
+                    "\"" + key + "\":\\s*\"([^\"]*?)\"");
             java.util.regex.Matcher m = p.matcher(json);
             if (m.find()) {
                 return m.group(1);
@@ -416,7 +428,7 @@ public class SecurityControlController {
         }
         return null;
     }
-    
+
     // Helper method to read all content from BufferedReader
     private String readAllContent(BufferedReader br) throws java.io.IOException {
         StringBuilder content = new StringBuilder();
@@ -426,7 +438,7 @@ public class SecurityControlController {
         }
         return content.toString();
     }
-    
+
     // Helper method to parse CSV content with proper quote handling (RFC 4180)
     // Handles quoted fields that can contain newlines, commas, and escaped quotes
     private java.util.List<String[]> parseCSVContent(String csvContent) {
@@ -434,11 +446,11 @@ public class SecurityControlController {
         java.util.List<String> fields = new java.util.ArrayList<>();
         StringBuilder currentField = new StringBuilder();
         boolean inQuotes = false;
-        
+
         int i = 0;
         while (i < csvContent.length()) {
             char c = csvContent.charAt(i);
-            
+
             if (c == '"') {
                 if (inQuotes && i + 1 < csvContent.length() && csvContent.charAt(i + 1) == '"') {
                     // Escaped quote ("")
@@ -452,7 +464,7 @@ public class SecurityControlController {
                     continue;
                 }
             }
-            
+
             if (c == ',' && !inQuotes) {
                 // End of field
                 fields.add(currentField.toString().trim());
@@ -460,7 +472,7 @@ public class SecurityControlController {
                 i++;
                 continue;
             }
-            
+
             if ((c == '\n' || c == '\r') && !inQuotes) {
                 // End of row
                 if (!currentField.toString().isEmpty() || fields.size() > 0) {
@@ -479,11 +491,11 @@ public class SecurityControlController {
                 }
                 continue;
             }
-            
+
             currentField.append(c);
             i++;
         }
-        
+
         // Add last field and row if content doesn't end with newline
         if (!currentField.toString().isEmpty() || fields.size() > 0) {
             fields.add(currentField.toString().trim());
@@ -491,20 +503,21 @@ public class SecurityControlController {
                 rows.add(fields.toArray(new String[0]));
             }
         }
-        
+
         System.out.println("[PARSE] CSV parsing complete: " + rows.size() + " rows parsed");
         return rows;
     }
-    
-    // Helper method to parse CSV line with proper quote handling (kept for reference/legacy)
+
+    // Helper method to parse CSV line with proper quote handling (kept for
+    // reference/legacy)
     private String[] parseCSVLine(String line) {
         java.util.List<String> result = new java.util.ArrayList<>();
         StringBuilder current = new StringBuilder();
         boolean inQuotes = false;
-        
+
         for (int i = 0; i < line.length(); i++) {
             char c = line.charAt(i);
-            
+
             if (c == '"') {
                 inQuotes = !inQuotes;
             } else if (c == ',' && !inQuotes) {
@@ -515,7 +528,7 @@ public class SecurityControlController {
             }
         }
         result.add(current.toString());
-        
+
         return result.toArray(new String[0]);
     }
 }
