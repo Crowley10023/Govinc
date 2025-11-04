@@ -1995,14 +1995,20 @@ network segmentation","SC-7","Network"</div>
                 matchCell = matchBadge;
             }
             
+            // Determine the action to preselect
+            let selectedActionValue = row.action || 'new';
+            
             let actionSelect = '<select class="action-select action-selector" data-row="' + row.rowNumber + '">';
             if (row.matchingRate !== 'none' && row.suggestedMatch) {
                 const mergeValue = 'merge:' + row.suggestedMatch.existingControlId;
-                // Default to 'merge' when there's a match
-                actionSelect += '<option value="' + mergeValue + '" selected>Merge</option>';
-                actionSelect += '<option value="new">Create New</option>';
+                // Preselect merge when there's a match
+                const mergeSelected = (selectedActionValue === mergeValue) ? ' selected' : '';
+                const newSelected = (selectedActionValue === 'new') ? ' selected' : '';
+                actionSelect += '<option value="' + mergeValue + '"' + mergeSelected + '>Merge</option>';
+                actionSelect += '<option value="new"' + newSelected + '>Create New</option>';
                 actionSelect += '<option value="skip">Skip</option>';
             } else {
+                // No match - always preselect 'new'
                 actionSelect += '<option value="new" selected>Create New</option>';
                 actionSelect += '<option value="skip">Skip</option>';
             }
@@ -2025,18 +2031,6 @@ network segmentation","SC-7","Network"</div>
         const selectors = document.querySelectorAll('.action-selector');
         selectors.forEach(sel => {
             const rowNumber = parseInt(sel.dataset.row);
-            // Find the corresponding row and sync the initial value
-            for (let j = 0; j < csvData.length; j++) {
-                if (csvData[j].rowNumber === rowNumber) {
-                    // Set the dropdown value to match the current action in csvData
-                    sel.value = csvData[j].action;
-                    // If no match found, ensure 'new' is selected
-                    if (csvData[j].matchingRate === 'none' && csvData[j].action === 'new') {
-                        sel.value = 'new';
-                    }
-                    break;
-                }
-            }
             
             sel.addEventListener('change', function() {
                 const rowNumber = parseInt(this.dataset.row);

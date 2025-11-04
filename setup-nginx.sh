@@ -11,7 +11,7 @@ set -e
 
 # Configuration variables
 DOMAIN_NAME=""
-APP_NAME="theia01-governance"
+APP_NAME="compliance_incubator"
 NGINX_SITES_AVAILABLE="/etc/nginx/sites-available"
 NGINX_SITES_ENABLED="/etc/nginx/sites-enabled"
 SSL_CERT_PATH="/etc/ssl/certs"

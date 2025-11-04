@@ -196,7 +196,8 @@
                         <button type="button" 
                                 class="btn-delete btn-delete-trigger"
                                 th:data-id="${domain.id}"
-                                th:data-name="${domain.name}">
+                                th:data-name="${domain.name}"
+                                onclick="handleDeleteClick(event)">
                             Delete
                         </button>
                     </div>
@@ -237,16 +238,12 @@
 <script>
     let pendingDeleteId = null;
 
-    // Initialize delete buttons
-    document.addEventListener('DOMContentLoaded', function() {
-        document.querySelectorAll('.btn-delete-trigger').forEach(button => {
-            button.addEventListener('click', function() {
-                const id = this.getAttribute('data-id');
-                const name = this.getAttribute('data-name');
-                openDeleteModal(id, name);
-            });
-        });
-    });
+    function handleDeleteClick(event) {
+        const button = event.target;
+        const id = button.getAttribute('data-id');
+        const name = button.getAttribute('data-name');
+        openDeleteModal(id, name);
+    }
 
     function openDeleteModal(id, name) {
         pendingDeleteId = id;
@@ -260,7 +257,13 @@
     }
 
     function confirmDelete() {
-        if (!pendingDeleteId) return;
+        if (!pendingDeleteId) {
+            showResultModal(false, 'Deletion Failed', 'Invalid domain ID. Please try again.', false);
+            return;
+        }
+
+        // Store the ID before closing modal (important!)
+        const idToDelete = pendingDeleteId;
 
         // Close confirmation modal
         closeDeleteModal();
@@ -269,24 +272,38 @@
         const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
         const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
 
-        // Send delete request
+        // Send delete request with numeric id
+        const trimmedId = String(idToDelete).trim();
+        const deleteId = Number(trimmedId);
+        
+        if (isNaN(deleteId) || deleteId <= 0) {
+            showResultModal(false, 'Deletion Failed', 'Invalid domain ID. Please try again.', false);
+            return;
+        }
+
+        const body = 'id=' + deleteId;
+
         fetch('/security-control-domain/delete', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 [csrfHeader]: csrfToken
             },
-            body: 'id=' + encodeURIComponent(pendingDeleteId)
+            body: body
         })
         .then(response => {
             if (response.ok) {
-                return response.text();
+                return response.json();
             } else {
                 throw new Error('Delete failed with status ' + response.status);
             }
         })
         .then(data => {
-            showResultModal(true, 'Deletion Successful', 'The security control domain has been deleted successfully.', true);
+            if (data.success) {
+                showResultModal(true, 'Deletion Successful', 'The security control domain has been deleted successfully.', true);
+            } else {
+                showResultModal(false, data.title || 'Deletion Failed', data.message || 'An error occurred while deleting the domain.', false);
+            }
         })
         .catch(error => {
             console.error('Error:', error);
