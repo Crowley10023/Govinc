@@ -262,8 +262,9 @@ public class SecurityControlController {
                             continue;
                         }
 
+                        final String domainNameForFilter = domainName;
                         SecurityControlDomain domain = securityControlDomainService.findAll().stream()
-                                .filter(d -> d.getName().equalsIgnoreCase(domainName)).findFirst().orElse(null);
+                                .filter(d -> d.getName().equalsIgnoreCase(domainNameForFilter)).findFirst().orElse(null);
                         if (domain == null) {
                             domain = new SecurityControlDomain(domainName, "");
                             domain = securityControlDomainService.save(domain);
