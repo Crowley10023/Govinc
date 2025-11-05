@@ -15,6 +15,7 @@ import com.govinc.organization.OrgServiceAssessmentControl;
 import com.govinc.user.User;
 import com.govinc.user.UserRepository;
 import com.govinc.catalog.SecurityControlDomain;
+import com.govinc.entity.OrganisationDetailsRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -67,6 +68,9 @@ public class AssessmentController {
 
     @Autowired
     private AssessmentReporter assessmentReporter;
+
+    @Autowired
+    private OrganisationDetailsRepository organisationDetailsRepository;
 
     @GetMapping("/create")
     public String showCreateAssessmentForm(Model model) {
@@ -602,15 +606,33 @@ public class AssessmentController {
         List<AssessmentControlAnswer> answers = (details.getControlAnswers() != null)
                 ? new ArrayList<>(details.getControlAnswers())
                 : new ArrayList<>();
+        
+        // Retrieve template path from OrganisationDetails if available
+        String templatePath = null;
         try {
-            byte[] wordBytes = assessmentReporter.createWordReport(assessment, details, users, orgUnit, answers);
+            com.govinc.entity.OrganisationDetails orgDetails = organisationDetailsRepository.findAll().stream().findFirst().orElse(null);
+            if (orgDetails != null && orgDetails.getWordTemplatePath() != null && !orgDetails.getWordTemplatePath().isEmpty()) {
+                java.io.File templateFile = new java.io.File(orgDetails.getWordTemplatePath());
+                if (templateFile.exists()) {
+                    templatePath = orgDetails.getWordTemplatePath();
+                    System.out.println("[AssessmentController] Using template from OrganisationDetails: " + templatePath);
+                } else {
+                    System.out.println("[AssessmentController] Template file not found at: " + orgDetails.getWordTemplatePath());
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[AssessmentController] Error retrieving template path: " + e.getMessage());
+        }
+        
+        try {
+            byte[] wordBytes = assessmentReporter.createWordReport(assessment, details, users, orgUnit, answers, templatePath);
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=assessment_" + id + ".docx")
                     .contentType(MediaType
                             .parseMediaType("application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
                     .body(wordBytes);
         } catch (Exception e) {
-            e.printStackTrace(); // <-- Add this line
+            e.printStackTrace();
             byte[] failBytes = ("Error creating Word document: " + e.getMessage()).getBytes(StandardCharsets.UTF_8);
             return ResponseEntity.internalServerError()
                     .contentType(MediaType.APPLICATION_OCTET_STREAM)

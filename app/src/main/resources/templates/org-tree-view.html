@@ -26,33 +26,44 @@
         }
 
         .org-node {
-            fill: #f7fafc;
-            stroke: #4682b4;
-            stroke-width: 2;
-            rx: 6;
+            fill: #ffffff;
+            stroke: #2c5aa0;
+            stroke-width: 2.5;
+            rx: 8;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+            transition: fill 0.2s ease, stroke-width 0.2s ease;
+        }
+
+        .org-node:hover {
+            fill: #e8f1f8;
+            stroke-width: 3;
         }
 
         .org-label {
-            font-family: Arial, sans-serif;
-            font-size: 16px;
-            fill: #2c3e50;
-            font-weight: bold;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 13px;
+            fill: #1a3d5c;
+            font-weight: 600;
             text-anchor: middle;
             alignment-baseline: middle;
+            pointer-events: none;
         }
 
         .org-link {
-            stroke: #b0b0b0;
+            stroke: #9ca3af;
             stroke-width: 2;
+            fill: none;
         }
         .expand-btn {
             cursor: pointer;
-            fill: #4682b4;
+            fill: #2c5aa0;
             user-select: none;
         }
         .selected-node {
-            stroke: #e67e22 !important;
-            stroke-width: 4 !important;
+            fill: #fff3cd !important;
+            stroke: #ff9800 !important;
+            stroke-width: 3.5 !important;
+            filter: drop-shadow(0 3px 6px rgba(255, 152, 0, 0.3)) !important;
         }
 
         .zoom-controls {
@@ -229,7 +240,7 @@
         function drawOrgTreeWithSiblings(parentNode, selectedNodeId, svgWidth, startY, level, svgDisplayWidth) {
             const treeGroup = document.getElementById('orgTreeGroup');
             treeGroup.innerHTML = '';
-            const nodeW = 120, nodeH = 40, vSpacing = 90;
+            const nodeW = 160, nodeH = 60, vSpacing = 80;
             const children = parentNode.children || [];
             const n = children.length;
             const spacing = svgDisplayWidth / (n + 1);
@@ -266,6 +277,8 @@
         function drawNode(parent, node, x, y, w, h, highlight) {
             const nodeGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
             nodeGroup.setAttribute('id', 'node-' + node.id);
+            nodeGroup.style.cursor = 'pointer';
+            
             const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
             r.setAttribute('x', x - w/2);
             r.setAttribute('y', y);
@@ -274,11 +287,50 @@
             r.classList.add('org-node');
             if (highlight) r.classList.add('selected-node');
             nodeGroup.appendChild(r);
+            
             const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
             t.setAttribute('x', x);
-            t.setAttribute('y', y + h/2 + 6);
+            t.setAttribute('y', y + h/2 - 2);
             t.classList.add('org-label');
-            t.textContent = node.name;
+            
+            // Split long names into multiple lines
+            if (node.name && node.name.length > 16) {
+                const words = node.name.split(' ');
+                let line1 = '', line2 = '';
+                let currentLine = '';
+                
+                for (let word of words) {
+                    if ((currentLine + (currentLine ? ' ' : '') + word).length <= 10) {
+                        currentLine += (currentLine ? ' ' : '') + word;
+                    } else {
+                        if (!line1) line1 = currentLine;
+                        else {
+                            line2 = currentLine;
+                            break;
+                        }
+                        currentLine = word;
+                    }
+                }
+                if (!line1) line1 = currentLine;
+                else if (!line2) line2 = currentLine;
+                
+                const tspan1 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+                tspan1.setAttribute('x', x);
+                tspan1.setAttribute('dy', '0');
+                tspan1.textContent = line1;
+                t.appendChild(tspan1);
+                
+                if (line2) {
+                    const tspan2 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+                    tspan2.setAttribute('x', x);
+                    tspan2.setAttribute('dy', '1.2em');
+                    tspan2.textContent = line2;
+                    t.appendChild(tspan2);
+                }
+            } else {
+                t.textContent = node.name;
+            }
+            
             nodeGroup.appendChild(t);
             parent.appendChild(nodeGroup);
         }
@@ -297,7 +349,7 @@
         function drawOrgTreeFull(root, svgWidth, startY, level, svgDisplayWidth) {
             const treeGroup = document.getElementById('orgTreeGroup');
             treeGroup.innerHTML = '';
-            const nodeW = 120, nodeH = 40, hSpacing = 160, vSpacing = 90;
+            const nodeW = 160, nodeH = 60, hSpacing = 160, vSpacing = 80;
             function computeSubtreeWidth(node) {
                 if (!node.children || node.children.length === 0) return 1;
                 return node.children.map(computeSubtreeWidth).reduce((a,b)=>a+b,0);
@@ -338,6 +390,8 @@
             positions.forEach(pos => {
                 const nodeGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
                 nodeGroup.setAttribute('id', 'node-'+pos.node.id);
+                nodeGroup.style.cursor = 'pointer';
+                
                 const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
                 r.setAttribute('x', pos.x-nodeW/2);
                 r.setAttribute('y', pos.y);
@@ -345,11 +399,50 @@
                 r.setAttribute('height', nodeH);
                 r.classList.add('org-node');
                 nodeGroup.appendChild(r);
+                
                 const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
                 t.setAttribute('x', pos.x);
-                t.setAttribute('y', pos.y+nodeH/2+6);
+                t.setAttribute('y', pos.y+nodeH/2-2);
                 t.classList.add('org-label');
-                t.textContent = pos.node.name;
+                
+                // Split long names into multiple lines
+                if (pos.node.name && pos.node.name.length > 16) {
+                    const words = pos.node.name.split(' ');
+                    let line1 = '', line2 = '';
+                    let currentLine = '';
+                    
+                    for (let word of words) {
+                        if ((currentLine + (currentLine ? ' ' : '') + word).length <= 10) {
+                            currentLine += (currentLine ? ' ' : '') + word;
+                        } else {
+                            if (!line1) line1 = currentLine;
+                            else {
+                                line2 = currentLine;
+                                break;
+                            }
+                            currentLine = word;
+                        }
+                    }
+                    if (!line1) line1 = currentLine;
+                    else if (!line2) line2 = currentLine;
+                    
+                    const tspan1 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+                    tspan1.setAttribute('x', pos.x);
+                    tspan1.setAttribute('dy', '0');
+                    tspan1.textContent = line1;
+                    t.appendChild(tspan1);
+                    
+                    if (line2) {
+                        const tspan2 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+                        tspan2.setAttribute('x', pos.x);
+                        tspan2.setAttribute('dy', '1.2em');
+                        tspan2.textContent = line2;
+                        t.appendChild(tspan2);
+                    }
+                } else {
+                    t.textContent = pos.node.name;
+                }
+                
                 nodeGroup.appendChild(t);
                 treeGroup.appendChild(nodeGroup);
             });

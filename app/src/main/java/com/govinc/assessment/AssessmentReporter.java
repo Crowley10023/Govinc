@@ -22,6 +22,11 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import org.apache.poi.xwpf.usermodel.*;
+import org.apache.poi.util.IOUtils;
+import java.io.File;
+import java.io.FileInputStream;
+
 @Component
 public class AssessmentReporter {
 
@@ -42,7 +47,7 @@ public class AssessmentReporter {
     public byte[] createPdfReport(Assessment assessment, AssessmentDetails details, java.util.List<User> users,
             OrgUnit orgUnit, java.util.List<AssessmentControlAnswer> answers) throws Exception {
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-            Document doc = new Document();
+            com.itextpdf.text.Document doc = new com.itextpdf.text.Document();
             PdfWriter writer = PdfWriter.getInstance(doc, baos);
             doc.open();
 
@@ -468,344 +473,567 @@ public class AssessmentReporter {
     }
 
     /**
-     * Creates a Word report (DOCX) using Apache POI, similar in structure to
-     * createPdfReport.
+     * Creates a Word report (DOCX) using Apache POI with optional template.
+     * If a Word template is configured, it will be used as the base document.
+     * Template placeholders like {{TITLE}}, {{ASSESSMENT_NAME}}, {{GENERATED_DATE}}, etc. will be replaced with actual data.
+     * If no placeholders are found, the full report content is appended to the template.
      * 
      * @param assessment The assessment instance
      * @param details    Assessment metadata
      * @param users      Users involved
      * @param orgUnit    OrgUnit
      * @param answers    List of control answers
+     * @param templatePath Optional path to a template .docx file
      * @return DOCX word report as byte array
      */
     public byte[] createWordReport(Assessment assessment, AssessmentDetails details, java.util.List<User> users,
-            OrgUnit orgUnit, java.util.List<AssessmentControlAnswer> answers) throws Exception {
-        // Uses Apache POI (XWPF* classes)
+            OrgUnit orgUnit, java.util.List<AssessmentControlAnswer> answers, String templatePath) throws Exception {
+        XWPFDocument doc = null;
+        boolean templateLoaded = false;
+        
+        // Try to load template if provided
+        if (templatePath != null && !templatePath.isEmpty()) {
+            try {
+                File templateFile = new File(templatePath);
+                if (templateFile.exists()) {
+                    doc = new XWPFDocument(new FileInputStream(templateFile));
+                    templateLoaded = true;
+                    System.out.println("[AssessmentReporter] Loaded template from: " + templatePath);
+                } else {
+                    System.out.println("[AssessmentReporter] Template file not found at: " + templatePath);
+                    doc = new XWPFDocument();
+                }
+            } catch (Exception e) {
+                System.err.println("[AssessmentReporter] Error loading template: " + e.getMessage());
+                doc = new XWPFDocument();
+            }
+        } else {
+            doc = new XWPFDocument();
+        }
+
         try (java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream()) {
-            org.apache.poi.xwpf.usermodel.XWPFDocument doc = new org.apache.poi.xwpf.usermodel.XWPFDocument();
-
-            // --------- Title Page ---------
-            org.apache.poi.xwpf.usermodel.XWPFParagraph title = doc.createParagraph();
-            title.setStyle("Heading1");
-            org.apache.poi.xwpf.usermodel.XWPFRun run = title.createRun();
-            run.setText("Assessment Report");
-            run.setBold(true);
-            run.setFontSize(22);
-            run.addBreak();
-
-            org.apache.poi.xwpf.usermodel.XWPFParagraph meta = doc.createParagraph();
-            org.apache.poi.xwpf.usermodel.XWPFRun metarun = meta.createRun();
-            metarun.setText("Generated on: " + java.time.LocalDateTime.now()
-                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
-            metarun.setFontSize(12);
-            metarun.addBreak();
-            metarun.addBreak();
-
-            doc.createParagraph(); // blank
-
-            // --------- Table of Contents (manual entry) -----------
-            org.apache.poi.xwpf.usermodel.XWPFParagraph tocTitle = doc.createParagraph();
-            org.apache.poi.xwpf.usermodel.XWPFRun tocRun = tocTitle.createRun();
-            tocRun.setText("Contents");
-            tocRun.setBold(true);
-            tocRun.setFontSize(16);
-            tocRun.addBreak();
-            String[] toc = new String[] { "1. General Information", "2. Users and Organization",
-                    "3. Assessment Summary", "4. Domain Overview Table", "5. Controls by Domain" };
-            for (String item : toc) {
-                org.apache.poi.xwpf.usermodel.XWPFParagraph p = doc.createParagraph();
-                org.apache.poi.xwpf.usermodel.XWPFRun r = p.createRun();
-                r.setText(item);
-                r.setFontSize(12);
-            }
-            doc.createParagraph();
-            // -------------------------------------------------------
-
-            // Gather all controls, answers, and scoring (same as in PDF report)
-            java.util.List<SecurityControl> allControls = assessment.getSecurityCatalog().getSecurityControls();
-            java.util.Map<Long, AssessmentControlAnswer> answerMap = answers.stream()
-                    .collect(java.util.stream.Collectors.toMap(
-                            a -> a.getSecurityControl().getId(),
-                            a -> a,
-                            (a1, a2) -> a1 // If duplicate, keep the first
-                    ));
-
-            // --- 1. General Info ---
-            org.apache.poi.xwpf.usermodel.XWPFParagraph genInfoHeader = doc.createParagraph();
-            org.apache.poi.xwpf.usermodel.XWPFRun genInfoRun = genInfoHeader.createRun();
-            genInfoRun.setText("1. General Information");
-            genInfoRun.setBold(true);
-            genInfoRun.setFontSize(16);
-
-            addKeyValue(doc, "Assessment Name: ", assessment.getName());
-            addKeyValue(doc, "Assessment ID: ", String.valueOf(assessment.getId()));
-            addKeyValue(doc, "Date: ", assessment.getDate() != null ? assessment.getDate().toString() : "-");
-            addKeyValue(doc, "Catalog: ",
-                    (assessment.getSecurityCatalog() != null ? assessment.getSecurityCatalog().getName() : "-"));
-            addKeyValue(doc, "Completed On: ", details.getDate() != null ? details.getDate().toString() : "-");
-            doc.createParagraph();
-
-            // --- 2. Users & Organization ---
-            org.apache.poi.xwpf.usermodel.XWPFParagraph usersHeader = doc.createParagraph();
-            org.apache.poi.xwpf.usermodel.XWPFRun usersRun = usersHeader.createRun();
-            usersRun.setText("2. Users and Organization");
-            usersRun.setBold(true);
-            usersRun.setFontSize(16);
-
-            if (orgUnit != null) {
-                addKeyValue(doc, "Org Unit: ", orgUnit.getName());
+            
+            // If template was successfully loaded, replace placeholders in template
+            if (templateLoaded) {
+                replacePlaceholdersInTemplate(doc, assessment, details, users, orgUnit, answers);
             } else {
-                addKeyValue(doc, "Org Unit: ", "-");
+                // Generate content from scratch if no template
+                generateDefaultReport(doc, assessment, details, users, orgUnit, answers);
             }
-            if (!users.isEmpty()) {
-                org.apache.poi.xwpf.usermodel.XWPFParagraph up = doc.createParagraph();
-                org.apache.poi.xwpf.usermodel.XWPFRun ur = up.createRun();
-                ur.setBold(true);
-                ur.setText("Users Participating:");
-                for (User u : users) {
-                    org.apache.poi.xwpf.usermodel.XWPFParagraph userline = doc.createParagraph();
-                    org.apache.poi.xwpf.usermodel.XWPFRun userrun = userline.createRun();
-                    userrun.setText(u.getName() + " <" + u.getEmail() + ">");
-                }
-            } else {
-                addKeyValue(doc, "Users: ", "-");
-            }
-            doc.createParagraph();
-
-            // --- 3. Assessment Summary ---
-            org.apache.poi.xwpf.usermodel.XWPFParagraph summaryHeader = doc.createParagraph();
-            org.apache.poi.xwpf.usermodel.XWPFRun summaryRun = summaryHeader.createRun();
-            summaryRun.setText("3. Assessment Summary");
-            summaryRun.setBold(true);
-            summaryRun.setFontSize(16);
-            doc.createParagraph();
-
-            // --- AI-Generated Summary (matches PDF logic) ---
-            OpenAIConfiguration config = openAIConfigurationRepository.findAll().stream().findFirst().orElse(null);
-            if (config != null && config.getSummaryPrompt() != null && !config.getSummaryPrompt().isBlank()) {
-                java.util.List<String> answerTexts = answers.stream()
-                        .map(a -> {
-                            MaturityAnswer ma = a.getMaturityAnswer();
-                            return ma != null ? ma.getAnswer() : null;
-                        })
-                        .filter(s -> s != null && !s.isBlank())
-                        .collect(java.util.stream.Collectors.toList());
-                String prompt = config.getSummaryPrompt() + "\n---\n" + String.join("\n", answerTexts);
-                String summary;
-                try {
-                    summary = openAIUtil.askAI(prompt);
-                    System.out.println("[OpenAI AssessmentReporter] API result: " + summary);
-                } catch (Exception ex) {
-                    summary = "AI-generated summary: Not available (OpenAI API not reachable)";
-                    System.err.println("[OpenAI AssessmentReporter] OpenAI API call failed: " + ex.getMessage());
-                }
-                org.apache.poi.xwpf.usermodel.XWPFParagraph summaryAI = doc.createParagraph();
-                org.apache.poi.xwpf.usermodel.XWPFRun aiRun = summaryAI.createRun();
-                aiRun.setBold(true);
-                aiRun.setItalic(true);
-                aiRun.setFontSize(13);
-                aiRun.setText("Assessment AI-generated summary:");
-
-                org.apache.poi.xwpf.usermodel.XWPFParagraph summaryText = doc.createParagraph();
-                org.apache.poi.xwpf.usermodel.XWPFRun sumRun = summaryText.createRun();
-                sumRun.setText(summary);
-            }
-
-            if (assessment.getOrgServices() != null && !assessment.getOrgServices().isEmpty()) {
-                org.apache.poi.xwpf.usermodel.XWPFParagraph orgSvcHead = doc.createParagraph();
-                org.apache.poi.xwpf.usermodel.XWPFRun osvRun = orgSvcHead.createRun();
-                osvRun.setText("3.1 Assigned Org Services");
-                osvRun.setBold(true);
-                osvRun.setFontSize(13);
-                org.apache.poi.xwpf.usermodel.XWPFTable svcTable = doc.createTable();
-                // header
-                org.apache.poi.xwpf.usermodel.XWPFTableRow tRow = svcTable.getRow(0);
-                tRow.getCell(0).setText("Org Service");
-                tRow.addNewTableCell().setText("Description");
-                for (com.govinc.organization.OrgService orgService : assessment.getOrgServices()) {
-                    org.apache.poi.xwpf.usermodel.XWPFTableRow row = svcTable.createRow();
-                    row.getCell(0).setText(orgService.getName());
-                    row.getCell(1).setText(orgService.getDescription() != null ? orgService.getDescription() : "-");
-                }
-            }
-
-            // Score summary
-            int totalScore = 0;
-            int numAnswered = 0;
-            java.util.Map<Long, Integer> scoresByControl = new java.util.HashMap<>();
-            for (SecurityControl ctrl : allControls) {
-                if (answerMap.containsKey(ctrl.getId())) {
-                    AssessmentControlAnswer aca = answerMap.get(ctrl.getId());
-                    int score = aca.getScore();
-                    scoresByControl.put(ctrl.getId(), score);
-                    totalScore += score;
-                    numAnswered++;
-                }
-            }
-            double avgScore = numAnswered > 0 ? (totalScore / (double) numAnswered) : 0.0;
-
-            org.apache.poi.xwpf.usermodel.XWPFParagraph summaryTableIntro = doc.createParagraph();
-            org.apache.poi.xwpf.usermodel.XWPFRun summaryTableIntroRun = summaryTableIntro.createRun();
-            summaryTableIntroRun.setText("Assessment Summary Table:");
-            org.apache.poi.xwpf.usermodel.XWPFTable summaryTable = doc.createTable();
-            org.apache.poi.xwpf.usermodel.XWPFTableRow stRow = summaryTable.getRow(0);
-            stRow.getCell(0).setText("# Security Controls");
-            stRow.addNewTableCell().setText("Average Score (%)");
-            stRow.addNewTableCell().setText("Org Unit");
-            org.apache.poi.xwpf.usermodel.XWPFTableRow stData = summaryTable.createRow();
-            stData.getCell(0).setText(String.valueOf(allControls.size()));
-            stData.getCell(1).setText(String.format("%.1f", avgScore));
-            stData.getCell(2).setText(orgUnit != null ? orgUnit.getName() : "-");
-
-            doc.createParagraph();
-
-            // --- 4. Domain Overview Table ---
-            org.apache.poi.xwpf.usermodel.XWPFParagraph domainOverviewHeader = doc.createParagraph();
-            org.apache.poi.xwpf.usermodel.XWPFRun domainOverviewRun = domainOverviewHeader.createRun();
-            domainOverviewRun.setText("4. Domain Overview Table");
-            domainOverviewRun.setBold(true);
-            domainOverviewRun.setFontSize(16);
-
-            java.util.Map<String, java.util.List<SecurityControl>> controlsPerDomain = allControls.stream()
-                    .collect(java.util.stream.Collectors.groupingBy(
-                            ctrl -> ctrl.getSecurityControlDomain() != null ? ctrl.getSecurityControlDomain().getName()
-                                    : "Unknown"));
-            org.apache.poi.xwpf.usermodel.XWPFTable overviewTable = doc.createTable();
-            org.apache.poi.xwpf.usermodel.XWPFTableRow ovwHeader = overviewTable.getRow(0);
-            ovwHeader.getCell(0).setText("Security Control Domain");
-            ovwHeader.addNewTableCell().setText("Score (%)");
-            for (String domain : controlsPerDomain.keySet()) {
-                java.util.List<SecurityControl> domainCtrls = controlsPerDomain.get(domain);
-                int sc = 0, n = 0;
-                for (SecurityControl ctrl : domainCtrls) {
-                    if (scoresByControl.containsKey(ctrl.getId())) {
-                        sc += scoresByControl.get(ctrl.getId());
-                        n++;
-                    }
-                }
-                double perc = n > 0 ? (sc / (double) n) : 0.0;
-                org.apache.poi.xwpf.usermodel.XWPFTableRow rw = overviewTable.createRow();
-                rw.getCell(0).setText(domain);
-                rw.getCell(1).setText(String.format("%.1f", perc));
-            }
-
-            doc.createParagraph();
-
-            // --- 5. Controls by Domain (detailed) ---
-            org.apache.poi.xwpf.usermodel.XWPFParagraph controlsDomainHeader = doc.createParagraph();
-            org.apache.poi.xwpf.usermodel.XWPFRun controlsDomainRun = controlsDomainHeader.createRun();
-            controlsDomainRun.setText("5. Controls by Domain");
-            controlsDomainRun.setBold(true);
-            controlsDomainRun.setFontSize(16);
-            doc.createParagraph();
-
-            java.util.List<String> domainOrder = new java.util.ArrayList<>(controlsPerDomain.keySet());
-            java.util.Collections.sort(domainOrder);
-            int domainNum = 1;
-
-            for (String domain : domainOrder) {
-                java.util.List<SecurityControl> ctrlList = controlsPerDomain.get(domain);
-                org.apache.poi.xwpf.usermodel.XWPFParagraph domP = doc.createParagraph();
-                org.apache.poi.xwpf.usermodel.XWPFRun domRun = domP.createRun();
-                domRun.setText("5." + domainNum + " " + domain);
-                domRun.setBold(true);
-                domRun.setFontSize(13);
-
-                org.apache.poi.xwpf.usermodel.XWPFTable t = doc.createTable();
-                org.apache.poi.xwpf.usermodel.XWPFTableRow h = t.getRow(0);
-                h.getCell(0).setText("Title");
-                h.addNewTableCell().setText("Description");
-                h.addNewTableCell().setText("Reference");
-                h.addNewTableCell().setText("Answer");
-                h.addNewTableCell().setText("Answer Source");
-                for (SecurityControl ctrl : ctrlList) {
-                    String tt = ctrl.getName() != null ? ctrl.getName() : "-";
-                    String desc = ctrl.getDetail() != null ? ctrl.getDetail() : "-";
-                    String ref = ctrl.getReference() != null ? ctrl.getReference() : "-";
-                    String answ = "-";
-                    String src = "-";
-                    boolean foundServiceAnswer = false;
-                    // Only use an org service answer if this control is actually covered (mapped)
-                    // by this org service AND is applicable
-                    if (assessment.getOrgServices() != null) {
-                        for (com.govinc.organization.OrgService orgService : assessment.getOrgServices()) {
-                            com.govinc.organization.OrgServiceAssessment osa = orgServiceAssessmentService
-                                    .findOrCreateAssessment(orgService.getId());
-                            if (osa != null && osa.getControls() != null) {
-                                for (com.govinc.organization.OrgServiceAssessmentControl osac : osa.getControls()) {
-                                    if (osac.getSecurityControl() != null
-                                            && osac.getSecurityControl().getId().equals(ctrl.getId())
-                                            && osac.isApplicable()) {
-                                        Integer osPercent = osac.getPercent();
-                                        if (osPercent != null) {
-                                            java.util.Set<com.govinc.maturity.MaturityAnswer> maturityAnswersSet = assessment
-                                                    .getSecurityCatalog().getMaturityModel().getMaturityAnswers();
-                                            com.govinc.maturity.MaturityAnswer closest = maturityAnswersSet.stream()
-                                                    .min(java.util.Comparator
-                                                            .comparingInt(ma -> Math.abs(ma.getScore() - osPercent)))
-                                                    .orElse(null);
-                                            if (closest != null) {
-                                                answ = closest.getAnswer();
-                                            } else {
-                                                answ = String.valueOf(osPercent) + "%";
-                                            }
-                                            src = orgService.getName();
-                                            foundServiceAnswer = true;
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                            if (foundServiceAnswer)
-                                break;
-                        }
-                    }
-                    // If no org service provided answer, use assessment answer if available
-                    if (!foundServiceAnswer && answerMap.containsKey(ctrl.getId())) {
-                        MaturityAnswer ma = answerMap.get(ctrl.getId()).getMaturityAnswer();
-                        if (ma != null) {
-                            answ = ma.getAnswer();
-                            src = "Assessment";
-                        }
-                    }
-                    if (!foundServiceAnswer && answerMap.containsKey(ctrl.getId())) {
-                        MaturityAnswer ma = answerMap.get(ctrl.getId()).getMaturityAnswer();
-                        if (ma != null)
-                            answ = ma.getAnswer();
-                        src = "Assessment";
-                    }
-                    org.apache.poi.xwpf.usermodel.XWPFTableRow row = t.createRow();
-                    row.getCell(0).setText(tt);
-                    row.getCell(1).setText(desc);
-                    row.getCell(2).setText(ref);
-                    row.getCell(3).setText(answ);
-                    row.getCell(4).setText(src);
-                }
-                domainNum++;
-            }
-
-            // Footer paragraph
-            org.apache.poi.xwpf.usermodel.XWPFParagraph footer = doc.createParagraph();
-            org.apache.poi.xwpf.usermodel.XWPFRun footerRun = footer.createRun();
-            footerRun.setItalic(true);
-            footerRun.setFontSize(10);
-            footerRun.setText("Generated by GovInc Assessment System on: " + java.time.LocalDateTime.now()
-                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
 
             // Serialize document
             doc.write(baos);
             return baos.toByteArray();
         }
-
     }
 
-    // Helper: Add key-value pair to document as single paragraph
-    private void addKeyValue(org.apache.poi.xwpf.usermodel.XWPFDocument doc, String key, String value) {
-        org.apache.poi.xwpf.usermodel.XWPFParagraph p = doc.createParagraph();
-        org.apache.poi.xwpf.usermodel.XWPFRun k = p.createRun();
+    /**
+     * Replaces placeholders in a template Word document with actual assessment data.
+     * Looks for patterns like {{PLACEHOLDER_NAME}} in paragraphs and table cells.
+     * If placeholders are found, only replacements are done.
+     * If no placeholders are found, the full report content is appended to the template.
+     */
+    private void replacePlaceholdersInTemplate(XWPFDocument doc, Assessment assessment, AssessmentDetails details,
+            java.util.List<User> users, OrgUnit orgUnit, java.util.List<AssessmentControlAnswer> answers) throws Exception {
+        
+        System.out.println("[AssessmentReporter] Processing " + doc.getParagraphs().size() + " paragraphs");
+        
+        // Track if any placeholders were found and replaced
+        boolean foundPlaceholders = false;
+        
+        // Replace placeholders in paragraphs
+        for (XWPFParagraph para : doc.getParagraphs()) {
+            if (replacePlaceholdersInParagraph(para, assessment, details, users, orgUnit)) {
+                foundPlaceholders = true;
+            }
+        }
+        
+        // Replace placeholders in tables
+        for (XWPFTable table : doc.getTables()) {
+            for (XWPFTableRow row : table.getRows()) {
+                for (XWPFTableCell cell : row.getTableCells()) {
+                    for (XWPFParagraph para : cell.getParagraphs()) {
+                        if (replacePlaceholdersInParagraph(para, assessment, details, users, orgUnit)) {
+                            foundPlaceholders = true;
+                        }
+                    }
+                }
+            }
+        }
+        
+        System.out.println("[AssessmentReporter] Placeholders found: " + foundPlaceholders);
+        
+        // If no placeholders were found, append full report content to the template
+        if (!foundPlaceholders) {
+            System.out.println("[AssessmentReporter] No placeholders found. Appending full report content to template.");
+            appendFullReportToTemplate(doc, assessment, details, users, orgUnit, answers);
+        } else {
+            System.out.println("[AssessmentReporter] Template placeholders replaced successfully");
+        }
+    }
+
+    /**
+     * Appends the full default report content to an existing template document.
+     */
+    private void appendFullReportToTemplate(XWPFDocument doc, Assessment assessment, AssessmentDetails details,
+            java.util.List<User> users, OrgUnit orgUnit, java.util.List<AssessmentControlAnswer> answers) throws Exception {
+        
+        System.out.println("[AssessmentReporter] Appending full report to template");
+        
+        // Add separator
+        XWPFParagraph separator = doc.createParagraph();
+        separator.createRun().setText("--- Assessment Report Content ---");
+        doc.createParagraph();
+        
+        // Generate and append the full report content
+        generateDefaultReport(doc, assessment, details, users, orgUnit, answers);
+    }
+
+    /**
+     * Replaces placeholders in a single paragraph, handling multi-run text properly.
+     * Returns true if any placeholder was replaced, false otherwise.
+     */
+    private boolean replacePlaceholdersInParagraph(XWPFParagraph para, Assessment assessment, AssessmentDetails details,
+            java.util.List<User> users, OrgUnit orgUnit) {
+        
+        // Collect all text from all runs
+        StringBuilder fullText = new StringBuilder();
+        java.util.List<XWPFRun> allRuns = new java.util.ArrayList<>(para.getRuns());
+        for (int i = 0; i < allRuns.size(); i++) {
+            XWPFRun run = allRuns.get(i);
+            String runText = run.getText(0);
+            if (runText != null) {
+                fullText.append(runText);
+            }
+        }
+        
+        String text = fullText.toString();
+        
+        // Define replacements map
+        java.util.Map<String, String> replacements = new java.util.HashMap<>();
+        replacements.put("{{TITLE}}", "Assessment Report");
+        replacements.put("{{ASSESSMENT_NAME}}", assessment.getName() != null ? assessment.getName() : "");
+        replacements.put("{{ASSESSMENT_ID}}", String.valueOf(assessment.getId()));
+        replacements.put("{{ASSESSMENT_DATE}}", assessment.getDate() != null ? assessment.getDate().toString() : "-");
+        replacements.put("{{CATALOG_NAME}}", assessment.getSecurityCatalog() != null ? assessment.getSecurityCatalog().getName() : "-");
+        replacements.put("{{COMPLETED_DATE}}", details.getDate() != null ? details.getDate().toString() : "-");
+        replacements.put("{{ORG_UNIT}}", orgUnit != null ? orgUnit.getName() : "-");
+        replacements.put("{{GENERATED_DATE}}", java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
+        replacements.put("{{USERS_COUNT}}", String.valueOf(users.size()));
+        
+        String modifiedText = text;
+        boolean foundAny = false;
+        for (java.util.Map.Entry<String, String> entry : replacements.entrySet()) {
+            if (text.contains(entry.getKey())) {
+                foundAny = true;
+                modifiedText = modifiedText.replace(entry.getKey(), entry.getValue());
+            }
+        }
+        
+        if (foundAny) {
+            System.out.println("[AssessmentReporter] Replacing: '" + text + "' -> '" + modifiedText + "'");
+            
+            // Preserve formatting from first run if available
+            XWPFRun templateRun = (allRuns.size() > 0) ? allRuns.get(0) : null;
+            
+            // Remove all existing runs from back to front to preserve indices
+            for (int i = allRuns.size() - 1; i >= 0; i--) {
+                para.removeRun(i);
+            }
+            
+            // Create new run with modified text
+            XWPFRun newRun = para.createRun();
+            newRun.setText(modifiedText);
+            
+            // Copy formatting from template run if available
+            if (templateRun != null) {
+                try {
+                    if (templateRun.isBold()) newRun.setBold(true);
+                    if (templateRun.isItalic()) newRun.setItalic(true);
+                    if (templateRun.getUnderline() != null) newRun.setUnderline(templateRun.getUnderline());
+                    if (templateRun.getFontSize() > 0) newRun.setFontSize(templateRun.getFontSize());
+                    if (templateRun.getFontName() != null) newRun.setFontFamily(templateRun.getFontName());
+                    String color = templateRun.getColor();
+                    if (color != null && !color.isEmpty()) newRun.setColor(color);
+                } catch (Exception e) {
+                    System.out.println("[AssessmentReporter] Could not copy formatting: " + e.getMessage());
+                }
+            }
+        }
+        
+        return foundAny;
+    }
+
+    /**
+     * Generates a default Word report from scratch when no template is available.
+     */
+    private void generateDefaultReport(XWPFDocument doc, Assessment assessment, AssessmentDetails details,
+            java.util.List<User> users, OrgUnit orgUnit, java.util.List<AssessmentControlAnswer> answers) throws Exception {
+        
+        // --------- Title Page ---------
+        XWPFParagraph title = doc.createParagraph();
+        XWPFRun run = title.createRun();
+        run.setText("Assessment Report");
+        run.setBold(true);
+        run.setFontSize(22);
+        run.setColor("1F2E8B");
+        run.addBreak();
+
+        XWPFParagraph meta = doc.createParagraph();
+        XWPFRun metarun = meta.createRun();
+        metarun.setText("Generated on: " + java.time.LocalDateTime.now()
+                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
+        metarun.setFontSize(12);
+        metarun.addBreak();
+        metarun.addBreak();
+
+        doc.createParagraph(); // blank
+
+        // --------- Table of Contents (manual entry) -----------
+        XWPFParagraph tocTitle = doc.createParagraph();
+        XWPFRun tocRun = tocTitle.createRun();
+        tocRun.setText("Contents");
+        tocRun.setBold(true);
+        tocRun.setFontSize(16);
+        tocRun.setColor("1F2E8B");
+        tocRun.addBreak();
+        String[] toc = new String[] { "1. General Information", "2. Users and Organization",
+                "3. Assessment Summary", "4. Domain Overview Table", "5. Controls by Domain" };
+        for (String item : toc) {
+            XWPFParagraph p = doc.createParagraph();
+            XWPFRun r = p.createRun();
+            r.setText(item);
+            r.setFontSize(12);
+        }
+        doc.createParagraph();
+        // -------------------------------------------------------
+
+        // Gather all controls, answers, and scoring
+        java.util.List<SecurityControl> allControls = assessment.getSecurityCatalog().getSecurityControls();
+        java.util.Map<Long, AssessmentControlAnswer> answerMap = answers.stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        a -> a.getSecurityControl().getId(),
+                        a -> a,
+                        (a1, a2) -> a1
+                ));
+
+        // --- 1. General Info ---
+        XWPFParagraph genInfoHeader = doc.createParagraph();
+        XWPFRun genInfoRun = genInfoHeader.createRun();
+        genInfoRun.setText("1. General Information");
+        genInfoRun.setBold(true);
+        genInfoRun.setFontSize(16);
+        genInfoRun.setColor("1F2E8B");
+
+        addKeyValueFormatted(doc, "Assessment Name: ", assessment.getName());
+        addKeyValueFormatted(doc, "Assessment ID: ", String.valueOf(assessment.getId()));
+        addKeyValueFormatted(doc, "Date: ", assessment.getDate() != null ? assessment.getDate().toString() : "-");
+        addKeyValueFormatted(doc, "Catalog: ",
+                (assessment.getSecurityCatalog() != null ? assessment.getSecurityCatalog().getName() : "-"));
+        addKeyValueFormatted(doc, "Completed On: ", details.getDate() != null ? details.getDate().toString() : "-");
+        doc.createParagraph();
+
+        // --- 2. Users & Organization ---
+        XWPFParagraph usersHeader = doc.createParagraph();
+        XWPFRun usersRun = usersHeader.createRun();
+        usersRun.setText("2. Users and Organization");
+        usersRun.setBold(true);
+        usersRun.setFontSize(16);
+        usersRun.setColor("1F2E8B");
+
+        if (orgUnit != null) {
+            addKeyValueFormatted(doc, "Org Unit: ", orgUnit.getName());
+        } else {
+            addKeyValueFormatted(doc, "Org Unit: ", "-");
+        }
+        if (!users.isEmpty()) {
+            XWPFParagraph up = doc.createParagraph();
+            XWPFRun ur = up.createRun();
+            ur.setBold(true);
+            ur.setText("Users Participating:");
+            for (User u : users) {
+                XWPFParagraph userline = doc.createParagraph();
+                XWPFRun userrun = userline.createRun();
+                userrun.setText(u.getName() + " <" + u.getEmail() + ">");
+            }
+        } else {
+            addKeyValueFormatted(doc, "Users: ", "-");
+        }
+        doc.createParagraph();
+
+        // --- 3. Assessment Summary ---
+        XWPFParagraph summaryHeader = doc.createParagraph();
+        XWPFRun summaryRun = summaryHeader.createRun();
+        summaryRun.setText("3. Assessment Summary");
+        summaryRun.setBold(true);
+        summaryRun.setFontSize(16);
+        summaryRun.setColor("1F2E8B");
+        doc.createParagraph();
+
+        // --- AI-Generated Summary ---
+        OpenAIConfiguration config = openAIConfigurationRepository.findAll().stream().findFirst().orElse(null);
+        if (config != null && config.getSummaryPrompt() != null && !config.getSummaryPrompt().isBlank()) {
+            java.util.List<String> answerTexts = answers.stream()
+                    .map(a -> {
+                        MaturityAnswer ma = a.getMaturityAnswer();
+                        return ma != null ? ma.getAnswer() : null;
+                    })
+                    .filter(s -> s != null && !s.isBlank())
+                    .collect(java.util.stream.Collectors.toList());
+            String prompt = config.getSummaryPrompt() + "\n---\n" + String.join("\n", answerTexts);
+            String summary;
+            try {
+                summary = openAIUtil.askAI(prompt);
+                System.out.println("[OpenAI AssessmentReporter] API result: " + summary);
+            } catch (Exception ex) {
+                summary = "AI-generated summary: Not available (OpenAI API not reachable)";
+                System.err.println("[OpenAI AssessmentReporter] OpenAI API call failed: " + ex.getMessage());
+            }
+            XWPFParagraph summaryAI = doc.createParagraph();
+            XWPFRun aiRun = summaryAI.createRun();
+            aiRun.setBold(true);
+            aiRun.setItalic(true);
+            aiRun.setFontSize(13);
+            aiRun.setText("Assessment AI-generated summary:");
+
+            XWPFParagraph summaryText = doc.createParagraph();
+            XWPFRun sumRun = summaryText.createRun();
+            sumRun.setText(summary);
+        }
+
+        if (assessment.getOrgServices() != null && !assessment.getOrgServices().isEmpty()) {
+            XWPFParagraph orgSvcHead = doc.createParagraph();
+            XWPFRun osvRun = orgSvcHead.createRun();
+            osvRun.setText("3.1 Assigned Org Services");
+            osvRun.setBold(true);
+            osvRun.setFontSize(13);
+            osvRun.setColor("434BA3");
+            XWPFTable svcTable = doc.createTable();
+            XWPFTableRow tRow = svcTable.getRow(0);
+            setTableCellBackground(tRow.getCell(0), "434BA3");
+            setTableCellText(tRow.getCell(0), "Org Service", true, "FFFFFF");
+            tRow.addNewTableCell();
+            setTableCellBackground(tRow.getCell(1), "434BA3");
+            setTableCellText(tRow.getCell(1), "Description", true, "FFFFFF");
+            for (com.govinc.organization.OrgService orgService : assessment.getOrgServices()) {
+                XWPFTableRow row = svcTable.createRow();
+                row.getCell(0).setText(orgService.getName());
+                row.getCell(1).setText(orgService.getDescription() != null ? orgService.getDescription() : "-");
+            }
+        }
+
+        // Score summary
+        int totalScore = 0;
+        int numAnswered = 0;
+        java.util.Map<Long, Integer> scoresByControl = new java.util.HashMap<>();
+        for (SecurityControl ctrl : allControls) {
+            if (answerMap.containsKey(ctrl.getId())) {
+                AssessmentControlAnswer aca = answerMap.get(ctrl.getId());
+                int score = aca.getScore();
+                scoresByControl.put(ctrl.getId(), score);
+                totalScore += score;
+                numAnswered++;
+            }
+        }
+        double avgScore = numAnswered > 0 ? (totalScore / (double) numAnswered) : 0.0;
+
+        XWPFParagraph summaryTableIntro = doc.createParagraph();
+        XWPFRun summaryTableIntroRun = summaryTableIntro.createRun();
+        summaryTableIntroRun.setText("Assessment Summary Table:");
+        summaryTableIntroRun.setBold(true);
+        XWPFTable summaryTable = doc.createTable();
+        XWPFTableRow stRow = summaryTable.getRow(0);
+        setTableCellBackground(stRow.getCell(0), "434BA3");
+        setTableCellText(stRow.getCell(0), "# Security Controls", true, "FFFFFF");
+        stRow.addNewTableCell();
+        setTableCellBackground(stRow.getCell(1), "434BA3");
+        setTableCellText(stRow.getCell(1), "Average Score (%)", true, "FFFFFF");
+        stRow.addNewTableCell();
+        setTableCellBackground(stRow.getCell(2), "434BA3");
+        setTableCellText(stRow.getCell(2), "Org Unit", true, "FFFFFF");
+        XWPFTableRow stData = summaryTable.createRow();
+        stData.getCell(0).setText(String.valueOf(allControls.size()));
+        stData.getCell(1).setText(String.format("%.1f", avgScore));
+        stData.getCell(2).setText(orgUnit != null ? orgUnit.getName() : "-");
+
+        doc.createParagraph();
+
+        // --- 4. Domain Overview Table ---
+        XWPFParagraph domainOverviewHeader = doc.createParagraph();
+        XWPFRun domainOverviewRun = domainOverviewHeader.createRun();
+        domainOverviewRun.setText("4. Domain Overview Table");
+        domainOverviewRun.setBold(true);
+        domainOverviewRun.setFontSize(16);
+        domainOverviewRun.setColor("1F2E8B");
+
+        java.util.Map<String, java.util.List<SecurityControl>> controlsPerDomain = allControls.stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        ctrl -> ctrl.getSecurityControlDomain() != null ? ctrl.getSecurityControlDomain().getName()
+                                : "Unknown"));
+        XWPFTable overviewTable = doc.createTable();
+        XWPFTableRow ovwHeader = overviewTable.getRow(0);
+        setTableCellBackground(ovwHeader.getCell(0), "434BA3");
+        setTableCellText(ovwHeader.getCell(0), "Security Control Domain", true, "FFFFFF");
+        ovwHeader.addNewTableCell();
+        setTableCellBackground(ovwHeader.getCell(1), "434BA3");
+        setTableCellText(ovwHeader.getCell(1), "Score (%)", true, "FFFFFF");
+        for (String domain : controlsPerDomain.keySet()) {
+            java.util.List<SecurityControl> domainCtrls = controlsPerDomain.get(domain);
+            int sc = 0, n = 0;
+            for (SecurityControl ctrl : domainCtrls) {
+                if (scoresByControl.containsKey(ctrl.getId())) {
+                    sc += scoresByControl.get(ctrl.getId());
+                    n++;
+                }
+            }
+            double perc = n > 0 ? (sc / (double) n) : 0.0;
+            XWPFTableRow rw = overviewTable.createRow();
+            rw.getCell(0).setText(domain);
+            rw.getCell(1).setText(String.format("%.1f", perc));
+        }
+
+        doc.createParagraph();
+
+        // --- 5. Controls by Domain (detailed) ---
+        XWPFParagraph controlsDomainHeader = doc.createParagraph();
+        XWPFRun controlsDomainRun = controlsDomainHeader.createRun();
+        controlsDomainRun.setText("5. Controls by Domain");
+        controlsDomainRun.setBold(true);
+        controlsDomainRun.setFontSize(16);
+        controlsDomainRun.setColor("1F2E8B");
+        doc.createParagraph();
+
+        java.util.List<String> domainOrder = new java.util.ArrayList<>(controlsPerDomain.keySet());
+        java.util.Collections.sort(domainOrder);
+        int domainNum = 1;
+
+        for (String domain : domainOrder) {
+            java.util.List<SecurityControl> ctrlList = controlsPerDomain.get(domain);
+            XWPFParagraph domP = doc.createParagraph();
+            XWPFRun domRun = domP.createRun();
+            domRun.setText("5." + domainNum + " " + domain);
+            domRun.setBold(true);
+            domRun.setFontSize(13);
+            domRun.setColor("434BA3");
+
+            XWPFTable t = doc.createTable();
+            XWPFTableRow h = t.getRow(0);
+            String[] headers = {"Title", "Description", "Reference", "Answer", "Answer Source"};
+            for (int i = 0; i < headers.length; i++) {
+                if (i == 0) {
+                    setTableCellBackground(h.getCell(i), "434BA3");
+                    setTableCellText(h.getCell(i), headers[i], true, "FFFFFF");
+                } else {
+                    h.addNewTableCell();
+                    setTableCellBackground(h.getCell(i), "434BA3");
+                    setTableCellText(h.getCell(i), headers[i], true, "FFFFFF");
+                }
+            }
+            for (SecurityControl ctrl : ctrlList) {
+                String tt = ctrl.getName() != null ? ctrl.getName() : "-";
+                String desc = ctrl.getDetail() != null ? ctrl.getDetail() : "-";
+                String ref = ctrl.getReference() != null ? ctrl.getReference() : "-";
+                String answ = "-";
+                String src = "-";
+                boolean foundServiceAnswer = false;
+                if (assessment.getOrgServices() != null) {
+                    for (com.govinc.organization.OrgService orgService : assessment.getOrgServices()) {
+                        com.govinc.organization.OrgServiceAssessment osa = orgServiceAssessmentService
+                                .findOrCreateAssessment(orgService.getId());
+                        if (osa != null && osa.getControls() != null) {
+                            for (com.govinc.organization.OrgServiceAssessmentControl osac : osa.getControls()) {
+                                if (osac.getSecurityControl() != null
+                                        && osac.getSecurityControl().getId().equals(ctrl.getId())
+                                        && osac.isApplicable()) {
+                                    Integer osPercent = osac.getPercent();
+                                    if (osPercent != null) {
+                                        java.util.Set<com.govinc.maturity.MaturityAnswer> maturityAnswersSet = assessment
+                                                .getSecurityCatalog().getMaturityModel().getMaturityAnswers();
+                                        com.govinc.maturity.MaturityAnswer closest = maturityAnswersSet.stream()
+                                                .min(java.util.Comparator
+                                                        .comparingInt(ma -> Math.abs(ma.getScore() - osPercent)))
+                                                .orElse(null);
+                                        if (closest != null) {
+                                            answ = closest.getAnswer();
+                                        } else {
+                                            answ = String.valueOf(osPercent) + "%";
+                                        }
+                                        src = orgService.getName();
+                                        foundServiceAnswer = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        if (foundServiceAnswer)
+                            break;
+                    }
+                }
+                if (!foundServiceAnswer && answerMap.containsKey(ctrl.getId())) {
+                    MaturityAnswer ma = answerMap.get(ctrl.getId()).getMaturityAnswer();
+                    if (ma != null) {
+                        answ = ma.getAnswer();
+                        src = "Assessment";
+                    }
+                }
+                XWPFTableRow row = t.createRow();
+                row.getCell(0).setText(tt);
+                row.getCell(1).setText(desc);
+                row.getCell(2).setText(ref);
+                row.getCell(3).setText(answ);
+                row.getCell(4).setText(src);
+            }
+            domainNum++;
+        }
+
+        // Footer paragraph
+        XWPFParagraph footer = doc.createParagraph();
+        XWPFRun footerRun = footer.createRun();
+        footerRun.setItalic(true);
+        footerRun.setFontSize(10);
+        footerRun.setText("Generated by GovInc Assessment System on: " + java.time.LocalDateTime.now()
+                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
+    }
+
+    /**
+     * Backwards compatibility overload without template path
+     */
+    public byte[] createWordReport(Assessment assessment, AssessmentDetails details, java.util.List<User> users,
+            OrgUnit orgUnit, java.util.List<AssessmentControlAnswer> answers) throws Exception {
+        return createWordReport(assessment, details, users, orgUnit, answers, null);
+    }
+
+    // Helper: Add formatted key-value pair to document with improved styling
+    private void addKeyValueFormatted(XWPFDocument doc, String key, String value) {
+        XWPFParagraph p = doc.createParagraph();
+        XWPFRun k = p.createRun();
         k.setBold(true);
         k.setText(key);
-        org.apache.poi.xwpf.usermodel.XWPFRun v = p.createRun();
+        k.setColor("434BA3");
+        XWPFRun v = p.createRun();
         v.setText(value);
+        v.setColor("2C3E50");
+    }
+
+    // Helper: Set table cell background color
+    private void setTableCellBackground(XWPFTableCell cell, String color) {
+        try {
+            org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTcPr tcPr = cell.getCTTc().addNewTcPr();
+            org.openxmlformats.schemas.wordprocessingml.x2006.main.CTShd ctShd = org.openxmlformats.schemas.wordprocessingml.x2006.main.CTShd.Factory.newInstance();
+            ctShd.setFill(color);
+            tcPr.setShd(ctShd);
+        } catch (Exception e) {
+            System.err.println("[AssessmentReporter] Error setting table cell background: " + e.getMessage());
+        }
+    }
+
+    // Helper: Set table cell text with formatting
+    private void setTableCellText(XWPFTableCell cell, String text, boolean bold, String color) {
+        cell.setText("");
+        XWPFParagraph p = cell.getParagraphs().get(0);
+        XWPFRun r = p.createRun();
+        r.setText(text);
+        if (bold) r.setBold(true);
+        r.setColor(color);
     }
 }

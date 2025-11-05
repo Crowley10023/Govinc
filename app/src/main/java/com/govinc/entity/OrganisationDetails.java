@@ -15,6 +15,12 @@ public class OrganisationDetails {
     @Column(nullable = false)
     private String toolName;
 
+    @Column(length = 500)
+    private String wordTemplatePath;
+
+    @Column(length = 255)
+    private String wordTemplateFilename;
+
     public OrganisationDetails() {}
 
     public Long getId() { return id; }
@@ -25,4 +31,10 @@ public class OrganisationDetails {
 
     public String getToolName() { return toolName; }
     public void setToolName(String toolName) { this.toolName = toolName; }
+
+    public String getWordTemplatePath() { return wordTemplatePath; }
+    public void setWordTemplatePath(String wordTemplatePath) { this.wordTemplatePath = wordTemplatePath; }
+
+    public String getWordTemplateFilename() { return wordTemplateFilename; }
+    public void setWordTemplateFilename(String wordTemplateFilename) { this.wordTemplateFilename = wordTemplateFilename; }
 }

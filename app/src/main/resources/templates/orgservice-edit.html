@@ -1,43 +1,306 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
+
 <head>
-    <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <title>Edit Org Service</title>
-    <link rel="stylesheet" href="/style.css">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <title th:text="${orgService.id != null} ? 'Edit Org Service' : 'Create Org Service'">Edit Org Service</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/general.css">
 </head>
+
 <body>
-    <div th:replace="~{navigation :: mainNav}"></div>
-    <div class="container"><div class="entity-edit-frame">
-      <h1 th:text="${orgService.id != null} ? 'Edit Org Service' : 'Create Org Service'"></h1>
-      <form th:action="@{'/orgservices/save'}" method="post" style="margin-bottom:1.2em;">
-        <input type="hidden" name="id" th:value="${orgService.id}"/>
-        <div class="form-row" style="display: flex; flex-wrap: wrap; align-items: center; margin-bottom: 1em;">
-          <div style="flex: 0 0 140px; font-weight:600;">Name:</div>
-          <div style="flex: 1 1 200px;">
-            <input type="text" id="name" name="name" th:value="${orgService.name}" required style="width: 100%;" />
+  <div th:replace="~{navigation :: mainNav}"></div>
+  <div class="main-scroll-container">
+    <div class="container">
+      <div class="entity-edit-frame" style="margin-top: 2em; margin-bottom: 3em;">
+        
+        <!-- Header Section -->
+        <div class="orgservice-header">
+          <h1 th:text="${orgService.id != null} ? 'Edit Org Service' : 'Create New Org Service'"></h1>
+        </div>
+
+        <!-- Main Form Card -->
+        <form th:action="@{'/orgservices/save'}" method="post" class="form-card">
+          <input type="hidden" name="id" th:value="${orgService.id}" />
+          
+          <!-- Form Fields Container -->
+          <div class="form-fields-container">
+            
+            <!-- Name Field -->
+            <div class="form-group">
+              <label for="name" class="form-label">
+                <span class="label-text">Service Name</span>
+                <span class="label-required">*</span>
+              </label>
+              <input 
+                type="text" 
+                id="name" 
+                name="name" 
+                th:value="${orgService.name}" 
+                required 
+                class="form-input"
+                placeholder="Enter a descriptive name for this service"
+              />
+            </div>
+
+            <!-- Description Field -->
+            <div class="form-group">
+              <label for="description" class="form-label">
+                <span class="label-text">Description</span>
+              </label>
+              <textarea 
+                id="description" 
+                name="description" 
+                rows="5" 
+                class="form-textarea"
+                th:text="${orgService.description}"
+                placeholder="Provide details about this organizational service"
+              ></textarea>
+            </div>
+
+            <!-- Org Units Selection -->
+            <div class="form-group">
+              <label for="orgUnitIds" class="form-label">
+                <span class="label-text">Assigned Organizational Units</span>
+              </label>
+              <div class="select-wrapper">
+                <select 
+                  id="orgUnitIds" 
+                  name="orgUnitIds" 
+                  multiple 
+                  size="6" 
+                  class="form-select"
+                >
+                  <option th:each="ou : ${allOrgUnits}" 
+                    th:value="${ou.id}" 
+                    th:text="${ou.name}"
+                    th:selected="${orgService.orgUnits != null} ? ${orgService.orgUnits.contains(ou)} : false">
+                  </option>
+                </select>
+              </div>
+              <p class="form-hint">Hold Ctrl (or Cmd) to select multiple units</p>
+            </div>
+
           </div>
-        </div>
-        <div class="form-row" style="display: flex; flex-wrap: wrap; align-items: flex-start; margin-bottom: 1em;">
-          <div style="flex: 0 0 140px; font-weight:600;">Description:</div>
-          <div style="flex: 1 1 200px;">
-            <textarea id="description" name="description" rows="3" style="width: 100%;" th:text="${orgService.description}"></textarea>
+
+          <!-- Action Buttons -->
+          <div class="form-actions">
+            <button type="submit" class="btn-create-primary">
+              <span th:text="${orgService.id != null} ? 'Update Service' : 'Create Service'"></span>
+            </button>
+            <a th:href="@{'/orgservices/list'}" class="btn-secondary">
+              Back to Services
+            </a>
           </div>
-        </div>
-        <div class="form-row" style="display: flex; flex-wrap: wrap; align-items: flex-start; margin-bottom: 1em;">
-          <div style="flex: 0 0 140px; font-weight:600;">Org Units:</div>
-          <div style="flex: 1 1 200px;">
-            <select id="orgUnitIds" name="orgUnitIds" multiple size="6" style="width: 100%;">
-              <option th:each="ou : ${allOrgUnits}" th:value="${ou.id}" th:text="${ou.name}"
-                th:selected="${orgService.orgUnits != null} ? ${orgService.orgUnits.contains(ou)} : false"></option>
-            </select>
-          </div>
-        </div>
-        <div class="action-buttons-flex" style="margin:1.1em 0 0.3em 0;">
-          <button type="submit" class="btn">Save</button>
-          <a th:href="@{|/orgservice-assessment/edit/${orgService.id}|}" class="btn" style="background:#FF9505">Assess</a>
-          <a th:href="@{'/orgservices/list'}" class="btn" style="background:#eee; color:#164666;">Back to list</a>
-        </div>
-      </form>
-    </div></div>
+
+        </form>
+
+      </div>
+    </div>
+  </div>
+
+  <style>
+    /* ========== EDIT FORM STYLES ========== */
+    
+    .form-card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(34, 116, 165, 0.1);
+      padding: 2.5em;
+      border: 1px solid rgba(34, 116, 165, 0.08);
+    }
+
+    .form-fields-container {
+      display: flex;
+      flex-direction: column;
+      gap: 2em;
+      margin-bottom: 2.5em;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6em;
+    }
+
+    .form-label {
+      display: flex;
+      align-items: center;
+      gap: 0.3em;
+      font-weight: 600;
+      color: var(--primary-blue);
+      font-size: 0.95em;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .label-text {
+      color: var(--primary-blue);
+    }
+
+    .label-required {
+      color: #cc2222;
+      font-weight: 700;
+    }
+
+    .form-input,
+    .form-textarea,
+    .form-select {
+      padding: 0.85em 1em;
+      border: 2px solid rgba(34, 116, 165, 0.15);
+      border-radius: 8px;
+      font-size: 1em;
+      font-family: inherit;
+      transition: all 0.2s ease;
+      box-sizing: border-box;
+    }
+
+    .form-input:focus,
+    .form-textarea:focus,
+    .form-select:focus {
+      outline: none;
+      border-color: var(--primary-blue);
+      box-shadow: 0 0 0 3px rgba(34, 116, 165, 0.1);
+      background: #fff;
+    }
+
+    .form-input::placeholder,
+    .form-textarea::placeholder {
+      color: #999;
+    }
+
+    .form-textarea {
+      resize: vertical;
+      min-height: 140px;
+      line-height: 1.5;
+    }
+
+    .select-wrapper {
+      position: relative;
+    }
+
+    .form-select {
+      width: 100%;
+      padding: 0.75em 1em;
+      background-color: #fff;
+      cursor: pointer;
+    }
+
+    .form-select option {
+      padding: 0.5em;
+      background: #fff;
+      color: #333;
+    }
+
+    .form-select option:checked {
+      background: linear-gradient(135deg, var(--primary-blue) 0%, #0056b3 100%);
+      color: #fff;
+    }
+
+    .form-hint {
+      font-size: 0.85em;
+      color: #666;
+      margin: 0;
+      font-style: italic;
+    }
+
+    .form-actions {
+      display: flex;
+      gap: 1em;
+      align-items: center;
+      padding-top: 1.5em;
+      border-top: 1px solid #f0f0f0;
+    }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.75em 1.5em;
+      background: #f0f0f0;
+      color: var(--primary-blue);
+      border: 2px solid rgba(34, 116, 165, 0.2);
+      border-radius: 8px;
+      font-size: 0.95em;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .btn-secondary:hover {
+      background: #e8e8e8;
+      border-color: var(--primary-blue);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(34, 116, 165, 0.15);
+    }
+
+    /* Page header styling */
+    .orgservice-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2.5em;
+      padding-bottom: 1.5em;
+      border-bottom: 2px solid rgba(34, 116, 165, 0.1);
+    }
+
+    .orgservice-header h1 {
+      margin: 0;
+      font-size: 2.2em;
+      color: var(--primary-blue);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+      .form-card {
+        padding: 1.5em;
+      }
+
+      .form-fields-container {
+        gap: 1.5em;
+        margin-bottom: 1.5em;
+      }
+
+      .orgservice-header h1 {
+        font-size: 1.8em;
+      }
+
+      .form-actions {
+        flex-direction: column;
+        gap: 0.8em;
+      }
+
+      .btn-create-primary,
+      .btn-secondary {
+        width: 100%;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .form-card {
+        padding: 1.2em;
+        border-radius: 8px;
+      }
+
+      .form-label {
+        font-size: 0.9em;
+      }
+
+      .form-input,
+      .form-textarea,
+      .form-select {
+        font-size: 16px; /* Prevents zoom on iOS */
+      }
+
+      .orgservice-header h1 {
+        font-size: 1.5em;
+      }
+    }
+  </style>
+
 </body>
+
 </html>

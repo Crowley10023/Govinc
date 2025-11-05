@@ -34,12 +34,8 @@ public class OrgServiceAssessmentController {
         }
         try {
             assessmentService.saveAssessment(assessment);
-            // Redirect to orgservice edit view after save
-            if (assessment.getOrgService() != null && assessment.getOrgService().getId() != null) {
-                return "redirect:/orgservices/edit/" + assessment.getOrgService().getId();
-            } else {
-                return "redirect:/orgservices/list";
-            }
+            // Redirect to orgservice list view after save
+            return "redirect:/orgservice-list";
         } catch (RuntimeException ex) {
             OrgServiceAssessment fullAssessment = assessmentService.findOrCreateAssessment(
                 assessment.getOrgService() != null ? assessment.getOrgService().getId() : null

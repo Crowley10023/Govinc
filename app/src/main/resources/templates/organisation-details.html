@@ -4,23 +4,366 @@
     <title>Organisation Details</title>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="stylesheet" href="/style.css">
+    <style>
+        .config-container {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 30px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 10px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        
+        .config-header {
+            text-align: center;
+            margin-bottom: 35px;
+            border-bottom: 3px solid #4364a3;
+            padding-bottom: 20px;
+        }
+        
+        .config-header h2 {
+            color: #2c3e50;
+            font-size: 28px;
+            margin: 0;
+            font-weight: 600;
+        }
+        
+        .form-group {
+            margin-bottom: 25px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .form-group input[type="text"],
+        .form-group input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e6ed;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+        }
+        
+        .form-group input[type="text"]:focus,
+        .form-group input[type="file"]:focus {
+            border-color: #4364a3;
+            outline: none;
+            box-shadow: 0 0 8px rgba(67, 100, 163, 0.3);
+        }
+        
+        .form-group input[type="file"] {
+            padding: 10px;
+            cursor: pointer;
+        }
+        
+        .file-upload-section {
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #e0e6ed;
+        }
+        
+        .file-upload-hint {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin-top: 6px;
+            font-style: italic;
+        }
+        
+        .current-template {
+            background: #ecf0f1;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 10px;
+            border-left: 4px solid #4364a3;
+        }
+        
+        .current-template span {
+            color: #2c3e50;
+            font-weight: 600;
+        }
+        
+        .template-name {
+            color: #4364a3;
+            word-break: break-all;
+        }
+        
+        .template-actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .template-actions button {
+            padding: 8px 16px;
+            font-size: 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-remove-template {
+            background-color: #e74c3c;
+            color: white;
+        }
+        
+        .btn-remove-template:hover {
+            background-color: #c0392b;
+        }
+        
+        .btn-upload {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.4);
+        }
+        
+        .btn-upload:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(52, 152, 219, 0.6);
+        }
+        
+        .btn-upload:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .form-actions {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 35px;
+        }
+        
+        button[type="submit"],
+        button[type="reset"] {
+            padding: 14px 35px;
+            font-size: 15px;
+            font-weight: 600;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        button[type="submit"] {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        button[type="submit"]:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+        
+        button[type="reset"] {
+            background-color: #95a5a6;
+            color: white;
+        }
+        
+        button[type="reset"]:hover {
+            background-color: #7f8c8d;
+        }
+        
+        .success-message {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        .success-message::before {
+            content: "✓";
+            font-size: 20px;
+            font-weight: bold;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .info-box {
+            background: #e8f4f8;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            color: #2c3e50;
+        }
+        
+        .info-box strong {
+            color: #2980b9;
+        }
+    </style>
 </head>
 <body>
     <div th:replace="~{navigation :: mainNav}"></div>
-    <div class="container">
-        <h2>Organisation Details Configuration</h2>
-        <form th:action="@{/config/organisation-details}" method="post" th:object="${organisationDetails}">
+    
+    <div class="config-container">
+        <div class="config-header">
+            <h2>📋 Organisation Configuration</h2>
+        </div>
+        
+        <div th:if="${saved}" class="success-message">
+            Configuration saved successfully!
+        </div>
+        
+        <div class="info-box">
+            <strong>ℹ️ Note:</strong> Update your organisation details and optionally upload a Microsoft Word template to customize your assessment reports.
+        </div>
+        
+        <form th:action="@{/config/organisation-details}" method="post" th:object="${organisationDetails}" enctype="multipart/form-data">
             <input type="hidden" th:field="*{id}" />
-            <label for="organisationName">Organisation Name:</label><br>
-            <input type="text" th:field="*{organisationName}" id="organisationName" placeholder="Organisation Name" style="width:350px"><br>
+            
+            <div class="form-group">
+                <label for="organisationName">🏢 Organisation Name</label>
+                <input type="text" th:field="*{organisationName}" id="organisationName" 
+                       placeholder="Enter your organisation name" required>
+            </div>
 
-            <label for="toolName">Name of Tool:</label><br>
-            <input type="text" th:field="*{toolName}" id="toolName" placeholder="Tool/Application Name" style="width:350px"><br><br>
+            <div class="form-group">
+                <label for="toolName">🛠️ Tool/Application Name</label>
+                <input type="text" th:field="*{toolName}" id="toolName" 
+                       placeholder="Enter the name of your assessment tool" required>
+            </div>
+
+            <div class="form-group file-upload-section">
+                <label for="wordTemplate">📄 Word Report Template</label>
+                <div style="display: flex; gap: 10px; align-items: flex-start;">
+                    <input type="file" id="wordTemplate" name="wordTemplate" 
+                           accept=".docx,.doc" style="flex: 1;">
+                    <button type="button" id="uploadBtn" class="btn-upload" onclick="uploadTemplate()" style="padding: 12px 20px; white-space: nowrap; margin-top: 0;">
+                        📤 Upload
+                    </button>
+                </div>
+                <div class="file-upload-hint">
+                    Upload a Microsoft Word template (.docx) to customize your assessment reports. 
+                    The template will be used as the base for all generated Word reports.
+                </div>
+                
+                <div th:if="${hasExistingTemplate}" class="current-template">
+                    <span>📎 Current Template:</span>
+                    <div class="template-name" th:text="${currentTemplateName}"></div>
+                    <div class="template-actions">
+                        <button type="button" class="btn-remove-template" onclick="removeTemplate()">
+                            Remove Template
+                        </button>
+                    </div>
+                </div>
+            </div>
 
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-            <button type="submit">Save</button>
-            <span th:if="${saved}"><b>✔ Saved!</b></span>
+            
+            <div class="form-actions">
+                <button type="submit">💾 Save Configuration</button>
+                <button type="reset">🔄 Reset</button>
+            </div>
         </form>
     </div>
+    
+    <script>
+        function uploadTemplate() {
+            const fileInput = document.getElementById('wordTemplate');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a file first');
+                return;
+            }
+            
+            if (!file.name.toLowerCase().endsWith('.docx') && !file.name.toLowerCase().endsWith('.doc')) {
+                alert('Please select a valid Word document (.docx or .doc)');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('wordTemplate', file);
+            formData.append('_csrf', document.querySelector('input[name="_csrf"]').value);
+            
+            const uploadBtn = document.getElementById('uploadBtn');
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = '⏳ Uploading...';
+            
+            fetch('/config/organisation-details/upload-template', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('input[name="_csrf"]').value
+                }
+            }).then(response => {
+                if (response.ok) {
+                    alert('Template uploaded successfully!');
+                    location.reload();
+                } else {
+                    alert('Failed to upload template. Please try again.');
+                    uploadBtn.disabled = false;
+                    uploadBtn.textContent = '📤 Upload';
+                }
+            }).catch(error => {
+                console.error('Error:', error);
+                alert('Error uploading template: ' + error.message);
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = '📤 Upload';
+            });
+        }
+        
+        function removeTemplate() {
+            if (confirm('Are you sure you want to remove the current template? Reports will use the default format.')) {
+                const csrfToken = document.querySelector('input[name="_csrf"]');
+                fetch('/config/organisation-details/remove-template', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken.value,
+                        'Content-Type': 'application/json'
+                    }
+                }).then(response => {
+                    if (response.ok) {
+                        location.reload();
+                    } else {
+                        alert('Failed to remove template');
+                    }
+                }).catch(error => {
+                    console.error('Error:', error);
+                    alert('Error removing template');
+                });
+            }
+        }
+    </script>
 </body>
 </html>
