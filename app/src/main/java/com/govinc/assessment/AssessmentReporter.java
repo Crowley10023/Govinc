@@ -33,6 +33,9 @@ public class AssessmentReporter {
     private final com.govinc.organization.OrgServiceAssessmentService orgServiceAssessmentService;
     private final OpenAIConfigurationRepository openAIConfigurationRepository;
     private final OpenAIUtil openAIUtil;
+    
+    // Progress tracking for report generation
+    private final java.util.Map<Long, ReportProgress> progressMap = new java.util.concurrent.ConcurrentHashMap<>();
 
     @Autowired
     public AssessmentReporter(
@@ -42,6 +45,27 @@ public class AssessmentReporter {
         this.orgServiceAssessmentService = orgServiceAssessmentService;
         this.openAIConfigurationRepository = openAIConfigurationRepository;
         this.openAIUtil = openAIUtil;
+    }
+    
+    /**
+     * Get the current progress of a report generation
+     */
+    public ReportProgress getProgress(Long assessmentId) {
+        return progressMap.getOrDefault(assessmentId, new ReportProgress(0, "Not started"));
+    }
+    
+    /**
+     * Update progress for a report generation
+     */
+    private void updateProgress(Long assessmentId, int percent, String status) {
+        progressMap.put(assessmentId, new ReportProgress(percent, status));
+    }
+    
+    /**
+     * Clear progress tracking for a report
+     */
+    private void clearProgress(Long assessmentId) {
+        progressMap.remove(assessmentId);
     }
 
     public byte[] createPdfReport(Assessment assessment, AssessmentDetails details, java.util.List<User> users,
@@ -474,26 +498,20 @@ public class AssessmentReporter {
 
     /**
      * Creates a Word report (DOCX) using Apache POI with optional template.
-     * If a Word template is configured, it will be used as the base document.
-     * Template placeholders like {{TITLE}}, {{ASSESSMENT_NAME}}, {{GENERATED_DATE}}, etc. will be replaced with actual data.
-     * If no placeholders are found, the full report content is appended to the template.
-     * 
-     * @param assessment The assessment instance
-     * @param details    Assessment metadata
-     * @param users      Users involved
-     * @param orgUnit    OrgUnit
-     * @param answers    List of control answers
-     * @param templatePath Optional path to a template .docx file
-     * @return DOCX word report as byte array
+     * Tracks progress during generation.
      */
     public byte[] createWordReport(Assessment assessment, AssessmentDetails details, java.util.List<User> users,
             OrgUnit orgUnit, java.util.List<AssessmentControlAnswer> answers, String templatePath) throws Exception {
+        Long assessmentId = assessment.getId();
+        updateProgress(assessmentId, 5, "Initializing...");
+        
         XWPFDocument doc = null;
         boolean templateLoaded = false;
         
-        // Try to load template if provided
-        if (templatePath != null && !templatePath.isEmpty()) {
-            try {
+        try {
+            // Try to load template if provided
+            if (templatePath != null && !templatePath.isEmpty()) {
+                updateProgress(assessmentId, 10, "Loading template...");
                 File templateFile = new File(templatePath);
                 if (templateFile.exists()) {
                     doc = new XWPFDocument(new FileInputStream(templateFile));
@@ -503,27 +521,41 @@ public class AssessmentReporter {
                     System.out.println("[AssessmentReporter] Template file not found at: " + templatePath);
                     doc = new XWPFDocument();
                 }
-            } catch (Exception e) {
-                System.err.println("[AssessmentReporter] Error loading template: " + e.getMessage());
+            } else {
+                updateProgress(assessmentId, 10, "Creating new document...");
                 doc = new XWPFDocument();
             }
-        } else {
-            doc = new XWPFDocument();
-        }
 
-        try (java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream()) {
-            
-            // If template was successfully loaded, replace placeholders in template
-            if (templateLoaded) {
-                replacePlaceholdersInTemplate(doc, assessment, details, users, orgUnit, answers);
-            } else {
-                // Generate content from scratch if no template
-                generateDefaultReport(doc, assessment, details, users, orgUnit, answers);
+            try (java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream()) {
+                
+                // If template was successfully loaded, replace placeholders in template
+                if (templateLoaded) {
+                    updateProgress(assessmentId, 30, "Processing template placeholders...");
+                    replacePlaceholdersInTemplate(doc, assessment, details, users, orgUnit, answers);
+                } else {
+                    // Generate content from scratch if no template
+                    updateProgress(assessmentId, 30, "Generating report content...");
+                    generateDefaultReport(doc, assessment, details, users, orgUnit, answers);
+                }
+                
+                updateProgress(assessmentId, 85, "Formatting and finalizing...");
+                // Serialize document
+                doc.write(baos);
+                updateProgress(assessmentId, 95, "Preparing download...");
+                
+                byte[] result = baos.toByteArray();
+                updateProgress(assessmentId, 100, "Complete!");
+                return result;
             }
-
-            // Serialize document
-            doc.write(baos);
-            return baos.toByteArray();
+        } finally {
+            // Clear progress after generation completes or fails
+            java.util.Timer timer = new java.util.Timer();
+            timer.schedule(new java.util.TimerTask() {
+                @Override
+                public void run() {
+                    clearProgress(assessmentId);
+                }
+            }, 3000); // Clear after 3 seconds to allow UI to display completion
         }
     }
 

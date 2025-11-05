@@ -590,6 +590,16 @@ public class AssessmentController {
         return "redirect:/assessment/list";
     }
 
+    @GetMapping("/{id}/word-report-progress")
+    @ResponseBody
+    public Map<String, Object> getWordReportProgress(@PathVariable Long id) {
+        ReportProgress progress = assessmentReporter.getProgress(id);
+        Map<String, Object> response = new HashMap<>();
+        response.put("percent", progress.getPercent());
+        response.put("status", progress.getStatus());
+        return response;
+    }
+
     @GetMapping("/{id}/word-report")
     public ResponseEntity<byte[]> downloadWordReport(@PathVariable Long id) {
         

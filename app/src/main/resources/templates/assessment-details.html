@@ -647,10 +647,12 @@
         window.currentOrgUnitId = /*[[${assessment.orgUnit != null ? assessment.orgUnit.id : ''}]]*/ '';
         // Assigned users list for selection state
         window.assessmentAssignedUserIds = /*[[${assessment.users != null ? assessment.users.![id] : {}}]]*/[];
+        // Assessment ID for progress polling
+        window.currentAssessmentIdForProgress = /*[[${assessment.id}]]*/ 0;
         /*]]>*/
     </script>
     <script>
-        // Word Report Progress Handler
+        // Word Report Progress Handler with real-time polling
         $(document).ready(function () {
             $('#word-report-btn').click(function (e) {
                 e.preventDefault();
@@ -665,59 +667,35 @@
 
         function showWordReportProgress() {
             $('#word-report-progress-modal').css('display', 'flex');
-            startProgressSimulation();
+            startProgressPolling();
         }
 
-        function startProgressSimulation() {
-            let progress = 0;
-            const statuses = [
-                'Initializing...',
-                'Gathering assessment data...',
-                'Processing security controls...',
-                'Compiling answers and scores...',
-                'Generating report structure...',
-                'Formatting content...',
-                'Adding tables and formatting...',
-                'Finalizing document...',
-                'Creating Word document...',
-                'Preparing for download...'
-            ];
-            let statusIndex = 0;
-
-            const progressInterval = setInterval(function () {
-                if (progress < 90) {
-                    progress += Math.random() * 15 + 5; // Random increment between 5-20%
-                    if (progress > 90) progress = 90;
-                }
-                
-                $('#progress-bar-fill').css('width', progress + '%');
-                $('#progress-percentage').text(Math.floor(progress) + '%');
-                
-                // Update status message every iteration
-                if (statusIndex < statuses.length) {
-                    $('#progress-status').text(statuses[statusIndex]);
-                    statusIndex = (statusIndex + 1) % statuses.length;
-                }
-            }, 500);
-
-            // Complete the progress after form submission
-            $(document).one('submit', '#word-report-form', function () {
-                // Keep the modal open and complete the progress after a delay
-                setTimeout(function () {
-                    // If we reach here, the download likely started
-                    $('#progress-bar-fill').css('width', '100%');
-                    $('#progress-percentage').text('100%');
-                    $('#progress-status').text('Complete! Your download should start soon...');
-                    clearInterval(progressInterval);
-                    
-                    // Close the modal after 2 seconds
-                    setTimeout(function () {
-                        $('#word-report-progress-modal').css('display', 'none');
-                        // Reset progress for next use
-                        resetProgress();
-                    }, 2000);
-                }, 3000);
-            });
+        function startProgressPolling() {
+            const assessmentId = window.currentAssessmentIdForProgress;
+            const progressPollInterval = setInterval(function () {
+                $.ajax({
+                    url: '/assessment/' + assessmentId + '/word-report-progress',
+                    type: 'GET',
+                    dataType: 'json',
+                    success: function (data) {
+                        $('#progress-bar-fill').css('width', data.percent + '%');
+                        $('#progress-percentage').text(data.percent + '%');
+                        $('#progress-status').text(data.status);
+                        
+                        // If progress reaches 100%, close the modal after a delay
+                        if (data.percent >= 100) {
+                            clearInterval(progressPollInterval);
+                            setTimeout(function () {
+                                $('#word-report-progress-modal').css('display', 'none');
+                                resetProgress();
+                            }, 1500);
+                        }
+                    },
+                    error: function () {
+                        // If error occurs, continue polling
+                    }
+                });
+            }, 300); // Poll every 300ms for smooth updates
         }
 
         function resetProgress() {
