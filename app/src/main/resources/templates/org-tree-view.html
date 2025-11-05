@@ -6,9 +6,23 @@
     <title>Organization Tree View</title>
     <link rel="stylesheet" href="/style.css">
     <style>
+        .org-tree-container {
+            width: 100%;
+            height: 600px;
+            border: 1px solid #ccc;
+            background-color: #f9f9f9;
+            position: relative;
+            overflow: hidden;
+        }
+
         .org-svg-tree {
             width: 100%;
-            min-height: 500px;
+            height: 100%;
+            cursor: grab;
+        }
+
+        .org-svg-tree.grabbing {
+            cursor: grabbing;
         }
 
         .org-node {
@@ -40,6 +54,42 @@
             stroke: #e67e22 !important;
             stroke-width: 4 !important;
         }
+
+        .zoom-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 5px;
+            background-color: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 5px;
+            z-index: 10;
+        }
+
+        .zoom-btn {
+            padding: 6px 10px;
+            border: 1px solid #ccc;
+            background-color: white;
+            cursor: pointer;
+            border-radius: 3px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .zoom-btn:hover {
+            background-color: #e9ecef;
+        }
+
+        .zoom-display {
+            padding: 6px 10px;
+            background-color: #f5f5f5;
+            border-radius: 3px;
+            font-size: 12px;
+            min-width: 40px;
+            text-align: center;
+        }
     </style>
 </head>
 
@@ -51,13 +101,28 @@
         <p>No organization unit found for this ID.</p>
     </div>
     <div th:if="${orgUnit != null}">
-        <div style="width: 100%; overflow-x: auto;">
-            <svg id="orgTreeSvg" class="org-svg-tree" xmlns="http://www.w3.org/2000/svg" height="800" width="1600"></svg>
+        <div class="org-tree-container" id="treeViewport">
+            <svg id="orgTreeSvg" class="org-svg-tree" xmlns="http://www.w3.org/2000/svg" height="800" width="1600">
+                <g id="orgTreeGroup"></g>
+            </svg>
+            <div class="zoom-controls">
+                <button class="zoom-btn" id="zoomInBtn" title="Zoom In">+</button>
+                <div class="zoom-display" id="zoomLevel">100%</div>
+                <button class="zoom-btn" id="zoomOutBtn" title="Zoom Out">−</button>
+                <button class="zoom-btn" id="resetZoomBtn" title="Reset View">Reset</button>
+            </div>
         </div>
         <a th:href="@{'/orgunits/list'}">&larr; Back to Org Units List</a>
     </div>
 
     <script>
+        // Pan and zoom state
+        let panX = 0, panY = 0, zoomLevel = 1;
+        let isPanning = false, startX = 0, startY = 0;
+        const MIN_ZOOM = 0.5;
+        const MAX_ZOOM = 3;
+        const ZOOM_STEP = 0.1;
+
         // Fetch full org tree at once, then render the whole tree immediately.
         document.addEventListener('DOMContentLoaded', function () {
             const rootId = "[[${orgUnit != null ? orgUnit.id : ''}]]";
@@ -73,13 +138,97 @@
                         // Fallback to normal rendering
                         drawOrgTreeFull(tree, 800, 40, 0, 1600);
                     }
+                    // Initialize pan and zoom controls after tree is drawn
+                    initPanZoomControls();
                 });
         });
 
+        function initPanZoomControls() {
+            const svg = document.getElementById('orgTreeSvg');
+            const treeGroup = document.getElementById('orgTreeGroup');
+            const viewport = document.getElementById('treeViewport');
+            const zoomInBtn = document.getElementById('zoomInBtn');
+            const zoomOutBtn = document.getElementById('zoomOutBtn');
+            const resetZoomBtn = document.getElementById('resetZoomBtn');
+            const zoomDisplay = document.getElementById('zoomLevel');
+
+            // Zoom controls
+            zoomInBtn.addEventListener('click', () => {
+                zoomLevel = Math.min(zoomLevel + ZOOM_STEP, MAX_ZOOM);
+                updateTransform();
+                updateZoomDisplay();
+            });
+
+            zoomOutBtn.addEventListener('click', () => {
+                zoomLevel = Math.max(zoomLevel - ZOOM_STEP, MIN_ZOOM);
+                updateTransform();
+                updateZoomDisplay();
+            });
+
+            resetZoomBtn.addEventListener('click', () => {
+                panX = 0;
+                panY = 0;
+                zoomLevel = 1;
+                updateTransform();
+                updateZoomDisplay();
+            });
+
+            // Mouse wheel zoom
+            viewport.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const rect = svg.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+
+                const oldZoom = zoomLevel;
+                zoomLevel = e.deltaY > 0 
+                    ? Math.max(zoomLevel - ZOOM_STEP, MIN_ZOOM)
+                    : Math.min(zoomLevel + ZOOM_STEP, MAX_ZOOM);
+
+                // Adjust pan to zoom toward mouse position
+                panX -= mouseX * (zoomLevel - oldZoom) / oldZoom;
+                panY -= mouseY * (zoomLevel - oldZoom) / oldZoom;
+
+                updateTransform();
+                updateZoomDisplay();
+            }, { passive: false });
+
+            // Pan with mouse drag
+            svg.addEventListener('mousedown', (e) => {
+                isPanning = true;
+                startX = e.clientX - panX;
+                startY = e.clientY - panY;
+                svg.classList.add('grabbing');
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isPanning) return;
+                panX = e.clientX - startX;
+                panY = e.clientY - startY;
+                updateTransform();
+            });
+
+            document.addEventListener('mouseup', () => {
+                isPanning = false;
+                svg.classList.remove('grabbing');
+            });
+
+            function updateTransform() {
+                treeGroup.setAttribute('transform', `translate(${panX}, ${panY}) scale(${zoomLevel})`);
+            }
+
+            function updateZoomDisplay() {
+                zoomDisplay.textContent = Math.round(zoomLevel * 100) + '%';
+            }
+
+            // Initialize transform
+            updateZoomDisplay();
+        }
+
         // Recursive-aware draw: shows all parent's children and recursively expands them
         function drawOrgTreeWithSiblings(parentNode, selectedNodeId, svgWidth, startY, level, svgDisplayWidth) {
-            const svg = document.getElementById('orgTreeSvg');
-            svg.innerHTML = '';
+            const treeGroup = document.getElementById('orgTreeGroup');
+            treeGroup.innerHTML = '';
             const nodeW = 120, nodeH = 40, vSpacing = 90;
             const children = parentNode.children || [];
             const n = children.length;
@@ -87,20 +236,20 @@
             // Draw parent (optional, could be omitted as visual anchor)
             /* Uncomment if you want to show parent as top node
             const parentX = svgDisplayWidth/2, parentY = startY;
-            drawNode(svg, parentNode, parentX, parentY, nodeW, nodeH);
+            drawNode(treeGroup, parentNode, parentX, parentY, nodeW, nodeH);
             let yOffset = startY + vSpacing;
             */
             let yOffset = startY;
             // Recursively draw nodes and their children
             function drawRecursively(node, x, y, spacing, vSpacing, selectedId) {
-                drawNode(svg, node, x, y, nodeW, nodeH, node.id == selectedId);
+                drawNode(treeGroup, node, x, y, nodeW, nodeH, node.id == selectedId);
                 if (node.children && node.children.length) {
                     const childCount = node.children.length;
                     const childSpacing = spacing / childCount;
                     node.children.forEach((child, idx) => {
                         const childX = x - spacing / 2 + childSpacing * (idx + 0.5);
                         const childY = y + vSpacing;
-                        drawLink(svg, x, y + nodeH, childX, childY);
+                        drawLink(treeGroup, x, y + nodeH, childX, childY);
                         drawRecursively(child, childX, childY, childSpacing, vSpacing, selectedId);
                     });
                 }
@@ -108,13 +257,13 @@
 
             children.forEach((sib, idx) => {
                 const x = spacing * (idx + 1);
-                drawNode(svg, sib, x, yOffset, nodeW, nodeH, sib.id == selectedNodeId);
+                drawNode(treeGroup, sib, x, yOffset, nodeW, nodeH, sib.id == selectedNodeId);
                 // If this is the selected node, expand its children below it
                 drawRecursively(sib, x, yOffset, spacing, vSpacing, selectedNodeId);
             });
         }
 
-        function drawNode(svg, node, x, y, w, h, highlight) {
+        function drawNode(parent, node, x, y, w, h, highlight) {
             const nodeGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
             nodeGroup.setAttribute('id', 'node-' + node.id);
             const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
@@ -131,23 +280,23 @@
             t.classList.add('org-label');
             t.textContent = node.name;
             nodeGroup.appendChild(t);
-            svg.appendChild(nodeGroup);
+            parent.appendChild(nodeGroup);
         }
 
-        function drawLink(svg, x1, y1, x2, y2) {
+        function drawLink(parent, x1, y1, x2, y2) {
             const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             line.setAttribute('x1', x1);
             line.setAttribute('y1', y1);
             line.setAttribute('x2', x2);
             line.setAttribute('y2', y2);
             line.classList.add('org-link');
-            svg.appendChild(line);
+            parent.appendChild(line);
         }
 
         // fallback if parent is not present (original code)
         function drawOrgTreeFull(root, svgWidth, startY, level, svgDisplayWidth) {
-            const svg = document.getElementById('orgTreeSvg');
-            svg.innerHTML = '';
+            const treeGroup = document.getElementById('orgTreeGroup');
+            treeGroup.innerHTML = '';
             const nodeW = 120, nodeH = 40, hSpacing = 160, vSpacing = 90;
             function computeSubtreeWidth(node) {
                 if (!node.children || node.children.length === 0) return 1;
@@ -181,7 +330,7 @@
                             line.setAttribute('x2', target.x);
                             line.setAttribute('y2', target.y);
                             line.classList.add('org-link');
-                            svg.appendChild(line);
+                            treeGroup.appendChild(line);
                         }
                     });
                 }
@@ -202,7 +351,7 @@
                 t.classList.add('org-label');
                 t.textContent = pos.node.name;
                 nodeGroup.appendChild(t);
-                svg.appendChild(nodeGroup);
+                treeGroup.appendChild(nodeGroup);
             });
         }
     </script>
