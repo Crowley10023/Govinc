@@ -273,8 +273,8 @@
             <form th:action="@{'/assessment/' + ${assessment.id} + '/report'}" method="get" style="margin: 0;">
                 <button type="submit" class="btn-nav">Create Report (PDF)</button>
             </form>
-            <form th:action="@{'/assessment/' + ${assessment.id} + '/word-report'}" method="get" style="margin: 0;">
-                <button type="submit" class="btn-nav">Create Report (Word)</button>
+            <form id="word-report-form" th:action="@{'/assessment/' + ${assessment.id} + '/word-report'}" method="get" style="margin: 0;">
+                <button type="submit" id="word-report-btn" class="btn-nav">Create Report (Word)</button>
             </form>
             <form th:action="@{'/assessment/' + ${assessment.id} + '/excel'}" method="get" style="margin: 0;">
                 <button type="submit" class="btn-nav">Export to Excel</button>
@@ -283,6 +283,22 @@
             <span id="create-url-feedback"></span>
             <div id="direct-url-row" class="direct-url-row">
                 <a id="direct-url-link" href="#" target="_blank"></a>
+            </div>
+
+            <!-- Progress Popup for Word Report Generation -->
+            <div id="word-report-progress-modal" class="modal-bg" style="display: none;">
+                <div class="modal-popup progress-popup">
+                    <h3>Generating Word Report</h3>
+                    <div class="progress-container">
+                        <div class="progress-bar-bg">
+                            <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%;"></div>
+                        </div>
+                        <div class="progress-text">
+                            <span id="progress-percentage">0%</span>
+                        </div>
+                    </div>
+                    <div id="progress-status" class="progress-status">Initializing...</div>
+                </div>
             </div>
 
             <!-- Org Unit Selection Modal -->
@@ -632,6 +648,83 @@
         // Assigned users list for selection state
         window.assessmentAssignedUserIds = /*[[${assessment.users != null ? assessment.users.![id] : {}}]]*/[];
         /*]]>*/
+    </script>
+    <script>
+        // Word Report Progress Handler
+        $(document).ready(function () {
+            $('#word-report-btn').click(function (e) {
+                e.preventDefault();
+                // Show progress modal
+                showWordReportProgress();
+                // Submit the form after a brief delay to allow modal to display
+                setTimeout(function () {
+                    $('#word-report-form').submit();
+                }, 100);
+            });
+        });
+
+        function showWordReportProgress() {
+            $('#word-report-progress-modal').css('display', 'flex');
+            startProgressSimulation();
+        }
+
+        function startProgressSimulation() {
+            let progress = 0;
+            const statuses = [
+                'Initializing...',
+                'Gathering assessment data...',
+                'Processing security controls...',
+                'Compiling answers and scores...',
+                'Generating report structure...',
+                'Formatting content...',
+                'Adding tables and formatting...',
+                'Finalizing document...',
+                'Creating Word document...',
+                'Preparing for download...'
+            ];
+            let statusIndex = 0;
+
+            const progressInterval = setInterval(function () {
+                if (progress < 90) {
+                    progress += Math.random() * 15 + 5; // Random increment between 5-20%
+                    if (progress > 90) progress = 90;
+                }
+                
+                $('#progress-bar-fill').css('width', progress + '%');
+                $('#progress-percentage').text(Math.floor(progress) + '%');
+                
+                // Update status message every iteration
+                if (statusIndex < statuses.length) {
+                    $('#progress-status').text(statuses[statusIndex]);
+                    statusIndex = (statusIndex + 1) % statuses.length;
+                }
+            }, 500);
+
+            // Complete the progress after form submission
+            $(document).one('submit', '#word-report-form', function () {
+                // Keep the modal open and complete the progress after a delay
+                setTimeout(function () {
+                    // If we reach here, the download likely started
+                    $('#progress-bar-fill').css('width', '100%');
+                    $('#progress-percentage').text('100%');
+                    $('#progress-status').text('Complete! Your download should start soon...');
+                    clearInterval(progressInterval);
+                    
+                    // Close the modal after 2 seconds
+                    setTimeout(function () {
+                        $('#word-report-progress-modal').css('display', 'none');
+                        // Reset progress for next use
+                        resetProgress();
+                    }, 2000);
+                }, 3000);
+            });
+        }
+
+        function resetProgress() {
+            $('#progress-bar-fill').css('width', '0%');
+            $('#progress-percentage').text('0%');
+            $('#progress-status').text('Initializing...');
+        }
     </script>
     <script>
         // SVG for a checkmark
