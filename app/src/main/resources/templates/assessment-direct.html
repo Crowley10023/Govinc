@@ -102,16 +102,6 @@
                 controlsDiv.style.display = 'none';
             }
         }
-        function toggleDesc(btn) {
-            var $tooltip = $(btn).siblings('.ctrl-desc-tooltip');
-            $('.ctrl-desc-tooltip').not($tooltip).fadeOut(120);
-            $tooltip.fadeToggle(120);
-        }
-        $(document).on('mousedown keydown', function (e) {
-            if (!$(e.target).closest('.ctrl-desc-wrap').length) {
-                $('.ctrl-desc-tooltip').fadeOut(120);
-            }
-        });
         function toggleAssessmentDetails(header) {
             var body = header.nextElementSibling;
             if (body.style.display === 'none' || body.style.display === '') {
@@ -225,11 +215,8 @@
                             var ca = controlAnswers[ctrl.id] != null ? controlAnswers[ctrl.id] : 'No answer';
                             ansCell = '<span>' + ca + '</span>';
                         }
-                        controlsHtml += '<tr><td class="ctrl-name-col"><div class="ctrl-desc-wrap"><span>' + (ctrl.name != null ? ctrl.name : '-') + '</span>' +
-                            '<button type="button" class="ctrl-desc-btn" tabindex="0" title="Show description" onclick="toggleDesc(this)">' +
-                            '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#fff" stroke="#2274A5" stroke-width="2" />' +
-                            '<text x="12" y="17" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="15" dy="-2" fill="#2274A5">?</text></svg></button>' +
-                            '<div class="ctrl-desc-tooltip"><b>Description:</b><div>' + ((ctrl.detail && ctrl.detail !== '') ? ctrl.detail : 'No detail') + '</div></div></div></td>' +
+                        controlsHtml += '<tr><td class="ctrl-name-col"><div class="ctrl-desc-wrap"><span style="font-weight:bold">' + (ctrl.name != null ? ctrl.name : '-') + '</span>' +
+                            '<div style="display: block;">' + ((ctrl.detail && ctrl.detail !== '') ? ctrl.detail : 'No detail') + '</div></div></td>' +
                             '<td>' + ansCell + '</td></tr>';
                     });
                     controlsHtml += '</tbody></table></div></div></div>';
@@ -332,23 +319,24 @@
         }
 
         .ctrl-desc-tooltip {
-            display: none;
+            display: block !important;
             background: #fffbe8;
             color: #333;
             border: 1px solid #d4cead;
             border-radius: 5px;
             padding: 12px 15px;
             min-width: 240px;
-            max-width: 300px;
-            position: absolute;
-            left: 30px;
-            top: -10px;
+            max-width: 100%;
+            position: relative;
+            left: 0;
+            top: 0;
             z-index: 99;
             box-shadow: 0 0 10px 2px #0001;
             font-size: 0.95em;
             line-height: 1.3em;
             text-align: left;
             white-space: normal;
+            margin-top: 0.25em;
         }
     </style>
 </body>

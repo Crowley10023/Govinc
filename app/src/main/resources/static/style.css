@@ -35,10 +35,10 @@
 }
 .ctrl-desc-tooltip {
     display: none;
-    position: absolute;
-    left: 44px;
+    position: relative;
+    left: 0;
     z-index: 20;
-    max-width: 320px;
+    max-width: 100%;
     background: linear-gradient(94deg, var(--modal-beige1) 90%, var(--modal-beige2) 100%);
     color: var(--text-main);
     border: 1.5px solid var(--modal-beige3);
@@ -55,7 +55,7 @@
 }
 .ctrl-desc-wrap {
     position: relative;
-    display: inline-block;
+    display: block;
     width: 100%;
 }
 /* Modal Styles */

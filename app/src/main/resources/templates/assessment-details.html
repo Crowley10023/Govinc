@@ -161,19 +161,8 @@
                                             th:if="${ctrl.securityControlDomain != null && domain != null && ctrl.securityControlDomain.id == domain.id}">
                                             <td class="ctrl-name-col">
                                                 <div class="ctrl-desc-wrap">
-                                                    <span th:text="${ctrl.name}"></span>
-                                                    <button type="button" class="ctrl-desc-btn" tabindex="0"
-                                                        title="Show description" onclick="toggleDesc(this)">
-                                                        <svg viewBox="0 0 24 24">
-                                                            <circle cx="12" cy="12" r="10" fill="#fff" stroke="#2274A5"
-                                                                stroke-width="2" />
-                                                            <text x="12" y="17" text-anchor="middle"
-                                                                font-family="Arial,Helvetica,sans-serif" font-size="15"
-                                                                dy="-2" fill="#2274A5">?</text>
-                                                        </svg>
-                                                    </button>
-                                                    <div class="ctrl-desc-tooltip">
-                                                        <b>Description:</b>
+                                                    <span style="font-weight: bold;" th:text="${ctrl.name}"></span>
+                                                    <div style="display: block;">
                                                         <div
                                                             th:utext="${#strings.escapeXml(ctrl.detail) ?: 'No detail'}">
                                                         </div>
@@ -241,17 +230,7 @@
                                             <td class="ctrl-name-col">
                                                 <div class="ctrl-desc-wrap">
                                                     <span th:text="${ctrl.name}"></span>
-                                                    <button type="button" class="ctrl-desc-btn" tabindex="0"
-                                                        title="Show description" onclick="toggleDesc(this)">
-                                                        <svg viewBox="0 0 24 24">
-                                                            <circle cx="12" cy="12" r="10" fill="#fff" stroke="#2274A5"
-                                                                stroke-width="2" />
-                                                            <text x="12" y="17" text-anchor="middle"
-                                                                font-family="Arial,Helvetica,sans-serif" font-size="15"
-                                                                dy="-2" fill="#2274A5">?</text>
-                                                        </svg>
-                                                    </button>
-                                                    <div class="ctrl-desc-tooltip">
+                                                    <div class="ctrl-desc-tooltip" style="display: block;">
                                                         <b>Description:</b>
                                                         <div
                                                             th:utext="${#strings.escapeXml(ctrl.detail) ?: 'No detail'}">
@@ -609,17 +588,7 @@
         });
 
         // =================== Tooltip Handling Section ===================
-        function toggleDesc(btn) {
-            var $tooltip = $(btn).siblings('.ctrl-desc-tooltip');
-            $('.ctrl-desc-tooltip').not($tooltip).fadeOut(120);
-            $tooltip.fadeToggle(120);
-        }
-        // Hide tooltip when clicking outside
-        $(document).on('mousedown keydown', function (e) {
-            if (!$(e.target).closest('.ctrl-desc-wrap').length) {
-                $('.ctrl-desc-tooltip').fadeOut(120);
-            }
-        });
+        // Tooltips are now always visible - no toggle functionality needed
     </script>
     <script>
         // Collapsible domains JS - must be global for inline HTML attribute handlers
