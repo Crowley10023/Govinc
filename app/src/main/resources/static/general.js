@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // ================== AUTOSAVE ASSESSMENT COMMENT LOGIC =====================
-  if (window.jQuery) {
+  if (typeof window.jQuery !== 'undefined' && window.jQuery) {
     var debounceTimers = {};
     $(document).on('input', '.comment-textarea', function () {
       var textarea = $(this);

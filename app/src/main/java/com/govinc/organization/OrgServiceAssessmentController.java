@@ -35,7 +35,7 @@ public class OrgServiceAssessmentController {
         try {
             assessmentService.saveAssessment(assessment);
             // Redirect to orgservice list view after save
-            return "redirect:/orgservice-list";
+            return "redirect:/orgservices/list";
         } catch (RuntimeException ex) {
             OrgServiceAssessment fullAssessment = assessmentService.findOrCreateAssessment(
                 assessment.getOrgService() != null ? assessment.getOrgService().getId() : null
