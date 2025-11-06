@@ -495,8 +495,6 @@ setup_h2_fallback() {
 
 # Main database setup function
 setup_database() {
-    echo -e "${BLUE}Checking if sudo access is verified...${NC}"
-    echo
     echo -e "${BLUE}Database Setup Options:${NC}"
     echo "1. Connect to existing MariaDB/MySQL database"
     echo "2. Install and setup MariaDB locally"
@@ -530,34 +528,22 @@ setup_database() {
             local retry_count=0
             local connection_successful=false
             
-            local tested_db_host=""
-            local tested_db_port=""
-            local tested_db_name=""
-            local tested_db_user=""
-            local tested_db_password=""
-            
             while [ $retry_count -lt $max_retries ] && [ "$connection_successful" = false ]; do
                 if [ $retry_count -gt 0 ]; then
                     echo -e "${YELLOW}\nRetry attempt $retry_count of $((max_retries-1))...${NC}"
                 fi
                 
-                # Use saved values as defaults if available
-                local default_host="${DB_HOST:-localhost}"
-                local default_port="${DB_PORT:-3306}"
-                local default_name="${DB_NAME:-govinc}"
-                local default_user="${DB_USER:-govinc}"
+                read -p "Database host (default: localhost): " db_host
+                db_host=${db_host:-localhost}
                 
-                read -p "Database host (default: $default_host): " db_host
-                db_host=${db_host:-$default_host}
+                read -p "Database port (default: 3306): " db_port
+                db_port=${db_port:-3306}
                 
-                read -p "Database port (default: $default_port): " db_port
-                db_port=${db_port:-$default_port}
+                read -p "Database name (default: $DB_NAME): " db_name
+                db_name=${db_name:-$DB_NAME}
                 
-                read -p "Database name (default: $default_name): " db_name
-                db_name=${db_name:-$default_name}
-                
-                read -p "Database user (default: $default_user): " db_user
-                db_user=${db_user:-$default_user}
+                read -p "Database user (default: $DB_USER): " db_user
+                db_user=${db_user:-$DB_USER}
                 
                 read -s -p "Database password: " db_password
                 echo
@@ -579,22 +565,10 @@ setup_database() {
                 conn_result=$?
                 
                 if [ $conn_result -eq 0 ]; then
-                    tested_db_host="$db_host"
-                    tested_db_port="$db_port"
-                    tested_db_name="$db_name"
-                    tested_db_user="$db_user"
-                    tested_db_password="$db_password"
-                    
-                    update_application_properties "$tested_db_host" "$tested_db_port" "$tested_db_user" "$tested_db_password" "$tested_db_name"
+                    update_application_properties "$db_host" "$db_port" "$db_user" "$db_password" "$db_name"
                     connection_successful=true
                     echo -e "${GREEN}✓ Using verified database credentials${NC}"
                 elif [ $conn_result -eq 2 ]; then
-                    tested_db_host="$db_host"
-                    tested_db_port="$db_port"
-                    tested_db_name="$db_name"
-                    tested_db_user="$db_user"
-                    tested_db_password="$db_password"
-                    
                     echo -e "${YELLOW}\nDatabase connection works, but database is not accessible.${NC}"
                     echo -e "${YELLOW}Options:${NC}"
                     echo "1. Create the database (requires root access)"
@@ -606,8 +580,8 @@ setup_database() {
                         1)
                             read -s -p "Enter MySQL root password: " root_password
                             echo
-                            if create_database "$tested_db_host" "$tested_db_port" "$root_password" "$tested_db_password"; then
-                                update_application_properties "$tested_db_host" "$tested_db_port" "$tested_db_user" "$tested_db_password" "$tested_db_name"
+                            if create_database "$db_host" "$db_port" "$root_password" "$db_password"; then
+                                update_application_properties "$db_host" "$db_port" "$db_user" "$db_password" "$db_name"
                                 connection_successful=true
                             else
                                 retry_count=$((retry_count + 1))
@@ -746,18 +720,28 @@ main() {
     echo -e "${BLUE}========================================${NC}"
     echo
     
+    local use_saved_config=false
+    
     # Try to load saved configuration
     if load_saved_config; then
         echo -e "${YELLOW}Use saved values? (y/n): ${NC}"
         read -p "" use_saved
-        if [[ ! $use_saved =~ ^[Yy]$ ]]; then
+        if [[ $use_saved =~ ^[Yy]$ ]]; then
+            use_saved_config=true
+        else
             unset DB_HOST DB_PORT DB_NAME DB_USER DB_PASSWORD TARGET_DIRECTORY SERVICE_NAME
         fi
     fi
     
     echo
     echo -e "${BLUE}Step 1: Database Setup${NC}"
-    setup_database
+    
+    if [ "$use_saved_config" = false ]; then
+        setup_database
+    else
+        echo -e "${GREEN}✓ Using saved database configuration${NC}"
+        update_application_properties "$DB_HOST" "$DB_PORT" "$DB_USER" "$DB_PASSWORD" "$DB_NAME"
+    fi
     
     echo
     echo -e "${BLUE}Step 2: Building Application${NC}"
@@ -766,16 +750,27 @@ main() {
         echo
         echo -e "${BLUE}Step 3: Deployment Configuration${NC}"
         
-        read -p "Enter target directory for JAR deployment: " target_dir
-        if [ -z "$target_dir" ]; then
-            echo -e "${RED}Target directory cannot be empty${NC}"
-            return 1
-        fi
+        local target_dir
+        local service_name
         
-        read -p "Enter service name to stop/start during deployment: " service_name
-        if [ -z "$service_name" ]; then
-            echo -e "${RED}Service name cannot be empty${NC}"
-            return 1
+        if [ "$use_saved_config" = true ]; then
+            target_dir="$TARGET_DIRECTORY"
+            service_name="$SERVICE_NAME"
+            echo -e "${GREEN}✓ Using saved deployment configuration${NC}"
+            echo -e "${BLUE}Target directory: $target_dir${NC}"
+            echo -e "${BLUE}Service name: $service_name${NC}"
+        else
+            read -p "Enter target directory for JAR deployment: " target_dir
+            if [ -z "$target_dir" ]; then
+                echo -e "${RED}Target directory cannot be empty${NC}"
+                return 1
+            fi
+            
+            read -p "Enter service name to stop/start during deployment: " service_name
+            if [ -z "$service_name" ]; then
+                echo -e "${RED}Service name cannot be empty${NC}"
+                return 1
+            fi
         fi
         
         # Save configuration for future use
