@@ -5,7 +5,7 @@
 #
 # REQUIREMENTS:
 # - Must be run with sudo
-# - Creates .gitignored config file for credential reuse
+# - Creates .gitignored config file for credential reuse-
 
 set -e  # Exit on any error
 
