@@ -264,7 +264,7 @@
 
         <form th:action="@{/orgservice-assessment/save}" method="post">
             <input type="hidden" name="id" th:value="${assessment.id}" />
-            <input type="hidden" name="orgService.id" th:value="${assessment.orgService.id}" />
+            <input type="hidden" name="orgServiceId" th:value="${assessment.orgService.id}" />
             <input type="hidden" name="assessmentDate" th:value="${assessment.assessmentDate}" />
 
             <!-- Filter Section -->
@@ -317,20 +317,19 @@
                             </td>
                             <td>
                                 <input type="checkbox" class="control-checkbox control-applicable"
-                                       th:name="'controls[' + ${stat.index} + '].applicable'"
+                                       name="applicable"
+                                       th:value="${control.securityControl.id}"
                                        th:checked="${control.applicable}"
                                        th:disabled="${control.answeredByAnotherAssessment}" />
-                                <input type="hidden" th:name="'controls[' + ${stat.index} + '].securityControl.id'"
+                                <input type="hidden" name="controlIds"
                                     th:value="${control.securityControl.id}" />
-                                <input type="hidden" th:name="'controls[' + ${stat.index} + '].id'"
-                                    th:value="${control.id}" />
                                 <div class="linked-service-info" th:if="${control.answeredByAnotherAssessment}">
                                     Already linked to: <b th:text="${control.answeredByOrgServiceName}"></b>
                                 </div>
                             </td>
                             <td>
                                 <input type="number" min="0" max="100" class="control-input control-percent"
-                                    th:name="'controls[' + ${stat.index} + '].percent'"
+                                    name="percent"
                                     th:value="${control.percent}" required
                                     th:disabled="${control.answeredByAnotherAssessment}" />
                             </td>
