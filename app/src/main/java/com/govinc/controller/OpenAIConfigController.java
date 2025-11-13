@@ -160,7 +160,17 @@ public class OpenAIConfigController {
             // Don't allow name change
             provider.setDisplayName(providerData.getDisplayName());
             provider.setDescription(providerData.getDescription());
-            provider.setSettings(providerData.getSettings());
+            
+            // MERGE settings instead of replacing them
+            // This ensures that settings not explicitly updated are preserved
+            if (providerData.getSettings() != null) {
+                Map<String, String> currentSettings = provider.getSettings();
+                for (java.util.Map.Entry<String, String> entry : providerData.getSettings().entrySet()) {
+                    currentSettings.put(entry.getKey(), entry.getValue());
+                }
+                // Note: If a setting was explicitly removed from the frontend, it should be sent with an empty value or removed from the new settings map
+                // The current implementation will preserve settings that aren't in the update request
+            }
 
             // If setting to active, deactivate others
             if (providerData.isActive() && !provider.isActive()) {

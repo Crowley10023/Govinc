@@ -56,6 +56,8 @@ public class OpenAIUtil {
 
         if ("openai".equalsIgnoreCase(providerName)) {
             return askOpenAI(prompt, provider);
+        } else if ("openai-custom".equalsIgnoreCase(providerName)) {
+            return askOpenAICustom(prompt, provider);
         } else if ("ollama".equalsIgnoreCase(providerName)) {
             return askOllama(prompt, provider);
         } else if ("anthropic".equalsIgnoreCase(providerName)) {
@@ -156,6 +158,70 @@ public class OpenAIUtil {
             return "Error calling Ollama: " + e.getMessage();
         }
         return "";
+    }
+
+    /**
+     * Call OpenAI-compatible API with custom headers and configuration
+     * Supports proprietary OpenAI-compatible APIs that use custom authentication headers
+     */
+    private String askOpenAICustom(String prompt, AIProvider provider) {
+        try {
+            String apiKey = provider.getSetting("apiKey");
+            String model = provider.getSetting("model");
+            String baseUrl = provider.getSetting("baseUrl");
+            String headerName = provider.getSetting("headerName");
+            String maxTokens = provider.getSetting("maxTokens");
+
+            if (apiKey == null || apiKey.trim().isEmpty()) {
+                return "No API key configured for OpenAI Custom provider.";
+            }
+
+            if (model == null || model.trim().isEmpty()) {
+                model = "gpt-3.5-turbo";
+            }
+
+            if (baseUrl == null || baseUrl.trim().isEmpty()) {
+                baseUrl = "https://api.openai.com/v1";
+            }
+
+            // Default to "api-key" header if not specified, but allow customization
+            if (headerName == null || headerName.trim().isEmpty()) {
+                headerName = "api-key";
+            }
+
+            RestTemplate restTemplate = new RestTemplate();
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set(headerName, apiKey.trim());
+
+            JSONObject requestObj = new JSONObject();
+            requestObj.put("model", model);
+            requestObj.put("messages", List.of(Map.of("role", "user", "content", prompt)));
+            
+            // Add max_completion_tokens if configured
+            if (maxTokens != null && !maxTokens.trim().isEmpty()) {
+                try {
+                    requestObj.put("max_completion_tokens", Integer.parseInt(maxTokens));
+                } catch (NumberFormatException e) {
+                    // Ignore if not a valid number
+                }
+            }
+
+            String url = baseUrl + "/chat/completions";
+            HttpEntity<String> entity = new HttpEntity<>(requestObj.toString(), headers);
+            ResponseEntity<String> response = restTemplate.postForEntity(url, entity, String.class);
+
+            if (response.getStatusCode().is2xxSuccessful()) {
+                JSONObject body = new JSONObject(response.getBody());
+                return body.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
+            } else if (response.getStatusCode().value() == 401) {
+                return "OpenAI Custom API response: 401 Unauthorized. Your API key is likely missing, invalid, or not active.";
+            } else {
+                return "OpenAI Custom API returned code: " + response.getStatusCode();
+            }
+        } catch (Exception e) {
+            return "Error calling OpenAI Custom API: " + e.getMessage();
+        }
     }
 
     /**
