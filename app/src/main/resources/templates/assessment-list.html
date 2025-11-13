@@ -63,6 +63,25 @@
                 let orgUnitsCache = null;
                 let selectedOrgUnit = null;
 
+                // Check for orgUnit parameter on page load
+                document.addEventListener('DOMContentLoaded', function () {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const orgUnitParam = urlParams.get('orgUnit');
+                    if (orgUnitParam) {
+                        // Fetch org units and find the one matching the parameter
+                        fetch('/orgunits')
+                            .then(res => res.json())
+                            .then(orgUnits => {
+                                orgUnitsCache = orgUnits;
+                                const matchedOrgUnit = orgUnits.find(u => u.id == orgUnitParam);
+                                if (matchedOrgUnit) {
+                                    selectedOrgUnit = matchedOrgUnit;
+                                    applyOrgUnitFilter();
+                                }
+                            });
+                    }
+                });
+
                 document.getElementById('orgUnitFilterBtn').addEventListener('click', function () {
                     document.getElementById('orgUnitModal').style.display = 'block';
                     if (!orgUnitsCache) {
@@ -122,7 +141,13 @@
                     applyOrgUnitFilter();
                 };
                 function applyOrgUnitFilter() {
+                    // Wait for DOM to be ready if called early
                     const tbody = document.getElementById('assessmentTbody');
+                    if (!tbody) {
+                        setTimeout(applyOrgUnitFilter, 100);
+                        return;
+                    }
+                    
                     let rows = tbody.querySelectorAll('tr');
                     let filterActive = !!selectedOrgUnit;
                     rows.forEach(row => {

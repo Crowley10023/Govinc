@@ -29,7 +29,7 @@
             fill: #ffffff;
             stroke: #2c5aa0;
             stroke-width: 2.5;
-            rx: 8;
+            rx: 6;
             filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
             transition: fill 0.2s ease, stroke-width 0.2s ease;
         }
@@ -41,12 +41,29 @@
 
         .org-label {
             font-family: 'Segoe UI', Arial, sans-serif;
-            font-size: 13px;
+            font-size: 12px;
             fill: #1a3d5c;
             font-weight: 600;
             text-anchor: middle;
             alignment-baseline: middle;
             pointer-events: none;
+        }
+
+        .org-node-link {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 10px;
+            fill: #2c5aa0;
+            font-weight: 500;
+            text-anchor: middle;
+            alignment-baseline: middle;
+            pointer-events: auto;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        .org-node-link:hover {
+            fill: #1a3d5c;
+            font-weight: 600;
         }
 
         .org-link {
@@ -240,7 +257,7 @@
         function drawOrgTreeWithSiblings(parentNode, selectedNodeId, svgWidth, startY, level, svgDisplayWidth) {
             const treeGroup = document.getElementById('orgTreeGroup');
             treeGroup.innerHTML = '';
-            const nodeW = 160, nodeH = 60, vSpacing = 80;
+            const nodeW = 160, nodeH = 50, vSpacing = 90;
             const children = parentNode.children || [];
             const n = children.length;
             const spacing = svgDisplayWidth / (n + 1);
@@ -268,13 +285,13 @@
 
             children.forEach((sib, idx) => {
                 const x = spacing * (idx + 1);
-                drawNode(treeGroup, sib, x, yOffset, nodeW, nodeH, sib.id == selectedNodeId);
+                drawNode(treeGroup, sib, x, yOffset, nodeW, nodeH, sib.id == selectedNodeId, sib.id);
                 // If this is the selected node, expand its children below it
                 drawRecursively(sib, x, yOffset, spacing, vSpacing, selectedNodeId);
             });
         }
 
-        function drawNode(parent, node, x, y, w, h, highlight) {
+        function drawNode(parent, node, x, y, w, h, highlight, nodeId) {
             const nodeGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
             nodeGroup.setAttribute('id', 'node-' + node.id);
             nodeGroup.style.cursor = 'pointer';
@@ -290,7 +307,7 @@
             
             const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
             t.setAttribute('x', x);
-            t.setAttribute('y', y + h/2 - 2);
+            t.setAttribute('y', y + 17);
             t.classList.add('org-label');
             
             // Split long names into multiple lines
@@ -323,7 +340,7 @@
                 if (line2) {
                     const tspan2 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
                     tspan2.setAttribute('x', x);
-                    tspan2.setAttribute('dy', '1.2em');
+                    tspan2.setAttribute('dy', '1.1em');
                     tspan2.textContent = line2;
                     t.appendChild(tspan2);
                 }
@@ -332,6 +349,19 @@
             }
             
             nodeGroup.appendChild(t);
+            
+            // Add assessments link
+            const link = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            link.setAttribute('x', x);
+            link.setAttribute('y', y + h - 8);
+            link.classList.add('org-node-link');
+            link.textContent = 'assessments';
+            link.addEventListener('click', (e) => {
+                e.stopPropagation();
+                window.location.href = `/assessment/list?orgUnit=${nodeId}`;
+            });
+            nodeGroup.appendChild(link);
+            
             parent.appendChild(nodeGroup);
         }
 
@@ -349,7 +379,7 @@
         function drawOrgTreeFull(root, svgWidth, startY, level, svgDisplayWidth) {
             const treeGroup = document.getElementById('orgTreeGroup');
             treeGroup.innerHTML = '';
-            const nodeW = 160, nodeH = 60, hSpacing = 160, vSpacing = 80;
+            const nodeW = 160, nodeH = 50, hSpacing = 160, vSpacing = 90;
             function computeSubtreeWidth(node) {
                 if (!node.children || node.children.length === 0) return 1;
                 return node.children.map(computeSubtreeWidth).reduce((a,b)=>a+b,0);
@@ -402,7 +432,7 @@
                 
                 const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
                 t.setAttribute('x', pos.x);
-                t.setAttribute('y', pos.y+nodeH/2-2);
+                t.setAttribute('y', pos.y + 17);
                 t.classList.add('org-label');
                 
                 // Split long names into multiple lines
@@ -435,7 +465,7 @@
                     if (line2) {
                         const tspan2 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
                         tspan2.setAttribute('x', pos.x);
-                        tspan2.setAttribute('dy', '1.2em');
+                        tspan2.setAttribute('dy', '1.1em');
                         tspan2.textContent = line2;
                         t.appendChild(tspan2);
                     }
@@ -444,6 +474,19 @@
                 }
                 
                 nodeGroup.appendChild(t);
+                
+                // Add assessments link
+                const link = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                link.setAttribute('x', pos.x);
+                link.setAttribute('y', pos.y + nodeH - 8);
+                link.classList.add('org-node-link');
+                link.textContent = 'assessments';
+                link.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    window.location.href = `/assessment/list?orgUnit=${pos.node.id}`;
+                });
+                nodeGroup.appendChild(link);
+                
                 treeGroup.appendChild(nodeGroup);
             });
         }
