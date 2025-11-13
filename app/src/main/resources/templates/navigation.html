@@ -7,7 +7,7 @@
     <div class="nav-row">
       <div class="landing-image">
         <img th:if="${layoutConfig != null and layoutConfig.imageData != null and layoutConfig.imageData.length > 0}" src="/config/image-upload/preview"
-          alt="Compliance Incubator Logo" class="ci-logo-img-visible" />
+          alt="Compliance Incubator Logo" class="ci-logo-img-visible" style="min-width: 10em" />
         <img th:unless="${layoutConfig != null and layoutConfig.imageData != null and layoutConfig.imageData.length > 0}" src="/title.png"
           alt="Default Compliance Incubator Logo" class="ci-logo-img-visible" />
       </div>
@@ -28,7 +28,7 @@
           th:text="${userName != null} ? ${userName} : (${userId != null} ? ${userId} : 'no user')"
           style="color: var(--text-main); background: var(--shine-glare);"></span>
       </div>
-      <div class="version-section" style="display: flex; align-items: center; gap: 8px;padding-right: 2em;">
+      <div class="version-section" style="display: flex; align-items: center; gap: 8px;padding-right: 2em;F">
         <span class="nav-label"
           style="color: var(--background-light); background: var(--primary-blue-dark); font-size: 0.85em;">v</span>
         <span class="app-version"

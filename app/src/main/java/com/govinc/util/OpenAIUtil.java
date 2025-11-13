@@ -210,6 +210,7 @@ public class OpenAIUtil {
      * Supports proprietary OpenAI-compatible APIs that use custom authentication headers
      */
     private String askOpenAICustom(String prompt, AIProvider provider) {
+        String errorMsg = "OpenAI Custom API error";
         try {
             String apiKey = provider.getSetting("apiKey");
             String model = provider.getSetting("model");
@@ -252,16 +253,20 @@ public class OpenAIUtil {
                 }
             }
 
+            
+
             String url = baseUrl + "/chat/completions";
             HttpEntity<String> entity = new HttpEntity<>(requestObj.toString(), headers);
             ResponseEntity<String> response = restTemplate.postForEntity(url, entity, String.class);
+
+            errorMsg += "\n\n" + entity + "\n\n" + response;
 
             if (response.getStatusCode().is2xxSuccessful()) {
                 JSONObject body = new JSONObject(response.getBody());
                 return body.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
             } else if (response.getStatusCode().value() == 401) {
                 String body = response.getBody();
-                String errorMsg = "OpenAI Custom API response: 401 Unauthorized. Your API key is likely missing, invalid, or not active.";
+                errorMsg = "OpenAI Custom API response: 401 Unauthorized. Your API key is likely missing, invalid, or not active.";
                 if (body != null && !body.isEmpty()) {
                     try {
                         JSONObject errorObj = new JSONObject(body);
@@ -277,7 +282,7 @@ public class OpenAIUtil {
                 return errorMsg;
             } else {
                 String body = response.getBody();
-                String errorMsg = "OpenAI Custom API returned code: " + response.getStatusCode();
+                errorMsg += response.getStatusCode();
                 if (body != null && !body.isEmpty()) {
                     try {
                         JSONObject errorObj = new JSONObject(body);
@@ -293,7 +298,7 @@ public class OpenAIUtil {
                 return errorMsg;
             }
         } catch (HttpClientErrorException e) {
-            String errorMsg = "Error calling OpenAI Custom API: " + e.getStatusCode();
+            errorMsg += e.getStatusCode();
             String body = e.getResponseBodyAsString();
             if (body != null && !body.isEmpty()) {
                 try {
@@ -309,7 +314,7 @@ public class OpenAIUtil {
             }
             return errorMsg;
         } catch (Exception e) {
-            return "Error calling OpenAI Custom API: " + e.getMessage();
+            return "Error calling OpenAI Custom API: " + e.getMessage() + errorMsg;
         }
     }
 
