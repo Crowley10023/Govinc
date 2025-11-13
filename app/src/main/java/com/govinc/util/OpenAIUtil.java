@@ -257,16 +257,18 @@ public class OpenAIUtil {
 
             String url = baseUrl + "/chat/completions";
             HttpEntity<String> entity = new HttpEntity<>(requestObj.toString(), headers);
+
+            errorMsg += "\n\n" + entity + headers + requestObj.toString() + "\n\n";
+
             ResponseEntity<String> response = restTemplate.postForEntity(url, entity, String.class);
 
-            errorMsg += "\n\n" + entity + "\n\n" + response;
+            errorMsg += response;
 
             if (response.getStatusCode().is2xxSuccessful()) {
                 JSONObject body = new JSONObject(response.getBody());
                 return body.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
             } else if (response.getStatusCode().value() == 401) {
-                String body = response.getBody();
-                errorMsg = "OpenAI Custom API response: 401 Unauthorized. Your API key is likely missing, invalid, or not active.";
+                String body = response.getBody();                
                 if (body != null && !body.isEmpty()) {
                     try {
                         JSONObject errorObj = new JSONObject(body);
@@ -284,6 +286,7 @@ public class OpenAIUtil {
                 String body = response.getBody();
                 errorMsg += response.getStatusCode();
                 if (body != null && !body.isEmpty()) {
+                    errorMsg += "body \n\n" + body;
                     try {
                         JSONObject errorObj = new JSONObject(body);
                         if (errorObj.has("error")) {
