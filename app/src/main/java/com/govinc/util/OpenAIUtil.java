@@ -78,10 +78,6 @@ public class OpenAIUtil {
                 return "No OpenAI API key configured. Please set the API key in provider settings.";
             }
 
-            if (!apiKey.trim().startsWith("sk-")) {
-                return "The OpenAI API key must start with 'sk-'. Please check your key.";
-            }
-
             if (model == null || model.trim().isEmpty()) {
                 model = "gpt-3.5-turbo";
             }

@@ -4,8 +4,9 @@
 # This script handles database setup and application build
 #
 # REQUIREMENTS:
-# - Must be run with sudo
-# - Creates .gitignored config file for credential reuse-
+# - Must be run with sudo (./build-setup.sh or sudo ./build-setup.sh)
+# - Must have execute permission: chmod +x build-setup.sh
+# - Creates .gitignored config file for credential reuse
 
 set -e  # Exit on any error
 
@@ -740,6 +741,11 @@ main() {
         setup_database
     else
         echo -e "${GREEN}✓ Using saved database configuration${NC}"
+        db_host="$DB_HOST"
+        db_port="$DB_PORT"
+        db_name="$DB_NAME"
+        db_user="$DB_USER"
+        db_password="$DB_PASSWORD"
         update_application_properties "$DB_HOST" "$DB_PORT" "$DB_USER" "$DB_PASSWORD" "$DB_NAME"
     fi
     
@@ -773,10 +779,12 @@ main() {
             fi
         fi
         
-        # Save configuration for future use
-        echo
-        echo -e "${YELLOW}Saving configuration for future use...${NC}"
-        save_config "$db_host" "$db_port" "$db_name" "$db_user" "$db_password" "$target_dir" "$service_name"
+        # Save configuration for future use (only if not using pre-saved config)
+        if [ "$use_saved_config" = false ]; then
+            echo
+            echo -e "${YELLOW}Saving configuration for future use...${NC}"
+            save_config "$db_host" "$db_port" "$db_name" "$db_user" "$db_password" "$target_dir" "$service_name"
+        fi
         
         echo
         echo -e "${BLUE}Step 4: Deploying JAR${NC}"
@@ -804,6 +812,9 @@ main() {
         return 1
     fi
 }
+
+# Ensure this script is executable
+chmod +x "$0" 2>/dev/null || true
 
 # Set up signal handling
 trap 'echo -e "\n${YELLOW}Script interrupted by user${NC}"; exit 130' INT TERM
