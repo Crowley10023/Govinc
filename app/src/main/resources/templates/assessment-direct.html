@@ -83,16 +83,16 @@
         </div>
         <div id="controls-container" class="controls-viewport"></div>
     </div>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
     <script>
         // --- Helper for answer post feedback (icons) ---
         function showSuccessIcon(container) {
-            container.html('<span class="answer-success" title="Saved"><svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="#d8ffd8" stroke="#33aa33" stroke-width="2"/><path d="M5 9l3 3 5-5" fill="none" stroke="#33aa33" stroke-width="2"/></svg></span>');
+            container.innerHTML = '<span class="answer-success" title="Saved"><svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="#d8ffd8" stroke="#33aa33" stroke-width="2"/><path d="M5 9l3 3 5-5" fill="none" stroke="#33aa33" stroke-width="2"/></svg></span>';
         }
         function showErrorIcon(container) {
-            container.html('<span class="answer-error" title="Error saving"><svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="#ffd8d8" stroke="#cc2222" stroke-width="2"/><path d="M6 6l6 6M12 6l-6 6" fill="none" stroke="#cc2222" stroke-width="2"/></svg></span>');
+            container.innerHTML = '<span class="answer-error" title="Error saving"><svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="#ffd8d8" stroke="#cc2222" stroke-width="2"/><path d="M6 6l6 6M12 6l-6 6" fill="none" stroke="#cc2222" stroke-width="2"/></svg></span>';
         }
-        function clearIcon(container) { container.empty(); }
+        function clearIcon(container) { container.innerHTML = ''; }
         var CHECKMARK_SVG = '<svg width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" stroke="#22b573" stroke-width="2" fill="#fff"/><polyline points="6,12 10,16 16,7" stroke="#22b573" stroke-width="2.5" fill="none"/></svg>';
         function toggleDomain(header) {
             var controlsDiv = header.nextElementSibling;
@@ -147,12 +147,14 @@
                 document.getElementById('ad-date').innerHTML = '<h1>Invalid assessment link</h1>';
                 return;
             }
-            $.getJSON('/assessment-direct/' + obfuscatedId + '/alldata', function (data) {
+            fetch('/assessment-direct/' + obfuscatedId + '/alldata')
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
                 if (!data || data.error) {
                     document.getElementById('ad-date').innerHTML = '<h1>Assessment Not Found</h1>';
                     return;
                 }
-                if (data.assessment.status === 'CLOSED' || data.isOpen === false) {
+                if (!data.assessment || data.assessment.status === 'CLOSED' || data.isOpen === false) {
                     document.getElementById('ad-date').innerHTML = '<h1>SORRY NOT LONGER AVAILABLE</h1>';
                     return;
                 }
@@ -222,60 +224,65 @@
                     controlsHtml += '</tbody></table></div></div></div>';
                 });
                 document.getElementById('controls-container').innerHTML = controlsHtml;
-                $('.answer-select').on('change', function () {
-                    var select = $(this);
-                    var controlId = select.data('control-id');
-                    var answerId = select.val();
-                    var feedbackIcon = select.closest('span').find('.answer-feedback');
-                    select.css('background', '');
-                    clearIcon(feedbackIcon);
-                    if (!answerId) {
+                document.querySelectorAll('.answer-select').forEach(function(select) {
+                    select.addEventListener('change', function() {
+                        var controlId = select.getAttribute('data-control-id');
+                        var answerId = select.value;
+                        var feedbackIcon = select.closest('.dropdown-row').querySelector('.answer-feedback');
+                        select.style.background = '';
                         clearIcon(feedbackIcon);
-                        return;
-                    }
-                    $.ajax({
-                        url: '/assessment-direct/' + a.id + '/answer',
-                        type: 'POST',
-                        data: { controlId: controlId, answerId: answerId },
-                        success: function (resp) {
-                            select.css('background', '#d8ffd8');
-                            showSuccessIcon(feedbackIcon);
-                            setTimeout(function () { clearIcon(feedbackIcon); select.css('background', ''); }, 1500);
-                        },
-                        error: function () {
-                            select.css('background', '#ffd8d8');
-                            showErrorIcon(feedbackIcon);
+                        if (!answerId) {
+                            clearIcon(feedbackIcon);
+                            return;
                         }
+                        fetch('/assessment-direct/' + a.id + '/answer', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded'
+                            },
+                            body: 'controlId=' + controlId + '&answerId=' + answerId
+                        })
+                        .then(function(resp) {
+                            select.style.background = '#d8ffd8';
+                            showSuccessIcon(feedbackIcon);
+                            setTimeout(function() { clearIcon(feedbackIcon); select.style.background = ''; }, 1500);
+                        })
+                        .catch(function() {
+                            select.style.background = '#ffd8d8';
+                            showErrorIcon(feedbackIcon);
+                        });
                     });
                 });
                 var debounceTimers = {};
-                $(document).on('input', '.comment-textarea', function () {
-                    var textarea = $(this);
-                    var controlId = textarea.data('control-id');
-                    var comment = textarea.val();
-                    var feedback = textarea.nextAll('.comment-feedback').first();
-                    if (debounceTimers[controlId])
-                        clearTimeout(debounceTimers[controlId]);
-                    debounceTimers[controlId] = setTimeout(function () {
-                        $.ajax({
-                            url: '/assessment-direct/' + a.id + '/control/' + controlId + '/comment',
-                            type: 'PUT',
-                            contentType: 'application/json',
-                            data: JSON.stringify({ comment: comment }),
-                            success: function () {
-                                textarea.css('background', '#d8ffd8');
-                                feedback.html('<span style="color:#228B22;font-weight:bold;">Saved</span>');
-                                setTimeout(function () {
-                                    feedback.empty();
-                                    textarea.css('background', '');
+                document.querySelectorAll('.comment-textarea').forEach(function(textarea) {
+                    textarea.addEventListener('input', function() {
+                        var controlId = textarea.getAttribute('data-control-id');
+                        var comment = textarea.value;
+                        var feedback = textarea.nextElementSibling;
+                        if (debounceTimers[controlId])
+                            clearTimeout(debounceTimers[controlId]);
+                        debounceTimers[controlId] = setTimeout(function() {
+                            fetch('/assessment-direct/' + a.id + '/control/' + controlId + '/comment', {
+                                method: 'PUT',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({ comment: comment })
+                            })
+                            .then(function() {
+                                textarea.style.background = '#d8ffd8';
+                                feedback.innerHTML = '<span style="color:#228B22;font-weight:bold;">Saved</span>';
+                                setTimeout(function() {
+                                    feedback.innerHTML = '';
+                                    textarea.style.background = '';
                                 }, 1400);
-                            },
-                            error: function () {
-                                textarea.css('background', '#ffd8d8');
-                                feedback.html('<span style="color:red;font-weight:bold;">Error saving</span>');
-                            }
-                        });
-                    }, 650);
+                            })
+                            .catch(function() {
+                                textarea.style.background = '#ffd8d8';
+                                feedback.innerHTML = '<span style="color:red;font-weight:bold;">Error saving</span>';
+                            });
+                        }, 650);
+                    });
                 });
                 checkDomainCompleteness();
                 document.body.addEventListener("change", function (e) {
@@ -283,7 +290,10 @@
                         checkDomainCompleteness();
                     }
                 });
-            });
+                })
+                .catch(function() {
+                    document.getElementById('ad-date').innerHTML = '<h1>Failed to load assessment</h1>';
+                });
         });
     </script>
     <style>
