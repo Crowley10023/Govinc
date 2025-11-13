@@ -9,7 +9,9 @@ import java.util.Map;
  * Stores provider-specific settings like API keys, URLs, models, etc.
  */
 @Entity
-@Table(name = "ai_provider")
+@Table(name = "ai_provider", uniqueConstraints = {
+    @UniqueConstraint(name = "UK_displayName", columnNames = "displayName")
+})
 public class AIProvider {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -18,7 +20,7 @@ public class AIProvider {
     @Column(nullable = false, length = 50)
     private String name; // e.g., "openai", "ollama", "anthropic" - NOT unique to allow multiple instances
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String displayName; // e.g., "OpenAI API", "Ollama Local" - MUST be unique
 
     @Column(nullable = false)
