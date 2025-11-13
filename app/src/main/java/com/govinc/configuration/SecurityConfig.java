@@ -58,7 +58,6 @@ public class SecurityConfig {
             "/layoutConfig",
             "/login", // Allow login page
             "/admin/auth-config/**", // Allow auth config interface
-            "/admin/auth-config",
             "/api/security-control/import/**", // Allow security control import API endpoints
             "/api/security-control/translate", // Allow security control translation API endpoint
             "/security-control/import", // Allow security control import form submission - CSRF exempt
