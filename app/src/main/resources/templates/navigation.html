@@ -28,6 +28,13 @@
           th:text="${userName != null} ? ${userName} : (${userId != null} ? ${userId} : 'no user')"
           style="color: var(--text-main); background: var(--shine-glare);"></span>
       </div>
+      <div class="version-section" style="display: flex; align-items: center; gap: 8px;padding-right: 2em;">
+        <span class="nav-label"
+          style="color: var(--background-light); background: var(--primary-blue-dark); font-size: 0.85em;">v</span>
+        <span class="app-version"
+          th:text="${appVersion != null} ? ${appVersion} : 'unknown'"
+          style="color: var(--text-main); background: var(--shine-glare); font-size: 0.9em; padding: 2px 6px; border-radius: 3px;"></span>
+      </div>
     </div>
     <div class="nav-row">
       <div class="nav-entry dropdown">

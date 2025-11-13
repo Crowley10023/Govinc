@@ -1,0 +1,66 @@
+name: Auto Increment Version on Push
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+
+jobs:
+  increment-version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Read current version
+        id: read_version
+        run: |
+          VERSION=$(cat version.txt)
+          echo "current_version=$VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Increment patch version
+        id: increment
+        run: |
+          VERSION="${{ steps.read_version.outputs.current_version }}"
+          IFS='.' read -ra VERSION_PARTS <<< "$VERSION"
+          MAJOR=${VERSION_PARTS[0]}
+          MINOR=${VERSION_PARTS[1]}
+          PATCH=${VERSION_PARTS[2]}
+          NEW_PATCH=$((PATCH + 1))
+          NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "$NEW_VERSION" > version.txt
+      
+      - name: Check if version changed
+        id: check_change
+        run: |
+          if git diff --quiet version.txt; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Commit and push version bump
+        if: steps.check_change.outputs.changed == 'true'
+        run: |
+          git add version.txt
+          git commit -m "chore: bump version to ${{ steps.increment.outputs.new_version }}"
+          git push origin HEAD:${{ github.ref_name }}
+      
+      - name: Create Release Tag
+        if: steps.check_change.outputs.changed == 'true'
+        run: |
+          git tag "v${{ steps.increment.outputs.new_version }}"
+          git push origin "v${{ steps.increment.outputs.new_version }}"
