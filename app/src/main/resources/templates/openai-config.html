@@ -752,7 +752,8 @@
                     <label for="providerName">Provider Type:</label>
                     <select id="providerName" onchange="updateProviderSpecificFields()">
                         <option value="">-- Select Provider Type --</option>
-                        <option value="openai">OpenAI</option>
+                        <option value="openai">OpenAI (Official)</option>
+                        <option value="openai-custom">OpenAI Custom</option>
                         <option value="ollama">Ollama</option>
                         <option value="anthropic">Anthropic</option>
                     </select>
@@ -985,7 +986,7 @@
             document.getElementById('createAnthropicSettings').style.display = 'none';
             
             // Show selected provider section
-            if (providerType === 'openai') {
+            if (providerType === 'openai' || providerType === 'openai-custom') {
                 document.getElementById('createOpenAISettings').style.display = 'block';
             } else if (providerType === 'ollama') {
                 document.getElementById('createOllamaSettings').style.display = 'block';
@@ -1038,7 +1039,7 @@
             const settingsContainer = document.getElementById('editSettingsContainer');
             settingsContainer.innerHTML = '';
             
-            if (providerName === 'openai') {
+            if (providerName === 'openai' || providerName === 'openai-custom') {
                 document.getElementById('editOpenAISettings').style.display = 'block';
                 document.getElementById('editOpenAIKey').value = (settings && settings.apiKey) ? settings.apiKey : '';
                 document.getElementById('editOpenAIModel').value = (settings && settings.model) ? settings.model : '';
@@ -1161,7 +1162,6 @@
             .then(data => {
                 if (data.success) {
                     showStatus('Provider deleted successfully', 'success');
-                    // Use href to navigate via GET instead of reload (avoids Firefox "resend data" prompt)
                     setTimeout(() => { window.location.href = '/config/openai'; }, 1500);
                 } else {
                     showStatus('Error: ' + (data.error || 'Unknown error'), 'error');
@@ -1189,7 +1189,7 @@
             const settings = {};
             
             // Collect provider-specific settings
-            if (name === 'openai') {
+            if (name === 'openai' || name === 'openai-custom') {
                 const apiKey = document.getElementById('createOpenAIKey').value.trim();
                 const model = document.getElementById('createOpenAIModel').value.trim();
                 const baseUrl = document.getElementById('createOpenAIUrl').value.trim();
@@ -1265,7 +1265,6 @@
             .then(data => {
                 if (data.success) {
                     showStatus('Provider created successfully', 'success');
-                    // Use href to navigate via GET instead of reload (avoids Firefox "resend data" prompt)
                     setTimeout(() => { window.location.href = '/config/openai'; }, 1500);
                 } else {
                     showStatus('Error: ' + (data.error || 'Unknown error'), 'error');
@@ -1294,7 +1293,7 @@
             const settings = {};
             
             // Collect provider-specific settings
-            if (providerType === 'openai') {
+            if (providerType === 'openai' || providerType === 'openai-custom') {
                 const apiKey = document.getElementById('editOpenAIKey').value.trim();
                 const model = document.getElementById('editOpenAIModel').value.trim();
                 const baseUrl = document.getElementById('editOpenAIUrl').value.trim();
@@ -1376,7 +1375,6 @@
             .then(data => {
                 if (data.success) {
                     showStatus('Provider updated successfully', 'success');
-                    // Use href to navigate via GET instead of reload (avoids Firefox "resend data" prompt)
                     setTimeout(() => { window.location.href = '/config/openai'; }, 1500);
                 } else {
                     showStatus('Error: ' + (data.error || 'Unknown error'), 'error');
@@ -1391,7 +1389,7 @@
         }
 
         function selectProvider(element, providerId) {
-            providerId = String(providerId); // Ensure it's a string for comparison
+            providerId = String(providerId);
             document.querySelectorAll('.provider-info').forEach(el => {
                 el.classList.remove('active');
             });
@@ -1409,7 +1407,6 @@
                 return;
             }
             
-            // Just activate the provider
             fetch('/config/openai/provider/' + providerId + '/activate', {
                 method: 'POST',
                 headers: {
@@ -1426,7 +1423,6 @@
             .then(data => {
                 if (data.success) {
                     showStatus('Provider activated successfully', 'success');
-                    // Use href to navigate via GET instead of reload (avoids Firefox "resend data" prompt)
                     setTimeout(() => { window.location.href = '/config/openai'; }, 1500);
                 } else {
                     showStatus('Error: ' + (data.error || 'Unknown error'), 'error');
@@ -1467,7 +1463,6 @@
             .then(data => {
                 if (data.success) {
                     showStatus('General settings saved successfully', 'success');
-                    // Use href to navigate via GET instead of reload (avoids Firefox "resend data" prompt)
                     setTimeout(() => { window.location.href = '/config/openai'; }, 1500);
                 } else {
                     showStatus('Error: ' + (data.error || 'Unknown error'), 'error');

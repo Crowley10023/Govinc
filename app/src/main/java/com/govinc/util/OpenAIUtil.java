@@ -7,6 +7,7 @@ import com.govinc.repository.OpenAIConfigurationRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.http.*;
 import org.json.JSONObject;
 import java.util.*;
@@ -105,10 +106,54 @@ public class OpenAIUtil {
                 JSONObject body = new JSONObject(response.getBody());
                 return body.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
             } else if (response.getStatusCode().value() == 401) {
-                return "OpenAI API response: 401 Unauthorized. Your API key is likely missing, invalid, or not active.";
+                String body = response.getBody();
+                String errorMsg = "OpenAI API response: 401 Unauthorized. Your API key is likely missing, invalid, or not active.";
+                if (body != null && !body.isEmpty()) {
+                    try {
+                        JSONObject errorObj = new JSONObject(body);
+                        if (errorObj.has("error")) {
+                            errorMsg += " Details: " + errorObj.getJSONObject("error").optString("message", body);
+                        } else {
+                            errorMsg += " Response: " + body;
+                        }
+                    } catch (Exception e) {
+                        errorMsg += " Response: " + body;
+                    }
+                }
+                return errorMsg;
             } else {
-                return "OpenAI returned code: " + response.getStatusCode();
+                String body = response.getBody();
+                String errorMsg = "OpenAI returned code: " + response.getStatusCode();
+                if (body != null && !body.isEmpty()) {
+                    try {
+                        JSONObject errorObj = new JSONObject(body);
+                        if (errorObj.has("error")) {
+                            errorMsg += ". Error: " + errorObj.getJSONObject("error").optString("message", body);
+                        } else {
+                            errorMsg += ". Response: " + body;
+                        }
+                    } catch (Exception e) {
+                        errorMsg += ". Response: " + body;
+                    }
+                }
+                return errorMsg;
             }
+        } catch (HttpClientErrorException e) {
+            String errorMsg = "Error calling OpenAI: " + e.getStatusCode();
+            String body = e.getResponseBodyAsString();
+            if (body != null && !body.isEmpty()) {
+                try {
+                    JSONObject errorObj = new JSONObject(body);
+                    if (errorObj.has("error")) {
+                        errorMsg += ". " + errorObj.getJSONObject("error").optString("message", body);
+                    } else {
+                        errorMsg += ". Response: " + body;
+                    }
+                } catch (Exception ex) {
+                    errorMsg += ". Response: " + body;
+                }
+            }
+            return errorMsg;
         } catch (Exception e) {
             return "Error calling OpenAI: " + e.getMessage();
         }
@@ -215,10 +260,54 @@ public class OpenAIUtil {
                 JSONObject body = new JSONObject(response.getBody());
                 return body.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
             } else if (response.getStatusCode().value() == 401) {
-                return "OpenAI Custom API response: 401 Unauthorized. Your API key is likely missing, invalid, or not active.";
+                String body = response.getBody();
+                String errorMsg = "OpenAI Custom API response: 401 Unauthorized. Your API key is likely missing, invalid, or not active.";
+                if (body != null && !body.isEmpty()) {
+                    try {
+                        JSONObject errorObj = new JSONObject(body);
+                        if (errorObj.has("error")) {
+                            errorMsg += " Details: " + errorObj.getJSONObject("error").optString("message", body);
+                        } else {
+                            errorMsg += " Response: " + body;
+                        }
+                    } catch (Exception e) {
+                        errorMsg += " Response: " + body;
+                    }
+                }
+                return errorMsg;
             } else {
-                return "OpenAI Custom API returned code: " + response.getStatusCode();
+                String body = response.getBody();
+                String errorMsg = "OpenAI Custom API returned code: " + response.getStatusCode();
+                if (body != null && !body.isEmpty()) {
+                    try {
+                        JSONObject errorObj = new JSONObject(body);
+                        if (errorObj.has("error")) {
+                            errorMsg += ". Error: " + errorObj.getJSONObject("error").optString("message", body);
+                        } else {
+                            errorMsg += ". Response: " + body;
+                        }
+                    } catch (Exception e) {
+                        errorMsg += ". Response: " + body;
+                    }
+                }
+                return errorMsg;
             }
+        } catch (HttpClientErrorException e) {
+            String errorMsg = "Error calling OpenAI Custom API: " + e.getStatusCode();
+            String body = e.getResponseBodyAsString();
+            if (body != null && !body.isEmpty()) {
+                try {
+                    JSONObject errorObj = new JSONObject(body);
+                    if (errorObj.has("error")) {
+                        errorMsg += ". " + errorObj.getJSONObject("error").optString("message", body);
+                    } else {
+                        errorMsg += ". Response: " + body;
+                    }
+                } catch (Exception ex) {
+                    errorMsg += ". Response: " + body;
+                }
+            }
+            return errorMsg;
         } catch (Exception e) {
             return "Error calling OpenAI Custom API: " + e.getMessage();
         }

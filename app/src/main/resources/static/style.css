@@ -583,9 +583,8 @@ input:focus, textarea:focus, select:focus {
   flex: 0 0 auto;
 }
 .landing-image img {
-  max-width: 68px !important;
+  max-width: 20em !important;
   filter: drop-shadow(0 2px 16px rgba(255,255,255,0.15));
-  min-width: 50px;
 }
 .ci-logo-img {
   max-width: 88px;
