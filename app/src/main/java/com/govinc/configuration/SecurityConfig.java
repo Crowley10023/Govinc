@@ -56,6 +56,8 @@ public class SecurityConfig {
             "/layoutConfig/**",
             "/config/layout",
             "/layoutConfig",
+            "/config/image-upload/preview", // Allow logo preview access without authentication
+            "/title.png", // Allow default logo access without authentication
             "/login", // Allow login page
             "/admin/auth-config/**", // Allow auth config interface
             "/api/security-control/import/**", // Allow security control import API endpoints
