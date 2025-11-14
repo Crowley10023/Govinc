@@ -182,7 +182,7 @@ public class AuthProviderHealthService {
     private HealthCheckResult checkAzureHealthWithDetails(AuthConfigService.AuthProvider provider) {
         try {
             String healthUrl = "https://login.microsoftonline.com/" + provider.getTenantId() + 
-                              "/v2.0/.well-known/openid_configuration";
+                              "/v2.0/.well-known/openid-configuration";
             String response = restTemplate.getForObject(healthUrl, String.class);
             
             if (response != null && response.contains("issuer")) {
@@ -204,7 +204,7 @@ public class AuthProviderHealthService {
         } catch (HttpClientErrorException e) {
             String errorCode = "HTTP_CLIENT_ERROR_" + e.getStatusCode().value();
             String message = "HTTP client error: " + e.getStatusCode() + " " + e.getStatusText();
-            String details = "URL: https://login.microsoftonline.com/" + provider.getTenantId() + "/v2.0/.well-known/openid_configuration";
+            String details = "URL: https://login.microsoftonline.com/" + provider.getTenantId() + "/v2.0/.well-known/openid-configuration";
             
             if (e.getStatusCode().value() == 400) {
                 message = "Invalid tenant ID - Azure AD rejected the request";
