@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <title>AI Prompt Cache Management</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/general.css">
+    <th:block th:replace="~{fragments/theme-css :: themeCss}" />
+    <style>
+        .cache-stats {
+            display: flex;
+            gap: 2em;
+            margin-bottom: 2em;
+            flex-wrap: wrap;
+        }
+
+        .stat-box {
+            padding: 1em;
+            background: var(--modal-beige-1);
+            border-left: 4px solid var(--primary-blue-dark);
+            border-radius: 4px;
+            min-width: 200px;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: var(--text-main);
+            font-weight: bold;
+        }
+
+        .stat-value {
+            font-size: 1.8em;
+            color: var(--primary-blue-dark);
+            font-weight: bold;
+            margin-top: 0.5em;
+        }
+
+        .cache-controls {
+            display: flex;
+            gap: 1em;
+            margin-bottom: 2em;
+            flex-wrap: wrap;
+        }
+
+        .btn-control {
+            padding: 0.7em 1.5em;
+            border: none;
+            border-radius: 4px;
+            font-size: 1em;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: var(--primary-blue-dark);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-color);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-danger {
+            background: var(--error-red);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .cache-table-wrapper {
+            overflow-x: auto;
+            margin-bottom: 2em;
+        }
+
+        .cache-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .cache-table thead {
+            background: var(--primary-blue-dark);
+            color: white;
+            font-weight: bold;
+        }
+
+        .cache-table th {
+            padding: 1em;
+            text-align: left;
+            border-right: 1px solid #ddd;
+        }
+
+        .cache-table th:last-child {
+            border-right: none;
+        }
+
+        .cache-table td {
+            padding: 1em;
+            border-bottom: 1px solid #eee;
+            border-right: 1px solid #eee;
+        }
+
+        .cache-table td:last-child {
+            border-right: none;
+        }
+
+        .cache-table tbody tr:hover {
+            background: var(--table-hover-1);
+        }
+
+        .cache-table tbody tr:nth-child(odd) {
+            background: var(--table-bg-1);
+        }
+
+        .cache-table tbody tr:nth-child(even) {
+            background: var(--table-bg-2);
+        }
+
+        .prompt-cell {
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+
+        .prompt-cell:hover {
+            cursor: pointer;
+            color: var(--primary-blue-dark);
+            text-decoration: underline;
+        }
+
+        .provider-badge {
+            display: inline-block;
+            padding: 0.3em 0.7em;
+            background: var(--accent-color);
+            color: white;
+            border-radius: 3px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+
+        .hit-count-badge {
+            display: inline-block;
+            padding: 0.3em 0.7em;
+            background: var(--label-gold);
+            color: white;
+            border-radius: 3px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+
+        .btn-delete {
+            padding: 0.4em 0.8em;
+            background: var(--error-red);
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background 0.3s ease;
+        }
+
+        .btn-delete:hover {
+            background: #c0392b;
+        }
+
+        .btn-view {
+            padding: 0.4em 0.8em;
+            background: var(--primary-blue-dark);
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background 0.3s ease;
+            margin-right: 0.5em;
+        }
+
+        .btn-view:hover {
+            background: var(--primary-color);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3em;
+            color: var(--gray-777);
+        }
+
+        .empty-state-icon {
+            font-size: 3em;
+            margin-bottom: 1em;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal.show {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        .modal-content {
+            background: #eee;
+            padding: 2em;
+            border-radius: 8px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+            animation: slideIn 0.3s ease;
+            opacity: 1;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--primary-blue-dark);
+            padding-bottom: 1em;
+            margin-bottom: 1em;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            color: var(--primary-blue-dark);
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            cursor: pointer;
+            color: var(--text-main);
+        }
+
+        .modal-close:hover {
+            color: var(--error-red);
+        }
+
+        .cache-details {
+            margin-bottom: 1.5em;
+        }
+
+        .cache-detail-row {
+            margin-bottom: 1em;
+            padding-bottom: 1em;
+            border-bottom: 1px solid #eee;
+        }
+
+        .cache-detail-row:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .detail-label {
+            font-weight: bold;
+            color: var(--primary-blue-dark);
+            font-size: 0.9em;
+            text-transform: uppercase;
+            margin-bottom: 0.5em;
+        }
+
+        .detail-value {
+            font-family: monospace;
+            background: var(--modal-beige-1);
+            padding: 0.8em;
+            border-radius: 3px;
+            word-wrap: break-word;
+            word-break: break-word;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 1em;
+            justify-content: flex-end;
+            margin-top: 2em;
+            padding-top: 1em;
+            border-top: 1px solid #eee;
+        }
+
+        .btn-modal {
+            padding: 0.7em 1.5em;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .btn-modal-cancel {
+            background: var(--gray-888);
+            color: white;
+        }
+
+        .btn-modal-cancel:hover {
+            background: var(--gray-777);
+        }
+
+        .btn-modal-delete {
+            background: var(--error-red);
+            color: white;
+        }
+
+        .btn-modal-delete:hover {
+            background: #c0392b;
+        }
+
+        .message {
+            padding: 1em;
+            border-radius: 4px;
+            margin-bottom: 1.5em;
+            display: none;
+        }
+
+        .message.show {
+            display: block;
+        }
+
+        .message.success {
+            background: var(--success-green);
+            color: white;
+        }
+
+        .message.error {
+            background: var(--error-red);
+            color: white;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2em;
+            color: var(--primary-blue-dark);
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--primary-blue-dark);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .search-box {
+            margin-bottom: 1.5em;
+        }
+
+        .search-box input {
+            width: 100%;
+            max-width: 500px;
+            padding: 0.7em;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 1em;
+        }
+
+        .search-box input::placeholder {
+            color: var(--gray-888);
+        }
+    </style>
+</head>
+
+<body>
+    <div th:replace="~{navigation :: mainNav}"></div>
+    <div class="container">
+        <h2>AI Prompt Cache Management</h2>
+        <p>View, search, and manage cached AI prompts. Each cache entry shows the prompt, provider, hit count, and usage
+            timestamps.</p>
+
+        <div id="messageContainer"></div>
+
+        <div class="cache-stats">
+            <div class="stat-box">
+                <div class="stat-label">Total Cached Prompts</div>
+                <div class="stat-value" id="totalCount">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Total Cache Hits</div>
+                <div class="stat-value" id="totalHits">0</div>
+            </div>
+        </div>
+
+        <div class="cache-controls">
+            <button class="btn-control btn-primary" onclick="reloadCache()">Refresh</button>
+            <button class="btn-control btn-danger" onclick="confirmClearAll()">Clear All Cache</button>
+        </div>
+
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="Search in prompts..." onkeyup="filterTable()">
+        </div>
+
+        <div id="loadingContainer" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Loading cache entries...</p>
+        </div>
+
+        <div id="cacheTableContainer"></div>
+    </div>
+
+    <!-- Detail View Modal -->
+    <div id="detailModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Cache Entry Details</h2>
+                <button class="modal-close" onclick="closeDetailModal()">×</button>
+            </div>
+            <div id="detailContent"></div>
+            <div class="modal-actions">
+                <button class="btn-modal btn-modal-cancel" onclick="closeDetailModal()">Close</button>
+                <button class="btn-modal btn-modal-delete" onclick="deleteFromModal()">Delete Entry</button>
+            </div>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        const csrfToken = /*[[${_csrf.token}]]*/ '';
+        const csrfHeader = /*[[${_csrf.headerName}]]*/ '';
+
+        let cachedData = [];
+        let selectedEntryId = null;
+
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            const date = new Date(dateString);
+            return date.toLocaleString();
+        }
+
+        function showMessage(message, type = 'success') {
+            const container = document.getElementById('messageContainer');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type} show`;
+            messageDiv.textContent = message;
+            container.innerHTML = '';
+            container.appendChild(messageDiv);
+            setTimeout(() => {
+                messageDiv.classList.remove('show');
+            }, 5000);
+        }
+
+        function reloadCache() {
+            showLoading(true);
+            fetch('/config/ai-cache/list')
+                .then(response => response.json())
+                .then(data => {
+                    showLoading(false);
+                    if (data.success) {
+                        cachedData = data.entries;
+                        renderCacheTable();
+                        updateStats();
+                    } else {
+                        showMessage('Error loading cache: ' + data.error, 'error');
+                    }
+                })
+                .catch(error => {
+                    showLoading(false);
+                    showMessage('Error: ' + error.message, 'error');
+                });
+        }
+
+        function updateStats() {
+            const totalCount = cachedData.length;
+            const totalHits = cachedData.reduce((sum, entry) => sum + (entry.hitCount || 0), 0);
+            document.getElementById('totalCount').textContent = totalCount;
+            document.getElementById('totalHits').textContent = totalHits;
+        }
+
+        function renderCacheTable() {
+            const container = document.getElementById('cacheTableContainer');
+
+            if (cachedData.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📭</div>
+                        <p>No cached prompts yet.</p>
+                        <small>Cache entries will appear here after you make AI requests.</small>
+                    </div>
+                `;
+                return;
+            }
+
+            let tableHtml = `
+                <div class="cache-table-wrapper">
+                    <table class="cache-table" id="cacheTable">
+                        <thead>
+                            <tr>
+                                <th>Prompt</th>
+                                <th>Provider</th>
+                                <th>Hits</th>
+                                <th>Created</th>
+                                <th>Last Used</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            cachedData.forEach(entry => {
+                const promptPreview = entry.prompt.length > 50
+                    ? entry.prompt.substring(0, 50) + '...'
+                    : entry.prompt;
+
+                tableHtml += `
+                    <tr class="cache-row">
+                        <td class="prompt-cell" title="${escapeHtml(entry.prompt)}" onclick="viewDetails(${entry.id})">
+                            ${escapeHtml(promptPreview)}
+                        </td>
+                        <td><span class="provider-badge">${escapeHtml(entry.providerName)}</span></td>
+                        <td><span class="hit-count-badge">${entry.hitCount}</span></td>
+                        <td>${formatDate(entry.createdAt)}</td>
+                        <td>${formatDate(entry.lastUsed)}</td>
+                        <td>
+                            <button class="btn-view" onclick="viewDetails(${entry.id})">View</button>
+                            <button class="btn-delete" onclick="deleteEntry(${entry.id})">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tableHtml += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            container.innerHTML = tableHtml;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function filterTable() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const rows = document.querySelectorAll('.cache-row');
+
+            rows.forEach(row => {
+                const promptCell = row.querySelector('.prompt-cell');
+                const text = promptCell.textContent.toLowerCase();
+                row.style.display = text.includes(searchTerm) ? '' : 'none';
+            });
+        }
+
+        function viewDetails(id) {
+            const entry = cachedData.find(e => e.id === id);
+            if (!entry) return;
+
+            selectedEntryId = id;
+            const detailContent = document.getElementById('detailContent');
+
+            detailContent.innerHTML = `
+                <div class="cache-details">
+                    <div class="cache-detail-row">
+                        <div class="detail-label">Prompt</div>
+                        <div class="detail-value">${escapeHtml(entry.prompt)}</div>
+                    </div>
+                    <div class="cache-detail-row">
+                        <div class="detail-label">Response</div>
+                        <div class="detail-value">${escapeHtml(entry.response)}</div>
+                    </div>
+                    <div class="cache-detail-row">
+                        <div class="detail-label">Provider</div>
+                        <div class="detail-value">${escapeHtml(entry.providerName)}</div>
+                    </div>
+                    <div class="cache-detail-row">
+                        <div class="detail-label">Cache Hits</div>
+                        <div class="detail-value">${entry.hitCount}</div>
+                    </div>
+                    <div class="cache-detail-row">
+                        <div class="detail-label">Created At</div>
+                        <div class="detail-value">${formatDate(entry.createdAt)}</div>
+                    </div>
+                    <div class="cache-detail-row">
+                        <div class="detail-label">Last Used</div>
+                        <div class="detail-value">${formatDate(entry.lastUsed)}</div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('detailModal').classList.add('show');
+        }
+
+        function closeDetailModal() {
+            document.getElementById('detailModal').classList.remove('show');
+            selectedEntryId = null;
+        }
+
+        function deleteEntry(id) {
+            const headers = new Headers();
+            if (csrfToken) {
+                headers.append(csrfHeader, csrfToken);
+            }
+
+            fetch(`/config/ai-cache/${id}`, {
+                method: 'DELETE',
+                headers: headers
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showMessage('Cache entry deleted successfully', 'success');
+                        reloadCache();
+                    } else {
+                        showMessage('Error deleting entry: ' + data.error, 'error');
+                    }
+                })
+                .catch(error => showMessage('Error: ' + error.message, 'error'));
+
+        }
+
+        function deleteFromModal() {
+            if (selectedEntryId) {
+                const idToDelete = selectedEntryId;
+                closeDetailModal();
+                deleteEntry(idToDelete);
+            }
+        }
+
+        function confirmClearAll() {
+            if (confirm('Are you sure you want to clear ALL cache entries? This action cannot be undone.')) {
+                const headers = new Headers();
+                if (csrfToken) {
+                    headers.append(csrfHeader, csrfToken);
+                }
+                headers.append('Content-Type', 'application/json');
+
+                fetch('/config/ai-cache/clear-all', {
+                    method: 'POST',
+                    headers: headers,
+                    body: '{}'
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            showMessage('All cache entries cleared successfully', 'success');
+                            reloadCache();
+                        } else {
+                            showMessage('Error clearing cache: ' + data.error, 'error');
+                        }
+                    })
+                    .catch(error => showMessage('Error: ' + error.message, 'error'));
+            }
+        }
+
+        function showLoading(show) {
+            document.getElementById('loadingContainer').style.display = show ? 'block' : 'none';
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('detailModal').addEventListener('click', function (event) {
+            if (event.target === this) {
+                closeDetailModal();
+            }
+        });
+
+        // Load cache on page load
+        reloadCache();
+    </script>
+</body>
+
+</html>

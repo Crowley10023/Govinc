@@ -16,6 +16,7 @@ import com.govinc.user.User;
 import com.govinc.user.UserRepository;
 import com.govinc.catalog.SecurityControlDomain;
 import com.govinc.entity.OrganisationDetailsRepository;
+import com.govinc.util.OpenAIUtil;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -71,6 +72,9 @@ public class AssessmentController {
 
     @Autowired
     private OrganisationDetailsRepository organisationDetailsRepository;
+
+    @Autowired
+    private OpenAIUtil openAIUtil;
 
     @GetMapping("/create")
     public String showCreateAssessmentForm(Model model) {

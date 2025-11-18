@@ -2,8 +2,10 @@ package com.govinc.util;
 
 import com.govinc.entity.AIProvider;
 import com.govinc.entity.OpenAIConfiguration;
+import com.govinc.entity.AIPromptCache;
 import com.govinc.repository.AIProviderRepository;
 import com.govinc.repository.OpenAIConfigurationRepository;
+import com.govinc.repository.AIPromptCacheRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
@@ -11,6 +13,8 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.http.*;
 import org.json.JSONObject;
 import java.util.*;
+import java.security.MessageDigest;
+import java.nio.charset.StandardCharsets;
 
 /**
  * OpenAIUtil handles AI requests by routing them to the configured active provider.
@@ -20,15 +24,18 @@ import java.util.*;
 public class OpenAIUtil {
     private final OpenAIConfigurationRepository configRepository;
     private final AIProviderRepository providerRepository;
+    private final AIPromptCacheRepository cacheRepository;
 
     @Autowired
-    public OpenAIUtil(OpenAIConfigurationRepository configRepository, AIProviderRepository providerRepository) {
+    public OpenAIUtil(OpenAIConfigurationRepository configRepository, AIProviderRepository providerRepository, AIPromptCacheRepository cacheRepository) {
         this.configRepository = configRepository;
         this.providerRepository = providerRepository;
+        this.cacheRepository = cacheRepository;
     }
 
     /**
      * Main method to ask AI using the active provider
+     * Checks cache first for exact prompt matches before making API calls
      */
     public String askAI(String prompt) {
         System.out.println("prompt: " + prompt);
@@ -44,9 +51,80 @@ public class OpenAIUtil {
             return "The configured AI provider (" + provider.getDisplayName() + ") is not active.";
         }
 
+        // Check cache for exact prompt match
+        String cachedResult = getCachedResponse(prompt, provider.getName());
+        if (cachedResult != null) {
+            System.out.println("Cache hit for prompt: " + prompt);
+            return cachedResult;
+        }
+
         String result = routeToProvider(prompt, provider);
         System.out.println("... --> " + result);
+        
+        // Cache the result if it's not an error
+        if (!result.startsWith("Error") && !result.startsWith("No AI provider") && !result.startsWith("The configured")) {
+            cacheResponse(prompt, result, provider.getName());
+        }
+        
         return result;
+    }
+
+    /**
+     * Check cache for an exact prompt match
+     * Uses SHA-256 hash for exact matching
+     */
+    private String getCachedResponse(String prompt, String providerName) {
+        try {
+            String hash = hashPrompt(prompt);
+            Optional<AIPromptCache> cached = cacheRepository.findByPromptHashAndProviderName(hash, providerName);
+            if (cached.isPresent()) {
+                AIPromptCache cache = cached.get();
+                cache.recordHit();
+                cacheRepository.save(cache);
+                return cache.getResponse();
+            }
+        } catch (Exception e) {
+            System.err.println("Error checking cache: " + e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Cache a prompt and its response
+     */
+    private void cacheResponse(String prompt, String response, String providerName) {
+        try {
+            String hash = hashPrompt(prompt);
+            
+            // Check if already exists
+            Optional<AIPromptCache> existing = cacheRepository.findByPromptHashAndProviderName(hash, providerName);
+            if (existing.isPresent()) {
+                AIPromptCache cache = existing.get();
+                cache.recordHit();
+                cacheRepository.save(cache);
+            } else {
+                AIPromptCache cache = new AIPromptCache(prompt, hash, response, providerName);
+                cacheRepository.save(cache);
+                System.out.println("Cached response for prompt: " + prompt);
+            }
+        } catch (Exception e) {
+            System.err.println("Error caching response: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Generate SHA-256 hash of prompt for exact matching
+     */
+    private String hashPrompt(String prompt) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        byte[] hash = digest.digest(prompt.getBytes(StandardCharsets.UTF_8));
+        StringBuilder hexString = new StringBuilder();
+        for (byte b : hash) {
+            String hex = Integer.toHexString(0xff & b);
+            if (hex.length() == 1) hexString.append('0');
+            hexString.append(hex);
+        }
+        return hexString.toString();
     }
 
     /**

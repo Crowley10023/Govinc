@@ -19,7 +19,7 @@ public class GlobalOrganisationDetailsAdvice {
     @Autowired
     private OrganisationDetailsRepository organisationDetailsRepository;
     
-    @Value("${app.version.file:version.txt}")
+    @Value("${app.version:2.1.0}")
     private String versionFile;
 
     @ModelAttribute
@@ -42,6 +42,6 @@ public class GlobalOrganisationDetailsAdvice {
         } catch (Exception e) {
             logger.debug("Could not read version from file: " + e.getMessage());
         }
-        return "1.0.0";
+        return versionFile;
     }
 }

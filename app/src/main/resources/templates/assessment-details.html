@@ -6,6 +6,7 @@
     <title>Assessment Details</title>
     <link rel="stylesheet" href="/style.css">
     <link rel="stylesheet" href="/general.css">
+    <link rel="stylesheet" href="/answering-guide.css">
     <!-- All moved styles are now in style.css -->
     <!-- CSRF meta tags for AJAX -->
     <meta name="_csrf" th:content="${_csrf.token}" />
@@ -171,6 +172,16 @@
                                             </td>
                                             <td>
                                                 <div class="control-actions-flex-row">
+                                                    <div class="answering-guide-row">
+                                                        <button type="button" class="answering-guide-btn" 
+                                                            th:data-control-id="${ctrl.id}"
+                                                            th:data-control-name="${ctrl.name}"
+                                                            th:data-control-detail="${ctrl.detail}"
+                                                            th:disabled="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])}"
+                                                            th:title="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])} ? 'Disabled for taken-over answers' : 'Get AI-powered answering guide'">
+                                                            💡 Guide
+                                                        </button>
+                                                    </div>
                                                     <div class="dropdown-row">
                                                         <select th:name="${'control_' + ctrl.id}"
                                                             th:data-control-id="${ctrl.id}"
@@ -335,6 +346,34 @@
                         </div>
                     </form>
                     <div id="users-modal-error" class="modal-error"></div>
+                </div>
+            </div>
+
+            <!-- Answering Guide Modal -->
+            <div class="modal-bg" id="answering-guide-modal-bg">
+                <div class="modal-popup answering-guide-popup">
+                    <div class="answering-guide-header">
+                        <h3>Answering Guide</h3>
+                        <button type="button" class="modal-close-btn" onclick="closeAnsweringGuideModal()">X</button>
+                    </div>
+                    <div class="answering-guide-content">
+                        <div id="answering-guide-control-name" class="guide-control-name"></div>
+                        <div id="answering-guide-loading" class="guide-loading" style="display:none;">
+                            <p>Loading questions...</p>
+                        </div>
+                        <div id="answering-guide-questions" class="guide-questions"></div>
+                        <div id="answering-guide-proposed-answer" class="guide-proposed-answer" style="display:none;">
+                            <h4>Proposed Answer</h4>
+                            <div id="guide-proposed-answer-text" class="proposed-answer-text"></div>
+                            <div class="guide-answer-actions">
+                                <button type="button" class="guide-takeover-btn" onclick="takeoverProposedAnswer()">Take Over</button>
+                                <button type="button" class="guide-discard-btn" onclick="discardProposedAnswer()">Discard</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-btn-row">
+                        <button type="button" id="answering-guide-close-btn" onclick="closeAnsweringGuideModal()">Close</button>
+                    </div>
                 </div>
             </div>
         </section>
@@ -519,12 +558,181 @@
                 });
             });
 
-
+            // =================== Answering Guide Modal Logic ===================
+            $(document).on('click', '.answering-guide-btn', function() {
+                var controlId = $(this).data('control-id');
+                var controlName = $(this).data('control-name');
+                var controlDetail = $(this).data('control-detail');
+                var securityCatalogId = window.securityCatalogId || 0;
+                
+                openAnsweringGuideModal(controlId, controlName, controlDetail, securityCatalogId);
+            });
         });
         // =================== End modal handling section ===================
 
         function closeOrgUnitModal() {
             $('#orgunit-modal-bg').hide();
+        }
+
+        // =================== Answering Guide Functions ===================
+        var currentAnsweringGuideState = {
+            controlId: null,
+            securityCatalogId: null,
+            questions: [],
+            answers: {},
+            proposedAnswer: null
+        };
+
+        function openAnsweringGuideModal(controlId, controlName, controlDetail, securityCatalogId) {
+            currentAnsweringGuideState.controlId = controlId;
+            currentAnsweringGuideState.securityCatalogId = securityCatalogId;
+            currentAnsweringGuideState.questions = [];
+            currentAnsweringGuideState.answers = {};
+            currentAnsweringGuideState.proposedAnswer = null;
+
+            $('#answering-guide-control-name').html('<h4>' + $('<span/>').text(controlName).html() + '</h4><p>' + $('<span/>').text(controlDetail).html() + '</p>');
+            $('#answering-guide-questions').empty();
+            $('#answering-guide-proposed-answer').hide();
+            $('#answering-guide-loading').show();
+            $('#answering-guide-modal-bg').css('display', 'flex');
+
+            // Fetch questions from backend
+            $.ajax({
+                url: '/assessment/generate-answering-guide-questions',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    controlId: controlId,
+                    controlName: controlName,
+                    controlDetail: controlDetail,
+                    securityCatalogId: securityCatalogId
+                }),
+                success: function(response) {
+                    $('#answering-guide-loading').hide();
+                    if (response && response.questions && Array.isArray(response.questions)) {
+                        currentAnsweringGuideState.questions = response.questions;
+                        displayAnsweringGuideQuestions(response.questions);
+                    } else {
+                        $('#answering-guide-questions').html('<p style="color: red;">Error: Could not load questions.</p>');
+                    }
+                },
+                error: function(xhr) {
+                    $('#answering-guide-loading').hide();
+                    var errorMsg = 'Error generating questions. Please try again.';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    }
+                    $('#answering-guide-questions').html('<p style="color: red;">' + $('<span/>').text(errorMsg).html() + '</p>');
+                }
+            });
+        }
+
+        function displayAnsweringGuideQuestions(questions) {
+            var html = '<div class="questions-container">';
+            questions.forEach(function(q, index) {
+                html += '<div class="question-item">';
+                html += '<label class="question-label">' + (index + 1) + '. ' + $('<span/>').text(q).html() + '</label>';
+                html += '<div class="question-answer-options">';
+                html += '<label class="option-label"><input type="radio" name="question_' + index + '" value="Yes" class="question-answer-input" data-question-index="' + index + '"> Yes</label>';
+                html += '<label class="option-label"><input type="radio" name="question_' + index + '" value="No" class="question-answer-input" data-question-index="' + index + '"> No</label>';
+                html += '</div>';
+                html += '</div>';
+            });
+            html += '<button type="button" class="guide-submit-answers-btn" onclick="submitAnsweringGuideAnswers()">Submit Answers</button>';
+            html += '</div>';
+            $('#answering-guide-questions').html(html);
+        }
+
+        function submitAnsweringGuideAnswers() {
+            var answers = [];
+            var allAnswered = true;
+            for (var i = 0; i < currentAnsweringGuideState.questions.length; i++) {
+                var selectedValue = $('input[name="question_' + i + '"]:checked').val();
+                if (!selectedValue) {
+                    allAnswered = false;
+                    break;
+                }
+                answers.push(selectedValue);
+            }
+            
+            if (!allAnswered) {
+                alert('Please answer all questions before submitting.');
+                return;
+            }
+            
+            currentAnsweringGuideState.answers = answers;
+
+            // Send answers to backend to get proposed answer
+            $.ajax({
+                url: '/assessment/generate-answer-from-guide',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    controlId: currentAnsweringGuideState.controlId,
+                    securityCatalogId: currentAnsweringGuideState.securityCatalogId,
+                    questions: currentAnsweringGuideState.questions,
+                    answers: answers
+                }),
+                success: function(response) {
+                    if (response && response.proposedAnswer) {
+                        currentAnsweringGuideState.proposedAnswer = response.proposedAnswer;
+                        $('#guide-proposed-answer-text').text(response.proposedAnswer);
+                        $('#answering-guide-proposed-answer').show();
+                    } else {
+                        alert('Error generating answer. Please try again.');
+                    }
+                },
+                error: function(xhr) {
+                    var errorMsg = 'Error generating answer. Please try again.';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    }
+                    alert(errorMsg);
+                }
+            });
+        }
+
+        function takeoverProposedAnswer() {
+            if (!currentAnsweringGuideState.proposedAnswer || !currentAnsweringGuideState.controlId) {
+                alert('Error: No proposed answer available.');
+                return;
+            }
+
+            var proposedAnswer = currentAnsweringGuideState.proposedAnswer;
+            var controlId = currentAnsweringGuideState.controlId;
+
+            // Find the matching answer option in the dropdown and set it
+            var selectElement = $('select[data-control-id="' + controlId + '"]');
+            if (selectElement.length > 0) {
+                // Find the option that matches the proposed answer text
+                var matchedOption = selectElement.find('option').filter(function() {
+                    return $(this).text().trim() === proposedAnswer.trim();
+                }).first();
+
+                if (matchedOption.length > 0) {
+                    selectElement.val(matchedOption.val()).change();
+                    closeAnsweringGuideModal();
+                } else {
+                    alert('Proposed answer does not match available options. Please select manually.');
+                }
+            } else {
+                alert('Could not find answer dropdown for this control.');
+            }
+        }
+
+        function discardProposedAnswer() {
+            closeAnsweringGuideModal();
+        }
+
+        function closeAnsweringGuideModal() {
+            $('#answering-guide-modal-bg').css('display', 'none');
+            currentAnsweringGuideState = {
+                controlId: null,
+                securityCatalogId: null,
+                questions: [],
+                answers: {},
+                proposedAnswer: null
+            };
         }
 
         // =================== Create URL and Answer Save Logic ===================
@@ -644,6 +852,7 @@
         /*<![CDATA[*/
         // Expose assessmentId and currentOrgUnitId globally for modal JS usage
         window.assessmentId = /*[[${assessment.id}]]*/ 0;
+        window.securityCatalogId = /*[[${assessment.securityCatalog != null ? assessment.securityCatalog.id : 0}]]*/ 0;
         window.currentOrgUnitId = /*[[${assessment.orgUnit != null ? assessment.orgUnit.id : ''}]]*/ '';
         // Assigned users list for selection state
         window.assessmentAssignedUserIds = /*[[${assessment.users != null ? assessment.users.![id] : {}}]]*/[];
