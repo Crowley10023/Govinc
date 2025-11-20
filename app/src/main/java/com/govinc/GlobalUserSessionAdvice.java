@@ -1,5 +1,7 @@
 package com.govinc;
 
+import com.govinc.authorization.AuthorizationService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -9,6 +11,10 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 
 @ControllerAdvice
 public class GlobalUserSessionAdvice {
+    
+    @Autowired
+    private AuthorizationService authorizationService;
+    
     @ModelAttribute("userName")
     public String addUserNameToModel() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -27,6 +33,7 @@ public class GlobalUserSessionAdvice {
         }
         return null;
     }
+    
     @ModelAttribute("userId")
     public String addUserIdToModel() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -45,5 +52,47 @@ public class GlobalUserSessionAdvice {
         }
         return null;
     }
+    
+    /**
+     * Add authorization flags to all views for conditional navigation display
+     */
+    @ModelAttribute("canAccessConfig")
+    public boolean canAccessConfig() {
+        return authorizationService.canAccessConfig();
+    }
+    
+    @ModelAttribute("canAccessSecurityFramework")
+    public boolean canAccessSecurityFramework() {
+        return authorizationService.canAccessSecurityFramework();
+    }
+    
+    @ModelAttribute("canAccessOrganization")
+    public boolean canAccessOrganization() {
+        return authorizationService.canAccessOrganization();
+    }
+    
+    @ModelAttribute("canCreateAssessment")
+    public boolean canCreateAssessment() {
+        return authorizationService.canCreateAssessment();
+    }
+    
+    @ModelAttribute("canViewAssessmentList")
+    public boolean canViewAssessmentList() {
+        return authorizationService.canViewAssessmentList();
+    }
+    
+    @ModelAttribute("canAccessCompliance")
+    public boolean canAccessCompliance() {
+        return authorizationService.canAccessCompliance();
+    }
+    
+    @ModelAttribute("canAccessStatistics")
+    public boolean canAccessStatistics() {
+        return authorizationService.canAccessStatistics();
+    }
+    
+    @ModelAttribute("canAccessAssessmentUrls")
+    public boolean canAccessAssessmentUrls() {
+        return authorizationService.canAccessAssessmentUrls();
+    }
 }
-

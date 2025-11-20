@@ -2,15 +2,21 @@ package com.govinc;
 
 import com.govinc.entity.LayoutConfiguration;
 import com.govinc.entity.LayoutConfigurationRepository;
+import com.govinc.authorization.UnauthorizedException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.servlet.ModelAndView;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.HashMap;
+import java.util.Map;
 
 @ControllerAdvice
 public class GlobalExceptionHandler {
@@ -21,6 +27,27 @@ public class GlobalExceptionHandler {
     public GlobalExceptionHandler(Environment env, LayoutConfigurationRepository layoutConfigurationRepository) {
         this.env = env;
         this.layoutConfigurationRepository = layoutConfigurationRepository;
+    }
+
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<?> handleUnauthorizedException(UnauthorizedException ex, HttpServletRequest request) {
+        // Return JSON response for AJAX/API calls
+        if (isApiCall(request)) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("error", "Forbidden");
+            response.put("message", ex.getMessage() != null ? ex.getMessage() : "You do not have permission to perform this action");
+            response.put("status", 403);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        }
+        
+        // Return HTML response for page requests
+        ModelAndView mav = new ModelAndView();
+        mav.setViewName("error");
+        mav.addObject("message", ex.getMessage() != null ? ex.getMessage() : "Access Denied");
+        mav.addObject("showDetails", false);
+        mav.addObject("statusCode", 403);
+        addLayoutConfigToView(mav);
+        return new ResponseEntity<>(mav, HttpStatus.FORBIDDEN);
     }
 
     @ExceptionHandler(Exception.class)
@@ -41,7 +68,20 @@ public class GlobalExceptionHandler {
         mav.addObject("message", ex.getMessage());
         mav.addObject("showDetails", showDetails);
 
-        // Add layoutConfig to avoid Thymeleaf binding errors in error page
+        addLayoutConfigToView(mav);
+
+        if (showDetails) {
+            StringWriter sw = new StringWriter();
+            ex.printStackTrace(new PrintWriter(sw));
+            mav.addObject("details", sw.toString());
+        }
+        return mav;
+    }
+    
+    /**
+     * Add layout configuration to a view to avoid Thymeleaf binding errors.
+     */
+    private void addLayoutConfigToView(ModelAndView mav) {
         LayoutConfiguration layoutConfig = layoutConfigurationRepository.findAll().stream()
                 .findFirst().orElse(new LayoutConfiguration());
         
@@ -66,13 +106,20 @@ public class GlobalExceptionHandler {
             if (layoutConfig.getToolNameFontSize() == null) layoutConfig.setToolNameFontSize("1em");
         }
         mav.addObject("layoutConfig", layoutConfig);
-
-        if (showDetails) {
-            StringWriter sw = new StringWriter();
-            ex.printStackTrace(new PrintWriter(sw));
-            mav.addObject("details", sw.toString());
-        }
-        return mav;
-
+    }
+    
+    /**
+     * Check if the request is an API call (JSON response expected) or page request.
+     */
+    private boolean isApiCall(HttpServletRequest request) {
+        String accept = request.getHeader("Accept");
+        String contentType = request.getHeader("Content-Type");
+        String requestUri = request.getRequestURI();
+        
+        // Check if it's an AJAX request or API endpoint
+        return (accept != null && accept.contains("application/json")) ||
+               (contentType != null && contentType.contains("application/json")) ||
+               (requestUri != null && requestUri.contains("/api/")) ||
+               "XMLHttpRequest".equals(request.getHeader("X-Requested-With"));
     }
 }

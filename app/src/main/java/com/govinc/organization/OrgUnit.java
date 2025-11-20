@@ -22,7 +22,8 @@ public class OrgUnit {
     @JsonBackReference
     private OrgUnit parent;
 
-    @OneToOne
+    @ManyToOne
+    @JsonManagedReference
     private User leader;
 
     public OrgUnit() {
@@ -33,6 +34,8 @@ public class OrgUnit {
         this.parent = parent;
         this.leader = leader;
     }
+
+
 
     public Long getId() {
         return id;
@@ -70,11 +73,13 @@ public class OrgUnit {
         return leader;
     }
 
+    public void setLeader(User leader) {
+        this.leader = leader;
+    }
+
     public boolean isHasChildren() {
         return children != null && !children.isEmpty();
     }
 
-    public void setLeader(User leader) {
-        this.leader = leader;
-    }
+
 }

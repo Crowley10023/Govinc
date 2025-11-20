@@ -65,6 +65,14 @@ public class DatabaseMigrationService {
         migration_1_0.put("available", "0.9".equals(currentVersion));
         migrations.add(migration_1_0);
 
+        // Migration from 1.0 to 1.1
+        Map<String, Object> migration_1_1 = new LinkedHashMap<>();
+        migration_1_1.put("fromVersion", "1.0");
+        migration_1_1.put("toVersion", "1.1");
+        migration_1_1.put("description", "Allow multiple organization units per leader - remove unique constraint on leader_id");
+        migration_1_1.put("available", "1.0".equals(currentVersion));
+        migrations.add(migration_1_1);
+
         return migrations;
     }
 
@@ -135,6 +143,60 @@ public class DatabaseMigrationService {
     }
 
     /**
+     * Execute migration from 1.0 to 1.1
+     */
+    @Transactional
+    public void migrateTo_1_1() throws Exception {
+        System.out.println("[DB Migration] Starting migration to version 1.1");
+        try {
+            // Drop the unique constraint on leader_id column to allow one user to lead multiple org units
+            try {
+                System.out.println("[DB Migration] Attempting to drop UK_7vv1bxh5ptib49lxwxwgfst7m");
+                jdbcTemplate.execute("ALTER TABLE org_unit DROP INDEX UK_7vv1bxh5ptib49lxwxwgfst7m");
+                System.out.println("[DB Migration] Successfully dropped UK_7vv1bxh5ptib49lxwxwgfst7m");
+            } catch (Exception e) {
+                // Constraint might not exist or have different name, continue
+                System.out.println("[DB Migration] Could not drop UK_7vv1bxh5ptib49lxwxwgfst7m: " + e.getMessage());
+            }
+
+            // Try to find and drop any unique constraint on the leader_id column
+            try {
+                // Get constraint information for MariaDB
+                String query = "SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE " +
+                        "WHERE TABLE_NAME = 'org_unit' AND COLUMN_NAME = 'leader_id' AND CONSTRAINT_NAME != 'PRIMARY'";
+                List<Map<String, Object>> results = jdbcTemplate.queryForList(query);
+                System.out.println("[DB Migration] Found " + results.size() + " constraints on 'leader_id' column");
+                for (Map<String, Object> result : results) {
+                    String constraintName = (String) result.get("CONSTRAINT_NAME");
+                    if (constraintName != null && !constraintName.equals("PRIMARY") && !constraintName.equals("FK_leader_id")) {
+                        try {
+                            System.out.println("[DB Migration] Dropping constraint: " + constraintName);
+                            jdbcTemplate.execute("ALTER TABLE org_unit DROP INDEX " + constraintName);
+                            System.out.println("[DB Migration] Successfully dropped constraint: " + constraintName);
+                        } catch (Exception e) {
+                            System.out.println("[DB Migration] Could not drop constraint " + constraintName + ": " + e.getMessage());
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("[DB Migration] Error while checking constraints: " + e.getMessage());
+            }
+
+            // Update version
+            DatabaseConfig config = getDatabaseConfig();
+            config.setCurrentVersion("1.1");
+            config.setDescription("Removed unique constraint on org_unit.leader_id to allow one user to lead multiple organization units");
+            databaseConfigRepository.save(config);
+            System.out.println("[DB Migration] Successfully updated database config to version 1.1");
+
+        } catch (Exception e) {
+            System.out.println("[DB Migration] ERROR: Migration to 1.1 failed: " + e.getMessage());
+            e.printStackTrace();
+            throw new Exception("Migration to 1.1 failed: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Execute a specific migration
      */
     @Transactional
@@ -143,6 +205,8 @@ public class DatabaseMigrationService {
 
         if ("1.0".equals(toVersion) && "0.9".equals(currentVersion)) {
             migrateTo_1_0();
+        } else if ("1.1".equals(toVersion) && "1.0".equals(currentVersion)) {
+            migrateTo_1_1();
         } else {
             throw new Exception("Invalid migration: from " + currentVersion + " to " + toVersion);
         }

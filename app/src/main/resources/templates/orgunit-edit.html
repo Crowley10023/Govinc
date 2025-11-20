@@ -2,35 +2,310 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <title>Edit Org Unit</title>
+    <title th:text="${orgUnit.id != null} ? 'Edit Organization Unit' : 'Create Organization Unit'"></title>
+    <link rel="stylesheet" href="/general.css">
     <link rel="stylesheet" href="/style.css">
+    <style>
+        .form-container {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(34, 116, 165, 0.08);
+            padding: 2em;
+            margin-bottom: 2em;
+            border: 1px solid rgba(34, 116, 165, 0.1);
+        }
+
+        .form-header {
+            background: linear-gradient(135deg, var(--primary-blue) 0%, rgba(34, 116, 165, 0.9) 100%);
+            padding: 1.5em;
+            margin: -2em -2em 2em -2em;
+            border-radius: 12px 12px 0 0;
+            color: #fff;
+        }
+
+        .form-header h1 {
+            margin: 0;
+            font-size: 1.8em;
+            font-weight: 700;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5em;
+            margin-bottom: 1.8em;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            color: var(--primary-blue);
+            font-size: 0.95em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            padding: 0.8em;
+            border: 1.5px solid rgba(34, 116, 165, 0.2);
+            border-radius: 6px;
+            font-size: 0.95em;
+            font-family: inherit;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            background: #fff;
+            color: #333;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 3px rgba(34, 116, 165, 0.1);
+        }
+
+        .form-group select[multiple] {
+            min-height: 120px;
+            padding: 0.5em;
+        }
+
+        .form-group select[multiple] option {
+            padding: 0.5em;
+            line-height: 1.5;
+        }
+
+        .form-group textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5em;
+            margin-bottom: 1.8em;
+        }
+
+        .form-row-full {
+            grid-column: 1 / -1;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 1em;
+            margin-top: 2.5em;
+            padding-top: 2em;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .btn-primary {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.85em 2em;
+            background: linear-gradient(135deg, var(--primary-blue) 0%, #0056b3 100%);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.95em;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(34, 116, 165, 0.25);
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #003fa0 0%, #004499 100%);
+            box-shadow: 0 6px 16px rgba(34, 116, 165, 0.35);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.85em 2em;
+            background: #f0f0f0;
+            color: #333;
+            border: 1.5px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.95em;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+            border-color: #ccc;
+        }
+
+        .help-text {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 0.3em;
+            font-style: italic;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5em;
+            color: var(--primary-blue);
+            text-decoration: none;
+            font-weight: 600;
+            margin-bottom: 1.5em;
+            transition: all 0.2s ease;
+        }
+
+        .back-link:hover {
+            color: #003fa0;
+            gap: 0.8em;
+        }
+
+        .disabled-user {
+            color: #999;
+            font-style: italic;
+        }
+
+        .warning-box {
+            display: none;
+            margin-top: 0.8em;
+            padding: 0.8em;
+            background: rgba(204, 34, 34, 0.08);
+            border-left: 3px solid #cc2222;
+            border-radius: 4px;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .warning-box.show {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .form-container {
+                padding: 1.5em;
+            }
+
+            .form-header {
+                margin: -1.5em -1.5em 1.5em -1.5em;
+                padding: 1.2em;
+            }
+
+            .form-header h1 {
+                font-size: 1.4em;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+                gap: 1em;
+            }
+
+            .form-actions {
+                flex-direction: column;
+            }
+
+            .btn-primary,
+            .btn-secondary {
+                width: 100%;
+            }
+        }
+    </style>
 </head>
 <body>
 <div th:replace="~{navigation :: mainNav}"></div>
-<div class="container">
+<div class="main-scroll-container">
+    <div class="container">
+        <div class="form-container">
+            <div class="form-header">
+                <h1 th:text="${orgUnit.id != null} ? 'Edit Organization Unit' : 'Create Organization Unit'"></h1>
+            </div>
 
-    <h1 th:text="${orgUnit.id != null} ? 'Edit Organization Unit' : 'Create Organization Unit'"></h1>
-    <form th:action="@{'/orgunits/save'}" method="post">
-        <input type="hidden" name="id" th:value="${orgUnit.id}"/>
-        <label for="name">Name:</label>
-        <input type="text" id="name" name="name" th:value="${orgUnit.name}" required />
-        <br/>
-        <label for="parentId">Parent:</label>
-        <select id="parentId" name="parentId">
-            <option th:if="${orgUnit.parent == null}" value="" selected>(none)</option>
-            <option th:each="ou : ${allOrgUnits}" th:value="${ou.id}" th:text="${ou.name}"
-                th:selected="${orgUnit.parent != null} ? ${ou.id} == ${orgUnit.parent.id} : false"></option>
-        </select>
-        <br/>
-        <label for="childrenIds">Children:</label>
-        <select id="childrenIds" name="childrenIds" multiple size="5">
-            <option th:each="ou : ${allOrgUnits}" th:value="${ou.id}" th:text="${ou.name}"
-                th:selected="${orgUnit.children != null} ? ${orgUnit.children.contains(ou)} : false"></option>
-        </select>
-        <br/>
-        <button type="submit">Save</button>
-    </form>
-    <a th:href="@{'/orgunits/list'}">Back to list</a>
+            <form th:action="@{'/orgunits/save'}" method="post">
+                <input type="hidden" name="id" th:value="${orgUnit.id}"/>
+
+                <div class="form-group">
+                    <label for="name">Name <span style="color: #cc2222;">*</span></label>
+                    <input type="text" id="name" name="name" th:value="${orgUnit.name}" required />
+                    <span class="help-text">Enter the organization unit name</span>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="parentId">Parent Organization Unit</label>
+                        <select id="parentId" name="parentId">
+                            <option th:if="${orgUnit.parent == null}" value="" selected>(none)</option>
+                            <option th:each="ou : ${allOrgUnits}" 
+                                th:value="${ou.id}" 
+                                th:text="${ou.name}"
+                                th:selected="${orgUnit.parent != null} ? ${ou.id} == ${orgUnit.parent.id} : false">
+                            </option>
+                        </select>
+                        <span class="help-text">Select a parent organization unit if applicable</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="leaderId">Team Leader</label>
+                        <select id="leaderId" name="leaderId" onchange="updateLeaderWarning()">
+                            <option value="" selected>(none)</option>
+                            <option th:each="user : ${allUsers}" 
+                                th:if="${user.role == T(com.govinc.user.Role).ORGANISATION_TEAM_LEADER}"
+                                th:value="${user.id}" 
+                                th:text="${user.name}"
+                                th:selected="${orgUnit.leader != null and user.id == orgUnit.leader.id}"
+                                th:attr="data-current-org=${orgUnit.id}">
+                            </option>
+                        </select>
+                        <span class="help-text">Assign a team leader for this organization unit. Only users with the Team Leader role are available. A single person may lead multiple organization units.</span>
+                        <div id="leaderWarning" class="warning-box">
+                            <strong>⚠️ Warning:</strong> <span id="leaderWarningText"></span>
+                        </div>
+                    </div>
+                </div>
+
+
+
+                <div class="form-group form-row-full">
+                    <label for="childrenIds">Child Organization Units</label>
+                    <select id="childrenIds" name="childrenIds" multiple>
+                        <option th:each="ou : ${allOrgUnits}" 
+                            th:value="${ou.id}" 
+                            th:text="${ou.name}"
+                            th:selected="${orgUnit.children != null} ? ${orgUnit.children.contains(ou)} : false">
+                        </option>
+                    </select>
+                    <span class="help-text">Select all child organization units (hold Ctrl/Cmd to select multiple)</span>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Save Organization Unit</button>
+                    <a href="#" th:href="@{'/orgunits/list'}" class="btn-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
+
+<script>
+    function updateLeaderWarning() {
+        const leaderSelect = document.getElementById('leaderId');
+        const selectedOption = leaderSelect.options[leaderSelect.selectedIndex];
+        const warningBox = document.getElementById('leaderWarning');
+        
+        if (selectedOption.value === '' || selectedOption.value === undefined) {
+            warningBox.classList.remove('show');
+        } else {
+            warningBox.classList.remove('show');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        updateLeaderWarning(); // Initial check
+    });
+</script>
 </body>
 </html>

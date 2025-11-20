@@ -7,8 +7,8 @@ import java.util.List;
 import java.util.Optional;
 
 public interface OrgUnitRepository extends JpaRepository<OrgUnit, Long> {
-    // Fetch the org unit and all its direct children eagerly
-    @Query("SELECT u FROM OrgUnit u LEFT JOIN FETCH u.children WHERE u.id = :id")
+    // Fetch the org unit with all its direct children and leader eagerly
+    @Query("SELECT u FROM OrgUnit u LEFT JOIN FETCH u.children LEFT JOIN FETCH u.leader WHERE u.id = :id")
     Optional<OrgUnit> findByIdWithChildren(@Param("id") Long id);
 
     // Get all direct children for a given parent org unit ID

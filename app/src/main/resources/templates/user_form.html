@@ -1,23 +1,452 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title th:text="${user.id} != null ? 'Edit User' : 'Add User'">Add/Edit User</title>
     <link rel="stylesheet" href="/style.css">
+    <style>
+        .user-form-container {
+            max-width: 700px;
+            margin: 2em auto;
+            padding: 2em;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(34, 116, 165, 0.1);
+            border: 1px solid rgba(34, 116, 165, 0.1);
+        }
+
+        .form-header {
+            margin-bottom: 2em;
+            padding-bottom: 1.5em;
+            border-bottom: 2px solid var(--primary-blue);
+        }
+
+        .form-header h1 {
+            margin: 0 0 0.5em 0;
+            font-size: 2em;
+            color: var(--primary-blue);
+            font-weight: 700;
+        }
+
+        .form-header .subtitle {
+            color: #666;
+            font-size: 0.95em;
+        }
+
+        .form-group {
+            margin-bottom: 1.8em;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            color: var(--primary-blue);
+            margin-bottom: 0.6em;
+            font-size: 0.95em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            display: flex;
+            align-items: center;
+            gap: 0.5em;
+        }
+
+        .form-group label .required {
+            color: #cc2222;
+            font-size: 1.1em;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            padding: 0.85em;
+            border: 1px solid rgba(34, 116, 165, 0.25);
+            border-radius: 6px;
+            font-size: 1em;
+            font-family: inherit;
+            transition: all 0.2s ease;
+            background: #fff;
+        }
+
+        .form-group select[multiple] {
+            min-height: 120px;
+            padding: 0.5em;
+        }
+
+        .form-group select[multiple] option {
+            padding: 0.5em;
+            line-height: 1.5;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 3px rgba(34, 116, 165, 0.1);
+            background: #fafbfc;
+        }
+
+        .form-group input::placeholder {
+            color: #bbb;
+        }
+
+        .form-group.required > input,
+        .form-group.required > select {
+            border-color: rgba(34, 116, 165, 0.35);
+        }
+
+        .role-info {
+            display: none;
+            margin-top: 0.8em;
+            padding: 1em;
+            background: rgba(255, 149, 5, 0.08);
+            border-left: 3px solid var(--accent-orange);
+            border-radius: 4px;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .role-info.show {
+            display: block;
+        }
+
+        .form-section {
+            margin-bottom: 2.2em;
+            padding-bottom: 2em;
+            border-bottom: 1px solid #efefef;
+        }
+
+        .form-section:last-of-type {
+            margin-bottom: 0;
+            border-bottom: none;
+        }
+
+        .form-section-title {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: var(--primary-blue);
+            margin-bottom: 1.2em;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding-top: 0.5em;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 1em;
+            justify-content: flex-end;
+            margin-top: 2.5em;
+            padding-top: 2em;
+            border-top: 1px solid #efefef;
+        }
+
+        .btn-submit,
+        .btn-cancel {
+            padding: 0.85em 2em;
+            border: none;
+            border-radius: 6px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-submit {
+            background: linear-gradient(135deg, var(--primary-blue) 0%, #0056b3 100%);
+            color: #fff;
+        }
+
+        .btn-submit:hover {
+            background: linear-gradient(135deg, #003fa0 0%, #004499 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(34, 116, 165, 0.25);
+        }
+
+        .btn-submit:active {
+            transform: translateY(0);
+        }
+
+        .btn-cancel {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-cancel:hover {
+            background: #e0e0e0;
+            transform: translateY(-2px);
+        }
+
+        .form-error {
+            color: #cc2222;
+            font-size: 0.85em;
+            margin-top: 0.4em;
+        }
+
+        .field-hint {
+            font-size: 0.85em;
+            color: #999;
+            font-weight: 400;
+            margin-top: 0.4em;
+            text-transform: none;
+            letter-spacing: normal;
+        }
+
+        .org-unit-selection {
+            display: none;
+        }
+
+        .org-unit-selection.show {
+            display: flex;
+        }
+
+        .disabled-option {
+            color: #999;
+            font-style: italic;
+        }
+
+        .warning-box {
+            display: none;
+            margin-top: 0.8em;
+            padding: 1em;
+            background: rgba(204, 34, 34, 0.08);
+            border-left: 3px solid #cc2222;
+            border-radius: 4px;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .warning-box.show {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .user-form-container {
+                margin: 1em;
+                padding: 1.5em;
+            }
+
+            .form-header h1 {
+                font-size: 1.5em;
+            }
+
+            .form-actions {
+                flex-direction: column;
+            }
+
+            .btn-submit,
+            .btn-cancel {
+                width: 100%;
+            }
+        }
+    </style>
 </head>
 <body>
 <div th:replace="~{navigation :: mainNav}"></div>
-<div class="container">
-<div th:replace="~{navigation :: mainNav}"></div>
-<h1 th:text="${user.id} != null ? 'Edit User' : 'Add User'"></h1>
-<form th:action="${user.id} != null ? @{'/users/update/' + ${user.id}} : @{/users}" th:object="${user}" method="post">
-    <label for="name">Name:</label>
-    <input type="text" id="name" th:field="*{name}" required><br/>
-    <label for="email">Email:</label>
-    <input type="email" id="email" th:field="*{email}" required><br/>
-    <button type="submit">Submit</button>
-</form>
-<a href="/users"><button>Back to List</button></a>
+<div class="main-scroll-container">
+    <div class="container">
+        <div class="user-form-container">
+            <!-- Header -->
+            <div class="form-header">
+                <h1 th:text="${user.id} != null ? 'Edit User' : 'Add User'"></h1>
+                <p class="subtitle" th:text="${user.id} != null ? 'Update user information and permissions' : 'Create a new user account'"></p>
+            </div>
+
+            <!-- Form -->
+            <form th:action="${user.id} != null ? @{'/users/update/' + ${user.id}} : @{/users}" 
+                  th:object="${user}" 
+                  method="post"
+                  id="userForm">
+
+                <!-- Basic Information Section -->
+                <div class="form-section">
+                    <div class="form-section-title">Basic Information</div>
+
+                    <!-- Name Field -->
+                    <div class="form-group required">
+                        <label for="name">
+                            Name
+                            <span class="required">*</span>
+                        </label>
+                        <input type="text" 
+                               id="name" 
+                               th:field="*{name}" 
+                               placeholder="Enter full name"
+                               required>
+                    </div>
+
+                    <!-- Email Field -->
+                    <div class="form-group required">
+                        <label for="email">
+                            Email
+                            <span class="required">*</span>
+                        </label>
+                        <input type="email" 
+                               id="email" 
+                               th:field="*{email}" 
+                               placeholder="user@example.com"
+                               required>
+                    </div>
+                </div>
+
+                <!-- Permissions Section -->
+                <div class="form-section">
+                    <div class="form-section-title">Permissions & Role</div>
+
+                    <!-- Role Selection -->
+                    <div class="form-group required">
+                        <label for="role">
+                            Role
+                            <span class="required">*</span>
+                        </label>
+                        <select id="role" 
+                                th:field="*{role}" 
+                                required
+                                onchange="updateRoleInfo()">
+                            <option value="">-- Select a Role --</option>
+                            <option th:each="role : ${T(com.govinc.user.Role).values()}" 
+                                    th:value="${role}" 
+                                    th:text="${role.displayName}">Role</option>
+                        </select>
+                        <p class="field-hint" id="roleHint"></p>
+                        <div id="roleInfo" class="role-info"></div>
+                    </div>
+
+                    <!-- Organization Unit Selection (for Team Leaders - Multiple) -->
+                    <div id="orgUnitSection" class="form-group org-unit-selection">
+                        <label for="leadOrgUnitIds">
+                            Lead Organization Units
+                        </label>
+                        <select id="leadOrgUnitIds" 
+                                name="leadOrgUnitIds"
+                                multiple>
+                            <option th:each="orgUnit : ${orgUnits}" 
+                                    th:value="${orgUnit.id}" 
+                                    th:text="${orgUnit.name}"
+                                    th:selected="${user.leadsOrgUnits != null && user.leadsOrgUnits.contains(orgUnit)}"
+                                    th:attr="data-has-leader=${orgUnit.leader != null},
+                                             data-leader-id=${orgUnit.leader != null ? orgUnit.leader.id : ''},
+                                             data-leader-name=${orgUnit.leader != null ? orgUnit.leader.name : ''}">
+                                Organization Unit
+                            </option>
+                        </select>
+                        <p class="field-hint">Select organization units to lead (hold Ctrl/Cmd to select multiple). Only org units without a current leader are available.</p>
+                        <div id="warningBox" class="warning-box">
+                            <strong>⚠️ Warning:</strong> <span id="warningText"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Form Actions -->
+                <div class="form-actions">
+                    <a href="/users" class="btn-cancel">Cancel</a>
+                    <button type="submit" class="btn-submit">
+                        <span th:text="${user.id} != null ? 'Update User' : 'Create User'"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
+
+<script>
+    // Role descriptions for info display
+    const roleDescriptions = {
+        'ADMIN': 'Full administrative access to all systems and features',
+        'INFORMATION_SECURITY_MANAGER': 'Access to security frameworks and user/organization management (no configuration)',
+        'ORGANISATION_TEAM_LEADER': 'Access to assessments in their assigned organization and its child units. Can lead multiple organization units.',
+        'ASSESSMENT_DELEGATE': 'Access only to assigned assessments'
+    };
+
+    function updateRoleInfo() {
+        const roleSelect = document.getElementById('role');
+        const orgUnitSection = document.getElementById('orgUnitSection');
+        const roleHint = document.getElementById('roleHint');
+        const roleInfo = document.getElementById('roleInfo');
+        const selectedRole = roleSelect.value;
+
+        // Show/hide organization unit selection
+        if (selectedRole === 'ORGANISATION_TEAM_LEADER') {
+            orgUnitSection.classList.add('show');
+            updateOrgUnitOptions();
+        } else {
+            orgUnitSection.classList.remove('show');
+        }
+
+        // Update role description
+        if (selectedRole && roleDescriptions[selectedRole]) {
+            roleHint.textContent = roleDescriptions[selectedRole];
+            roleInfo.classList.add('show');
+            roleInfo.innerHTML = '<strong>Info:</strong> ' + roleDescriptions[selectedRole];
+        } else {
+            roleHint.textContent = '';
+            roleInfo.classList.remove('show');
+        }
+    }
+
+    function updateOrgUnitOptions() {
+        const orgUnitSelect = document.getElementById('leadOrgUnitIds');
+        const currentUserId = document.querySelector('input[name="id"]')?.value;
+        let availableCount = 0;
+        const originalTexts = new Map();
+
+        Array.from(orgUnitSelect.options).forEach(option => {
+            // Store original text on first call
+            if (!originalTexts.has(option.value)) {
+                originalTexts.set(option.value, option.textContent);
+            }
+
+            const hasLeader = option.getAttribute('data-has-leader') === 'true';
+            const leaderId = option.getAttribute('data-leader-id');
+            const leaderName = option.getAttribute('data-leader-name');
+            const originalText = originalTexts.get(option.value);
+
+            if (!hasLeader) {
+                // Org unit has no leader - available
+                option.classList.remove('disabled-option');
+                option.disabled = false;
+                option.textContent = originalText;
+                availableCount++;
+            } else if (currentUserId && leaderId === currentUserId) {
+                // Current user is already leader - allow selection
+                option.classList.remove('disabled-option');
+                option.disabled = false;
+                option.textContent = originalText;
+                availableCount++;
+            } else {
+                // Another user is leading - disable
+                option.classList.add('disabled-option');
+                option.disabled = true;
+                option.textContent = originalText + ` (led by ${leaderName})`;
+            }
+        });
+
+        console.log(`Available org units for team leader: ${availableCount}`);
+    }
+
+    function checkOrgUnitWarning() {
+        const orgUnitSelect = document.getElementById('leadOrgUnitIds');
+        const warningBox = document.getElementById('warningBox');
+        const warningText = document.getElementById('warningText');
+        warningBox.classList.remove('show');
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        updateRoleInfo();
+        
+        // Add listener to org unit select
+        const orgUnitSelect = document.getElementById('leadOrgUnitIds');
+        if (orgUnitSelect) {
+            orgUnitSelect.addEventListener('change', checkOrgUnitWarning);
+        }
+    });
+</script>
 </body>
 </html>

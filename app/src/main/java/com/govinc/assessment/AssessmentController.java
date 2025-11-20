@@ -17,6 +17,8 @@ import com.govinc.user.UserRepository;
 import com.govinc.catalog.SecurityControlDomain;
 import com.govinc.entity.OrganisationDetailsRepository;
 import com.govinc.util.OpenAIUtil;
+import com.govinc.authorization.AuthorizationService;
+import com.govinc.authorization.UnauthorizedException;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -75,9 +77,16 @@ public class AssessmentController {
 
     @Autowired
     private OpenAIUtil openAIUtil;
+    
+    @Autowired
+    private AuthorizationService authorizationService;
 
     @GetMapping("/create")
     public String showCreateAssessmentForm(Model model) {
+        // Authorization check: only ADMIN and ISM can create assessments
+        if (!authorizationService.canCreateAssessment()) {
+            throw new UnauthorizedException("You do not have permission to create assessments.");
+        }
         List<SecurityCatalog> catalogs = securityCatalogService.findAll();
         model.addAttribute("catalogs", catalogs);
         // --- Add users list to model ---
@@ -146,7 +155,22 @@ public class AssessmentController {
 
     @GetMapping("/list")
     public String showAssessments(Model model) {
-        model.addAttribute("assessments", assessmentRepository.findAll());
+        // Authorization check: user must have permission to view assessments
+        if (!authorizationService.canViewAssessmentList()) {
+            throw new UnauthorizedException("You do not have permission to view assessments.");
+        }
+        
+        // Get filtered list based on user role
+        java.util.List<Assessment> assessments = assessmentRepository.findAll();
+        java.util.List<Assessment> filtered = new java.util.ArrayList<>();
+        
+        for (Assessment assessment : assessments) {
+            if (authorizationService.canAccessAssessment(assessment.getId())) {
+                filtered.add(assessment);
+            }
+        }
+        
+        model.addAttribute("assessments", filtered);
         return "assessment-list";
     }
 
@@ -256,6 +280,10 @@ public class AssessmentController {
 
     @GetMapping("/{id}")
     public String getAssessmentById(@PathVariable Long id, Model model) {
+        // Authorization check
+        if (!authorizationService.canAccessAssessment(id)) {
+            throw new UnauthorizedException("You do not have permission to access this assessment.");
+        }
         Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
         if (assessmentOpt.isPresent()) {
             Assessment assessment = assessmentOpt.get();
@@ -471,6 +499,10 @@ public class AssessmentController {
     @PostMapping("/{id}/answer")
     @ResponseBody
     public String saveAnswer(@PathVariable Long id, @RequestParam Long controlId, @RequestParam Long answerId) {
+        // Authorization check
+        if (!authorizationService.canModifyAssessment(id)) {
+            return "forbidden";
+        }
         Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
         AssessmentDetails details = null;
         if (!detailsOpt.isPresent()) {
@@ -519,6 +551,10 @@ public class AssessmentController {
     @PutMapping("/{assessmentId}/control/{controlId}/comment")
     @ResponseBody
     public String saveComment(@PathVariable Long assessmentId, @PathVariable Long controlId, @RequestBody Map<String, String> body) {
+        // Authorization check
+        if (!authorizationService.canModifyAssessment(assessmentId)) {
+            return "forbidden";
+        }
         String comment = body.get("comment");
         Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(assessmentId);
         AssessmentDetails details = null;
@@ -578,6 +614,10 @@ public class AssessmentController {
     // Delete assessment (POST)
     @PostMapping("/{id}/delete")
     public String deleteAssessment(@PathVariable Long id) {
+        // Authorization check: only ADMIN and ISM can delete
+        if (!authorizationService.canDeleteAssessment(id)) {
+            throw new UnauthorizedException("You do not have permission to delete assessments.");
+        }
         // Remove assessment reference from all AssessmentDetails entities before
         // deleting
         Assessment assessment = assessmentRepository.findById(id).orElse(null);
@@ -606,6 +646,10 @@ public class AssessmentController {
 
     @GetMapping("/{id}/word-report")
     public ResponseEntity<byte[]> downloadWordReport(@PathVariable Long id) {
+        // Authorization check
+        if (!authorizationService.canAccessAssessment(id)) {
+            throw new UnauthorizedException("You do not have permission to download this assessment report.");
+        }
         
         Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
         Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
@@ -657,6 +701,10 @@ public class AssessmentController {
     // Download PDF using iText (via AssessmentReporter)
     @GetMapping("/{id}/report")
     public ResponseEntity<byte[]> downloadReport(@PathVariable Long id) {
+        // Authorization check
+        if (!authorizationService.canAccessAssessment(id)) {
+            throw new UnauthorizedException("You do not have permission to download this assessment report.");
+        }
         Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
         Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
         if (assessmentOpt.isEmpty() || detailsOpt.isEmpty()) {
@@ -686,6 +734,10 @@ public class AssessmentController {
     // Download Excel (stub - returns text as Excel file)
     @GetMapping("/{id}/excel")
     public ResponseEntity<byte[]> downloadExcel(@PathVariable Long id) throws IOException {
+        // Authorization check
+        if (!authorizationService.canAccessAssessment(id)) {
+            throw new UnauthorizedException("You do not have permission to download this assessment data.");
+        }
         Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
         StringBuilder builder = new StringBuilder();
         builder.append("Control,Answer\n");

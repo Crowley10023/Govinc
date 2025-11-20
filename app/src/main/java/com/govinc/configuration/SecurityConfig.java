@@ -59,7 +59,6 @@ public class SecurityConfig {
             "/config/image-upload/preview", // Allow logo preview access without authentication
             "/title.png", // Allow default logo access without authentication
             "/login", // Allow login page
-            "/admin/auth-config/**", // Allow auth config interface
             "/api/security-control/import/**", // Allow security control import API endpoints
             "/api/security-control/translate", // Allow security control translation API endpoint
             "/security-control/import", // Allow security control import form submission - CSRF exempt
@@ -147,22 +146,24 @@ public class SecurityConfig {
                 String[] parts = value.split(",");
                 String password = parts[0].trim();
                 
+                // All local users get ADMIN role by default for backward compatibility
+                // Roles should be assigned via the database User entity
                 users.add(User.withUsername(username)
                     .password(passwordEncoder().encode(password))
-                    .roles("USER", "ADMIN") // All local users get admin role for now
+                    .roles("USER", "ADMIN")
                     .build());
                 
                 logger.fine("Loaded local user: " + username);
             }
         }
         
-        // Always ensure at least one admin user exists
+        // Always ensure at least one admin user exists for fallback
         if (users.isEmpty()) {
             users.add(User.withUsername("admin")
                 .password(passwordEncoder().encode("admin"))
                 .roles("ADMIN")
                 .build());
-            logger.warning("No users configured in properties, using default admin/admin");
+            logger.warning("No users configured in properties, using default admin/admin. Configure users in application.properties or database.");
         }
         
         logger.info("Configured " + users.size() + " local users for form-based authentication");

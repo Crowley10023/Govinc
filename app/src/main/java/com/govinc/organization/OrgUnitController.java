@@ -9,8 +9,11 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.ModelAndView;
+import com.govinc.authorization.AuthorizationService;
+import com.govinc.authorization.UnauthorizedException;
+import com.govinc.user.UserRepository;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.List;
@@ -24,11 +27,21 @@ public class OrgUnitController {
     private OrgUnitService orgUnitService;
 
     @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
     private Environment env;
+    
+    @Autowired
+    private AuthorizationService authorizationService;
 
     // View for HTML rendering (Thymeleaf)
     @GetMapping({ "/list", "/list.html" })
     public String listOrgUnitsView(Model model) {
+        // Authorization check: only ADMIN and ISM can view org units
+        if (!authorizationService.canViewOrgUnits()) {
+            throw new UnauthorizedException("You do not have permission to view organization units.");
+        }
         List<OrgUnit> orgUnits = orgUnitService.getAllOrgUnits();
         model.addAttribute("orgUnits", orgUnits);
         return "orgunit-list";
@@ -37,16 +50,25 @@ public class OrgUnitController {
     // New method to enable the create org unit button (HTML form)
     @GetMapping("/create")
     public String createOrgUnitForm(Model model) {
+        // Authorization check: only ADMIN and ISM can create org units
+        if (!authorizationService.canAccessOrganization()) {
+            throw new UnauthorizedException("You do not have permission to create organization units.");
+        }
         OrgUnit orgUnit = new OrgUnit();
         List<OrgUnit> allOrgUnits = orgUnitService.getAllOrgUnits();
         model.addAttribute("orgUnit", orgUnit);
         model.addAttribute("allOrgUnits", allOrgUnits);
+        model.addAttribute("allUsers", userRepository.findAll());
         return "orgunit-edit";
     }
 
     // Edit Org Unit form (by id)
     @GetMapping("/edit/{id}")
     public String editOrgUnitForm(@PathVariable Long id, Model model) {
+        // Authorization check: only ADMIN and ISM can edit org units
+        if (!authorizationService.canAccessOrganization()) {
+            throw new UnauthorizedException("You do not have permission to edit organization units.");
+        }
         Optional<OrgUnit> orgUnitOpt = orgUnitService.getOrgUnit(id);
         if (orgUnitOpt.isEmpty()) {
             return "redirect:/orgunits/list";
@@ -57,6 +79,7 @@ public class OrgUnitController {
                 .collect(Collectors.toList());
         model.addAttribute("orgUnit", orgUnit);
         model.addAttribute("allOrgUnits", allOrgUnits);
+        model.addAttribute("allUsers", userRepository.findAll());
         return "orgunit-edit";
     }
 
@@ -64,12 +87,23 @@ public class OrgUnitController {
     @PostMapping("/save")
     public String saveOrgUnit(@ModelAttribute OrgUnit orgUnit,
             @RequestParam(value = "parentId", required = false) Long parentId,
+            @RequestParam(value = "leaderId", required = false) Long leaderId,
             @RequestParam(value = "childrenIds", required = false) List<Long> childrenIds) {
+        // Authorization check: only ADMIN and ISM can save org units
+        if (!authorizationService.canAccessOrganization()) {
+            throw new UnauthorizedException("You do not have permission to save organization units.");
+        }
         // Handle Parent
         if (parentId != null) {
             orgUnit.setParent(orgUnitService.getOrgUnit(parentId).orElse(null));
         } else {
             orgUnit.setParent(null);
+        }
+        // Handle Leader
+        if (leaderId != null) {
+            orgUnit.setLeader(userRepository.findById(leaderId).orElse(null));
+        } else {
+            orgUnit.setLeader(null);
         }
         // Handle Children
         if (childrenIds != null) {
@@ -120,6 +154,10 @@ public class OrgUnitController {
     @ResponseBody
     @DeleteMapping(value = "/{id:\\d+}", produces = MediaType.APPLICATION_JSON_VALUE)
     public void deleteOrgUnit(@PathVariable Long id) {
+        // Authorization check: only ADMIN and ISM can delete org units
+        if (!authorizationService.canAccessOrganization()) {
+            throw new UnauthorizedException("You do not have permission to delete organization units.");
+        }
         orgUnitService.deleteOrgUnit(id);
     }
 

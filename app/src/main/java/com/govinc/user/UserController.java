@@ -1,6 +1,10 @@
 package com.govinc.user;
 
 import com.govinc.session.UserSession;
+import com.govinc.authorization.AuthorizationService;
+import com.govinc.authorization.UnauthorizedException;
+import com.govinc.organization.OrgUnit;
+import com.govinc.organization.OrgUnitService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -17,30 +21,85 @@ public class UserController {
     
     @Autowired
     private UserSession userSession;
+    
+    @Autowired
+    private AuthorizationService authorizationService;
+    
+    @Autowired
+    private OrgUnitService orgUnitService;
 
     @GetMapping
     public String listUsers(Model model) {
-        model.addAttribute("users", userRepository.findAll());
+        // Authorization check: only ADMIN and ISM can view users
+        if (!authorizationService.canAccessOrganization()) {
+            throw new UnauthorizedException("You do not have permission to view users.");
+        }
+        List<User> users = userRepository.findAll();
+        model.addAttribute("users", users);
+        // Add org units list for display purposes
+        List<OrgUnit> orgUnits = orgUnitService.getAllOrgUnits();
+        model.addAttribute("orgUnits", orgUnits);
         return "users";
     }
 
     @GetMapping("/new")
     public String showCreateForm(Model model) {
+        // Authorization check: only ADMIN and ISM can create users
+        if (!authorizationService.canAccessOrganization()) {
+            throw new UnauthorizedException("You do not have permission to create users.");
+        }
         model.addAttribute("user", new User());
+        // Add org units list - will show only those not already assigned a leader
+        List<OrgUnit> orgUnits = orgUnitService.getAllOrgUnits();
+        model.addAttribute("orgUnits", orgUnits);
         return "user_form";
     }
 
     @PostMapping
-    public String createUser(@ModelAttribute User user) {
+    public String createUser(@ModelAttribute User user, @RequestParam(value = "leadOrgUnitIds", required = false) List<Long> leadOrgUnitIds) {
+        // Authorization check: only ADMIN and ISM can create users
+        if (!authorizationService.canAccessOrganization()) {
+            throw new UnauthorizedException("You do not have permission to create users.");
+        }
+        // Ensure "admin" user always has ADMIN role
+        if ("admin".equalsIgnoreCase(user.getName())) {
+            user.setRole(Role.ADMIN);
+        }
+        
+        // Set team leader org units if provided and user is Organization Team Leader
+        if (leadOrgUnitIds != null && !leadOrgUnitIds.isEmpty()) {
+            if (Role.ORGANISATION_TEAM_LEADER == user.getRole()) {
+                for (Long leadOrgUnitId : leadOrgUnitIds) {
+                    Optional<OrgUnit> orgUnit = orgUnitService.getOrgUnit(leadOrgUnitId);
+                    if (orgUnit.isPresent()) {
+                        OrgUnit ou = orgUnit.get();
+                        // Only assign if org unit doesn't already have a leader
+                        if (ou.getLeader() == null) {
+                            ou.setLeader(user);
+                            orgUnitService.addOrgUnit(ou);
+                            user.addLeadsOrgUnit(ou);
+                        }
+                    }
+                }
+            }
+        }
+        
         userRepository.save(user);
         return "redirect:/users";
     }
 
     @GetMapping("/edit/{id}")
     public String showEditForm(@PathVariable Long id, Model model) {
+        // Authorization check: only ADMIN and ISM can edit users
+        if (!authorizationService.canAccessOrganization()) {
+            throw new UnauthorizedException("You do not have permission to edit users.");
+        }
         Optional<User> user = userRepository.findById(id);
         if (user.isPresent()) {
             model.addAttribute("user", user.get());
+            // Add org units list
+            List<OrgUnit> orgUnits = orgUnitService.getAllOrgUnits();
+            model.addAttribute("orgUnits", orgUnits);
             return "user_form";
         } else {
             return "redirect:/users";
@@ -48,14 +107,70 @@ public class UserController {
     }
 
     @PostMapping("/update/{id}")
-    public String updateUser(@PathVariable Long id, @ModelAttribute User user) {
+    public String updateUser(@PathVariable Long id, @ModelAttribute User user, @RequestParam(value = "leadOrgUnitIds", required = false) List<Long> leadOrgUnitIds) {
+        // Authorization check: only ADMIN and ISM can update users
+        if (!authorizationService.canAccessOrganization()) {
+            throw new UnauthorizedException("You do not have permission to update users.");
+        }
         user.setId(id);
+        // Ensure "admin" user always has ADMIN role
+        if ("admin".equalsIgnoreCase(user.getName())) {
+            user.setRole(Role.ADMIN);
+        }
+        
+        // Get the current user from database
+        Optional<User> existingUserOpt = userRepository.findById(id);
+        if (existingUserOpt.isPresent()) {
+            User existingUser = existingUserOpt.get();
+            
+            // If current role is Team Leader, remove from any org units they currently lead
+            if (Role.ORGANISATION_TEAM_LEADER == existingUser.getRole()) {
+                for (OrgUnit orgUnit : existingUser.getLeadsOrgUnits()) {
+                    orgUnit.setLeader(null);
+                    orgUnitService.addOrgUnit(orgUnit);
+                }
+            }
+            
+            // Set new team leader org units if provided
+            if (leadOrgUnitIds != null && !leadOrgUnitIds.isEmpty()) {
+                if (Role.ORGANISATION_TEAM_LEADER == user.getRole()) {
+                    for (Long leadOrgUnitId : leadOrgUnitIds) {
+                        Optional<OrgUnit> orgUnit = orgUnitService.getOrgUnit(leadOrgUnitId);
+                        if (orgUnit.isPresent()) {
+                            OrgUnit ou = orgUnit.get();
+                            // Only assign if org unit doesn't have a different leader
+                            if (ou.getLeader() == null || ou.getLeader().getId().equals(user.getId())) {
+                                ou.setLeader(user);
+                                orgUnitService.addOrgUnit(ou);
+                                user.addLeadsOrgUnit(ou);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
         userRepository.save(user);
         return "redirect:/users";
     }
 
     @GetMapping("/delete/{id}")
     public String deleteUser(@PathVariable Long id) {
+        // Authorization check: only ADMIN and ISM can delete users
+        if (!authorizationService.canAccessOrganization()) {
+            throw new UnauthorizedException("You do not have permission to delete users.");
+        }
+        
+        // Remove user from any org units they lead
+        Optional<User> userOpt = userRepository.findById(id);
+        if (userOpt.isPresent()) {
+            User user = userOpt.get();
+            for (OrgUnit orgUnit : user.getLeadsOrgUnits()) {
+                orgUnit.setLeader(null);
+                orgUnitService.addOrgUnit(orgUnit);
+            }
+        }
+        
         userRepository.deleteById(id);
         return "redirect:/users";
     }
@@ -74,7 +189,22 @@ public class UserController {
     @GetMapping("/api")
     @ResponseBody
     public List<User> apiGetAllUsers() {
+        // Authorization check: only ADMIN and ISM can view users
+        if (!authorizationService.canAccessOrganization()) {
+            throw new UnauthorizedException("You do not have permission to view users.");
+        }
         return userRepository.findAll();
+    }
+    
+    // Endpoint to get all org units for user assignment
+    @GetMapping("/api/orgUnits")
+    @ResponseBody
+    public List<OrgUnit> apiGetOrgUnits() {
+        // Authorization check: only ADMIN and ISM can access
+        if (!authorizationService.canAccessOrganization()) {
+            throw new UnauthorizedException("You do not have permission to access org units.");
+        }
+        return orgUnitService.getAllOrgUnits();
     }
 
     // Endpoint to get current logged-in user's name and email
