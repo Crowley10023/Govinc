@@ -1,266 +1,13 @@
-<!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
-<head>
-    <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <title>Edit Security Control</title>
-    <meta charset="UTF-8">
-    <link rel="stylesheet" href="/style.css">
-    <style>
-        .security-control-editor {
-            max-width: 900px;
-            margin: 2em auto;
-            padding: 0;
-        }
+<div class="security-control-editor">
+    <div class="editor-header">
+        <h1>Edit Security Control</h1>
+    </div>
 
-        .editor-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 2.5em;
-            padding-bottom: 1.5em;
-            border-bottom: 2px solid var(--primary-blue);
-        }
-
-        .editor-header h1 {
-            margin: 0;
-            font-size: 2em;
-            color: var(--primary-blue-dark);
-        }
-
-        .editor-form {
-            background: linear-gradient(128deg, #eaf3fa 80%, white 100%);
-            border: 2px solid var(--primary-blue);
-            border-radius: 12px;
-            padding: 2.5em;
-            box-shadow: 0 4px 20px rgba(34, 116, 165, 0.12),
-                        0 0 0 1px rgba(34, 116, 165, 0.08);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .editor-form::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 12px;
-            background: linear-gradient(90deg, var(--shine-glare) 0%, transparent 85%);
-            opacity: 0.3;
-            border-radius: 10px 10px 0 0;
-            pointer-events: none;
-        }
-
-        .form-section {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 2.2em;
-            margin-bottom: 0.5em;
-        }
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 0.6em;
-        }
-
-        .form-group.large {
-            grid-column: 1;
-        }
-
-        .form-group.row-2col {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1.8em;
-        }
-
-        .form-group label {
-            font-weight: 600;
-            color: var(--primary-blue-dark);
-            font-size: 1em;
-            letter-spacing: 0.02em;
-            text-shadow: 0 1px 3px rgba(34, 116, 165, 0.08);
-        }
-
-        .form-group input[type="text"],
-        .form-group textarea,
-        .form-group select {
-            width: 100%;
-            box-sizing: border-box;
-            padding: 0.85em 1.1em;
-            font-size: 1em;
-            border: 1.5px solid var(--border);
-            border-radius: 6px;
-            background: #ffffff;
-            color: var(--text-main);
-            transition: all 0.22s ease;
-            box-shadow: 0 1px 6px rgba(34, 116, 165, 0.06) inset,
-                        0 0 0 0 rgba(34, 116, 165, 0);
-            font-family: 'Segoe UI', Arial, sans-serif;
-        }
-
-        .form-group input[type="text"]:focus,
-        .form-group textarea:focus,
-        .form-group select:focus {
-            border-color: var(--primary-blue);
-            outline: none;
-            box-shadow: 0 1px 6px rgba(34, 116, 165, 0.12) inset,
-                        0 0 12px rgba(34, 116, 165, 0.22);
-            background: #fafcff;
-        }
-
-        .form-group textarea {
-            min-height: 240px;
-            resize: vertical;
-            line-height: 1.6;
-        }
-
-        .form-group input[type="text"] {
-            min-height: 42px;
-        }
-
-        .form-group select {
-            min-height: 42px;
-            cursor: pointer;
-            appearance: none;
-            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232274a5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
-            background-repeat: no-repeat;
-            background-position: right 0.9em center;
-            background-size: 1.4em;
-            padding-right: 2.8em;
-        }
-
-        .form-actions {
-            display: flex;
-            gap: 1.2em;
-            margin-top: 3em;
-            padding-top: 2em;
-            border-top: 1px solid rgba(34, 116, 165, 0.2);
-            justify-content: center;
-        }
-
-        .btn-submit,
-        .btn-cancel {
-            padding: 0.75em 2.5em;
-            font-size: 1em;
-            border-radius: 6px;
-            font-weight: 600;
-            letter-spacing: 0.02em;
-            transition: all 0.22s ease;
-            cursor: pointer;
-            border: none;
-            min-height: 44px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .btn-submit {
-            background: linear-gradient(92deg, var(--primary-blue) 86%, var(--accent-orange) 100%);
-            color: #fff;
-            box-shadow: 0 4px 14px rgba(34, 116, 165, 0.24),
-                        0 0 0 1px rgba(34, 116, 165, 0.1) inset;
-            min-width: 160px;
-        }
-
-        .btn-submit:hover {
-            background: linear-gradient(92deg, var(--accent-orange) 68%, var(--yellow-highlight) 99%);
-            box-shadow: 0 6px 20px rgba(255, 149, 5, 0.28),
-                        0 0 0 1px rgba(255, 149, 5, 0.15) inset;
-            transform: translateY(-2px);
-        }
-
-        .btn-submit:active {
-            transform: translateY(0);
-        }
-
-        .btn-cancel {
-            background: #f0f4f8;
-            color: var(--primary-blue);
-            border: 1.5px solid var(--primary-blue);
-            box-shadow: 0 2px 8px rgba(34, 116, 165, 0.08);
-            min-width: 140px;
-        }
-
-        .btn-cancel:hover {
-            background: #e6edf4;
-            border-color: var(--primary-blue-dark);
-            color: var(--primary-blue-dark);
-            box-shadow: 0 4px 12px rgba(34, 116, 165, 0.14);
-        }
-
-        .hidden-input {
-            display: none;
-        }
-
-        @media (max-width: 768px) {
-            .security-control-editor {
-                margin: 1.5em 0.8em;
-            }
-
-            .editor-form {
-                padding: 1.8em;
-            }
-
-            .editor-header {
-                flex-direction: column;
-                align-items: flex-start;
-                margin-bottom: 1.8em;
-            }
-
-            .editor-header h1 {
-                font-size: 1.6em;
-            }
-
-            .form-group.row-2col {
-                grid-template-columns: 1fr;
-                gap: 1.5em;
-            }
-
-            .form-actions {
-                flex-direction: column;
-                gap: 0.8em;
-            }
-
-            .btn-submit,
-            .btn-cancel {
-                width: 100%;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .security-control-editor {
-                margin: 1em 0.5em;
-            }
-
-            .editor-form {
-                padding: 1.4em 1em;
-                border-radius: 8px;
-            }
-
-            .form-group textarea {
-                min-height: 160px;
-                font-size: 0.95em;
-            }
-
-            .form-section {
-                gap: 1.8em;
-            }
-        }
-    </style>
-</head>
-<body>
-<div th:replace="~{navigation :: mainNav}"></div>
-<div class="container">
-    <div class="security-control-editor">
-        <div class="editor-header">
-            <h1>Edit Security Control</h1>
-        </div>
-
-        <form th:action="@{/security-control/edit}" th:object="${securityControl}" method="post" class="editor-form">
+    <div class="editor-form">
+        <form th:action="@{/security-control/edit}" th:object="${securityControl}" method="post">
             <input type="hidden" th:field="*{id}" class="hidden-input" />
 
-            <div class="form-section">
+            <div class="form-grid">
                 <!-- Name Field -->
                 <div class="form-group">
                     <label for="name">Control Name</label>
@@ -273,21 +20,40 @@
                     <input type="text" th:field="*{reference}" id="reference" placeholder="e.g., AC-2, IA-4" />
                 </div>
 
+                <!-- Tag Field -->
+                <div class="form-group">
+                    <label for="tag">Tag (Optional)</label>
+                    <input type="text" th:field="*{tag}" id="tag" placeholder="e.g., critical, network, compliance" />
+
+                    <!-- Existing Tags -->
+                    <div class="tag-suggestions" th:if="${existingTags != null and !existingTags.isEmpty()}">
+                        <label class="tag-suggestions-label">Existing Tags</label>
+                        <div class="tag-suggestions-list">
+                            <button type="button" class="tag-pill"
+                                    th:each="t : ${existingTags}"
+                                    th:text="${t}"
+                                    th:attr="data-tag=${t}"
+                                    onclick="document.getElementById('tag').value=this.getAttribute('data-tag')">
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Security Control Domain Field -->
                 <div class="form-group">
                     <label for="securityControlDomain">Security Control Domain</label>
                     <select th:field="*{securityControlDomain.id}" id="securityControlDomain">
                         <option value="" disabled th:selected="${securityControl.securityControlDomain == null}">-- Select Domain --</option>
-                        <option th:each="domain : ${securityControlDomains}" 
-                                th:value="${domain.id}" 
-                                th:text="${domain.name}" 
+                        <option th:each="domain : ${securityControlDomains}"
+                                th:value="${domain.id}"
+                                th:text="${domain.name}"
                                 th:selected="${securityControl.securityControlDomain != null and domain.id == securityControl.securityControlDomain.id}">
                         </option>
                     </select>
                 </div>
 
-                <!-- Description Field (Large) -->
-                <div class="form-group large">
+                <!-- Description Field (Large, full width) -->
+                <div class="form-group description-group">
                     <label for="detail">Description</label>
                     <textarea th:field="*{detail}" id="detail" placeholder="Enter a detailed description of the security control..." required></textarea>
                 </div>
@@ -296,10 +62,17 @@
             <!-- Action Buttons -->
             <div class="form-actions">
                 <button type="submit" class="btn-submit">Save Control</button>
-                <a th:href="@{/security-control/list}" class="btn-cancel">Cancel</a>
+                <button type="button" class="btn-cancel" onclick="window.parent.closeEditModal && window.parent.closeEditModal()">Cancel</button>
+            </div>
+
+            <!-- Info: Catalogs this control is part of -->
+            <div class="catalog-info" th:if="${securityControl.securityCatalogs != null and !securityControl.securityCatalogs.isEmpty()}">
+                <p><strong>Part of security catalogs:</strong></p>
+                <ul>
+                    <li th:each="catalog : ${securityControl.securityCatalogs}"
+                        th:text="${catalog.name + (catalog.revision != null && !#strings.isEmpty(catalog.revision) ? ' (' + catalog.revision + ')' : '')}"></li>
+                </ul>
             </div>
         </form>
     </div>
 </div>
-</body>
-</html>

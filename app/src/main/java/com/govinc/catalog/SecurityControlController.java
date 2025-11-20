@@ -39,6 +39,16 @@ public class SecurityControlController {
                 : new SecurityControl();
         model.addAttribute("securityControl", control);
         model.addAttribute("securityControlDomains", securityControlDomainService.findAll());
+
+        // Collect distinct existing tags from all security controls (non-null, non-empty)
+        List<String> existingTags = service.findAll().stream()
+                .map(SecurityControl::getTag)
+                .filter(tag -> tag != null && !tag.trim().isEmpty())
+                .distinct()
+                .sorted(String::compareToIgnoreCase)
+                .toList();
+        model.addAttribute("existingTags", existingTags);
+
         return "edit-security-control";
     }
 

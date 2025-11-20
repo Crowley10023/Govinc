@@ -18,6 +18,7 @@ public class SecurityControl {
     @Column(length = 10000)
     private String detail;
     private String reference;
+    private String tag;
 
     @ManyToMany(mappedBy = "securityControls")
     private Set<SecurityCatalog> securityCatalogs = new HashSet<>();
@@ -32,6 +33,7 @@ public class SecurityControl {
         this.name = name;
         this.detail = detail;
         this.reference = reference;
+        this.tag = "";
     }
 
     public Long getId() {
@@ -64,6 +66,14 @@ public class SecurityControl {
 
     public void setReference(String reference) {
         this.reference = reference;
+    }
+
+    public String getTag() {
+        return tag;
+    }
+
+    public void setTag(String tag) {
+        this.tag = tag;
     }
     
     public Set<SecurityCatalog> getSecurityCatalogs() {

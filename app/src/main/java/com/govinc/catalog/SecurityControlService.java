@@ -35,6 +35,7 @@ public class SecurityControlService {
                 existingControl.setName(control.getName());
                 existingControl.setDetail(control.getDetail());
                 existingControl.setReference(control.getReference());
+                existingControl.setTag(control.getTag());
                 existingControl.setSecurityControlDomain(control.getSecurityControlDomain());
                 return repository.save(existingControl);
             }

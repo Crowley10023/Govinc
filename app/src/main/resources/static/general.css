@@ -544,6 +544,116 @@
   transform: translateY(-2px);
 }
 
+/* Security Control Editor (Edit popup) */
+.security-control-editor {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.security-control-editor .hidden-input {
+  display: none;
+}
+
+.security-control-editor .editor-header {
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 0.5rem;
+}
+
+.security-control-editor .editor-header h1 {
+  font-size: 1.4rem;
+  margin: 0;
+}
+
+.security-control-editor .editor-form form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.security-control-editor .form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem 1.5rem;
+}
+
+.security-control-editor .form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.security-control-editor .form-group label {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.security-control-editor .form-group input,
+.security-control-editor .form-group select,
+.security-control-editor .form-group textarea {
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  padding: 0.4rem 0.55rem;
+  font-size: 0.9rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.security-control-editor .form-group textarea {
+  min-height: 160px;
+  resize: vertical;
+  line-height: 1.4;
+}
+
+.security-control-editor .description-group {
+  grid-column: 1 / -1;
+}
+
+.security-control-editor .description-group textarea {
+  font-family: inherit;
+}
+
+.security-control-editor .form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.security-control-editor .btn-submit,
+.security-control-editor .btn-cancel {
+  border-radius: 4px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.security-control-editor .btn-submit {
+  background-color: #007bff;
+  color: #fff;
+  border-color: #007bff;
+}
+
+.security-control-editor .btn-submit:hover {
+  background-color: #0069d9;
+}
+
+.security-control-editor .btn-cancel {
+  background-color: #f8f9fa;
+  color: #495057;
+  border-color: #ced4da;
+}
+
+.security-control-editor .btn-cancel:hover {
+  background-color: #e2e6ea;
+}
+
+@media (max-width: 768px) {
+  .security-control-editor .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .orgservice-header {

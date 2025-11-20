@@ -134,6 +134,9 @@
             cursor: pointer;
             font-size: 16px;
             margin-top: 15px;
+            margin-right: 10px;
+            display: inline-block;
+            text-decoration: none;
         }
         
         .import-button:hover {
@@ -143,6 +146,14 @@
         .import-button:disabled {
             background-color: #6c757d;
             cursor: not-allowed;
+        }
+
+        .import-button.primary {
+            background-color: #007bff;
+        }
+
+        .import-button.primary:hover {
+            background-color: #0056b3;
         }
         
         .upload-section {
@@ -814,6 +825,53 @@
         table tr:hover {
             background-color: #f8f9fa;
         }
+
+        table tr.hidden {
+            display: none;
+        }
+
+        /* Filter Bar Styles */
+        .filter-bar {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .filter-bar h3 {
+            margin-top: 0;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .filter-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+        }
+
+        .filter-inputs label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-size: 12px;
+            color: #555;
+        }
+
+        .filter-inputs input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        @media (max-width: 768px) {
+            .filter-inputs {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
@@ -821,11 +879,28 @@
 <div class="container">
     
     <h1>Security Controls</h1>
-    <a href="/security-control/create">Create New Security Control</a>
-
-    <!-- Import Button -->
     <div style="margin: 20px 0;">
         <button id="importBtn" class="import-button">Import Security Controls from CSV</button>
+        <a href="/security-control/create" class="import-button primary">Create New Security Control</a>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+        <h3>🔍 Filter Security Controls</h3>
+        <div class="filter-inputs">
+            <div>
+                <label for="filterTitle">Title:</label>
+                <input type="text" id="filterTitle" placeholder="Search by title..." />
+            </div>
+            <div>
+                <label for="filterDescription">Description:</label>
+                <input type="text" id="filterDescription" placeholder="Search by description..." />
+            </div>
+            <div>
+                <label for="filterTag">Tag:</label>
+                <input type="text" id="filterTag" placeholder="Search by tag..." />
+            </div>
+        </div>
     </div>
 
     <!-- Match Detail Modal Popup -->
@@ -1140,27 +1215,39 @@ network segmentation","SC-7","Network"</div>
         </div>
     </div>
 
-    <table>
+    <!-- Edit Modal -->
+    <div id="editControlModal" class="modal">
+        <div class="modal-content" style="max-width: 900px; width: 95%; margin: 8vh ; height: 80vh; display: flex; flex-direction: column;">
+            <span class="close" onclick="closeEditModal()">&times;</span>
+            <div id="editFormContainer" style="flex: 1 1 auto; overflow-y: auto; margin-top: 10px;">
+                <!-- Form will be loaded via AJAX -->
+            </div>
+        </div>
+    </div>
+
+    <table id="controlsTable">
         <thead>
             <tr>
                 <th>ID</th>
                 <th>Name</th>
                 <th>Detail</th>
                 <th>Reference</th>
+                <th>Tag</th>
                 <th>Domain</th>
                 <th>Actions</th>
             </tr>
         </thead>
-        <tbody>
-            <tr th:each="control : ${controls}">
+        <tbody id="controlsTableBody">
+            <tr th:each="control : ${controls}" class="control-row" th:attr="data-title=${control.name}, data-description=${control.detail}, data-tag=${control.tag}">
                 <td th:text="${control.id}"></td>
                 <td th:text="${control.name}"></td>
                 <td th:text="${control.detail}"></td>
                 <td th:text="${control.reference}"></td>
+                <td th:text="${control.tag}"></td>
                 <td th:text="${control.securityControlDomain != null ? control.securityControlDomain.name : ''}"></td>
                 <td>
                     <div class="action-buttons">
-                        <a class="btn btn-primary" th:href="@{'/security-control/edit'(id=${control.id})}">Edit</a>
+                        <button class="btn btn-primary" type="button" th:data-id="${control.id}" onclick="openEditModal(this)">Edit</button>
                         <button class="btn btn-danger" type="button" th:data-id="${control.id}" th:data-name="${control.name}" onclick="openDeleteModalFromBtn(this)">Delete</button>
                     </div>
                 </td>
@@ -1171,12 +1258,26 @@ network segmentation","SC-7","Network"</div>
 </div>
 
 <script>
+    // Scroll position preservation
+    let savedScrollPosition = 0;
+
+    function saveScrollPosition() {
+        savedScrollPosition = window.scrollY;
+    }
+
+    function restoreScrollPosition() {
+        setTimeout(() => {
+            window.scrollTo(0, savedScrollPosition);
+        }, 100);
+    }
+
     // Delete Modal Functionality
     let currentDeleteId = null;
 
     function openDeleteModalFromBtn(btn) {
         const id = btn.getAttribute('data-id');
         const name = btn.getAttribute('data-name');
+        saveScrollPosition();
         openDeleteModal(id, name);
     }
 
@@ -1192,6 +1293,7 @@ network segmentation","SC-7","Network"</div>
 
     function closeDeleteModal() {
         document.getElementById('deleteModal').style.display = 'none';
+        restoreScrollPosition();
         currentDeleteId = null;
     }
 
@@ -1249,6 +1351,104 @@ network segmentation","SC-7","Network"</div>
             });
     }
 
+    // Edit Modal Functionality
+    function openEditModal(btn) {
+        const id = btn.getAttribute('data-id');
+        saveScrollPosition();
+        
+        // Load form via AJAX
+        fetch('/security-control/edit?id=' + id)
+            .then(response => response.text())
+            .then(html => {
+                // Extract form from the response
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const editorForm = doc.querySelector('.editor-form');
+                
+                // Ensure any styles and stylesheets from the loaded edit page are applied
+                const headStyles = doc.querySelectorAll('style, link[rel="stylesheet"]');
+                headStyles.forEach(node => {
+                    if (node.tagName.toLowerCase() === 'style') {
+                        const newStyle = document.createElement('style');
+                        newStyle.textContent = node.textContent;
+                        document.head.appendChild(newStyle);
+                    } else if (node.tagName.toLowerCase() === 'link') {
+                        const href = node.getAttribute('href');
+                        if (href && !Array.from(document.head.querySelectorAll('link[rel="stylesheet"]')).some(l => l.getAttribute('href') === href)) {
+                            const newLink = document.createElement('link');
+                            newLink.rel = 'stylesheet';
+                            newLink.href = href;
+                            document.head.appendChild(newLink);
+                        }
+                    }
+                });
+                
+                if (editorForm) {
+                    const container = document.getElementById('editFormContainer');
+                    container.innerHTML = '';
+
+                    // Wrap the loaded form content so .security-control-editor styles apply in the popup
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'security-control-editor';
+                    wrapper.innerHTML = editorForm.innerHTML;
+                    container.appendChild(wrapper);
+
+                    document.getElementById('editControlModal').style.display = 'block';
+                    
+                    // Re-attach cancel button click handler
+                    const cancelBtn = container.querySelector('.btn-cancel');
+                    if (cancelBtn) {
+                        cancelBtn.addEventListener('click', closeEditModal);
+                    }
+                    
+                    // Handle form submission
+                    const submitForm = container.querySelector('form');
+                    if (submitForm) {
+                        submitForm.addEventListener('submit', function(e) {
+                            e.preventDefault();
+                            submitEditForm(submitForm);
+                        });
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error loading form:', error);
+                alert('Error loading edit form');
+            });
+    }
+
+    function closeEditModal() {
+        document.getElementById('editControlModal').style.display = 'none';
+        document.getElementById('editFormContainer').innerHTML = '';
+        restoreScrollPosition();
+    }
+
+    function submitEditForm(form) {
+        const formData = new FormData(form);
+        
+        fetch('/security-control/edit', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="_csrf"]')?.getAttribute('content') || ''
+            }
+        })
+            .then(response => {
+                if (response.ok) {
+                    showAlert('Security control updated successfully!', 'success');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    throw new Error('Save failed');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error saving security control');
+            });
+    }
+
     function showAlert(message, type) {
         const alertDiv = document.createElement('div');
         alertDiv.className = 'alert ' + (type === 'error' ? 'alert-error' : 'alert-success');
@@ -1263,13 +1463,54 @@ network segmentation","SC-7","Network"</div>
         }, 5000);
     }
 
+    // Filtering functionality
+    const filterTitle = document.getElementById('filterTitle');
+    const filterDescription = document.getElementById('filterDescription');
+    const filterTag = document.getElementById('filterTag');
+
+    function applyFilters() {
+        const titleFilter = filterTitle.value.toLowerCase();
+        const descriptionFilter = filterDescription.value.toLowerCase();
+        const tagFilter = filterTag.value.toLowerCase();
+
+        const rows = document.querySelectorAll('.control-row');
+        rows.forEach(row => {
+            const titleAttr = row.getAttribute('data-title') || '';
+            const descriptionAttr = row.getAttribute('data-description') || '';
+            const tagAttr = row.getAttribute('data-tag') || '';
+
+            const title = titleAttr.toLowerCase();
+            const description = descriptionAttr.toLowerCase();
+            const tag = tagAttr.toLowerCase();
+
+            const titleMatch = title.includes(titleFilter) || titleFilter === '';
+            const descriptionMatch = description.includes(descriptionFilter) || descriptionFilter === '';
+            const tagMatch = tag.includes(tagFilter) || tagFilter === '';
+
+            if (titleMatch && descriptionMatch && tagMatch) {
+                row.classList.remove('hidden');
+            } else {
+                row.classList.add('hidden');
+            }
+        });
+    }
+
+    filterTitle.addEventListener('keyup', applyFilters);
+    filterDescription.addEventListener('keyup', applyFilters);
+    filterTag.addEventListener('keyup', applyFilters);
+
     // Close modals when clicking outside
     window.addEventListener('click', function(event) {
         const deleteModal = document.getElementById('deleteModal');
+        const editModal = document.getElementById('editControlModal');
         const importModal = document.getElementById('csvImportModal');
         const matchModal = document.getElementById('matchDetailModal');
+        
         if (event.target === deleteModal) {
             closeDeleteModal();
+        }
+        if (event.target === editModal) {
+            closeEditModal();
         }
         if (event.target === importModal) {
             importModal.style.display = 'none';
@@ -1284,10 +1525,15 @@ network segmentation","SC-7","Network"</div>
     document.addEventListener('keydown', function(event) {
         if (event.key === 'Escape') {
             const deleteModal = document.getElementById('deleteModal');
+            const editModal = document.getElementById('editControlModal');
             const importModal = document.getElementById('csvImportModal');
             const matchModal = document.getElementById('matchDetailModal');
+            
             if (deleteModal.style.display === 'block') {
                 closeDeleteModal();
+            }
+            if (editModal.style.display === 'block') {
+                closeEditModal();
             }
             if (importModal.style.display === 'block') {
                 importModal.style.display = 'none';
@@ -1309,7 +1555,7 @@ network segmentation","SC-7","Network"</div>
         }
     });
 
-    // Global variables
+    // Global variables for CSV import
     let csvData = [];
     let availableCatalogs = [];
     let analysisResults = {};
@@ -1320,7 +1566,7 @@ network segmentation","SC-7","Network"</div>
     // Get modal elements
     const modal = document.getElementById('csvImportModal');
     const importBtn = document.getElementById('importBtn');
-    const closeBtn = document.getElementsByClassName('close')[0];
+    const closeBtn = document.querySelectorAll('.close')[0];
     const csvFile = document.getElementById('csvFile');
     const submitImportBtn = document.getElementById('submitImportBtn');
     
@@ -1350,6 +1596,7 @@ network segmentation","SC-7","Network"</div>
 
     // Show modal when import button is clicked
     importBtn.onclick = function() {
+        saveScrollPosition();
         modal.style.display = 'block';
         goToStep(1);
         loadAvailableCatalogs();
@@ -1359,6 +1606,7 @@ network segmentation","SC-7","Network"</div>
     closeBtn.onclick = function() {
         modal.style.display = 'none';
         resetForm();
+        restoreScrollPosition();
     }
 
     // Close modal on Escape key
@@ -1366,6 +1614,7 @@ network segmentation","SC-7","Network"</div>
         if (event.key === 'Escape' && modal.style.display === 'block') {
             modal.style.display = 'none';
             resetForm();
+            restoreScrollPosition();
         }
     });
 
@@ -1516,6 +1765,7 @@ network segmentation","SC-7","Network"</div>
     document.getElementById('cancelBtn').addEventListener('click', function() {
         modal.style.display = 'none';
         resetForm();
+        restoreScrollPosition();
     });
 
     // PARSING AND DISPLAY FUNCTIONS
@@ -1655,7 +1905,6 @@ network segmentation","SC-7","Network"</div>
     }
 
     function detectLanguage() {
-        // Send sample content to AI to detect language
         const sampleContent = csvData.slice(0, 3).map(row => row.name + ' ' + row.detail).join(' ');
         
         const requestBody = {
@@ -1947,7 +2196,6 @@ network segmentation","SC-7","Network"</div>
             if (analysisResults[row.rowNumber]) {
                 const analysis = analysisResults[row.rowNumber];
                 row.matchingRate = analysis.matchingRate;
-                // Set default action based on match: merge for every match, new for no match
                 if (analysis.matchingRate !== 'none' && analysis.suggestedMergeControl) {
                     row.action = 'merge:' + analysis.suggestedMergeControl.existingControlId;
                 } else {
@@ -1986,7 +2234,6 @@ network segmentation","SC-7","Network"</div>
             else if (row.analyzed) matchBadge = '<span class="match-badge-none">None</span>';
             else matchBadge = '<span style="color: #999; font-size: 11px;">Pending...</span>';
             
-            // Build match cell with popup trigger - match badges are now clickable buttons
             let matchCell = '';
             if (row.suggestedMatch && row.matchingRate !== 'none') {
                 const rowNum = row.rowNumber;
@@ -1995,20 +2242,17 @@ network segmentation","SC-7","Network"</div>
                 matchCell = matchBadge;
             }
             
-            // Determine the action to preselect
             let selectedActionValue = row.action || 'new';
             
             let actionSelect = '<select class="action-select action-selector" data-row="' + row.rowNumber + '">';
             if (row.matchingRate !== 'none' && row.suggestedMatch) {
                 const mergeValue = 'merge:' + row.suggestedMatch.existingControlId;
-                // Preselect merge when there's a match
                 const mergeSelected = (selectedActionValue === mergeValue) ? ' selected' : '';
                 const newSelected = (selectedActionValue === 'new') ? ' selected' : '';
                 actionSelect += '<option value="' + mergeValue + '"' + mergeSelected + '>Merge</option>';
                 actionSelect += '<option value="new"' + newSelected + '>Create New</option>';
                 actionSelect += '<option value="skip">Skip</option>';
             } else {
-                // No match - always preselect 'new'
                 actionSelect += '<option value="new" selected>Create New</option>';
                 actionSelect += '<option value="skip">Skip</option>';
             }
@@ -2030,8 +2274,6 @@ network segmentation","SC-7","Network"</div>
         
         const selectors = document.querySelectorAll('.action-selector');
         selectors.forEach(sel => {
-            const rowNumber = parseInt(sel.dataset.row);
-            
             sel.addEventListener('change', function() {
                 const rowNumber = parseInt(this.dataset.row);
                 for (let j = 0; j < csvData.length; j++) {
@@ -2041,7 +2283,6 @@ network segmentation","SC-7","Network"</div>
                         break;
                     }
                 }
-                // Recalculate summary when action changes
                 updateStep4Summary();
             });
         });
@@ -2054,12 +2295,7 @@ network segmentation","SC-7","Network"</div>
         return div.innerHTML;
     }
     
-    /**
-     * Open modal popup showing matched control details
-     * Triggered by clicking on the match badge (high/medium/low)
-     */
     function openMatchDetailModal(rowNumber) {
-        // Find the row data
         let rowData = null;
         for (let i = 0; i < csvData.length; i++) {
             if (csvData[i].rowNumber === rowNumber) {
@@ -2076,10 +2312,8 @@ network segmentation","SC-7","Network"</div>
         const match = rowData.suggestedMatch;
         const analysisResult = analysisResults[rowNumber];
         
-        // Build detailed match information
         let detailHtml = '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;\">';
         
-        // Left column: Imported Control
         detailHtml += '<div>';
         detailHtml += '<h4 style="color: #007bff; border-bottom: 2px solid #007bff; padding-bottom: 10px; margin-bottom: 15px;">📥 Imported Control</h4>';
         detailHtml += '<div class="match-info" style="margin: 10px 0;">';
@@ -2103,7 +2337,6 @@ network segmentation","SC-7","Network"</div>
         detailHtml += '</div>';
         detailHtml += '</div>';
         
-        // Right column: Matched Control
         detailHtml += '<div>';
         detailHtml += '<h4 style="color: #28a745; border-bottom: 2px solid #28a745; padding-bottom: 10px; margin-bottom: 15px;">🎯 Matched Existing Control</h4>';
         detailHtml += '<div class="match-info" style="margin: 10px 0;">';
@@ -2123,7 +2356,6 @@ network segmentation","SC-7","Network"</div>
         detailHtml += '<div class="match-info-value">#' + match.existingControlId + '</div>';
         detailHtml += '</div>';
         
-        // Add match confidence/analysis info
         if (analysisResult && analysisResult.matchingRate) {
             detailHtml += '<div class="match-info" style="margin: 10px 0;">';
             detailHtml += '<div class="match-info-label">Match Level:</div>';
@@ -2135,7 +2367,6 @@ network segmentation","SC-7","Network"</div>
         detailHtml += '</div>';
         detailHtml += '</div>';
         
-        // Add AI Analysis if available
         if (analysisResult && analysisResult.aiAnalysis) {
             detailHtml += '<div style="margin-top: 20px; padding: 15px; background-color: #e3f2fd; border-left: 4px solid #2196F3; border-radius: 4px;">';
             detailHtml += '<h4 style="color: #1976d2; margin-top: 0;">🤖 AI Analysis</h4>';
@@ -2154,7 +2385,6 @@ network segmentation","SC-7","Network"</div>
     function updateStep4Summary() {
         const summaryDiv = document.getElementById('step4Summary');
         
-        // Count controls that will be imported (not skipped)
         let totalImport = 0;
         let mergeCount = 0;
         
@@ -2187,7 +2417,6 @@ network segmentation","SC-7","Network"</div>
         const summaryDiv = document.getElementById('step5Summary');
         const catalogOption = document.querySelector('input[name="catalogOption"]:checked').value;
         
-        // Count controls that will be imported (not skipped)
         let totalImport = 0;
         let mergeCount = 0;
         
@@ -2230,8 +2459,6 @@ network segmentation","SC-7","Network"</div>
         
         summaryDiv.innerHTML = summaryText;
     }
-
-    // Catalog Functions
 
     function loadAvailableCatalogs() {
         fetch('/api/security-catalogs', {
@@ -2284,7 +2511,6 @@ network segmentation","SC-7","Network"</div>
         });
     }
 
-    // Submit import button handler
     submitImportBtn.addEventListener('click', function() {
         if (!csvFile.files || csvFile.files.length === 0) {
             alert('Please select a CSV file to import.');
@@ -2293,7 +2519,6 @@ network segmentation","SC-7","Network"</div>
         
         const catalogOption = document.querySelector('input[name="catalogOption"]:checked').value;
         
-        // Prepare form data
         const formData = new FormData();
         formData.append('file', csvFile.files[0]);
         formData.append('catalogOption', catalogOption);
@@ -2308,7 +2533,6 @@ network segmentation","SC-7","Network"</div>
             formData.append('catalogRevision', document.getElementById('catalogRevision').value);
         }
         
-        // Build merge actions with translated data and candidate control information
         const mergeActions = {};
         for (let i = 0; i < csvData.length; i++) {
             const row = csvData[i];
@@ -2319,7 +2543,6 @@ network segmentation","SC-7","Network"</div>
                     translatedDetail: row.translatedDetail
                 };
                 
-                // If merging, include the candidate control information
                 if (row.action && row.action.startsWith('merge:') && row.suggestedMatch) {
                     actionData.candidateControlId = row.suggestedMatch.existingControlId;
                     actionData.candidateControlName = row.suggestedMatch.existingControlName;
@@ -2334,7 +2557,6 @@ network segmentation","SC-7","Network"</div>
         console.log('Prepared merge actions with candidate controls:', mergeActions);
         formData.append('mergeActions', JSON.stringify(mergeActions));
         
-        // Get CSRF headers
         const headers = {};
         const csrfToken = getCsrfToken();
         const csrfHeaderName = getCsrfHeaderName();
@@ -2342,7 +2564,6 @@ network segmentation","SC-7","Network"</div>
             headers[csrfHeaderName] = csrfToken;
         }
         
-        // Submit import
         fetch('/security-control/import', {
             method: 'POST',
             headers: headers,
@@ -2374,14 +2595,12 @@ network segmentation","SC-7","Network"</div>
         detectedLanguage = null;
         csvFile.value = '';
         
-        // Reset all steps to hidden except step 1
         const steps = document.querySelectorAll('.step-container');
         for (let i = 0; i < steps.length; i++) {
             steps[i].classList.remove('active');
         }
         document.getElementById('step1').classList.add('active');
         
-        // Reset form fields
         const languageCheckboxes = document.querySelectorAll('input[name="languages"]');
         for (let i = 0; i < languageCheckboxes.length; i++) {
             languageCheckboxes[i].checked = false;
@@ -2396,7 +2615,6 @@ network segmentation","SC-7","Network"</div>
         document.getElementById('previewTableSection').style.display = 'block';
         document.getElementById('previewButtonGroup').style.display = 'flex';
         
-        // Close match modal if open
         const matchModal = document.getElementById('matchDetailModal');
         if (matchModal) {
             matchModal.style.display = 'none';
