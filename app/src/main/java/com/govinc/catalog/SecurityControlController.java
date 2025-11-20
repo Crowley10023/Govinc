@@ -40,10 +40,14 @@ public class SecurityControlController {
         model.addAttribute("securityControl", control);
         model.addAttribute("securityControlDomains", securityControlDomainService.findAll());
 
-        // Collect distinct existing tags from all security controls (non-null, non-empty)
+        // Collect distinct existing tags from all security controls (non-null, non-empty),
+        // splitting comma-separated tag lists like "SOC, MDR" into individual tags.
         List<String> existingTags = service.findAll().stream()
                 .map(SecurityControl::getTag)
                 .filter(tag -> tag != null && !tag.trim().isEmpty())
+                .flatMap(tag -> java.util.Arrays.stream(tag.split(",")))
+                .map(String::trim)
+                .filter(tag -> !tag.isEmpty())
                 .distinct()
                 .sorted(String::compareToIgnoreCase)
                 .toList();
