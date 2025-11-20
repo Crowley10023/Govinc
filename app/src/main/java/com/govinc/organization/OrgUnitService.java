@@ -29,10 +29,20 @@ public class OrgUnitService {
     /**
      * Recursively loads org unit with all children for all tree levels.
      * This ensures the entire org tree is fully fetched and ready for tree view.
+     * Ensures that leader information is loaded for all nodes.
      */
     public Optional<OrgUnit> getOrgUnitWithChildrenRecursive(Long id) {
         Optional<OrgUnit> baseUnitOpt = orgUnitRepository.findByIdWithChildren(id);
-        baseUnitOpt.ifPresent(unit -> fetchAllChildrenRecursive(unit, new HashSet<>()));
+        baseUnitOpt.ifPresent(unit -> {
+            // Ensure the root unit has its leader loaded
+            if (unit.getLeader() == null) {
+                Optional<OrgUnit> withLeader = orgUnitRepository.findByIdWithLeader(id);
+                if (withLeader.isPresent() && withLeader.get().getLeader() != null) {
+                    unit.setLeader(withLeader.get().getLeader());
+                }
+            }
+            fetchAllChildrenRecursive(unit, new HashSet<>());
+        });
         return baseUnitOpt;
     }
 
@@ -43,10 +53,19 @@ public class OrgUnitService {
         if (children != null && !children.isEmpty()) {
             Set<OrgUnit> fullyLoadedChildren = new HashSet<>();
             for (OrgUnit child : children) {
-                // Fetch each child with its own children
+                // Fetch each child with its own children AND leader
                 Optional<OrgUnit> loadedChildOpt = orgUnitRepository.findByIdWithChildren(child.getId());
                 if (loadedChildOpt.isPresent()) {
                     OrgUnit loadedChild = loadedChildOpt.get();
+                    
+                    // Ensure leader is loaded for this child
+                    if (loadedChild.getLeader() == null) {
+                        Optional<OrgUnit> childWithLeader = orgUnitRepository.findByIdWithLeader(child.getId());
+                        if (childWithLeader.isPresent() && childWithLeader.get().getLeader() != null) {
+                            loadedChild.setLeader(childWithLeader.get().getLeader());
+                        }
+                    }
+                    
                     fullyLoadedChildren.add(loadedChild);
                     // Recursively fetch descendants
                     fetchAllChildrenRecursive(loadedChild, visited);

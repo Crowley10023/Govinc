@@ -180,7 +180,7 @@ public class OrgUnitController {
     private void printOrgUnitTree(OrgUnit orgUnit, int level) {
         // Indentation for readability
         String indent = "  ".repeat(level);
-        System.out.println(indent + "OrgUnit ID: " + orgUnit.getId() + ", Name: " + orgUnit.getName());
+        System.out.println(indent + "OrgUnit ID: " + orgUnit.getId() + ", Name: " + orgUnit.getName() + orgUnit.getLeader());
         if (orgUnit.getChildren() != null) {
             for (OrgUnit child : orgUnit.getChildren()) {
                 printOrgUnitTree(child, level + 1);

@@ -49,6 +49,16 @@
             pointer-events: none;
         }
 
+        .org-label-leader {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 10px;
+            fill: #2c5aa0;
+            font-style: italic;
+            text-anchor: middle;
+            alignment-baseline: middle;
+            pointer-events: none;
+        }
+
         .org-node-link {
             font-family: 'Segoe UI', Arial, sans-serif;
             font-size: 10px;
@@ -310,6 +320,9 @@
             t.setAttribute('y', y + 17);
             t.classList.add('org-label');
             
+            // Build array of text lines: org name + optional leader
+            let lines = [];
+            
             // Split long names into multiple lines
             if (node.name && node.name.length > 16) {
                 const words = node.name.split(' ');
@@ -331,22 +344,38 @@
                 if (!line1) line1 = currentLine;
                 else if (!line2) line2 = currentLine;
                 
-                const tspan1 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
-                tspan1.setAttribute('x', x);
-                tspan1.setAttribute('dy', '0');
-                tspan1.textContent = line1;
-                t.appendChild(tspan1);
-                
-                if (line2) {
-                    const tspan2 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
-                    tspan2.setAttribute('x', x);
-                    tspan2.setAttribute('dy', '1.1em');
-                    tspan2.textContent = line2;
-                    t.appendChild(tspan2);
-                }
+                lines.push(line1);
+                if (line2) lines.push(line2);
             } else {
-                t.textContent = node.name;
+                lines.push(node.name);
             }
+            
+            // Add leader name if present
+            if (node.leader && node.leader.name) {
+                lines.push(node.leader.name);
+            }
+            
+            // Create tspan elements for each line
+            lines.forEach((line, idx) => {
+                const tspan = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+                tspan.setAttribute('x', x);
+                if (idx === 0) {
+                    tspan.setAttribute('dy', '0');
+                } else {
+                    tspan.setAttribute('dy', '1.1em');
+                }
+                
+                // Add CSS class for styling
+                if (idx > 0 && node.leader && idx === lines.length - 1) {
+                    // This is the leader line
+                    tspan.classList.add('org-label-leader');
+                } else {
+                    tspan.classList.add('org-label');
+                }
+                
+                tspan.textContent = line;
+                t.appendChild(tspan);
+            });
             
             nodeGroup.appendChild(t);
             
@@ -435,6 +464,9 @@
                 t.setAttribute('y', pos.y + 17);
                 t.classList.add('org-label');
                 
+                // Build array of text lines: org name + optional leader
+                let lines = [];
+                
                 // Split long names into multiple lines
                 if (pos.node.name && pos.node.name.length > 16) {
                     const words = pos.node.name.split(' ');
@@ -456,22 +488,38 @@
                     if (!line1) line1 = currentLine;
                     else if (!line2) line2 = currentLine;
                     
-                    const tspan1 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
-                    tspan1.setAttribute('x', pos.x);
-                    tspan1.setAttribute('dy', '0');
-                    tspan1.textContent = line1;
-                    t.appendChild(tspan1);
-                    
-                    if (line2) {
-                        const tspan2 = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
-                        tspan2.setAttribute('x', pos.x);
-                        tspan2.setAttribute('dy', '1.1em');
-                        tspan2.textContent = line2;
-                        t.appendChild(tspan2);
-                    }
+                    lines.push(line1);
+                    if (line2) lines.push(line2);
                 } else {
-                    t.textContent = pos.node.name;
+                    lines.push(pos.node.name);
                 }
+                
+                // Add leader name if present
+                if (pos.node.leader && pos.node.leader.name) {
+                    lines.push('Lead: ' + pos.node.leader.name);
+                }
+                
+                // Create tspan elements for each line
+                lines.forEach((line, idx) => {
+                    const tspan = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+                    tspan.setAttribute('x', pos.x);
+                    if (idx === 0) {
+                        tspan.setAttribute('dy', '0');
+                    } else {
+                        tspan.setAttribute('dy', '1.1em');
+                    }
+                    
+                    // Add CSS class for styling
+                    if (idx > 0 && pos.node.leader && idx === lines.length - 1) {
+                        // This is the leader line
+                        tspan.classList.add('org-label-leader');
+                    } else {
+                        tspan.classList.add('org-label');
+                    }
+                    
+                    tspan.textContent = line;
+                    t.appendChild(tspan);
+                });
                 
                 nodeGroup.appendChild(t);
                 
