@@ -7,10 +7,10 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Service for analyzing similarity between security controls using AI and text-based methods.
+ * Service for analyzing similarity between security controls using AI.
  * Provides matching rates and suggestions for control consolidation.
  * 
- * ALWAYS uses AI when available to comprehensively check all existing controls.
+ * ALWAYS uses AI to comprehensively check all existing controls against a new control.
  */
 @Service
 public class SecurityControlSimilarityAnalyzer {
@@ -23,7 +23,7 @@ public class SecurityControlSimilarityAnalyzer {
     
     /**
      * Analyze a to-be-imported security control against existing controls
-     * ALWAYS uses AI if available to comprehensively check all existing controls
+     * ALWAYS uses AI to comprehensively check all existing controls
      * @param importControl Control to be imported
      * @return AnalysisResult containing similarity matches and recommendations
      */
@@ -41,49 +41,18 @@ public class SecurityControlSimilarityAnalyzer {
             return result;
         }
         
-        // Calculate text similarity scores for all existing controls
-        System.out.println("[ANALYZER] Calculating text similarity for all " + existingControls.size() + " controls...");
-        List<SimilarityMatch> allMatches = new ArrayList<>();
-        for (SecurityControl existingControl : existingControls) {
-            double textSimilarity = calculateTextSimilarity(importControl, existingControl);
-            SimilarityMatch match = new SimilarityMatch();
-            match.setExistingControlId(existingControl.getId());
-            match.setExistingControlName(existingControl.getName());
-            match.setExistingControlDetail(existingControl.getDetail());
-            match.setTextSimilarityScore(textSimilarity);
-            allMatches.add(match);
-        }
-        
-        // Sort by similarity score (highest first)
-        allMatches.sort((a, b) -> Double.compare(b.getTextSimilarityScore(), a.getTextSimilarityScore()));
-        
-        for (int i = 0; i < Math.min(3, allMatches.size()); i++) {
-            System.out.println("[ANALYZER]   " + (i+1) + ". " + allMatches.get(i).getExistingControlName() + " (score: " + String.format("%.2f", allMatches.get(i).getTextSimilarityScore()) + ")");
-        }
-        
-        // Get top match for initial assessment
-        SimilarityMatch topMatch = allMatches.get(0);
-        String matchingRate = determineMatchingRate(topMatch.getTextSimilarityScore());
-        result.setMatchingRate(matchingRate);
-        result.setHasSimilarControls(topMatch.getTextSimilarityScore() >= 0.4);
-        System.out.println("[ANALYZER] Top match: " + topMatch.getExistingControlName() + " (score: " + String.format("%.2f", topMatch.getTextSimilarityScore()) + ", rate: " + matchingRate + ")");
-        
-        // ALWAYS use AI if available for comprehensive analysis of all controls
+        // Check AI provider availability
         System.out.println("[ANALYZER] Checking if AI provider is available...");
-        if (openAIUtil != null) {
-            System.out.println("[ANALYZER] AI provider IS AVAILABLE - performing AI analysis");
-            performAIAnalysis(importControl, allMatches, result);
-        } else {
-            System.out.println("[ANALYZER] NO AI provider configured - using text-based analysis only");
-            // Fallback to text-based analysis only if no AI provider
-            List<SimilarityMatch> textMatches = allMatches.stream()
-                .filter(m -> m.getTextSimilarityScore() >= 0.4)
-                .limit(3)
-                .collect(Collectors.toList());
-            result.setMatches(textMatches);
-            result.setAiAnalysis("No AI provider configured - using text-based similarity only");
-            System.out.println("[ANALYZER] Text-based matches found: " + textMatches.size());
+        if (openAIUtil == null) {
+            System.out.println("[ANALYZER] ERROR: No AI provider configured - cannot proceed");
+            throw new IllegalStateException("AI provider (OpenAIUtil) is required for security control analysis but is not configured");
         }
+        
+        System.out.println("[ANALYZER] AI provider IS AVAILABLE - performing AI analysis");
+        System.out.println("[ANALYZER] Analyzing against " + existingControls.size() + " existing controls");
+        
+        // Perform comprehensive AI analysis against ALL controls
+        performAIAnalysisOnAllControls(importControl, existingControls, result);
         
         // Recommend action based on results
         if (!result.getMatches().isEmpty()) {
@@ -100,107 +69,19 @@ public class SecurityControlSimilarityAnalyzer {
     }
     
     /**
-     * Calculate text similarity using various string comparison methods
-     */
-    private double calculateTextSimilarity(SecurityControlImportDTO importControl, SecurityControl existingControl) {
-        // Combine multiple similarity metrics
-        double nameSimilarity = stringSimilarity(
-            importControl.getName().toLowerCase(),
-            existingControl.getName().toLowerCase()
-        );
-        
-        double detailSimilarity = 0;
-        if (importControl.getDetail() != null && existingControl.getDetail() != null) {
-            detailSimilarity = stringSimilarity(
-                importControl.getDetail().toLowerCase(),
-                existingControl.getDetail().toLowerCase()
-            );
-        }
-        
-        double referenceSimilarity = 0;
-        if (importControl.getReference() != null && existingControl.getReference() != null && 
-            !importControl.getReference().isEmpty() && !existingControl.getReference().isEmpty()) {
-            referenceSimilarity = importControl.getReference().equalsIgnoreCase(existingControl.getReference()) ? 1.0 : 0;
-        }
-        
-        // Weighted average: name is most important (50%), detail (35%), reference (15%)
-        return (nameSimilarity * 0.5) + (detailSimilarity * 0.35) + (referenceSimilarity * 0.15);
-    }
-    
-    /**
-     * Calculate string similarity using Levenshtein distance
-     */
-    private double stringSimilarity(String a, String b) {
-        if (a.equals(b)) return 1.0;
-        if (a.length() < 2 || b.length() < 2) return 0.0;
-        
-        // Use Levenshtein distance for similarity calculation
-        int maxLength = Math.max(a.length(), b.length());
-        int distance = levenshteinDistance(a, b);
-        return 1.0 - ((double) distance / maxLength);
-    }
-    
-    /**
-     * Calculate Levenshtein distance between two strings
-     */
-    private int levenshteinDistance(String a, String b) {
-        if (a.isEmpty()) return b.length();
-        if (b.isEmpty()) return a.length();
-        
-        int[][] dp = new int[a.length() + 1][b.length() + 1];
-        
-        for (int i = 0; i <= a.length(); i++) {
-            dp[i][0] = i;
-        }
-        for (int j = 0; j <= b.length(); j++) {
-            dp[0][j] = j;
-        }
-        
-        for (int i = 1; i <= a.length(); i++) {
-            for (int j = 1; j <= b.length(); j++) {
-                int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
-                dp[i][j] = Math.min(Math.min(
-                    dp[i - 1][j] + 1,      // deletion
-                    dp[i][j - 1] + 1),     // insertion
-                    dp[i - 1][j - 1] + cost // substitution
-                );
-            }
-        }
-        
-        return dp[a.length()][b.length()];
-    }
-    
-    /**
-     * Determine matching rate category based on similarity score
-     */
-    private String determineMatchingRate(double score) {
-        if (score >= 0.8) return "high";
-        if (score >= 0.6) return "medium";
-        if (score >= 0.4) return "low";
-        return "none";
-    }
-    
-    /**
      * Perform AI analysis for comprehensive control matching
      * Checks the import control against ALL existing controls using AI
      */
-    private void performAIAnalysis(SecurityControlImportDTO importControl, 
-                                    List<SimilarityMatch> allMatches, 
-                                    SimilarityAnalysisResult result) {
+    private void performAIAnalysisOnAllControls(SecurityControlImportDTO importControl, 
+                                                 List<SecurityControl> allControls, 
+                                                 SimilarityAnalysisResult result) {
         try {
             System.out.println("\n[AI ANALYSIS] Starting comprehensive AI analysis for control: " + importControl.getName());
-            System.out.println("[AI ANALYSIS] Checking against " + allMatches.size() + " existing controls");
+            System.out.println("[AI ANALYSIS] Checking against " + allControls.size() + " existing controls");
             
-            // Get top candidates by text similarity for AI to review
-            List<SimilarityMatch> topCandidates = allMatches.stream()
-                .limit(5)  // Check top 5 candidates
-                .collect(Collectors.toList());
-            
-            System.out.println("[AI ANALYSIS] Using top " + topCandidates.size() + " candidates for AI analysis");
-            
-            // Build comprehensive prompt for AI
+            // Build comprehensive prompt for AI to analyze against ALL controls
             StringBuilder prompt = new StringBuilder();
-            prompt.append("You are a security control expert. Determine if the following control to be imported ");
+            prompt.append("You are a security control expert. Determine if the following control to be imported \n");
             prompt.append("is similar to or should be merged with any existing security controls.\n\n");
             
             prompt.append("=== CONTROL TO BE IMPORTED ===\n");
@@ -216,30 +97,33 @@ public class SecurityControlSimilarityAnalyzer {
             }
             prompt.append("\n");
             
-            prompt.append("=== TOP CANDIDATE EXISTING CONTROLS ===\n");
-            for (int i = 0; i < topCandidates.size(); i++) {
-                SimilarityMatch match = topCandidates.get(i);
-                prompt.append("\nCandidate ").append((i + 1)).append(":\n");
-                prompt.append("  Name: ").append(match.getExistingControlName()).append("\n");
-                if (match.getExistingControlDetail() != null && !match.getExistingControlDetail().isEmpty()) {
-                    prompt.append("  Detail: ").append(match.getExistingControlDetail()).append("\n");
+            prompt.append("=== ALL EXISTING SECURITY CONTROLS ===\n");
+            for (int i = 0; i < allControls.size(); i++) {
+                SecurityControl control = allControls.get(i);
+                prompt.append("\n").append((i + 1)).append(".");
+                prompt.append(" ID: ").append(control.getId());
+                prompt.append(" | Name: ").append(control.getName());
+                if (control.getDetail() != null && !control.getDetail().isEmpty()) {
+                    prompt.append(" | Detail: ").append(control.getDetail());
                 }
-                prompt.append("  Text Similarity Score: ").append(String.format("%.2f", match.getTextSimilarityScore())).append("\n");
+                if (control.getReference() != null && !control.getReference().isEmpty()) {
+                    prompt.append(" | Reference: ").append(control.getReference());
+                }
+                prompt.append("\n");
             }
             
             prompt.append("\n=== ANALYSIS REQUEST ===\n");
-            prompt.append("Based on semantic similarity and control objectives, analyze if the imported control ");
-            prompt.append("is similar to any existing controls.\n\n");
-            prompt.append("IMPORTANT: Consider the control names, descriptions, and objectives.\n");
-            prompt.append("Do NOT just look at text similarity scores - use domain expertise.\n\n");
+            prompt.append("Analyze the imported control against ALL listed existing controls.\n");
+            prompt.append("Use semantic similarity and control objectives to identify matches.\n");
+            prompt.append("Consider control names, descriptions, objectives, and domains.\n\n");
             prompt.append("Respond in this exact format:\n");
-            prompt.append("MATCH: [YES/NO/PARTIAL]\n");
-            prompt.append("CANDIDATE: [NUMBER of best match, or NONE]\n");
+            prompt.append("MATCHES: [Comma-separated list of control IDs that match, or NONE]\n");
+            prompt.append("PRIMARY_MATCH: [ID of the best match, or NONE]\n");
             prompt.append("CONFIDENCE: [HIGH/MEDIUM/LOW]\n");
-            prompt.append("REASONING: [Brief 1-2 sentence explanation]\n");
+            prompt.append("REASONING: [Brief explanation of which controls match and why]\n");
             
-            System.out.println("[AI ANALYSIS] Prompt built, sending to AI provider...");
-            System.out.println("[AI ANALYSIS] Prompt preview (first 200 chars): " + prompt.toString().substring(0, Math.min(200, prompt.length())));
+            System.out.println("[AI ANALYSIS] Analyzing against ALL " + allControls.size() + " controls...");
+            System.out.println("[AI ANALYSIS] Sending comprehensive prompt to AI provider...");
             
             String aiAnalysis = openAIUtil.askAI(prompt.toString());
             System.out.println("[AI ANALYSIS] AI Response received:");
@@ -247,86 +131,181 @@ public class SecurityControlSimilarityAnalyzer {
             
             result.setAiAnalysis(aiAnalysis);
             
-            // Parse AI response to extract match and confidence
-            String responseUpper = aiAnalysis.toUpperCase();
-            List<SimilarityMatch> recommendedMatches = new ArrayList<>();
-            
-            if (responseUpper.contains("MATCH: YES") || responseUpper.contains("MATCH:YES")) {
-                System.out.println("[AI ANALYSIS] AI confirmed MATCH: YES");
-                // AI confirmed a match - extract candidate number
-                int candidateNum = extractCandidateNumber(aiAnalysis);
-                if (candidateNum > 0 && candidateNum <= topCandidates.size()) {
-                    recommendedMatches.add(topCandidates.get(candidateNum - 1));
-                    System.out.println("[AI ANALYSIS] AI confirmed match with candidate " + candidateNum + ": " + topCandidates.get(candidateNum - 1).getExistingControlName());
-                } else {
-                    // If no valid candidate specified, use top match
-                    recommendedMatches.add(topCandidates.get(0));
-                    System.out.println("[AI ANALYSIS] AI confirmed match, using top candidate: " + topCandidates.get(0).getExistingControlName());
-                }
-            } else if (responseUpper.contains("MATCH: PARTIAL") || responseUpper.contains("MATCH:PARTIAL")) {
-                System.out.println("[AI ANALYSIS] AI found MATCH: PARTIAL");
-                // Partial match - include top 2 candidates
-                recommendedMatches.addAll(topCandidates.stream().limit(2).collect(Collectors.toList()));
-                System.out.println("[AI ANALYSIS] Including top 2 candidates for partial match");
-            } else {
-                System.out.println("[AI ANALYSIS] AI found MATCH: NO");
-                System.out.println("[AI ANALYSIS] No match found");
-            }
-            
+            // Parse AI response to extract matches
+            List<SimilarityMatch> recommendedMatches = parseAIAnalysisResponse(aiAnalysis, allControls);
             result.setMatches(recommendedMatches);
-            System.out.println("[AI ANALYSIS] AI analysis complete. Recommended matches: " + recommendedMatches.size());
             
-            // Update matching rate if AI found something different than text analysis
+            // Determine matching rate and control flags
             if (!recommendedMatches.isEmpty()) {
-                double topScore = recommendedMatches.get(0).getTextSimilarityScore();
-                String aiDeterminedRate = determineMatchingRate(topScore);
-                if (!aiDeterminedRate.equals("none")) {
-                    result.setMatchingRate(aiDeterminedRate);
-                }
+                String confidence = extractConfidenceLevel(aiAnalysis);
+                String matchingRate = mapConfidenceToRate(confidence);
+                result.setMatchingRate(matchingRate);
                 result.setHasSimilarControls(true);
+                System.out.println("[AI ANALYSIS] AI identified " + recommendedMatches.size() + " matching controls with confidence: " + confidence);
+            } else {
+                result.setMatchingRate("none");
+                result.setHasSimilarControls(false);
+                System.out.println("[AI ANALYSIS] No matching controls identified");
             }
+            
+            System.out.println("[AI ANALYSIS] AI analysis complete. Recommended matches: " + recommendedMatches.size());
             
         } catch (Exception e) {
             System.err.println("\n[AI ANALYSIS ERROR] Error during AI analysis: " + e.getMessage());
             e.printStackTrace();
-            
-            // Fallback to text-based analysis if AI fails
-            List<SimilarityMatch> textMatches = allMatches.stream()
-                .filter(m -> m.getTextSimilarityScore() >= 0.4)
-                .limit(3)
-                .collect(Collectors.toList());
-            result.setMatches(textMatches);
-            result.setAiAnalysis("AI analysis failed - using text-based similarity only. Error: " + e.getMessage());
-            System.err.println("[AI ANALYSIS ERROR] Falling back to text-based analysis with " + textMatches.size() + " matches");
+            throw new RuntimeException("AI analysis failed: " + e.getMessage(), e);
         }
     }
     
     /**
-     * Extract candidate number from AI response
+     * Parse AI response to extract matching control IDs
      */
-    private int extractCandidateNumber(String aiResponse) {
-        // Look for "CANDIDATE: [NUMBER]" pattern
+    private List<SimilarityMatch> parseAIAnalysisResponse(String aiResponse, List<SecurityControl> allControls) {
+        List<SimilarityMatch> matches = new ArrayList<>();
+        
+        try {
+            // Extract PRIMARY_MATCH ID
+            String primaryMatchId = extractPrimaryMatchId(aiResponse);
+            
+            if (primaryMatchId != null && !primaryMatchId.equalsIgnoreCase("NONE")) {
+                try {
+                    long matchId = Long.parseLong(primaryMatchId);
+                    SecurityControl matchedControl = allControls.stream()
+                        .filter(c -> c.getId() == matchId)
+                        .findFirst()
+                        .orElse(null);
+                    
+                    if (matchedControl != null) {
+                        SimilarityMatch match = new SimilarityMatch();
+                        match.setExistingControlId(matchedControl.getId());
+                        match.setExistingControlName(matchedControl.getName());
+                        match.setExistingControlDetail(matchedControl.getDetail());
+                        match.setAiSimilarityScore(1.0); // AI confirmed match
+                        matches.add(match);
+                        System.out.println("[AI ANALYSIS] Extracted primary match ID: " + matchId);
+                    }
+                } catch (NumberFormatException e) {
+                    System.out.println("[AI ANALYSIS] Could not parse primary match ID: " + primaryMatchId);
+                }
+            }
+            
+            // Extract additional MATCHES
+            List<String> additionalMatchIds = extractAdditionalMatchIds(aiResponse);
+            for (String matchIdStr : additionalMatchIds) {
+                try {
+                    long matchId = Long.parseLong(matchIdStr);
+                    // Skip if already in primary match
+                    if (matches.stream().anyMatch(m -> m.getExistingControlId() == matchId)) {
+                        continue;
+                    }
+                    
+                    SecurityControl matchedControl = allControls.stream()
+                        .filter(c -> c.getId() == matchId)
+                        .findFirst()
+                        .orElse(null);
+                    
+                    if (matchedControl != null) {
+                        SimilarityMatch match = new SimilarityMatch();
+                        match.setExistingControlId(matchedControl.getId());
+                        match.setExistingControlName(matchedControl.getName());
+                        match.setExistingControlDetail(matchedControl.getDetail());
+                        match.setAiSimilarityScore(0.8); // Secondary match
+                        matches.add(match);
+                        System.out.println("[AI ANALYSIS] Extracted additional match ID: " + matchId);
+                    }
+                } catch (NumberFormatException e) {
+                    System.out.println("[AI ANALYSIS] Could not parse match ID: " + matchIdStr);
+                }
+            }
+            
+        } catch (Exception e) {
+            System.err.println("[AI ANALYSIS] Error parsing AI response: " + e.getMessage());
+        }
+        
+        return matches;
+    }
+    
+    /**
+     * Extract primary match ID from AI response
+     */
+    private String extractPrimaryMatchId(String aiResponse) {
         String[] lines = aiResponse.split("\n");
         for (String line : lines) {
-            if (line.toUpperCase().contains("CANDIDATE:")) {
-                // Try to extract number
+            if (line.toUpperCase().contains("PRIMARY_MATCH:")) {
                 String[] parts = line.split(":");
                 if (parts.length > 1) {
-                    String numStr = parts[1].trim();
-                    // Remove any non-digit characters
-                    numStr = numStr.replaceAll("[^0-9]", "");
-                    try {
-                        int num = Integer.parseInt(numStr);
-                        System.out.println("[AI ANALYSIS] Extracted candidate number: " + num);
-                        return num;
-                    } catch (NumberFormatException e) {
-                        System.out.println("[AI ANALYSIS] Could not parse candidate number from: " + parts[1]);
+                    String id = parts[1].trim();
+                    // Remove any non-digit characters except comma
+                    id = id.replaceAll("[^0-9]", "");
+                    if (!id.isEmpty()) {
+                        return id;
                     }
                 }
             }
         }
-        System.out.println("[AI ANALYSIS] No valid candidate number found in AI response");
-        return -1;
+        return null;
+    }
+    
+    /**
+     * Extract additional match IDs from MATCHES line
+     */
+    private List<String> extractAdditionalMatchIds(String aiResponse) {
+        List<String> ids = new ArrayList<>();
+        String[] lines = aiResponse.split("\n");
+        for (String line : lines) {
+            if (line.toUpperCase().contains("MATCHES:")) {
+                String[] parts = line.split(":");
+                if (parts.length > 1) {
+                    String idString = parts[1].trim();
+                    if (!idString.equalsIgnoreCase("NONE")) {
+                        // Split by comma and parse each ID
+                        String[] idArray = idString.split(",");
+                        for (String id : idArray) {
+                            id = id.trim().replaceAll("[^0-9]", "");
+                            if (!id.isEmpty()) {
+                                ids.add(id);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return ids;
+    }
+    
+    /**
+     * Extract confidence level from AI response
+     */
+    private String extractConfidenceLevel(String aiResponse) {
+        String[] lines = aiResponse.split("\n");
+        for (String line : lines) {
+            if (line.toUpperCase().contains("CONFIDENCE:")) {
+                String[] parts = line.split(":");
+                if (parts.length > 1) {
+                    String confidence = parts[1].trim().toUpperCase();
+                    if (confidence.contains("HIGH")) return "HIGH";
+                    if (confidence.contains("MEDIUM")) return "MEDIUM";
+                    if (confidence.contains("LOW")) return "LOW";
+                }
+            }
+        }
+        return "MEDIUM";
+    }
+    
+    /**
+     * Map confidence level to matching rate
+     */
+    private String mapConfidenceToRate(String confidence) {
+        switch (confidence.toUpperCase()) {
+            case "HIGH":
+                return "high";
+            case "MEDIUM":
+                return "medium";
+            case "LOW":
+                return "low";
+            default:
+                return "medium";
+        }
     }
     
     /**
@@ -405,7 +384,7 @@ public class SecurityControlSimilarityAnalyzer {
         private Long existingControlId;
         private String existingControlName;
         private String existingControlDetail;
-        private double textSimilarityScore;
+        private double aiSimilarityScore;
         
         // Getters and Setters
         public Long getExistingControlId() { return existingControlId; }
@@ -419,7 +398,7 @@ public class SecurityControlSimilarityAnalyzer {
             this.existingControlDetail = existingControlDetail; 
         }
         
-        public double getTextSimilarityScore() { return textSimilarityScore; }
-        public void setTextSimilarityScore(double textSimilarityScore) { this.textSimilarityScore = textSimilarityScore; }
+        public double getAiSimilarityScore() { return aiSimilarityScore; }
+        public void setAiSimilarityScore(double aiSimilarityScore) { this.aiSimilarityScore = aiSimilarityScore; }
     }
 }
