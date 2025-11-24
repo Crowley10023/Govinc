@@ -55,6 +55,7 @@ public class AuthorizationService {
         
         String username = auth.getName();
         Optional<User> userOpt = userRepository.findByName(username);
+        System.out.println("\n\nuser mapped: " + username + ", " + auth.getName());
         return userOpt.orElse(null);
     }
     
@@ -64,9 +65,11 @@ public class AuthorizationService {
     public Role getCurrentUserRole() {
         User user = getCurrentUser();
         if (user == null) return null;
+        System.out.println("\n\nrole mapped: " + user.getRole());
         if (user.getName().equalsIgnoreCase("admin")) {
             return Role.ADMIN;
         }
+
         return user.getRole();
     }
     
