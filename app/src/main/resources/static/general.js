@@ -33,42 +33,55 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // ================== AUTOSAVE ASSESSMENT COMMENT LOGIC =====================
-  if (typeof window.jQuery !== 'undefined' && window.jQuery) {
-    var debounceTimers = {};
-    $(document).on('input', '.comment-textarea', function () {
-      var textarea = $(this);
-      var controlId = textarea.data('control-id');
-      var comment = textarea.val();
+  var debounceTimers = {};
+  document.addEventListener('input', function(e) {
+    if (e.target.classList.contains('comment-textarea')) {
+      var textarea = e.target;
+      var controlId = textarea.dataset.controlId;
+      var comment = textarea.value;
       var assessmentId = window.assessmentId;
-      var feedback = textarea.nextAll('.comment-feedback').first();
-      if (textarea.prop('disabled')) return;
+      var feedback = textarea.nextElementSibling;
+      
+      if (textarea.disabled) return;
+      
       // Clear prior timer
       if (debounceTimers[controlId]) clearTimeout(debounceTimers[controlId]);
+      
       debounceTimers[controlId] = setTimeout(function() {
-        // AJAX save comment
-        $.ajax({
-          url: '/assessment/' + assessmentId + '/control/' + controlId + '/comment',
-          type: 'PUT',
-          contentType: 'application/json',
-          data: JSON.stringify({ comment: comment }),
-          success: function () {
-            textarea.css('background', '#d8ffd8');
-            feedback.html('<span style="color:#228B22;font-weight:bold;">Saved</span>');
-            setTimeout(function () {
-              feedback.empty();
-              textarea.css('background', '');
-            }, 1400);
+        // Fetch API call to save comment
+        fetch('/assessment/' + assessmentId + '/control/' + controlId + '/comment', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': document.querySelector('meta[name="_csrf"]').getAttribute('content')
           },
-          error: function () {
-            textarea.css('background', '#ffd8d8');
-            feedback.html('<span style="color:red;font-weight:bold;">Error saving</span>');
+          body: JSON.stringify({ comment: comment })
+        })
+        .then(function(response) {
+          if (response.ok) {
+            textarea.style.background = '#d8ffd8';
+            if (feedback && feedback.classList.contains('comment-feedback')) {
+              feedback.innerHTML = '<span style="color:#228B22;font-weight:bold;">Saved</span>';
+            }
+            setTimeout(function() {
+              if (feedback && feedback.classList.contains('comment-feedback')) {
+                feedback.innerHTML = '';
+              }
+              textarea.style.background = '';
+            }, 1400);
+          } else {
+            throw new Error('Failed to save');
+          }
+        })
+        .catch(function() {
+          textarea.style.background = '#ffd8d8';
+          if (feedback && feedback.classList.contains('comment-feedback')) {
+            feedback.innerHTML = '<span style="color:red;font-weight:bold;">Error saving</span>';
           }
         });
       }, 650);
-    });
-  } else {
-    console.warn('jQuery is required for assessment comment autosave.');
-  }
+    }
+  });
 
   // ========== Collapse all security domain controls on page load ==========
   document.querySelectorAll('.domain-controls').forEach(function(ctrlDiv) {

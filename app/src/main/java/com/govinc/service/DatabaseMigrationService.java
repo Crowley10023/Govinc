@@ -73,6 +73,14 @@ public class DatabaseMigrationService {
         migration_1_1.put("available", "1.0".equals(currentVersion));
         migrations.add(migration_1_1);
 
+        // Migration from 1.1 to 1.2
+        Map<String, Object> migration_1_2 = new LinkedHashMap<>();
+        migration_1_2.put("fromVersion", "1.1");
+        migration_1_2.put("toVersion", "1.2");
+        migration_1_2.put("description", "Make maturity_answer_id column nullable in assessment_control_answer - allows saving comments without answers");
+        migration_1_2.put("available", "1.1".equals(currentVersion));
+        migrations.add(migration_1_2);
+
         return migrations;
     }
 
@@ -197,6 +205,37 @@ public class DatabaseMigrationService {
     }
 
     /**
+     * Execute migration from 1.1 to 1.2
+     */
+    @Transactional
+    public void migrateTo_1_2() throws Exception {
+        System.out.println("[DB Migration] Starting migration to version 1.2");
+        try {
+            // Make maturity_answer_id column nullable
+            try {
+                System.out.println("[DB Migration] Modifying maturity_answer_id to allow NULL");
+                jdbcTemplate.execute("ALTER TABLE assessment_control_answer MODIFY COLUMN maturity_answer_id BIGINT NULL");
+                System.out.println("[DB Migration] Successfully modified maturity_answer_id column");
+            } catch (Exception e) {
+                System.out.println("[DB Migration] Error modifying maturity_answer_id column: " + e.getMessage());
+                throw e;
+            }
+
+            // Update version
+            DatabaseConfig config = getDatabaseConfig();
+            config.setCurrentVersion("1.2");
+            config.setDescription("Made maturity_answer_id column nullable - allows saving comments without answers");
+            databaseConfigRepository.save(config);
+            System.out.println("[DB Migration] Successfully updated database config to version 1.2");
+
+        } catch (Exception e) {
+            System.out.println("[DB Migration] ERROR: Migration to 1.2 failed: " + e.getMessage());
+            e.printStackTrace();
+            throw new Exception("Migration to 1.2 failed: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Execute a specific migration
      */
     @Transactional
@@ -207,6 +246,8 @@ public class DatabaseMigrationService {
             migrateTo_1_0();
         } else if ("1.1".equals(toVersion) && "1.0".equals(currentVersion)) {
             migrateTo_1_1();
+        } else if ("1.2".equals(toVersion) && "1.1".equals(currentVersion)) {
+            migrateTo_1_2();
         } else {
             throw new Exception("Invalid migration: from " + currentVersion + " to " + toVersion);
         }

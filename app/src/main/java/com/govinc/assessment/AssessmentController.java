@@ -318,7 +318,7 @@ public class AssessmentController {
             Map<Long, AssessmentControlAnswer> localControlAnswers = new HashMap<>();
             if (details != null && details.getControlAnswers() != null) {
                 for (AssessmentControlAnswer aca : details.getControlAnswers()) {
-                    if (aca.getSecurityControl() != null && aca.getMaturityAnswer() != null) {
+                    if (aca.getSecurityControl() != null) {
                         localControlAnswers.put(aca.getSecurityControl().getId(), aca);
                     }
                 }
@@ -419,7 +419,11 @@ public class AssessmentController {
                     }
                 } else if (localControlAnswers.containsKey(ctrlId)) {
                     AssessmentControlAnswer aca = localControlAnswers.get(ctrlId);
-                    controlAnswers.put(ctrlId, aca.getMaturityAnswer().getAnswer());
+                    if (aca.getMaturityAnswer() != null) {
+                        controlAnswers.put(ctrlId, aca.getMaturityAnswer().getAnswer());
+                    } else {
+                        controlAnswers.put(ctrlId, null);
+                    }
                     controlAnswerIsTakenOver.put(ctrlId, Boolean.FALSE);
                     // Populate comment
                     if (aca.getComment() != null) {
@@ -440,7 +444,10 @@ public class AssessmentController {
                         if (existingAca.getSecurityControl() != null && newAca.getSecurityControl() != null &&
                             existingAca.getSecurityControl().getId().equals(newAca.getSecurityControl().getId())) {
                             // Same control: update maturity answer if changed
-                            if (!existingAca.getMaturityAnswer().getId().equals(newAca.getMaturityAnswer().getId())) {
+                            if (existingAca.getMaturityAnswer() != null && newAca.getMaturityAnswer() != null &&
+                                !existingAca.getMaturityAnswer().getId().equals(newAca.getMaturityAnswer().getId())) {
+                                existingAca.setMaturityAnswer(newAca.getMaturityAnswer());
+                            } else if (existingAca.getMaturityAnswer() == null && newAca.getMaturityAnswer() != null) {
                                 existingAca.setMaturityAnswer(newAca.getMaturityAnswer());
                             }
                             found = true;
@@ -744,8 +751,9 @@ public class AssessmentController {
         if (detailsOpt.isPresent()) {
             AssessmentDetails details = detailsOpt.get();
             for (AssessmentControlAnswer aca : details.getControlAnswers()) {
+                String answer = (aca.getMaturityAnswer() != null) ? aca.getMaturityAnswer().getAnswer() : "";
                 builder.append(aca.getSecurityControl().getName()).append(",")
-                        .append(aca.getMaturityAnswer().getAnswer()).append("\n");
+                        .append(answer).append("\n");
             }
         }
         byte[] excelBytes = builder.toString().getBytes(StandardCharsets.UTF_8); // Should convert to real Excel if

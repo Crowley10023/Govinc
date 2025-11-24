@@ -15,6 +15,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -75,6 +76,9 @@ public class SecurityConfig {
     
     @Autowired(required = false)
     private ClientRegistrationRepository clientRegistrationRepository;
+    
+    @Autowired
+    private Environment environment;
     
     // Load users from properties for form-based authentication
     @Value("#{${users:{:}}}")
@@ -157,13 +161,18 @@ public class SecurityConfig {
             }
         }
         
-        // Always ensure at least one admin user exists for fallback
+        // Always ensure at least one admin user exists for fallback (unless in production mode)
         if (users.isEmpty()) {
-            users.add(User.withUsername("admin")
-                .password(passwordEncoder().encode("admin"))
-                .roles("ADMIN")
-                .build());
-            logger.warning("No users configured in properties, using default admin/admin. Configure users in application.properties or database.");
+            boolean isProduction = "true".equalsIgnoreCase(environment.getProperty("app.production", "false"));
+            if (!isProduction) {
+                users.add(User.withUsername("admin")
+                    .password(passwordEncoder().encode("admin"))
+                    .roles("ADMIN")
+                    .build());
+                logger.warning("No users configured in properties, using default admin/admin. Configure users in application.properties or database.");
+            } else {
+                logger.warning("Production environment with no configured users. Admin access is disabled.");
+            }
         }
         
         logger.info("Configured " + users.size() + " local users for form-based authentication");

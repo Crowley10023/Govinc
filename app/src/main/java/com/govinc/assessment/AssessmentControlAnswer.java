@@ -18,7 +18,7 @@ public class AssessmentControlAnswer {
     @ManyToOne(optional=false)
     private SecurityControl securityControl;
 
-    @ManyToOne(optional=false)
+    @ManyToOne(optional=true)
     private MaturityAnswer maturityAnswer;
 
     public AssessmentControlAnswer() {}

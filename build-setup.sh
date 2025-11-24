@@ -638,9 +638,9 @@ setup_database() {
     esac
 }
 
-# Function to remove admin user from application.properties for production
-remove_admin_user() {
-    echo -e "${YELLOW}Removing admin user from application.properties for production...${NC}"
+# Function to configure application.properties for production
+configure_production_properties() {
+    echo -e "${YELLOW}Configuring application.properties for production...${NC}"
     
     if [ ! -f "$APPLICATION_PROPS" ]; then
         echo -e "${RED}✗ application.properties not found at $APPLICATION_PROPS${NC}"
@@ -652,16 +652,21 @@ remove_admin_user() {
     cp "$APPLICATION_PROPS" "$backup_file"
     echo -e "${BLUE}  Backup created: $backup_file${NC}"
     
-    # Remove the admin user line using grep -v (more portable than sed -i)
+    # Remove the admin user line and add production flag
     local temp_file
     temp_file=$(mktemp)
     
     if grep -v '^users\.admin=' "$APPLICATION_PROPS" > "$temp_file"; then
+        # Add production flag at the end
+        echo "" >> "$temp_file"
+        echo "# Production Mode Flag" >> "$temp_file"
+        echo "app.production=true" >> "$temp_file"
+        
         mv "$temp_file" "$APPLICATION_PROPS"
-        echo -e "${GREEN}✓ Admin user removed from application.properties${NC}"
+        echo -e "${GREEN}✓ Admin user removed and production mode enabled${NC}"
         return 0
     else
-        echo -e "${RED}✗ Failed to remove admin user${NC}"
+        echo -e "${RED}✗ Failed to configure production properties${NC}"
         rm -f "$temp_file"
         return 1
     fi
@@ -700,14 +705,26 @@ deploy_jar() {
     local target_dir="$1"
     local service_name="$2"
     
-    # Find the built JAR file
-    local jar_file
-    jar_file=$(find app/build/libs -name "*.jar" -type f 2>/dev/null | head -1)
-    
-    if [ -z "$jar_file" ]; then
-        echo -e "${RED}✗ No JAR file found in app/build/libs${NC}"
+    # Read version from version.txt
+    local app_version
+    if [ ! -f "version.txt" ]; then
+        echo -e "${RED}✗ version.txt not found in project root${NC}"
         return 1
     fi
+    app_version=$(cat version.txt | tr -d '[:space:]')
+    
+    # Find the JAR file matching the version
+    local jar_file
+    jar_file=$(find app/build/libs -name "*-${app_version}.jar" -type f 2>/dev/null | head -1)
+    
+    if [ -z "$jar_file" ]; then
+        echo -e "${RED}✗ No JAR file found matching version $app_version in app/build/libs${NC}"
+        echo -e "${YELLOW}Available JAR files:${NC}"
+        find app/build/libs -name "*.jar" -type f 2>/dev/null | sed 's/^/  /'
+        return 1
+    fi
+    
+    echo -e "${BLUE}Using JAR: $jar_file (version $app_version)${NC}"
     
     echo -e "${YELLOW}Stopping service '$service_name'...${NC}"
     if systemctl stop "$service_name" 2>/dev/null; then
@@ -815,11 +832,11 @@ main() {
     echo -e "${BLUE}Step 3: Building Application${NC}"
     
     if build_application; then
-        # For production deployments, remove admin user
+        # For production deployments, configure production properties
         if [ "$deployment_type" = "prod" ]; then
             echo
-            if ! remove_admin_user; then
-                echo -e "${RED}Failed to remove admin user for production deployment${NC}"
+            if ! configure_production_properties; then
+                echo -e "${RED}Failed to configure production properties${NC}"
                 return 1
             fi
         fi

@@ -248,7 +248,7 @@ server {
     
     # API endpoints with rate limiting
     location /api/ {
-        limit_req zone=api burst=20 nodelay;
+        limit_req zone=api burst=200 nodelay;
         proxy_pass http://theia01_backend;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
