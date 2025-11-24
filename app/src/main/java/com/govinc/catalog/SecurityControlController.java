@@ -238,7 +238,8 @@ public class SecurityControlController {
                             continue;
                         }
 
-                        String name = columns[0].trim().replaceAll("^\"|\"$", "");
+                        String originalName = columns[0].trim().replaceAll("^\"|\"$", "");
+                        String name = originalName;
                         String description = columns[1].trim().replaceAll("^\"|\"$", "");
                         String reference = columns[2].trim().replaceAll("^\"|\"$", "");
                         String domainName = columns[3].trim().replaceAll("^\"|\"$", "");
@@ -250,24 +251,26 @@ public class SecurityControlController {
                         }
 
                         // Check merge actions and get translated data if available
-                        java.util.Map<String, String> actionInfo = mergeActions.get(name);
+                        // Use ORIGINAL name to look up in mergeActions map
+                        java.util.Map<String, String> actionInfo = mergeActions.get(originalName);
                         String mergeAction = null;
                         if (actionInfo != null) {
                             mergeAction = actionInfo.get("action");
                             // Use translated data if available
                             String translatedName = actionInfo.get("translatedName");
                             String translatedDetail = actionInfo.get("translatedDetail");
+                            String translatedDomainName = actionInfo.get("translatedDomainName");
                             if (translatedName != null && !translatedName.isEmpty()) {
                                 name = translatedName;
                             }
                             if (translatedDetail != null && !translatedDetail.isEmpty()) {
                                 description = translatedDetail;
-                                String translatedDomainName = actionInfo.get("translatedDomainName");
-                                if (translatedDomainName != null && !translatedDomainName.isEmpty()) {
-                                    domainName = translatedDomainName;
-                                }
+                            }
+                            if (translatedDomainName != null && !translatedDomainName.isEmpty()) {
+                                domainName = translatedDomainName;
                             }
                         }
+                        System.out.println("[IMPORT] Row " + rowNumber + ": Original name='" + originalName + "', Merge action=" + mergeAction);
 
                         // Check if this control should be skipped
                         if ("skip".equals(mergeAction)) {
@@ -276,20 +279,12 @@ public class SecurityControlController {
                             continue;
                         }
 
-                        final String domainNameForFilter = domainName;
-                        SecurityControlDomain domain = securityControlDomainService.findAll().stream()
-                                .filter(d -> d.getName().equalsIgnoreCase(domainNameForFilter)).findFirst().orElse(null);
-                        if (domain == null) {
-                            domain = new SecurityControlDomain(domainName, "");
-                            domain = securityControlDomainService.save(domain);
-                            System.out.println("[IMPORT]   Created new domain: " + domainName);
-                        }
-
                         // Check if this control should be merged with existing control
                         SecurityControl sc = null;
+                        boolean isMerge = mergeAction != null && mergeAction.startsWith("merge:");
 
-                        if (mergeAction != null && mergeAction.startsWith("merge:")) {
-                            // Merge with existing control
+                        if (isMerge) {
+                            // Merge with existing control - link to existing control without creating new one
                             try {
                                 Long existingControlId = Long.parseLong(mergeAction.substring(6));
                                 java.util.Optional<SecurityControl> existingOpt = service.findById(existingControlId);
@@ -297,49 +292,32 @@ public class SecurityControlController {
                                     sc = existingOpt.get();
                                     System.out.println("[IMPORT] Row " + rowNumber
                                             + ": Merging with existing control ID " + existingControlId);
-                                    // Update with imported data if empty or merge information
-                                    if (sc.getDetail() == null || sc.getDetail().isEmpty()) {
-                                        sc.setDetail(description);
-                                    }
-                                    if (sc.getReference() == null || sc.getReference().isEmpty()) {
-                                        sc.setReference(reference);
-                                    }
-                                    sc = service.save(sc);
+                                    System.out.println("[IMPORT] Row " + rowNumber
+                                            + ": Keeping existing control with domain: " + 
+                                            (sc.getSecurityControlDomain() != null ? sc.getSecurityControlDomain().getName() : "(none)"));
+                                    // NOTE: Do NOT persist the merged control. It is used as-is from the database.
+                                    // The imported data is NOT persisted, only the catalog link is created.
                                 } else {
                                     // Merge target not found, create new
                                     System.out.println(
-                                            "[IMPORT] Row " + rowNumber + ": Merge target not found, creating new");
-                                    sc = new SecurityControl();
-                                    sc.setName(name);
-                                    sc.setDetail(description);
-                                    sc.setReference(reference);
-                                    sc.setSecurityControlDomain(domain);
-                                    sc = service.save(sc);
+                                            "[IMPORT] Row " + rowNumber + ": Merge target not found, creating new control with new domain");
+                                    sc = createNewSecurityControl(name, description, reference, domainName);
                                 }
                             } catch (Exception mergeEx) {
                                 // If merge fails, create new
                                 System.err
-                                        .println("[IMPORT] Row " + rowNumber + ": Merge failed, creating new control");
-                                sc = new SecurityControl();
-                                sc.setName(name);
-                                sc.setDetail(description);
-                                sc.setReference(reference);
-                                sc.setSecurityControlDomain(domain);
-                                sc = service.save(sc);
+                                        .println("[IMPORT] Row " + rowNumber + ": Merge failed, creating new control with new domain");
+                                sc = createNewSecurityControl(name, description, reference, domainName);
                             }
                         } else {
-                            // Create new control
-                            System.out.println("[IMPORT] Row " + rowNumber + ": Creating new control: " + name);
-                            sc = new SecurityControl();
-                            sc.setName(name);
-                            sc.setDetail(description);
-                            sc.setReference(reference);
-                            sc.setSecurityControlDomain(domain);
-                            sc = service.save(sc);
+                            // Create new control - always create new domain for non-merged controls
+                            System.out.println("[IMPORT] Row " + rowNumber + ": Creating new control with domain: " + domainName);
+                            sc = createNewSecurityControl(name, description, reference, domainName);
                         }
 
                         importedControls.add(sc);
                         successCount++;
+                        System.out.println("[IMPORT] Row " + rowNumber + ": Added control to import list. Total: " + importedControls.size());
 
                     } catch (Exception rowEx) {
                         errorCount++;
@@ -350,15 +328,24 @@ public class SecurityControlController {
                 }
             }
 
+            System.out.println("[IMPORT] Import loop complete. Total imported controls: " + importedControls.size());
+
             // Link imported controls to catalog if specified
             if (targetCatalog != null && !importedControls.isEmpty()) {
+                System.out.println("[IMPORT] Linking " + importedControls.size() + " controls to catalog: " + targetCatalog.getName());
                 java.util.Set<SecurityControl> catalogControls = new java.util.HashSet<>(
                         targetCatalog.getSecurityControls());
+                System.out.println("[IMPORT] Catalog currently has " + catalogControls.size() + " controls");
                 catalogControls.addAll(importedControls);
+                System.out.println("[IMPORT] After adding imports, catalog will have " + catalogControls.size() + " controls");
                 targetCatalog.setSecurityControls(catalogControls);
                 securityCatalogService.save(targetCatalog);
                 System.out.println("[IMPORT] Linked " + importedControls.size() + " controls to catalog: "
                         + targetCatalog.getName());
+            } else if (targetCatalog == null) {
+                System.out.println("[IMPORT] No target catalog specified, controls not linked to any catalog");
+            } else if (importedControls.isEmpty()) {
+                System.out.println("[IMPORT] No controls imported, nothing to link to catalog");
             }
 
             // Prepare success message
@@ -388,6 +375,36 @@ public class SecurityControlController {
         return "redirect:/security-control/list";
     }
 
+    // Helper method to create a new security control with domain management
+    // Called when a security control is NOT merged, ensuring:
+    // 1. A new SecurityControl is created and persisted to database
+    // 2. A new SecurityControlDomain is created (if it doesn't already exist)
+    // 3. The new control links to the domain (existing or newly created)
+    private SecurityControl createNewSecurityControl(String name, String description, String reference, String domainName) {
+        final String domainNameForFilter = domainName;
+        SecurityControlDomain domain = securityControlDomainService.findAll().stream()
+                .filter(d -> d.getName().equalsIgnoreCase(domainNameForFilter)).findFirst().orElse(null);
+        
+        if (domain == null) {
+            // Create new domain for non-merged controls
+            domain = new SecurityControlDomain(domainName, "");
+            domain = securityControlDomainService.save(domain);
+            System.out.println("[IMPORT]   Created new domain: " + domainName);
+        } else {
+            System.out.println("[IMPORT]   Using existing domain: " + domainName);
+        }
+
+        // Create and persist new security control
+        SecurityControl sc = new SecurityControl();
+        sc.setName(name);
+        sc.setDetail(description);
+        sc.setReference(reference);
+        sc.setSecurityControlDomain(domain);
+        sc = service.save(sc);
+        System.out.println("[IMPORT]   Persisted new control: " + name + " with domain: " + domainName);
+        return sc;
+    }
+
     // Helper method to parse merge actions from JSON (with translation data)
     private java.util.Map<String, java.util.Map<String, String>> parseJsonMergeActions(String json) {
         java.util.Map<String, java.util.Map<String, String>> actions = new java.util.HashMap<>();
@@ -403,10 +420,11 @@ public class SecurityControlController {
                 String controlName = controlMatcher.group(1);
                 String controlData = controlMatcher.group(2);
 
-                // Parse action, translatedName, translatedDetail from controlData
+                // Parse action, translatedName, translatedDetail, translatedDomainName from controlData
                 String action = extractJsonValue(controlData, "action");
                 String translatedName = extractJsonValue(controlData, "translatedName");
                 String translatedDetail = extractJsonValue(controlData, "translatedDetail");
+                String translatedDomainName = extractJsonValue(controlData, "translatedDomainName");
 
                 java.util.Map<String, String> controlInfo = new java.util.HashMap<>();
                 controlInfo.put("action", action);
@@ -415,6 +433,9 @@ public class SecurityControlController {
                 }
                 if (translatedDetail != null && !translatedDetail.isEmpty()) {
                     controlInfo.put("translatedDetail", translatedDetail);
+                }
+                if (translatedDomainName != null && !translatedDomainName.isEmpty()) {
+                    controlInfo.put("translatedDomainName", translatedDomainName);
                 }
 
                 actions.put(controlName, controlInfo);

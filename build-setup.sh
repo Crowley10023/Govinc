@@ -638,15 +638,40 @@ setup_database() {
     esac
 }
 
+# Function to remove admin user from application.properties for production
+remove_admin_user() {
+    echo -e "${YELLOW}Removing admin user from application.properties for production...${NC}"
+    
+    # Create backup
+    cp "$APPLICATION_PROPS" "$APPLICATION_PROPS.backup.$(date +%Y%m%d_%H%M%S)"
+    
+    # Remove the admin user line
+    sed -i.tmp '/^users\.admin=/d' "$APPLICATION_PROPS"
+    
+    # Remove temporary file
+    rm -f "$APPLICATION_PROPS.tmp"
+    
+    echo -e "${GREEN}✓ Admin user removed from application.properties${NC}"
+}
+
 # Function to build the application
 build_application() {
     echo -e "${BLUE}Building the application...${NC}"
     
-    # Make gradlew executable
-    chmod +x ./gradlew
+    # Make gradlew executable on Linux/macOS
+    if [[ "$OSTYPE" == "linux-gnu"* ]] || [[ "$OSTYPE" == "darwin"* ]]; then
+        echo -e "${YELLOW}Setting execute permissions on gradlew...${NC}"
+        chmod +x ./gradlew
+        if [ -x "./gradlew" ]; then
+            echo -e "${GREEN}✓ gradlew is now executable${NC}"
+        else
+            echo -e "${RED}✗ Failed to make gradlew executable${NC}"
+            return 1
+        fi
+    fi
     
     echo -e "${YELLOW}Running Gradle build...${NC}"
-    ./gradlew clean build -x test
+    ./gradlew build
     
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}✓ Application built successfully!${NC}"
@@ -750,11 +775,41 @@ main() {
     fi
     
     echo
-    echo -e "${BLUE}Step 2: Building Application${NC}"
+    echo -e "${BLUE}Step 2: Deployment Type Selection${NC}"
+    
+    echo -e "${BLUE}Select deployment type:${NC}"
+    echo "1. Test"
+    echo "2. Production"
+    echo
+    read -p "Please choose deployment type (1-2): " deployment_type
+    
+    case $deployment_type in
+        1)
+            echo -e "${GREEN}✓ Test deployment selected${NC}"
+            deployment_type="test"
+            ;;
+        2)
+            echo -e "${GREEN}✓ Production deployment selected${NC}"
+            deployment_type="prod"
+            ;;
+        *)
+            echo -e "${RED}Invalid choice. Defaulting to test deployment.${NC}"
+            deployment_type="test"
+            ;;
+    esac
+    
+    echo
+    echo -e "${BLUE}Step 3: Building Application${NC}"
     
     if build_application; then
+        # For production deployments, remove admin user
+        if [ "$deployment_type" = "prod" ]; then
+            echo
+            remove_admin_user
+        fi
+        
         echo
-        echo -e "${BLUE}Step 3: Deployment Configuration${NC}"
+        echo -e "${BLUE}Step 4: Deployment Configuration${NC}"
         
         local target_dir
         local service_name
@@ -787,7 +842,7 @@ main() {
         fi
         
         echo
-        echo -e "${BLUE}Step 4: Deploying JAR${NC}"
+        echo -e "${BLUE}Step 5: Deploying JAR${NC}"
         
         if deploy_jar "$target_dir" "$service_name"; then
             echo

@@ -56,7 +56,6 @@
       <div class="nav-entry dropdown" th:if="${canAccessOrganization}">
         <button type="button" class="dropdown-button btn-nav shiny">Organization</button>
         <div class="dropdown-content">
-          <a href="/users"><button type="button" class="dropdown-menu-btn">Users</button></a>
           <a href="/orgunits/list"><button type="button" class="dropdown-menu-btn">Org Units</button></a>
           <a href="/orgservices/list"><button type="button" class="dropdown-menu-btn">Org Services</button></a>
         </div>
@@ -99,6 +98,7 @@
                 Details</button></a>
             <a href="/admin/auth-config"><button type="button" class="dropdown-menu-btn">Authentication</button></a>
             <a href="/config/database"><button type="button" class="dropdown-menu-btn">Database</button></a>
+            <a href="/users"><button type="button" class="dropdown-menu-btn">Users</button></a>
           </div>
         </div>
       </div>

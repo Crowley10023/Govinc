@@ -30,8 +30,8 @@ public class UserController {
 
     @GetMapping
     public String listUsers(Model model) {
-        // Authorization check: only ADMIN and ISM can view users
-        if (!authorizationService.canAccessOrganization()) {
+        // Authorization check: only ADMIN can view users
+        if (!authorizationService.isAdmin()) {
             throw new UnauthorizedException("You do not have permission to view users.");
         }
         List<User> users = userRepository.findAll();
@@ -44,8 +44,8 @@ public class UserController {
 
     @GetMapping("/new")
     public String showCreateForm(Model model) {
-        // Authorization check: only ADMIN and ISM can create users
-        if (!authorizationService.canAccessOrganization()) {
+        // Authorization check: only ADMIN can create users
+        if (!authorizationService.isAdmin()) {
             throw new UnauthorizedException("You do not have permission to create users.");
         }
         model.addAttribute("user", new User());
@@ -57,8 +57,8 @@ public class UserController {
 
     @PostMapping
     public String createUser(@ModelAttribute User user, @RequestParam(value = "leadOrgUnitIds", required = false) List<Long> leadOrgUnitIds) {
-        // Authorization check: only ADMIN and ISM can create users
-        if (!authorizationService.canAccessOrganization()) {
+        // Authorization check: only ADMIN can create users
+        if (!authorizationService.isAdmin()) {
             throw new UnauthorizedException("You do not have permission to create users.");
         }
         // Ensure "admin" user always has ADMIN role
@@ -90,8 +90,8 @@ public class UserController {
 
     @GetMapping("/edit/{id}")
     public String showEditForm(@PathVariable Long id, Model model) {
-        // Authorization check: only ADMIN and ISM can edit users
-        if (!authorizationService.canAccessOrganization()) {
+        // Authorization check: only ADMIN can edit users
+        if (!authorizationService.isAdmin()) {
             throw new UnauthorizedException("You do not have permission to edit users.");
         }
         Optional<User> user = userRepository.findById(id);
@@ -108,8 +108,8 @@ public class UserController {
 
     @PostMapping("/update/{id}")
     public String updateUser(@PathVariable Long id, @ModelAttribute User user, @RequestParam(value = "leadOrgUnitIds", required = false) List<Long> leadOrgUnitIds) {
-        // Authorization check: only ADMIN and ISM can update users
-        if (!authorizationService.canAccessOrganization()) {
+        // Authorization check: only ADMIN can update users
+        if (!authorizationService.isAdmin()) {
             throw new UnauthorizedException("You do not have permission to update users.");
         }
         user.setId(id);
@@ -156,8 +156,8 @@ public class UserController {
 
     @GetMapping("/delete/{id}")
     public String deleteUser(@PathVariable Long id) {
-        // Authorization check: only ADMIN and ISM can delete users
-        if (!authorizationService.canAccessOrganization()) {
+        // Authorization check: only ADMIN can delete users
+        if (!authorizationService.isAdmin()) {
             throw new UnauthorizedException("You do not have permission to delete users.");
         }
         
@@ -189,8 +189,8 @@ public class UserController {
     @GetMapping("/api")
     @ResponseBody
     public List<User> apiGetAllUsers() {
-        // Authorization check: only ADMIN and ISM can view users
-        if (!authorizationService.canAccessOrganization()) {
+        // Authorization check: only ADMIN can view users
+        if (!authorizationService.isAdmin()) {
             throw new UnauthorizedException("You do not have permission to view users.");
         }
         return userRepository.findAll();
@@ -200,8 +200,8 @@ public class UserController {
     @GetMapping("/api/orgUnits")
     @ResponseBody
     public List<OrgUnit> apiGetOrgUnits() {
-        // Authorization check: only ADMIN and ISM can access
-        if (!authorizationService.canAccessOrganization()) {
+        // Authorization check: only ADMIN can access
+        if (!authorizationService.isAdmin()) {
             throw new UnauthorizedException("You do not have permission to access org units.");
         }
         return orgUnitService.getAllOrgUnits();
