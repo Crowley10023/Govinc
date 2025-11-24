@@ -642,16 +642,29 @@ setup_database() {
 remove_admin_user() {
     echo -e "${YELLOW}Removing admin user from application.properties for production...${NC}"
     
+    if [ ! -f "$APPLICATION_PROPS" ]; then
+        echo -e "${RED}✗ application.properties not found at $APPLICATION_PROPS${NC}"
+        return 1
+    fi
+    
     # Create backup
-    cp "$APPLICATION_PROPS" "$APPLICATION_PROPS.backup.$(date +%Y%m%d_%H%M%S)"
+    local backup_file="$APPLICATION_PROPS.backup.$(date +%Y%m%d_%H%M%S)"
+    cp "$APPLICATION_PROPS" "$backup_file"
+    echo -e "${BLUE}  Backup created: $backup_file${NC}"
     
-    # Remove the admin user line
-    sed -i.tmp '/^users\.admin=/d' "$APPLICATION_PROPS"
+    # Remove the admin user line using grep -v (more portable than sed -i)
+    local temp_file
+    temp_file=$(mktemp)
     
-    # Remove temporary file
-    rm -f "$APPLICATION_PROPS.tmp"
-    
-    echo -e "${GREEN}✓ Admin user removed from application.properties${NC}"
+    if grep -v '^users\.admin=' "$APPLICATION_PROPS" > "$temp_file"; then
+        mv "$temp_file" "$APPLICATION_PROPS"
+        echo -e "${GREEN}✓ Admin user removed from application.properties${NC}"
+        return 0
+    else
+        echo -e "${RED}✗ Failed to remove admin user${NC}"
+        rm -f "$temp_file"
+        return 1
+    fi
 }
 
 # Function to build the application
@@ -711,8 +724,8 @@ deploy_jar() {
         return 1
     fi
     
-    if cp "$jar_file" "$target_dir/"; then
-        echo -e "${GREEN}✓ JAR copied successfully${NC}"
+    if cp "$jar_file" "$target_dir/app.jar"; then
+        echo -e "${GREEN}✓ JAR copied successfully to $target_dir/app.jar${NC}"
     else
         echo -e "${RED}✗ Failed to copy JAR${NC}"
         return 1
@@ -805,7 +818,10 @@ main() {
         # For production deployments, remove admin user
         if [ "$deployment_type" = "prod" ]; then
             echo
-            remove_admin_user
+            if ! remove_admin_user; then
+                echo -e "${RED}Failed to remove admin user for production deployment${NC}"
+                return 1
+            fi
         fi
         
         echo
@@ -850,7 +866,7 @@ main() {
             echo -e "${GREEN}  Build Setup Completed Successfully!  ${NC}"
             echo -e "${GREEN}========================================${NC}"
             echo
-            echo -e "${BLUE}JAR deployed to: $target_dir${NC}"
+            echo -e "${BLUE}JAR deployed to: $target_dir/app.jar${NC}"
             echo -e "${BLUE}Service name: $service_name${NC}"
             echo
             echo -e "${GREEN}✓ Setup completed successfully!${NC}"
