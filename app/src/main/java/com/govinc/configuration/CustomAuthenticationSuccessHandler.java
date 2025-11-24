@@ -37,8 +37,18 @@ public class CustomAuthenticationSuccessHandler implements AuthenticationSuccess
         String email = null;
 
         if (authentication.getPrincipal() instanceof OidcUser oidcUser) {
+            // Try preferred_username first (Keycloak), then fall back to email, then to sub (Azure)
             username = oidcUser.getPreferredUsername();
-            if (username == null) username = oidcUser.getEmail();
+            if (username == null) {
+                username = oidcUser.getEmail();
+            }
+            if (username == null) {
+                // For Azure, use 'sub' claim as username identifier
+                String sub = (String) oidcUser.getClaims().get("sub");
+                if (sub != null) {
+                    username = sub;
+                }
+            }
             email = oidcUser.getEmail();
         } else if (authentication.getPrincipal() instanceof UserDetails userDetails) {
             username = userDetails.getUsername();

@@ -46,6 +46,9 @@ public class AuthorizationService {
     /**
      * Get the currently authenticated user from Spring Security context.
      * Returns null if no user is authenticated or user not found in database.
+     * 
+     * For OAuth2/OIDC providers (Keycloak, Azure), resolves the username from the security principal.
+     * For form-based authentication, uses the standard username.
      */
     public User getCurrentUser() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -53,24 +56,62 @@ public class AuthorizationService {
             return null;
         }
         
-        String username = auth.getName();
+        String username = null;
+        
+        // Handle OIDC/OAuth2 users (Keycloak, Azure, etc.)
+        if (auth.getPrincipal() instanceof org.springframework.security.oauth2.core.oidc.user.OidcUser oidcUser) {
+            // Try preferred_username first (Keycloak), then email, then sub (Azure)
+            username = oidcUser.getPreferredUsername();
+            if (username == null) {
+                username = oidcUser.getEmail();
+            }
+            if (username == null) {
+                String sub = (String) oidcUser.getClaims().get("sub");
+                if (sub != null) {
+                    username = sub;
+                }
+            }
+            logger.info("OAuth2 user resolved: " + username);
+        } else {
+            // Handle form-based authentication
+            username = auth.getName();
+            logger.info("Form-based user resolved: " + username);
+        }
+        
+        if (username == null) {
+            logger.warning("Could not resolve username from authentication principal");
+            return null;
+        }
+        
         Optional<User> userOpt = userRepository.findByName(username);
-        System.out.println("\n\nuser mapped: " + username + ", " + auth.getName());
+        if (userOpt.isEmpty()) {
+            logger.warning("User " + username + " authenticated but not found in database");
+        }
         return userOpt.orElse(null);
     }
     
     /**
      * Get current user's role, or null if not authenticated.
+     * 
+     * This method is called regardless of authentication provider (Keycloak, Azure, form-based).
+     * User roles are always fetched from the app database, NOT from the identity provider.
      */
     public Role getCurrentUserRole() {
         User user = getCurrentUser();
-        if (user == null) return null;
-        System.out.println("\n\nrole mapped: " + user.getRole());
+        if (user == null) {
+            logger.warning("getCurrentUserRole called but no user authenticated or found in database");
+            return null;
+        }
+        
+        Role userRole = user.getRole();
+        logger.info("Role mapped for user " + user.getName() + ": " + userRole);
+        
         if (user.getName().equalsIgnoreCase("admin")) {
+            logger.info("Admin user " + user.getName() + " using ADMIN role");
             return Role.ADMIN;
         }
 
-        return user.getRole();
+        return userRole;
     }
     
     /**
