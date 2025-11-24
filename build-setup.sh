@@ -27,7 +27,7 @@ BUILD_CONFIG_FILE=".build-setup.local"  # Git ignored file for storing user entr
 # Function to check if running with sudo
 check_sudo() {
     if [ "$EUID" -ne 0 ]; then
-        echo -e "${RED}Error: This script must be run with sudo${NC}"
+        echo -e "${RED}✗ Error: This script must be run with sudo${NC}"
         echo -e "${YELLOW}Usage: sudo ./build-setup.sh${NC}"
         exit 1
     fi
@@ -497,11 +497,11 @@ setup_h2_fallback() {
 # Main database setup function
 setup_database() {
     echo -e "${BLUE}Database Setup Options:${NC}"
-    echo "1. Connect to existing MariaDB/MySQL database"
-    echo "2. Install and setup MariaDB locally"
-    echo "3. Use H2 in-memory database (development only)"
+    echo "  1. Connect to existing MariaDB/MySQL database"
+    echo "  2. Install and setup MariaDB locally"
+    echo "  3. Use H2 in-memory database (development only)"
     echo
-    read -p "Please choose an option (1-3): " choice
+    read -p "Choose an option (1-3): " choice
     
     case $choice in
         1)
@@ -531,7 +531,8 @@ setup_database() {
             
             while [ $retry_count -lt $max_retries ] && [ "$connection_successful" = false ]; do
                 if [ $retry_count -gt 0 ]; then
-                    echo -e "${YELLOW}\nRetry attempt $retry_count of $((max_retries-1))...${NC}"
+                    echo -e "${YELLOW}Retry attempt $retry_count of $((max_retries-1))${NC}"
+                    echo
                 fi
                 
                 read -p "Database host (default: localhost): " db_host
@@ -570,11 +571,12 @@ setup_database() {
                     connection_successful=true
                     echo -e "${GREEN}✓ Using verified database credentials${NC}"
                 elif [ $conn_result -eq 2 ]; then
-                    echo -e "${YELLOW}\nDatabase connection works, but database is not accessible.${NC}"
+                    echo -e "${YELLOW}Database connection works, but database is not accessible.${NC}"
                     echo -e "${YELLOW}Options:${NC}"
-                    echo "1. Create the database (requires root access)"
-                    echo "2. Try different database credentials"
-                    echo "3. Use H2 fallback database"
+                    echo "  1. Create the database (requires root access)"
+                    echo "  2. Try different database credentials"
+                    echo "  3. Use H2 fallback database"
+                    echo
                     read -p "Choose option (1-3): " db_option
                     
                     case $db_option in
@@ -605,8 +607,9 @@ setup_database() {
             done
             
             if [ "$connection_successful" = false ]; then
-                echo -e "${RED}\nMaximum retry attempts reached.${NC}"
-                echo -e "${YELLOW}Using H2 fallback database.${NC}"
+                echo
+                echo -e "${RED}✗ Maximum retry attempts reached.${NC}"
+                echo -e "${YELLOW}Using H2 fallback database as fallback.${NC}"
                 setup_h2_fallback
             fi
             ;;
@@ -632,7 +635,7 @@ setup_database() {
             setup_h2_fallback
             ;;
         *)
-            echo -e "${RED}Invalid choice. Using H2 fallback.${NC}"
+            echo -e "${RED}✗ Invalid choice. Using H2 fallback.${NC}"
             setup_h2_fallback
             ;;
     esac
@@ -767,7 +770,7 @@ main() {
     
     # Check if we're in the right directory
     if [ ! -f "settings.gradle.kts" ]; then
-        echo -e "${RED}Error: This script must be run from the project root directory!${NC}"
+        echo -e "${RED}✗ Error: This script must be run from the project root directory!${NC}"
         exit 1
     fi
     
@@ -780,17 +783,44 @@ main() {
     
     # Try to load saved configuration
     if load_saved_config; then
-        echo -e "${YELLOW}Use saved values? (y/n): ${NC}"
-        read -p "" use_saved
+        read -p "Use saved values? (Y/n, default: Y): " use_saved
+        use_saved=${use_saved:-Y}
         if [[ $use_saved =~ ^[Yy]$ ]]; then
             use_saved_config=true
+            echo -e "${GREEN}✓ Using saved configuration${NC}"
         else
             unset DB_HOST DB_PORT DB_NAME DB_USER DB_PASSWORD TARGET_DIRECTORY SERVICE_NAME
+            echo -e "${YELLOW}Using new configuration${NC}"
         fi
     fi
     
     echo
-    echo -e "${BLUE}Step 1: Database Setup${NC}"
+    echo -e "${BLUE}Step 1: Deployment Type Selection${NC}"
+    
+    echo -e "${BLUE}Select deployment type:${NC}"
+    echo "  1. Test"
+    echo "  2. Production"
+    echo
+    read -p "Choose deployment type (1-2, default: 2 Production): " deployment_type
+    deployment_type=${deployment_type:-2}
+    
+    case $deployment_type in
+        1)
+            echo -e "${GREEN}✓ Test deployment selected${NC}"
+            deployment_type="test"
+            ;;
+        2)
+            echo -e "${GREEN}✓ Production deployment selected${NC}"
+            deployment_type="prod"
+            ;;
+        *)
+            echo -e "${RED}✗ Invalid choice. Defaulting to Production deployment.${NC}"
+            deployment_type="prod"
+            ;;
+    esac
+    
+    echo
+    echo -e "${BLUE}Step 2: Database Setup${NC}"
     
     if [ "$use_saved_config" = false ]; then
         setup_database
@@ -805,44 +835,26 @@ main() {
     fi
     
     echo
-    echo -e "${BLUE}Step 2: Deployment Type Selection${NC}"
+    echo -e "${BLUE}Step 3: Configuring Application Properties${NC}"
     
-    echo -e "${BLUE}Select deployment type:${NC}"
-    echo "1. Test"
-    echo "2. Production"
-    echo
-    read -p "Please choose deployment type (1-2): " deployment_type
-    
-    case $deployment_type in
-        1)
-            echo -e "${GREEN}✓ Test deployment selected${NC}"
-            deployment_type="test"
-            ;;
-        2)
-            echo -e "${GREEN}✓ Production deployment selected${NC}"
-            deployment_type="prod"
-            ;;
-        *)
-            echo -e "${RED}Invalid choice. Defaulting to test deployment.${NC}"
-            deployment_type="test"
-            ;;
-    esac
+    # For production deployments, configure production properties before build
+    if [ "$deployment_type" = "prod" ]; then
+        echo -e "${YELLOW}Configuring application.properties for production mode...${NC}"
+        if ! configure_production_properties; then
+            echo -e "${RED}Failed to configure production properties${NC}"
+            return 1
+        fi
+    else
+        echo -e "${GREEN}✓ Application properties configured for test deployment${NC}"
+    fi
     
     echo
-    echo -e "${BLUE}Step 3: Building Application${NC}"
+    echo -e "${BLUE}Step 4: Building Application${NC}"
     
     if build_application; then
-        # For production deployments, configure production properties
-        if [ "$deployment_type" = "prod" ]; then
-            echo
-            if ! configure_production_properties; then
-                echo -e "${RED}Failed to configure production properties${NC}"
-                return 1
-            fi
-        fi
         
         echo
-        echo -e "${BLUE}Step 4: Deployment Configuration${NC}"
+        echo -e "${BLUE}Step 5: Deployment Configuration${NC}"
         
         local target_dir
         local service_name
@@ -856,15 +868,17 @@ main() {
         else
             read -p "Enter target directory for JAR deployment: " target_dir
             if [ -z "$target_dir" ]; then
-                echo -e "${RED}Target directory cannot be empty${NC}"
+                echo -e "${RED}✗ Target directory cannot be empty${NC}"
                 return 1
             fi
+            echo -e "${GREEN}✓ Target directory: $target_dir${NC}"
             
             read -p "Enter service name to stop/start during deployment: " service_name
             if [ -z "$service_name" ]; then
-                echo -e "${RED}Service name cannot be empty${NC}"
+                echo -e "${RED}✗ Service name cannot be empty${NC}"
                 return 1
             fi
+            echo -e "${GREEN}✓ Service name: $service_name${NC}"
         fi
         
         # Save configuration for future use (only if not using pre-saved config)
@@ -875,7 +889,7 @@ main() {
         fi
         
         echo
-        echo -e "${BLUE}Step 5: Deploying JAR${NC}"
+        echo -e "${BLUE}Step 6: Deploying JAR${NC}"
         
         if deploy_jar "$target_dir" "$service_name"; then
             echo
@@ -912,6 +926,6 @@ if main "$@"; then
     echo -e "${GREEN}Script completed successfully!${NC}"
     exit 0
 else
-    echo -e "${RED}Script completed with errors.${NC}"
+    echo -e "${RED}✗ Script completed with errors.${NC}"
     exit 1
 fi
