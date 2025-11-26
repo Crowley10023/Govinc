@@ -1,10 +1,13 @@
 package com.govinc.organization;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Controller
 @RequestMapping("/orgservice-assessment")
@@ -27,80 +30,51 @@ public class OrgServiceAssessmentController {
         return "orgservice-assessment";
     }
 
-    @PostMapping("/save")
-    public String saveAssessment(@RequestParam Long id,
-                                 @RequestParam Long orgServiceId,
-                                 @RequestParam String assessmentDate,
-                                 @RequestParam(required = false) String[] controlIds,
-                                 @RequestParam(required = false) String[] applicable,
-                                 @RequestParam(required = false) String[] percent,
-                                 Model model) {
+    @PostMapping("/save-control")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> saveControl(@RequestParam Long id,
+                                                            @RequestParam Long orgServiceId,
+                                                            @RequestParam String assessmentDate,
+                                                            @RequestParam Long controlId,
+                                                            @RequestParam Boolean applicable,
+                                                            @RequestParam Integer percent) {
+        Map<String, Object> response = new HashMap<>();
         try {
             OrgServiceAssessment assessment = assessmentService.getAssessment(id)
                     .orElseThrow(() -> new RuntimeException("Assessment not found"));
             
-            // Update assessment date
+            // Update assessment date if needed
             if (assessmentDate != null && !assessmentDate.isEmpty()) {
                 assessment.setAssessmentDate(java.time.LocalDate.parse(assessmentDate));
-            } else {
-                assessment.setAssessmentDate(java.time.LocalDate.now());
             }
             
-            // Update controls based on form submission
+            // Find and update the specific control
             List<OrgServiceAssessmentControl> controls = assessment.getControls();
+            OrgServiceAssessmentControl controlToUpdate = controls.stream()
+                    .filter(c -> c.getSecurityControl().getId().equals(controlId))
+                    .findFirst()
+                    .orElseThrow(() -> new RuntimeException("Control not found"));
             
-            // Create a set of applicable control indices for quick lookup
-            java.util.Set<String> applicableSet = new java.util.HashSet<>();
-            if (applicable != null) {
-                for (String app : applicable) {
-                    applicableSet.add(app);
-                }
+            // Check if the control is locked (answered by another assessment)
+            if (controlToUpdate.isAnsweredByAnotherAssessment()) {
+                response.put("success", false);
+                response.put("message", "This control is locked by another assessment");
+                return ResponseEntity.status(400).body(response);
             }
             
-            // Create a map of percent values by control ID
-            java.util.Map<String, String> percentMap = new java.util.HashMap<>();
-            if (controlIds != null && percent != null) {
-                for (int i = 0; i < Math.min(controlIds.length, percent.length); i++) {
-                    percentMap.put(controlIds[i], percent[i]);
-                }
-            }
-            
-            // Update each control
-            if (controlIds != null) {
-                for (int i = 0; i < controlIds.length; i++) {
-                    String controlId = controlIds[i];
-                    OrgServiceAssessmentControl control = controls.get(i);
-                    
-                    // Set applicable based on whether control ID is in the applicable set
-                    boolean isApplicable = applicableSet.contains(controlId);
-                    control.setApplicable(isApplicable);
-                    
-                    // Set percent value
-                    if (percentMap.containsKey(controlId)) {
-                        try {
-                            int percentValue = Integer.parseInt(percentMap.get(controlId));
-                            control.setPercent(Math.min(100, Math.max(0, percentValue)));
-                        } catch (NumberFormatException e) {
-                            control.setPercent(0);
-                        }
-                    } else {
-                        control.setPercent(0);
-                    }
-                }
-            }
+            // Update control values
+            controlToUpdate.setApplicable(applicable);
+            controlToUpdate.setPercent(Math.min(100, Math.max(0, percent)));
             
             assessmentService.saveAssessment(assessment);
-            return "redirect:/orgservices/list";
-        } catch (RuntimeException ex) {
-            Long orgServiceIdLong = orgServiceId != null ? orgServiceId : null;
-            OrgServiceAssessment fullAssessment = assessmentService.findOrCreateAssessment(orgServiceIdLong);
-            List<OrgServiceAssessmentControl> controls = assessmentService.enrichControlsWithLockInfo(fullAssessment);
-            long applicableCount = controls.stream().filter(OrgServiceAssessmentControl::isApplicable).count();
-            model.addAttribute("assessment", fullAssessment);
-            model.addAttribute("controls", controls);
-            model.addAttribute("applicableCount", applicableCount);
-            model.addAttribute("errorMsg", ex.getMessage());
-            return "orgservice-assessment";
+            
+            response.put("success", true);
+            response.put("message", "Control saved successfully");
+            return ResponseEntity.ok(response);
+        } catch (Exception ex) {
+            response.put("success", false);
+            response.put("message", ex.getMessage());
+            return ResponseEntity.status(500).body(response);
         }
     }
 }

@@ -4,33 +4,129 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>User List</title>
     <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/general.css">
+    <style>
+        .users-table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: #fff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .users-table thead {
+            background-color: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        .users-table th {
+            padding: 16px;
+            text-align: left;
+            font-weight: 600;
+            color: #495057;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .users-table tbody tr {
+            border-bottom: 1px solid #dee2e6;
+            transition: background-color 0.2s ease;
+        }
+        
+        .users-table tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .users-table td {
+            padding: 16px;
+            color: #212529;
+            font-size: 14px;
+        }
+        
+        .users-table td:first-child {
+            font-weight: 600;
+            color: #0066cc;
+        }
+        
+        .table-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        
+        .btn-table-action {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 4px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+        
+        .btn-table-edit {
+            background-color: #0066cc;
+            color: white;
+        }
+        
+        .btn-table-edit:hover {
+            background-color: #0052a3;
+        }
+        
+        .btn-table-delete {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        .btn-table-delete:hover {
+            background-color: #c82333;
+        }
+    </style>
 </head>
 <body>
 <div th:replace="~{navigation :: mainNav}"></div>
 <div class="container">
-    <h1>User List</h1>
-    <a href="/users/new"><button>Add User</button></a>
-    <table border="1">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr th:each="user : ${users}">
-                <td th:text="${user.id}"></td>
-                <td th:text="${user.name}"></td>
-                <td th:text="${user.email}"></td>
-                <td>
-                    <a th:href="@{'/users/edit/' + ${user.id}}"><button>Edit</button></a>
-                    <a th:href="@{'/users/delete/' + ${user.id}}" onclick="return confirm('Are you sure?')"><button>Delete</button></a>
-                </td>
-            </tr>
-        </tbody>
-    </table>
+    <div class="orgservice-header">
+        <h1>User List</h1>
+        <a href="/users/new" class="btn-create-primary">Add User</a>
+    </div>
+    
+    <div th:if="${#lists.isEmpty(users)}" class="empty-state">
+        <p>No users found.</p>
+        <a href="/users/new">Create the first one</a>
+    </div>
+    
+    <div th:if="${not #lists.isEmpty(users)}">
+        <table class="users-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>ID</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="user : ${users}">
+                    <td th:text="${user.name}"></td>
+                    <td th:text="${user.email}"></td>
+                    <td th:text="${user.role != null ? user.role : '—'}"></td>
+                    <td th:text="${user.id}"></td>
+                    <td>
+                        <div class="table-actions">
+                            <a th:href="@{'/users/edit/' + ${user.id}}" class="btn-table-action btn-table-edit">Edit</a>
+                            <a th:href="@{'/users/delete/' + ${user.id}}" class="btn-table-action btn-table-delete" onclick="return confirm('Are you sure?')">Delete</a>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
 </div>
 </body>
 </html>

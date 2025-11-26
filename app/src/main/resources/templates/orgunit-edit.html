@@ -253,7 +253,7 @@
                         <select id="leaderId" name="leaderId" onchange="updateLeaderWarning()">
                             <option value="" selected>(none)</option>
                             <option th:each="user : ${allUsers}" 
-                                th:if="${user.role == T(com.govinc.user.Role).ORGANISATION_TEAM_LEADER}"
+                                th:if="${user.role == T(com.govinc.user.Role).ORGANISATION_TEAM_LEADER or user.role == T(com.govinc.user.Role).ADMIN}"
                                 th:value="${user.id}" 
                                 th:text="${user.name}"
                                 th:selected="${orgUnit.leader != null and user.id == orgUnit.leader.id}"
