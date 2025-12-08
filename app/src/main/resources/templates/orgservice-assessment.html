@@ -44,7 +44,8 @@
         }
 
         .filter-group input[type="text"],
-        .filter-group input[type="search"] {
+        .filter-group input[type="search"],
+        .filter-group select {
             padding: 0.75em;
             border: 1px solid #ced4da;
             border-radius: 4px;
@@ -52,7 +53,8 @@
         }
 
         .filter-group input[type="text"]:focus,
-        .filter-group input[type="search"]:focus {
+        .filter-group input[type="search"]:focus,
+        .filter-group select:focus {
             outline: none;
             border-color: #80bdff;
             box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
@@ -175,7 +177,8 @@
             opacity: 0.6;
         }
 
-        .control-input {
+        .control-input,
+        .control-select {
             width: 100px;
             padding: 0.5em;
             border: 1px solid #ced4da;
@@ -183,7 +186,8 @@
             font-size: 1em;
         }
 
-        .control-input:disabled {
+        .control-input:disabled,
+        .control-select:disabled {
             background-color: #e9ecef;
             cursor: not-allowed;
         }
@@ -356,6 +360,13 @@
                     </div>
 
                     <div class="filter-group">
+                        <label for="maturityModelSelect">Maturity Model (for answering ease)</label>
+                        <select id="maturityModelSelect">
+                            <option value="">-- Select a model --</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
                         <div class="filter-checkbox-group">
                             <input type="checkbox" id="filterRated" />
                             <label for="filterRated">Show only rated items</label>
@@ -409,6 +420,8 @@
                                 <input type="number" min="0" max="100" class="control-input control-percent"
                                     th:value="${control.percent}" required
                                     th:disabled="${control.answeredByAnotherAssessment}" />
+                                <select class="control-select control-answer" style="display: none;"
+                                    th:disabled="${control.answeredByAnotherAssessment}"></select>
                             </td>
                         </tr>
                     </tbody>
@@ -449,12 +462,114 @@
         const filterTextInput = document.getElementById('filterText');
         const filterRatedCheckbox = document.getElementById('filterRated');
         const hideRatedByAnotherCheckbox = document.getElementById('hideRatedByAnother');
+        const maturityModelSelect = document.getElementById('maturityModelSelect');
         const clearFiltersBtn = document.getElementById('clearFiltersBtn');
         const tableBody = document.getElementById('controlsTableBody');
         const noResults = document.getElementById('noResults');
         const visibleCountSpan = document.getElementById('visibleCount');
         const totalCount = document.querySelectorAll('.control-row').length;
         const saveNotification = document.getElementById('saveNotification');
+
+        // Store current maturity model data
+        let currentMaturityModel = null;
+        let maturityModels = [];
+
+        // Load maturity models on page load
+        function loadMaturityModels() {
+            fetch('/maturitymodel/api/all')
+                .then(response => response.json())
+                .then(data => {
+                    maturityModels = data;
+                    // Populate the dropdown
+                    maturityModels.forEach(model => {
+                        const option = document.createElement('option');
+                        option.value = model.id;
+                        option.textContent = model.name;
+                        maturityModelSelect.appendChild(option);
+                    });
+                })
+                .catch(error => console.error('Error loading maturity models:', error));
+        }
+
+        // Handle maturity model selection
+        maturityModelSelect.addEventListener('change', function () {
+            const modelId = this.value;
+            
+            if (modelId === '') {
+                // Reset to normal input mode
+                currentMaturityModel = null;
+                switchToInputMode();
+            } else {
+                // Load the selected model and switch to dropdown mode
+                const model = maturityModels.find(m => m.id == modelId);
+                currentMaturityModel = model;
+                switchToAnswerMode(model);
+            }
+        });
+
+        function switchToInputMode() {
+            // Show all percent inputs and hide all answer selects
+            document.querySelectorAll('.control-row').forEach(row => {
+                const percentInput = row.querySelector('.control-percent');
+                const answerSelect = row.querySelector('.control-answer');
+                percentInput.style.display = 'block';
+                answerSelect.style.display = 'none';
+                answerSelect.value = '';
+                answerSelect.removeEventListener('change', handleAnswerChange);
+            });
+        }
+
+        function switchToAnswerMode(model) {
+            // Show all answer selects and hide all percent inputs
+            document.querySelectorAll('.control-row').forEach(row => {
+                const percentInput = row.querySelector('.control-percent');
+                const answerSelect = row.querySelector('.control-answer');
+                
+                // Clear previous options
+                answerSelect.innerHTML = '';
+                
+                // Add "-- Select an answer --" option
+                const defaultOption = document.createElement('option');
+                defaultOption.value = '';
+                defaultOption.textContent = '-- Select an answer --';
+                answerSelect.appendChild(defaultOption);
+                
+                // Add maturity answers as options
+                if (model.maturityAnswers && Array.isArray(model.maturityAnswers)) {
+                    model.maturityAnswers.forEach(answer => {
+                        const option = document.createElement('option');
+                        option.value = answer.rating;
+                        option.textContent = answer.answer;
+                        answerSelect.appendChild(option);
+                    });
+                }
+                
+                // Set current percent value to the select if a matching answer exists
+                const currentPercent = percentInput.value;
+                if (currentPercent && currentPercent !== '0') {
+                    answerSelect.value = currentPercent;
+                }
+                
+                percentInput.style.display = 'none';
+                answerSelect.style.display = 'block';
+                answerSelect.addEventListener('change', handleAnswerChange);
+            });
+        }
+
+        function handleAnswerChange(event) {
+            const row = event.target.closest('.control-row');
+            const controlId = row.getAttribute('data-control-id');
+            const answerSelect = event.target;
+            const percentValue = answerSelect.value;
+            const applicable = row.querySelector('.control-applicable').checked;
+            
+            // Update the hidden percent value for backend submission
+            const percentInput = row.querySelector('.control-percent');
+            percentInput.value = percentValue;
+            
+            // Save the change
+            saveControlChange(controlId, applicable, percentValue);
+        }
 
         function applyFilters() {
             const searchText = filterTextInput.value.toLowerCase();
@@ -492,6 +607,9 @@
             filterTextInput.value = '';
             filterRatedCheckbox.checked = false;
             hideRatedByAnotherCheckbox.checked = false;
+            maturityModelSelect.value = '';
+            currentMaturityModel = null;
+            switchToInputMode();
             applyFilters();
         }
 
@@ -557,16 +675,20 @@
         function updatePercentFieldState(row) {
             const checkbox = row.querySelector('.control-applicable');
             const percentInput = row.querySelector('.control-percent');
+            const answerSelect = row.querySelector('.control-answer');
             const isApplicable = checkbox.checked;
             const isLocked = checkbox.disabled;
 
-            // Enable percent input only if applicable is checked or locked
+            // Enable percent input/select only if applicable is checked or locked
             // Disable if not applicable and not locked
             if (!isApplicable && !isLocked) {
                 percentInput.disabled = true;
+                answerSelect.disabled = true;
                 percentInput.value = '0';
+                answerSelect.value = '';
             } else {
                 percentInput.disabled = isLocked;
+                answerSelect.disabled = isLocked;
             }
         }
 
@@ -575,10 +697,20 @@
             checkbox.addEventListener('change', function () {
                 const row = this.closest('.control-row');
                 const controlId = row.getAttribute('data-control-id');
-                const percent = row.querySelector('.control-percent').value;
+                
+                let percent;
+                if (currentMaturityModel) {
+                    // In model mode, get from the select
+                    const answerSelect = row.querySelector('.control-answer');
+                    percent = answerSelect.value || '0';
+                } else {
+                    // In input mode, get from the input
+                    percent = row.querySelector('.control-percent').value;
+                }
+                
                 const applicable = this.checked;
 
-                // Update the percent field state
+                // Update the field state
                 updatePercentFieldState(row);
 
                 saveControlChange(controlId, applicable, percent);
@@ -606,6 +738,9 @@
         document.querySelectorAll('.control-row').forEach(row => {
             updatePercentFieldState(row);
         });
+
+        // Load maturity models on page load
+        loadMaturityModels();
 
         filterTextInput.addEventListener('input', applyFilters);
         filterRatedCheckbox.addEventListener('change', applyFilters);

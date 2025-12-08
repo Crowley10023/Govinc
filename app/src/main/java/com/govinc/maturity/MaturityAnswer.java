@@ -4,6 +4,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "maturity_answers")
@@ -22,6 +23,7 @@ public class MaturityAnswer {
     private int rating = 0;
 
     @ManyToMany(mappedBy = "maturityAnswers")
+    @JsonIgnore
     private Set<MaturityModel> maturityModels = new HashSet<>();
 
     // Constructors

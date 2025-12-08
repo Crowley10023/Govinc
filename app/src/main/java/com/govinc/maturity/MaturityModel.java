@@ -7,6 +7,7 @@ import java.util.Set;
 import com.govinc.catalog.SecurityCatalog;
 
 import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "maturity_models")
@@ -20,6 +21,7 @@ public class MaturityModel {
 
     @OneToOne
     @JoinColumn(name = "security_catalog_id", referencedColumnName = "id")
+    @JsonIgnore
     private SecurityCatalog securityCatalog;
 
     @Transient

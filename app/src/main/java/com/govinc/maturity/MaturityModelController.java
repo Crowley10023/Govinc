@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -64,5 +65,12 @@ public class MaturityModelController {
     public String deleteMaturityModel(@PathVariable Long id) {
         maturityModelRepository.deleteById(id);
         return "redirect:/maturitymodel/list";
+    }
+
+    @GetMapping("/api/all")
+    @ResponseBody
+    public ResponseEntity<List<MaturityModel>> getAllMaturityModels() {
+        List<MaturityModel> models = maturityModelRepository.findAll();
+        return ResponseEntity.ok(models);
     }
 }
