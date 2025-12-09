@@ -176,6 +176,8 @@ public class AssessmentDetailsController {
                         // If this is an override of a taken-over answer, mark it as overridden
                         if (foundUserOverride && controlAnswerIsTakenOver.get(ctrl.getId())) {
                             controlAnswerIsOverridden.put(ctrl.getId(), true);
+                            // Keep the org service name visible even when overridden
+                            // (controlTakenOverOrgServiceName is already populated from first loop)
                         }
                         if (foundUserComment != null && !foundUserComment.isEmpty()) {
                             controlComments.put(ctrl.getId(), foundUserComment);

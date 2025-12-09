@@ -414,6 +414,10 @@ public class AssessmentController {
                     if (aca.getComment() != null) {
                         controlComments.put(ctrlId, aca.getComment());
                     }
+                    // If this control has an org service answer that was overridden, keep the org service name visible
+                    if (bestOrgServiceAnswer.containsKey(ctrlId)) {
+                        controlTakenOverOrgServiceName.put(ctrlId, bestOrgServiceAnswer.get(ctrlId).orgServiceName);
+                    }
                 } else if (bestOrgServiceAnswer.containsKey(ctrlId)) {
                     OrgServiceInfo inh = bestOrgServiceAnswer.get(ctrlId);
                     controlAnswers.put(ctrlId, inh.answer.getAnswer());
