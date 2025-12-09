@@ -74,6 +74,7 @@ public class AssessmentDetailsController {
             Map<Long, String> controlTakenOverOrgServiceName = new HashMap<>();
             Map<Long, Long> orgServiceControlAnswers = new HashMap<>();
             Map<Long, String> orgServiceControlComments = new HashMap<>();
+            Map<Long, Boolean> controlAnswerIsOverridden = new HashMap<>();
             List<MaturityAnswer> allMaturityAnswers = maturityAnswerRepository.findAll();
             
             if (assessment != null) {
@@ -118,6 +119,7 @@ public class AssessmentDetailsController {
                         if (found) {
                             controlAnswerIsTakenOver.put(ctrl.getId(), true);
                             controlTakenOverOrgServiceName.put(ctrl.getId(), takenFromName);
+                            controlAnswerIsOverridden.put(ctrl.getId(), false);
                             if (foundComment != null && !foundComment.isEmpty()) {
                                 System.out.println("Storing comment for control " + ctrl.getId() + ": [" + foundComment + "]");
                                 orgServiceControlComments.put(ctrl.getId(), foundComment);
@@ -135,6 +137,7 @@ public class AssessmentDetailsController {
                             }
                         } else {
                             controlAnswerIsTakenOver.put(ctrl.getId(), false);
+                            controlAnswerIsOverridden.put(ctrl.getId(), false);
                         }
                     }
                 }
@@ -144,6 +147,7 @@ public class AssessmentDetailsController {
             if (assessment != null && assessment.getSecurityCatalog() != null && assessment.getSecurityCatalog().getSecurityControls() != null) {
                 for (var ctrl : assessment.getSecurityCatalog().getSecurityControls()) {
                     controlAnswerIsTakenOver.putIfAbsent(ctrl.getId(), false);
+                    controlAnswerIsOverridden.putIfAbsent(ctrl.getId(), false);
                 }
             }
             
@@ -156,17 +160,23 @@ public class AssessmentDetailsController {
                 for (var ctrl : assessment.getSecurityCatalog().getSecurityControls()) {
                     Long foundUserAnswerId = null;
                     String foundUserComment = null;
+                    Boolean foundUserOverride = false;
                     
                     for (com.govinc.assessment.AssessmentControlAnswer a : detailAnswers) {
                         if (a.getSecurityControl() != null && a.getSecurityControl().getId().equals(ctrl.getId()) && a.getMaturityAnswer() != null) {
                             foundUserAnswerId = a.getMaturityAnswer().getId();
                             foundUserComment = a.getComment();
+                            foundUserOverride = a.getIsOverride() != null ? a.getIsOverride() : false;
                             break;
                         }
                     }
                     
                     if (foundUserAnswerId != null) {
                         controlDisplayAnswers.put(ctrl.getId(), foundUserAnswerId);
+                        // If this is an override of a taken-over answer, mark it as overridden
+                        if (foundUserOverride && controlAnswerIsTakenOver.get(ctrl.getId())) {
+                            controlAnswerIsOverridden.put(ctrl.getId(), true);
+                        }
                         if (foundUserComment != null && !foundUserComment.isEmpty()) {
                             controlComments.put(ctrl.getId(), foundUserComment);
                         } else if (orgServiceControlComments.containsKey(ctrl.getId())) {
@@ -202,6 +212,7 @@ public class AssessmentDetailsController {
             System.out.println("Final controlComments size: " + controlComments.size());
             
             model.addAttribute("controlAnswerIsTakenOver", controlAnswerIsTakenOver);
+            model.addAttribute("controlAnswerIsOverridden", controlAnswerIsOverridden);
             model.addAttribute("controlTakenOverOrgServiceName", controlTakenOverOrgServiceName);
             model.addAttribute("answerSummary", answerSummary);
             model.addAttribute("users", userRepository.findAll());

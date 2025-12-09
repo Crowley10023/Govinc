@@ -10,63 +10,57 @@ $(function () {
 });
 
 // =================== Override Functions ===================
-// Override function - applies first available answer without page reload
-function openOverrideModal(button) {
-    var controlId = button.getAttribute('data-control-id');
-    var assessmentId = window.assessmentId || 0;
+// Toggle override function - handles slider toggle
+function toggleOverride(checkbox) {
+    var controlId = checkbox.getAttribute('data-control-id');
+    var assessmentId = checkbox.getAttribute('data-assessment-id');
+    var isChecked = checkbox.checked;
     
-    // Get the dropdown for this control to find available answers
-    var $dropdown = $('select[data-control-id="' + controlId + '"]');
-    
-    // Build a list of available answers from the dropdown
-    var options = [];
-    $dropdown.find('option').each(function() {
-        var val = $(this).val();
-        var text = $(this).text();
-        if (val && text !== '-- select an answer --') {
-            options.push({ id: val, text: text });
+    if (isChecked) {
+        // Enable override - apply first available answer
+        var $dropdown = $('select[data-control-id="' + controlId + '"]');
+        var options = [];
+        $dropdown.find('option').each(function() {
+            var val = $(this).val();
+            var text = $(this).text();
+            if (val && text !== '-- select an answer --') {
+                options.push({ id: val, text: text });
+            }
+        });
+        
+        if (options.length === 0) {
+            checkbox.checked = false;
+            return;
         }
-    });
-    
-    if (options.length === 0) {
-        return;
+        
+        var answerId = options[0].id;
+        
+        $.ajax({
+            url: '/assessment/' + assessmentId + '/answer-override',
+            type: 'POST',
+            data: { controlId: controlId, answerId: answerId },
+            success: function() {
+                updateControlAfterOverride(controlId, answerId);
+            },
+            error: function() {
+                alert('Could not override answer. Please try again.');
+                checkbox.checked = false;
+            }
+        });
+    } else {
+        // Disable override - revert to org service answer
+        $.ajax({
+            url: '/assessment/' + assessmentId + '/control/' + controlId + '/remove-override',
+            type: 'POST',
+            success: function() {
+                updateControlAfterRemoveOverride(controlId, assessmentId);
+            },
+            error: function() {
+                alert('Could not revert to org service answer. Please try again.');
+                checkbox.checked = true;
+            }
+        });
     }
-    
-    // Use the first available answer as the override
-    var answerId = options[0].id;
-    
-    // Save the override
-    $.ajax({
-        url: '/assessment/' + assessmentId + '/answer-override',
-        type: 'POST',
-        data: { controlId: controlId, answerId: answerId },
-        success: function() {
-            // Update UI without reload
-            updateControlAfterOverride(controlId, answerId);
-        },
-        error: function() {
-            alert('Could not override answer. Please try again.');
-        }
-    });
-}
-
-// Remove override function - reverts without page reload
-function removeOverride(button) {
-    var controlId = button.getAttribute('data-control-id');
-    var assessmentId = button.getAttribute('data-assessment-id');
-    
-    // Remove override silently without confirmation
-    $.ajax({
-        url: '/assessment/' + assessmentId + '/control/' + controlId + '/remove-override',
-        type: 'POST',
-        success: function() {
-            // Update UI without reload
-            updateControlAfterRemoveOverride(controlId, assessmentId);
-        },
-        error: function() {
-            alert('Could not revert to org service answer. Please try again.');
-        }
-    });
 }
 
 // Update UI after override - get updated state from backend and update UI
@@ -87,24 +81,16 @@ function updateControlAfterOverride(controlId, answerId) {
             var $controlRow = $dropdown.closest('tr');
             if ($controlRow.length === 0) return;
             
-            // Update override button visibility and state
-            var $overrideBtn = $controlRow.find('.override-btn[data-control-id="' + controlId + '"]');
-            var $backToServiceBtn = $controlRow.find('.back-to-service-btn[data-control-id="' + controlId + '"]');
+            // Get the slider checkbox and ensure it's checked
+            var $sliderCheckbox = $controlRow.find('.override-slider-checkbox[data-control-id="' + controlId + '"]');
+            if ($sliderCheckbox.length > 0 && !$sliderCheckbox.prop('checked')) {
+                $sliderCheckbox.prop('checked', true);
+            }
+            
+            // Keep showing the org service name even when override is active
             var $takenOverLabels = $controlRow.find('.takenOver-row span.taken-over-label');
-            
-            // Hide override button, show back-to-service button
-            if ($overrideBtn.length > 0) {
-                $overrideBtn.css('display', 'none');
-            }
-            if ($backToServiceBtn.length > 0) {
-                $backToServiceBtn.css('display', '');
-            }
-            
-            // Show the org service name label if available
             if (state.orgServiceName && $takenOverLabels.length > 0) {
-                // Find the label that currently shows the org service name (first one)
-                $takenOverLabels.first().empty();
-                $takenOverLabels.first().text(state.orgServiceName);
+                $takenOverLabels.text(state.orgServiceName);
             }
             
             // Enable the dropdown again
@@ -150,20 +136,14 @@ function updateControlAfterRemoveOverride(controlId, assessmentId) {
                 $dropdown.val('');
             }
             
-            // Update override button visibility and state
-            var $overrideBtn = $controlRow.find('.override-btn[data-control-id="' + controlId + '"]');
-            var $backToServiceBtn = $controlRow.find('.back-to-service-btn[data-control-id="' + controlId + '"]');
-            var $takenOverLabels = $controlRow.find('.takenOver-row span.taken-over-label');
-            
-            // Show override button, hide back-to-service button
-            if ($overrideBtn.length > 0) {
-                $overrideBtn.css('display', '');
-            }
-            if ($backToServiceBtn.length > 0) {
-                $backToServiceBtn.css('display', 'none');
+            // Get the slider checkbox and ensure it's unchecked
+            var $sliderCheckbox = $controlRow.find('.override-slider-checkbox[data-control-id="' + controlId + '"]');
+            if ($sliderCheckbox.length > 0 && $sliderCheckbox.prop('checked')) {
+                $sliderCheckbox.prop('checked', false);
             }
             
             // Show the org service name label
+            var $takenOverLabels = $controlRow.find('.takenOver-row span.taken-over-label');
             if (state.orgServiceName && $takenOverLabels.length > 0) {
                 $takenOverLabels.first().empty();
                 $takenOverLabels.first().text(state.orgServiceName);

@@ -336,14 +336,6 @@
         .save-notification.hide {
             animation: slideOut 0.3s ease-in forwards;
         }
-
-        .comment-feedback {
-            display: inline-block;
-            font-size: 0.9em;
-            font-weight: 500;
-            margin-left: 5px;
-            min-width: 60px;
-        }
     </style>
 </head>
 
@@ -448,7 +440,6 @@
                                     style="min-width: 180px; min-height: 36px; resize: vertical; padding: 0.5em; border: 1px solid #ced4da; border-radius: 4px; font-size: 1em;"
                                     placeholder="Add comment (optional)"
                                     th:disabled="${control.answeredByAnotherAssessment}" th:text="${control.comment}"></textarea>
-                                <span class="comment-feedback"></span>
                             </td>
                         </tr>
                     </tbody>

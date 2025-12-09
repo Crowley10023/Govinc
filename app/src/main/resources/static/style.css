@@ -1,7 +1,7 @@
 /* --- Assessment Details Styles: (Moved from assessment-details.html inline <style>) --- */
 .answer-feedback {
     display: inline-block;
-    width: 20px;
+    /*width: 20px;*/
     height: 20px;
     vertical-align: middle;
     margin-left: 5px;
@@ -107,31 +107,125 @@
 
 /* ---- End Assessment Details Styles ---- */
 
-/* Flex row for control actions in controls-table */
+/* Flex row for control actions in controls-table - Consolidated Layout */
 .control-actions-flex-row {
     display: flex;
-    flex-direction: row;
-    align-items: flex-start;
-    gap: 18px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
     width: 100%;
 }
-.dropdown-row {
+
+/* Guide, Answer, and Override controls row */
+.answering-guide-row {
     display: flex;
     flex-direction: row;
     align-items: center;
     gap: 10px;
+    flex-shrink: 0;
 }
-.testarea-row {
+
+.answering-guide-row .answering-guide-btn {
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding: 0.25em 0.6em;
+    font-size: 0.9em;
+}
+
+/* Dropdown and feedback row */
+.dropdown-row {
+    display: flex;
+    flex-direction: baseline;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    flex-wrap: nowrap;
+}
+
+.dropdown-row select {
+    flex: 1;
+    min-width: 160px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.32em 0.78em;
+}
+
+.dropdown-row .answer-feedback {
+    flex-shrink: 0;
+}
+
+/* Taken-over label row */
+.takenOver-row {
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
+    min-height: 24px;
+    padding: 0.2em 0;
+    flex: 1;
 }
+
+.takenOver-row .taken-over-label {
+    flex: 1;
+    min-width: 0;
+    word-break: break-word;
+    display: inline;
+    line-height: 1.4;
+}
+
+/* Override slider row */
+.override-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 40px;
+    flex-shrink: 0;
+}
+
+.override-slider-row .override-slider-label {
+    flex-shrink: 0;
+}
+
+/* Comment textarea row */
+.testarea-row {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 8px;
+    width: 100%;
+}
+
 .comment-textarea {
-    min-width: 180px;
-    max-width: 400px;
+    flex: 1;
+    min-width: 200px;
+    max-width: 100%;
     height: 32px;
-    resize: horizontal;
+    resize: vertical;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+    .control-actions-flex-row {
+        gap: 10px;
+    }
+    .comment-textarea {
+        min-width: 150px;
+    }
+}
+
+@media (max-width: 768px) {
+    .answering-guide-btn {
+        padding: 0.2em 0.5em;
+        font-size: 0.85em;
+    }
+    .dropdown-row {
+        gap: 8px;
+    }
+    .comment-textarea {
+        min-width: 120px;
+        height: 28px;
+        font-size: 0.9em;
+    }
 }
 
 /* Modal Launch Buttons Row for Assessment Details */
@@ -358,7 +452,6 @@ input, textarea, select {
   border: 1px solid var(--border);
   border-radius: 3px;
   padding: 0.32em 0.78em;
-  margin-bottom: 0.7em;
   font-size: 0.96em;
   background: #fff;
   transition: border 0.2s, box-shadow 0.15s;
@@ -837,4 +930,75 @@ input:focus, textarea:focus, select:focus {
         min-width: 85vw;
         min-height: auto;
     }
+}
+
+/* ————— Override Slider Styles ————— */
+.override-slider-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+}
+
+.override-slider-label {
+    position: relative;
+    display: inline-block;
+    cursor: pointer;
+    user-select: none;
+}
+
+.override-slider-checkbox {
+    display: none;
+}
+
+.override-slider {
+    position: relative;
+    display: inline-block;
+    width: 54px;
+    height: 28px;
+    background-color: #ccc;
+    border-radius: 34px;
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.override-slider::after {
+    content: '';
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    background-color: white;
+    border-radius: 50%;
+    top: 3px;
+    left: 3px;
+    transition: left 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.override-slider-checkbox:checked + .override-slider {
+    background-color: #4CAF50;
+}
+
+.override-slider-checkbox:checked + .override-slider::after {
+    left: 29px;
+}
+
+.override-slider-label:hover .override-slider {
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+}
+
+.override-slider-checkbox:checked + .override-slider {
+    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.4);
+}
+
+.override-slider-checkbox:checked + .override-slider:hover {
+    box-shadow: 0 3px 10px rgba(76, 175, 80, 0.5);
+}
+
+.override-slider-label:active .override-slider {
+    transform: scale(1.05);
+}
+
+.override-slider-label:active .override-slider::after {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }

@@ -38,7 +38,7 @@
 }
 
 .testarea-row {
-  width: 40%;
+  width: 100%;
 }
 
 .takenOver-row {
@@ -815,7 +815,7 @@
 
 .table td {
   padding: 0.8em 1em;
-  border-bottom: 1px solid rgba(34, 116, 165, 0.05);
+  border-bottom: 5px solid rgba(34, 116, 165, 0.05);
 }
 
 .table tr:hover {

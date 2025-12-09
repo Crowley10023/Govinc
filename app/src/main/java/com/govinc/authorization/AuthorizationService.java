@@ -75,7 +75,6 @@ public class AuthorizationService {
         } else {
             // Handle form-based authentication
             username = auth.getName();
-            logger.info("Form-based user resolved: " + username);
         }
         
         if (username == null) {
@@ -99,15 +98,12 @@ public class AuthorizationService {
     public Role getCurrentUserRole() {
         User user = getCurrentUser();
         if (user == null) {
-            logger.warning("getCurrentUserRole called but no user authenticated or found in database");
             return null;
         }
         
         Role userRole = user.getRole();
-        logger.info("Role mapped for user " + user.getName() + ": " + userRole);
         
         if (user.getName().equalsIgnoreCase("admin")) {
-            logger.info("Admin user " + user.getName() + " using ADMIN role");
             return Role.ADMIN;
         }
 

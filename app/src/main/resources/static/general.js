@@ -60,13 +60,7 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(function(response) {
           if (response.ok) {
             textarea.style.background = '#d8ffd8';
-            if (feedback && feedback.classList.contains('comment-feedback')) {
-              feedback.innerHTML = '<span style="color:#228B22;font-weight:bold;">Saved</span>';
-            }
             setTimeout(function() {
-              if (feedback && feedback.classList.contains('comment-feedback')) {
-                feedback.innerHTML = '';
-              }
               textarea.style.background = '';
             }, 1400);
           } else {
