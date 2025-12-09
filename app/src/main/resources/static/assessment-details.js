@@ -10,58 +10,7 @@ $(function () {
 });
 
 // =================== Override Functions ===================
-// Store collapse state before any action
-function storeCollapsedState() {
-    var collapsedDomains = [];
-    var domainIndex = 0;
-    document.querySelectorAll('.domain-collapsible').forEach(function(domain) {
-        var controls = domain.querySelector('.domain-controls');
-        if (controls) {
-            // Store if this domain's controls are hidden
-            collapsedDomains.push(controls.style.display === 'none');
-        }
-        domainIndex++;
-    });
-    sessionStorage.setItem('collapsedDomains', JSON.stringify(collapsedDomains));
-}
-
-// Restore collapse state after page reload
-function restoreCollapsedState() {
-    var collapsedDomainsStr = sessionStorage.getItem('collapsedDomains');
-    if (!collapsedDomainsStr) return;
-    
-    var collapsedDomains = JSON.parse(collapsedDomainsStr);
-    var domainIndex = 0;
-    document.querySelectorAll('.domain-collapsible').forEach(function(domain) {
-        if (domainIndex < collapsedDomains.length) {
-            var controls = domain.querySelector('.domain-controls');
-            var header = domain.querySelector('.domain-header');
-            var chevron = header ? header.querySelector('.domain-chevron svg') : null;
-            
-            if (controls) {
-                if (collapsedDomains[domainIndex]) {
-                    // Collapsed state
-                    controls.style.display = 'none';
-                    if (chevron) {
-                        chevron.style.transform = '';
-                    }
-                } else {
-                    // Expanded state
-                    controls.style.display = 'block';
-                    if (chevron) {
-                        chevron.style.transform = 'rotate(180deg)';
-                    }
-                }
-            }
-        }
-        domainIndex++;
-    });
-    
-    // Clear the session storage after restoring
-    sessionStorage.removeItem('collapsedDomains');
-}
-
-// Override function - applies first available answer silently
+// Override function - applies first available answer without page reload
 function openOverrideModal(button) {
     var controlId = button.getAttribute('data-control-id');
     var assessmentId = window.assessmentId || 0;
@@ -86,42 +35,166 @@ function openOverrideModal(button) {
     // Use the first available answer as the override
     var answerId = options[0].id;
     
-    // Store the collapsed state before reload
-    storeCollapsedState();
-    
     // Save the override
     $.ajax({
         url: '/assessment/' + assessmentId + '/answer-override',
         type: 'POST',
         data: { controlId: controlId, answerId: answerId },
         success: function() {
-            location.reload();
+            // Update UI without reload
+            updateControlAfterOverride(controlId, answerId);
         },
         error: function() {
-            // Silently fail, clear session storage
-            sessionStorage.removeItem('collapsedDomains');
+            alert('Could not override answer. Please try again.');
         }
     });
 }
 
-// Remove override function - reverts silently
+// Remove override function - reverts without page reload
 function removeOverride(button) {
     var controlId = button.getAttribute('data-control-id');
     var assessmentId = button.getAttribute('data-assessment-id');
-    
-    // Store the collapsed state before reload
-    storeCollapsedState();
     
     // Remove override silently without confirmation
     $.ajax({
         url: '/assessment/' + assessmentId + '/control/' + controlId + '/remove-override',
         type: 'POST',
         success: function() {
-            location.reload();
+            // Update UI without reload
+            updateControlAfterRemoveOverride(controlId, assessmentId);
         },
         error: function() {
-            // Silently fail, clear session storage
-            sessionStorage.removeItem('collapsedDomains');
+            alert('Could not revert to org service answer. Please try again.');
+        }
+    });
+}
+
+// Update UI after override - get updated state from backend and update UI
+function updateControlAfterOverride(controlId, answerId) {
+    var assessmentId = window.assessmentId || 0;
+    
+    // Fetch the current state for this control
+    $.ajax({
+        url: '/assessment/' + assessmentId + '/control/' + controlId + '/state',
+        type: 'GET',
+        dataType: 'json',
+        success: function(state) {
+            // Update the dropdown
+            var $dropdown = $('select[data-control-id="' + controlId + '"]');
+            $dropdown.val(answerId);
+            
+            // Find the control row in the DOM
+            var $controlRow = $dropdown.closest('tr');
+            if ($controlRow.length === 0) return;
+            
+            // Update override button visibility and state
+            var $overrideBtn = $controlRow.find('.override-btn[data-control-id="' + controlId + '"]');
+            var $backToServiceBtn = $controlRow.find('.back-to-service-btn[data-control-id="' + controlId + '"]');
+            var $takenOverLabels = $controlRow.find('.takenOver-row span.taken-over-label');
+            
+            // Hide override button, show back-to-service button
+            if ($overrideBtn.length > 0) {
+                $overrideBtn.css('display', 'none');
+            }
+            if ($backToServiceBtn.length > 0) {
+                $backToServiceBtn.css('display', '');
+            }
+            
+            // Show the org service name label if available
+            if (state.orgServiceName && $takenOverLabels.length > 0) {
+                // Find the label that currently shows the org service name (first one)
+                $takenOverLabels.first().empty();
+                $takenOverLabels.first().text(state.orgServiceName);
+            }
+            
+            // Enable the dropdown again
+            $dropdown.prop('disabled', false);
+            $dropdown.removeClass('taken-over');
+            
+            // Enable comment textarea
+            var $textarea = $controlRow.find('textarea[data-control-id="' + controlId + '"]');
+            if ($textarea.length > 0) {
+                $textarea.prop('disabled', false);
+                $textarea.prop('placeholder', 'Add comment (optional)');
+            }
+            
+            // Enable answering guide button
+            var $guideBtn = $controlRow.find('.answering-guide-btn[data-control-id="' + controlId + '"]');
+            if ($guideBtn.length > 0) {
+                $guideBtn.prop('disabled', false);
+                $guideBtn.prop('title', 'Get AI-powered answering guide');
+            }
+        },
+        error: function() {
+            // Silently continue - UI is already updated locally
+        }
+    });
+}
+
+// Update UI after removing override - restore org service answer
+function updateControlAfterRemoveOverride(controlId, assessmentId) {
+    // Fetch the current state for this control
+    $.ajax({
+        url: '/assessment/' + assessmentId + '/control/' + controlId + '/state',
+        type: 'GET',
+        dataType: 'json',
+        success: function(state) {
+            var $dropdown = $('select[data-control-id="' + controlId + '"]');
+            var $controlRow = $dropdown.closest('tr');
+            if ($controlRow.length === 0) return;
+            
+            // Set the org service answer
+            if (state.orgServiceAnswerId) {
+                $dropdown.val(state.orgServiceAnswerId);
+            } else {
+                $dropdown.val('');
+            }
+            
+            // Update override button visibility and state
+            var $overrideBtn = $controlRow.find('.override-btn[data-control-id="' + controlId + '"]');
+            var $backToServiceBtn = $controlRow.find('.back-to-service-btn[data-control-id="' + controlId + '"]');
+            var $takenOverLabels = $controlRow.find('.takenOver-row span.taken-over-label');
+            
+            // Show override button, hide back-to-service button
+            if ($overrideBtn.length > 0) {
+                $overrideBtn.css('display', '');
+            }
+            if ($backToServiceBtn.length > 0) {
+                $backToServiceBtn.css('display', 'none');
+            }
+            
+            // Show the org service name label
+            if (state.orgServiceName && $takenOverLabels.length > 0) {
+                $takenOverLabels.first().empty();
+                $takenOverLabels.first().text(state.orgServiceName);
+            }
+            
+            // Disable the dropdown
+            $dropdown.prop('disabled', true);
+            $dropdown.addClass('taken-over');
+            
+            // Restore org service comment in textarea
+            var $textarea = $controlRow.find('textarea[data-control-id="' + controlId + '"]');
+            if ($textarea.length > 0) {
+                // Clear the current comment and restore org service comment
+                if (state.orgServiceComment) {
+                    $textarea.val(state.orgServiceComment);
+                } else {
+                    $textarea.val('');
+                }
+                $textarea.prop('disabled', true);
+                $textarea.prop('placeholder', 'No comment from Org Service');
+            }
+            
+            // Disable answering guide button
+            var $guideBtn = $controlRow.find('.answering-guide-btn[data-control-id="' + controlId + '"]');
+            if ($guideBtn.length > 0) {
+                $guideBtn.prop('disabled', true);
+                $guideBtn.prop('title', 'Disabled for taken-over answers');
+            }
+        },
+        error: function() {
+            // Silently continue - UI is already updated locally
         }
     });
 }
@@ -643,7 +716,4 @@ document.addEventListener("DOMContentLoaded", function () {
     // Collapse assessment details by default on page load
     var adBody = document.querySelector('.assessment-details-body');
     if (adBody) adBody.style.display = 'none';
-    
-    // Restore collapsed domains state if available
-    restoreCollapsedState();
 });

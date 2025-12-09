@@ -939,4 +939,70 @@ public class AssessmentController {
         }
         return "fail";
     }
+
+    // Get control state for UI update without page reload
+    @GetMapping("/{id}/control/{controlId}/state")
+    @ResponseBody
+    public Map<String, Object> getControlState(@PathVariable Long id, @PathVariable Long controlId) {
+        // Authorization check
+        if (!authorizationService.canAccessAssessment(id)) {
+            return Map.of("error", "forbidden");
+        }
+        
+        Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
+        if (assessmentOpt.isEmpty()) {
+            return Map.of("error", "not_found");
+        }
+        
+        Assessment assessment = assessmentOpt.get();
+        Map<String, Object> state = new HashMap<>();
+        
+        // Find org service answer for this control
+        String orgServiceName = null;
+        Long orgServiceAnswerId = null;
+        String orgServiceComment = null;
+        
+        if (assessment.getOrgServices() != null) {
+            for (OrgService orgService : assessment.getOrgServices()) {
+                List<OrgServiceAssessment> osaList = orgServiceAssessmentRepository
+                        .findByOrgServiceId(orgService.getId());
+                if (osaList != null) {
+                    for (OrgServiceAssessment osa : osaList) {
+                        if (osa.getControls() != null) {
+                            for (OrgServiceAssessmentControl osac : osa.getControls()) {
+                                if (osac.isApplicable() && osac.getSecurityControl() != null 
+                                    && osac.getSecurityControl().getId().equals(controlId) && osac.getPercent() >= 0) {
+                                    // Found org service answer for this control
+                                    orgServiceName = orgService.getName();
+                                    orgServiceComment = osac.getComment();
+                                    MaturityAnswer closest = findClosestMaturityAnswer(
+                                            assessment.getSecurityCatalog().getMaturityModel(),
+                                            osac.getPercent());
+                                    if (closest != null) {
+                                        orgServiceAnswerId = closest.getId();
+                                    }
+                                    break;
+                                }
+                            }
+                            if (orgServiceName != null) break;
+                        }
+                    }
+                    if (orgServiceName != null) break;
+                }
+            }
+        }
+        
+        state.put("controlId", controlId);
+        if (orgServiceName != null) {
+            state.put("orgServiceName", orgServiceName);
+        }
+        if (orgServiceAnswerId != null) {
+            state.put("orgServiceAnswerId", orgServiceAnswerId);
+        }
+        if (orgServiceComment != null) {
+            state.put("orgServiceComment", orgServiceComment);
+        }
+        
+        return state;
+    }
 }

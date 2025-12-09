@@ -209,16 +209,16 @@
                                                     </div>
                                                     <div class="override-buttons-row">
                                                         <button type="button" class="override-btn"
-                                                            th:if="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])}"
                                                             th:data-control-id="${ctrl.id}"
+                                                            th:style="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])} ? '' : 'display: none;'"
                                                             onclick="openOverrideModal(this)"
                                                             title="Override the org service answer for this control">
                                                             🔓 Override
                                                         </button>
                                                         <button type="button" class="back-to-service-btn"
-                                                            th:if="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])}"
                                                             th:data-control-id="${ctrl.id}"
                                                             th:data-assessment-id="${assessment.id}"
+                                                            th:style="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])} ? '' : 'display: none;'"
                                                             onclick="removeOverride(this)"
                                                             title="Revert to org service answer">
                                                             ↩ Back to Service
