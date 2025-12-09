@@ -328,6 +328,7 @@ public class AssessmentController {
             Map<Long, String> controlAnswers = new HashMap<>();
             Map<Long, Boolean> controlAnswerIsTakenOver = new HashMap<>();
             Map<Long, String> controlTakenOverOrgServiceName = new HashMap<>();
+            Map<Long, Boolean> controlAnswerIsOverridden = new HashMap<>();
             List<AssessmentControlAnswer> answers = new ArrayList<>();
 
             // Prepare Org Service answers for controls
@@ -375,11 +376,27 @@ public class AssessmentController {
 
             for (SecurityControl control : controls) {
                 Long ctrlId = control.getId();
-                if (bestOrgServiceAnswer.containsKey(ctrlId)) {
+                
+                // Check if there's an override for this control
+                boolean hasOverride = localControlAnswers.containsKey(ctrlId) && localControlAnswers.get(ctrlId).getIsOverride();
+                
+                if (hasOverride) {
+                    // User has overridden the org service answer
+                    AssessmentControlAnswer aca = localControlAnswers.get(ctrlId);
+                    if (aca.getMaturityAnswer() != null) {
+                        controlAnswers.put(ctrlId, aca.getMaturityAnswer().getAnswer());
+                    }
+                    controlAnswerIsTakenOver.put(ctrlId, Boolean.FALSE); // Not taken over, overridden
+                    controlAnswerIsOverridden.put(ctrlId, Boolean.TRUE);
+                    if (aca.getComment() != null) {
+                        controlComments.put(ctrlId, aca.getComment());
+                    }
+                } else if (bestOrgServiceAnswer.containsKey(ctrlId)) {
                     OrgServiceInfo inh = bestOrgServiceAnswer.get(ctrlId);
                     controlAnswers.put(ctrlId, inh.answer.getAnswer());
                     controlAnswerIsTakenOver.put(ctrlId, Boolean.TRUE);
                     controlTakenOverOrgServiceName.put(ctrlId, inh.orgServiceName);
+                    controlAnswerIsOverridden.put(ctrlId, Boolean.FALSE);
 
                     int inheritedPercent = -1;
                     if (assessment.getOrgServices() != null) {
@@ -425,6 +442,7 @@ public class AssessmentController {
                         controlAnswers.put(ctrlId, null);
                     }
                     controlAnswerIsTakenOver.put(ctrlId, Boolean.FALSE);
+                    controlAnswerIsOverridden.put(ctrlId, Boolean.FALSE);
                     // Populate comment
                     if (aca.getComment() != null) {
                         controlComments.put(ctrlId, aca.getComment());
@@ -432,6 +450,7 @@ public class AssessmentController {
                 } else {
                     controlAnswers.put(ctrlId, null);
                     controlAnswerIsTakenOver.put(ctrlId, Boolean.FALSE);
+                    controlAnswerIsOverridden.put(ctrlId, Boolean.FALSE);
                 }
             }
             
@@ -471,6 +490,7 @@ public class AssessmentController {
             model.addAttribute("controlComments", controlComments);
             model.addAttribute("controlAnswerIsTakenOver", controlAnswerIsTakenOver);
             model.addAttribute("controlTakenOverOrgServiceName", controlTakenOverOrgServiceName);
+            model.addAttribute("controlAnswerIsOverridden", controlAnswerIsOverridden);
 
             // Summary table by answer type
             model.addAttribute("answerSummary", assessmentDetailsService.computeAnswerSummary(details));
@@ -805,5 +825,88 @@ public class AssessmentController {
         assessment.setUsers(users);
         assessment = assessmentRepository.save(assessment);
         return new ArrayList<>(users);
+    }
+
+    // Save answer with override flag for org service answers
+    @PostMapping("/{id}/answer-override")
+    @ResponseBody
+    public String saveAnswerWithOverride(@PathVariable Long id, @RequestParam Long controlId, @RequestParam Long answerId) {
+        // Authorization check
+        if (!authorizationService.canModifyAssessment(id)) {
+            return "forbidden";
+        }
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
+        AssessmentDetails details = null;
+        if (!detailsOpt.isPresent()) {
+            // Try to find the assessment:
+            Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
+            if (!assessmentOpt.isPresent())
+                return "fail";
+            details = new AssessmentDetails();
+            // Link this details entity to the assessment
+            Set<Assessment> assessmentSet = new HashSet<>();
+            assessmentSet.add(assessmentOpt.get());
+            details.setAssessments(assessmentSet);
+            details.setDate(LocalDate.now());
+        } else {
+            details = detailsOpt.get();
+        }
+        Set<AssessmentControlAnswer> answers = details.getControlAnswers();
+        // Find or add
+        AssessmentControlAnswer found = null;
+        for (AssessmentControlAnswer aca : answers) {
+            if (aca.getSecurityControl() != null && aca.getSecurityControl().getId().equals(controlId)) {
+                found = aca;
+                break;
+            }
+        }
+        SecurityControl control = securityControlRepository.findById(controlId).orElse(null);
+        MaturityAnswer maturityAnswer = maturityAnswerRepository.findById(answerId).orElse(null);
+        if (control == null || maturityAnswer == null)
+            return "fail";
+
+        if (found == null) {
+            found = new AssessmentControlAnswer(control, maturityAnswer);
+            found.setIsOverride(true);
+            found = assessmentControlAnswerRepository.save(found);
+            answers.add(found);
+        } else {
+            found.setMaturityAnswer(maturityAnswer);
+            found.setIsOverride(true);
+            found = assessmentControlAnswerRepository.save(found);
+        }
+        assessmentDetailsService.save(details);
+        return "ok";
+    }
+
+    // Remove override and revert to org service answer
+    @PostMapping("/{id}/control/{controlId}/remove-override")
+    @ResponseBody
+    public String removeOverride(@PathVariable Long id, @PathVariable Long controlId) {
+        // Authorization check
+        if (!authorizationService.canModifyAssessment(id)) {
+            return "forbidden";
+        }
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
+        if (!detailsOpt.isPresent()) {
+            return "fail";
+        }
+        AssessmentDetails details = detailsOpt.get();
+        Set<AssessmentControlAnswer> answers = details.getControlAnswers();
+        // Find and remove the answer that is marked as override
+        AssessmentControlAnswer toRemove = null;
+        for (AssessmentControlAnswer aca : answers) {
+            if (aca.getSecurityControl() != null && aca.getSecurityControl().getId().equals(controlId) && aca.getIsOverride()) {
+                toRemove = aca;
+                break;
+            }
+        }
+        if (toRemove != null) {
+            answers.remove(toRemove);
+            assessmentControlAnswerRepository.delete(toRemove);
+            assessmentDetailsService.save(details);
+            return "ok";
+        }
+        return "fail";
     }
 }

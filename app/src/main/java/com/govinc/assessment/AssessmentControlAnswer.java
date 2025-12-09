@@ -21,6 +21,9 @@ public class AssessmentControlAnswer {
     @ManyToOne(optional=true)
     private MaturityAnswer maturityAnswer;
 
+    @Column(name = "is_override", nullable = false)
+    private Boolean isOverride = false; // Indicates if this answer overrides an org service answer
+
     public AssessmentControlAnswer() {}
 
     public AssessmentControlAnswer(SecurityControl securityControl, MaturityAnswer maturityAnswer) {
@@ -31,6 +34,7 @@ public class AssessmentControlAnswer {
         this.securityControl = securityControl;
         this.maturityAnswer = maturityAnswer;
         this.comment = comment;
+        this.isOverride = false;
     }
 
     public Long getId() {
@@ -65,6 +69,14 @@ public class AssessmentControlAnswer {
 
     public void setComment(String comment) {
         this.comment = comment;
+    }
+
+    public Boolean getIsOverride() {
+        return isOverride != null ? isOverride : false;
+    }
+
+    public void setIsOverride(Boolean isOverride) {
+        this.isOverride = isOverride != null ? isOverride : false;
     }
 
     /**

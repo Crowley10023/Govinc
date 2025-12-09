@@ -9,6 +9,123 @@ $(function () {
     }
 });
 
+// =================== Override Functions ===================
+// Store collapse state before any action
+function storeCollapsedState() {
+    var collapsedDomains = [];
+    var domainIndex = 0;
+    document.querySelectorAll('.domain-collapsible').forEach(function(domain) {
+        var controls = domain.querySelector('.domain-controls');
+        if (controls) {
+            // Store if this domain's controls are hidden
+            collapsedDomains.push(controls.style.display === 'none');
+        }
+        domainIndex++;
+    });
+    sessionStorage.setItem('collapsedDomains', JSON.stringify(collapsedDomains));
+}
+
+// Restore collapse state after page reload
+function restoreCollapsedState() {
+    var collapsedDomainsStr = sessionStorage.getItem('collapsedDomains');
+    if (!collapsedDomainsStr) return;
+    
+    var collapsedDomains = JSON.parse(collapsedDomainsStr);
+    var domainIndex = 0;
+    document.querySelectorAll('.domain-collapsible').forEach(function(domain) {
+        if (domainIndex < collapsedDomains.length) {
+            var controls = domain.querySelector('.domain-controls');
+            var header = domain.querySelector('.domain-header');
+            var chevron = header ? header.querySelector('.domain-chevron svg') : null;
+            
+            if (controls) {
+                if (collapsedDomains[domainIndex]) {
+                    // Collapsed state
+                    controls.style.display = 'none';
+                    if (chevron) {
+                        chevron.style.transform = '';
+                    }
+                } else {
+                    // Expanded state
+                    controls.style.display = 'block';
+                    if (chevron) {
+                        chevron.style.transform = 'rotate(180deg)';
+                    }
+                }
+            }
+        }
+        domainIndex++;
+    });
+    
+    // Clear the session storage after restoring
+    sessionStorage.removeItem('collapsedDomains');
+}
+
+// Override function - applies first available answer silently
+function openOverrideModal(button) {
+    var controlId = button.getAttribute('data-control-id');
+    var assessmentId = window.assessmentId || 0;
+    
+    // Get the dropdown for this control to find available answers
+    var $dropdown = $('select[data-control-id="' + controlId + '"]');
+    
+    // Build a list of available answers from the dropdown
+    var options = [];
+    $dropdown.find('option').each(function() {
+        var val = $(this).val();
+        var text = $(this).text();
+        if (val && text !== '-- select an answer --') {
+            options.push({ id: val, text: text });
+        }
+    });
+    
+    if (options.length === 0) {
+        return;
+    }
+    
+    // Use the first available answer as the override
+    var answerId = options[0].id;
+    
+    // Store the collapsed state before reload
+    storeCollapsedState();
+    
+    // Save the override
+    $.ajax({
+        url: '/assessment/' + assessmentId + '/answer-override',
+        type: 'POST',
+        data: { controlId: controlId, answerId: answerId },
+        success: function() {
+            location.reload();
+        },
+        error: function() {
+            // Silently fail, clear session storage
+            sessionStorage.removeItem('collapsedDomains');
+        }
+    });
+}
+
+// Remove override function - reverts silently
+function removeOverride(button) {
+    var controlId = button.getAttribute('data-control-id');
+    var assessmentId = button.getAttribute('data-assessment-id');
+    
+    // Store the collapsed state before reload
+    storeCollapsedState();
+    
+    // Remove override silently without confirmation
+    $.ajax({
+        url: '/assessment/' + assessmentId + '/control/' + controlId + '/remove-override',
+        type: 'POST',
+        success: function() {
+            location.reload();
+        },
+        error: function() {
+            // Silently fail, clear session storage
+            sessionStorage.removeItem('collapsedDomains');
+        }
+    });
+}
+
 // =================== Modal Logic and Dynamic Content Loading ===================
 $(document).ready(function () {
     // Org Unit modal logic
@@ -526,4 +643,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // Collapse assessment details by default on page load
     var adBody = document.querySelector('.assessment-details-body');
     if (adBody) adBody.style.display = 'none';
+    
+    // Restore collapsed domains state if available
+    restoreCollapsedState();
 });

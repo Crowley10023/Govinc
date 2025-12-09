@@ -174,8 +174,8 @@
                                                             th:data-control-id="${ctrl.id}"
                                                             th:data-control-name="${ctrl.name}"
                                                             th:data-control-detail="${ctrl.detail}"
-                                                            th:disabled="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])}"
-                                                            th:title="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])} ? 'Disabled for taken-over answers' : 'Get AI-powered answering guide'">
+                                                            th:disabled="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])}"
+                                                            th:title="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])} ? 'Disabled for taken-over answers' : 'Get AI-powered answering guide'">
                                                             💡 Guide
                                                         </button>
                                                     </div>
@@ -183,8 +183,8 @@
                                                         <select th:name="${'control_' + ctrl.id}"
                                                             th:data-control-id="${ctrl.id}"
                                                             th:data-domain-id="${domain.id}" class="answer-select"
-                                                            th:disabled="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])}"
-                                                            th:classappend="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])} ? 'taken-over' : ''">
+                                                            th:disabled="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])}"
+                                                            th:classappend="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])} ? 'taken-over' : ''">
                                                             <option value="">-- select an answer --</option>
                                                             <option th:each="ans : ${maturityAnswers}"
                                                                 th:value="${ans.id}"
@@ -195,24 +195,41 @@
                                                     </div>
                                                     <div class="takenOver-row">
                                                         <span
-                                                            th:if="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])}"
+                                                            th:if="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])}"
                                                             class="taken-over-label"
                                                             title="Answer is taken from an Org Service">
                                                             <span
                                                                 th:text="${controlTakenOverOrgServiceName[ctrl.id]}"></span>
                                                         </span>
                                                         <span
-                                                            th:if="${T(java.lang.Boolean).FALSE.equals(controlAnswerIsTakenOver[ctrl.id])}"
+                                                            th:if="${!T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) or T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])}"
                                                             class="taken-over-label">
                                                             <span>&nbsp;</span>
                                                         </span>                                                        
+                                                    </div>
+                                                    <div class="override-buttons-row">
+                                                        <button type="button" class="override-btn"
+                                                            th:if="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])}"
+                                                            th:data-control-id="${ctrl.id}"
+                                                            onclick="openOverrideModal(this)"
+                                                            title="Override the org service answer for this control">
+                                                            🔓 Override
+                                                        </button>
+                                                        <button type="button" class="back-to-service-btn"
+                                                            th:if="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])}"
+                                                            th:data-control-id="${ctrl.id}"
+                                                            th:data-assessment-id="${assessment.id}"
+                                                            onclick="removeOverride(this)"
+                                                            title="Revert to org service answer">
+                                                            ↩ Back to Service
+                                                        </button>
                                                     </div>
                                                     <div class="testarea-row">
                                                         <textarea class="comment-textarea"
                                                             th:name="${'comment_' + ctrl.id}"
                                                             th:data-control-id="${ctrl.id}"
-                                                            th:disabled="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])}"
-                                                            th:placeholder="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id])} ? 'Comment from Org Service' : 'Add comment (optional)'"
+                                                            th:disabled="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])}"
+                                                            th:placeholder="${(T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id]))} ? 'Comment from Org Service' : 'Add comment (optional)'"
                                                             th:text="${controlComments != null and controlComments[ctrl.id] != null ? controlComments[ctrl.id] : ''}"></textarea>
                                                         <span class="comment-feedback"></span>
                                                     </div>
