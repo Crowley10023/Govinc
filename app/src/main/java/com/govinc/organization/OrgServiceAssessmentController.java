@@ -77,4 +77,45 @@ public class OrgServiceAssessmentController {
             return ResponseEntity.status(500).body(response);
         }
     }
+
+    @PutMapping("/save-control-comment")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> saveControlComment(@RequestBody Map<String, Object> body) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            Long id = Long.parseLong(body.get("id").toString());
+            Long controlId = Long.parseLong(body.get("controlId").toString());
+            String comment = (String) body.get("comment");
+            
+            OrgServiceAssessment assessment = assessmentService.getAssessment(id)
+                    .orElseThrow(() -> new RuntimeException("Assessment not found"));
+            
+            // Find and update the specific control
+            List<OrgServiceAssessmentControl> controls = assessment.getControls();
+            OrgServiceAssessmentControl controlToUpdate = controls.stream()
+                    .filter(c -> c.getSecurityControl().getId().equals(controlId))
+                    .findFirst()
+                    .orElseThrow(() -> new RuntimeException("Control not found"));
+            
+            // Check if the control is locked (answered by another assessment)
+            if (controlToUpdate.isAnsweredByAnotherAssessment()) {
+                response.put("success", false);
+                response.put("message", "This control is locked by another assessment");
+                return ResponseEntity.status(400).body(response);
+            }
+            
+            // Update comment
+            controlToUpdate.setComment(comment != null ? comment : "");
+            
+            assessmentService.saveAssessment(assessment);
+            
+            response.put("success", true);
+            response.put("message", "Comment saved successfully");
+            return ResponseEntity.ok(response);
+        } catch (Exception ex) {
+            response.put("success", false);
+            response.put("message", ex.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
 }

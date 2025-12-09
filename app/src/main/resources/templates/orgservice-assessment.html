@@ -192,6 +192,16 @@
             cursor: not-allowed;
         }
 
+        .control-comment {
+            background-color: white;
+            transition: background-color 0.3s;
+        }
+
+        .control-comment:disabled {
+            background-color: #e9ecef;
+            cursor: not-allowed;
+        }
+
         .linked-service-info {
             color: #6c757d;
             font-size: 0.9em;
@@ -326,6 +336,14 @@
         .save-notification.hide {
             animation: slideOut 0.3s ease-in forwards;
         }
+
+        .comment-feedback {
+            display: inline-block;
+            font-size: 0.9em;
+            font-weight: 500;
+            margin-left: 5px;
+            min-width: 60px;
+        }
     </style>
 </head>
 
@@ -399,6 +417,7 @@
                             <th>Security Control</th>
                             <th style="width: 150px;">Applicable</th>
                             <th style="width: 120px;">Percent</th>
+                            <th style="width: 250px;">Comment</th>
                         </tr>
                     </thead>
                     <tbody id="controlsTableBody">
@@ -422,6 +441,14 @@
                                     th:disabled="${control.answeredByAnotherAssessment}" />
                                 <select class="control-select control-answer" style="display: none;"
                                     th:disabled="${control.answeredByAnotherAssessment}"></select>
+                            </td>
+                            <td>
+                                <textarea class="control-comment" 
+                                    th:attr="data-control-id=${control.securityControl.id}"
+                                    style="min-width: 180px; min-height: 36px; resize: vertical; padding: 0.5em; border: 1px solid #ced4da; border-radius: 4px; font-size: 1em;"
+                                    placeholder="Add comment (optional)"
+                                    th:disabled="${control.answeredByAnotherAssessment}" th:text="${control.comment}"></textarea>
+                                <span class="comment-feedback"></span>
                             </td>
                         </tr>
                     </tbody>
@@ -672,6 +699,38 @@
                 });
         }
 
+        function saveControlComment(controlId, comment) {
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            if (csrfToken) {
+                headers[csrfHeader] = csrfToken;
+            }
+
+            fetch('/orgservice-assessment/save-control-comment', {
+                method: 'PUT',
+                body: JSON.stringify({ id: assessmentId, controlId: controlId, comment: comment }),
+                headers: headers
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        showSaveNotification(true);
+                    } else {
+                        showSaveNotification(false);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showSaveNotification(false);
+                });
+        }
+
         function updatePercentFieldState(row) {
             const checkbox = row.querySelector('.control-applicable');
             const percentInput = row.querySelector('.control-percent');
@@ -731,6 +790,30 @@
                 timeout = setTimeout(() => {
                     saveControlChange(controlId, applicable, percent);
                 }, 500);
+            });
+        });
+
+        // Event listeners for comment textareas
+        var debounceTimers = {};
+        document.querySelectorAll('.control-comment').forEach(textarea => {
+            textarea.addEventListener('input', function () {
+                const controlId = this.getAttribute('data-control-id');
+                const comment = this.value;
+                const feedback = this.nextElementSibling;
+
+                if (debounceTimers[controlId]) {
+                    clearTimeout(debounceTimers[controlId]);
+                }
+
+                debounceTimers[controlId] = setTimeout(() => {
+                    textarea.style.background = '';
+                    feedback.textContent = '';
+                    
+                    if (comment.trim() !== '' || comment.length > 0) {
+                        textarea.style.background = '#fffbe8';
+                        saveControlComment(controlId, comment);
+                    }
+                }, 650);
             });
         });
 

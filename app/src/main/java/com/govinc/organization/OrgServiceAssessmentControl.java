@@ -24,6 +24,9 @@ public class OrgServiceAssessmentControl {
     @Column(nullable = false)
     private int percent;
 
+    @Column(columnDefinition = "TEXT")
+    private String comment;
+
     @Transient
     private boolean answeredByAnotherAssessment = false;
 
@@ -37,6 +40,13 @@ public class OrgServiceAssessmentControl {
         this.securityControl = securityControl;
         this.applicable = applicable;
         this.percent = percent;
+    }
+
+    public OrgServiceAssessmentControl(SecurityControl securityControl, boolean applicable, int percent, String comment) {
+        this.securityControl = securityControl;
+        this.applicable = applicable;
+        this.percent = percent;
+        this.comment = comment;
     }
 
     public Long getId() {
@@ -93,5 +103,13 @@ public class OrgServiceAssessmentControl {
     
     public void setAnsweredByOrgServiceName(String answeredByOrgServiceName) {
         this.answeredByOrgServiceName = answeredByOrgServiceName;
+    }
+
+    public String getComment() {
+        return comment;
+    }
+
+    public void setComment(String comment) {
+        this.comment = comment;
     }
 }
