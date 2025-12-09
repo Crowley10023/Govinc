@@ -54,12 +54,11 @@ public class AssessmentDetailsController {
 
     @GetMapping("/details/{id}")
     public String details(@PathVariable Long id, Model model) {
-        // ========= BEGIN VERY DETAILED DEBUG =========
         System.out.println("========= DETAILS CONTROLLER DEBUG =========");
         System.out.println("Loading AssessmentDetails for id=" + id);
         Optional<AssessmentDetails> details = assessmentDetailsService.findById(id);
         if (details.isPresent()) {
-            System.out.println(".... details present");
+            System.out.println("Details present");
             AssessmentDetails ad = details.get();
             Map<String, Map<String, Object>> answerSummary = assessmentDetailsService.computeAnswerSummary(ad);
 
@@ -68,44 +67,62 @@ public class AssessmentDetailsController {
             if (ad.getAssessments() != null && !ad.getAssessments().isEmpty()) {
                 assessment = ad.getAssessments().iterator().next();
             }
-            System.out.println(".... now going on");
+            System.out.println("Now proceeding with assessment logic");
+            
             // --- Improved logic for taken-over and display answer ---
             Map<Long, Boolean> controlAnswerIsTakenOver = new HashMap<>();
             Map<Long, String> controlTakenOverOrgServiceName = new HashMap<>();
-            Map<Long, Long> orgServiceControlAnswers = new HashMap<>(); // control id -> maturityAnswerId
+            Map<Long, Long> orgServiceControlAnswers = new HashMap<>();
+            Map<Long, String> orgServiceControlComments = new HashMap<>();
             List<MaturityAnswer> allMaturityAnswers = maturityAnswerRepository.findAll();
+            
             if (assessment != null) {
-                // For every SecurityControl in the catalog
                 if (assessment.getSecurityCatalog() != null && assessment.getSecurityCatalog().getSecurityControls() != null) {
                     List<OrgService> assignedOrgServices = (assessment.getOrgServices() != null)
                         ? assessment.getOrgServices().stream().toList() : java.util.Collections.emptyList();
-                    System.out.println("\n\n\n assessment: " + assessment.getName());
+                    System.out.println("Assessment: " + assessment.getName());
+                    
                     for (var ctrl : assessment.getSecurityCatalog().getSecurityControls()) {
                         boolean found = false;
                         String takenFromName = null;
                         int foundPercent = 0;
+                        String foundComment = null;
+                        
                         for (OrgService orgService : assignedOrgServices) {
-                            System.out.println("   org service: " + orgService.getName());
+                            System.out.println("Checking org service: " + orgService.getName());
                             OrgServiceAssessment orgServiceAssessment = orgServiceAssessmentService.findOrCreateAssessment(orgService.getId());
+                            
+                            if (orgServiceAssessment.getControls() == null) {
+                                continue;
+                            }
+                            
                             for (OrgServiceAssessmentControl orgServiceCtrl : orgServiceAssessment.getControls()) {
-                                System.out.println( "      orgservice id: " + orgServiceCtrl.getSecurityControl().getId() + " --> ID control: " + ctrl.getId());
+                                if (orgServiceCtrl.getSecurityControl() == null) {
+                                    continue;
+                                }
+                                
                                 if (orgServiceCtrl.getSecurityControl().getId().equals(ctrl.getId())) {
-                                    System.out.println("     ----- match!");
                                     if (orgServiceCtrl.getPercent() >= 0) {
-                                        System.out.println("     ----- match done");
                                         found = true;
                                         takenFromName = orgService.getName();
                                         foundPercent = orgServiceCtrl.getPercent();
+                                        foundComment = orgServiceCtrl.getComment();
+                                        System.out.println("Found org service answer for control " + ctrl.getId() + ", comment: [" + foundComment + "]");
                                         break;
                                     }
                                 }
                             }
                             if (found) break;
                         }
+                        
                         if (found) {
                             controlAnswerIsTakenOver.put(ctrl.getId(), true);
                             controlTakenOverOrgServiceName.put(ctrl.getId(), takenFromName);
-                            // Match percent to maturity answer
+                            if (foundComment != null && !foundComment.isEmpty()) {
+                                System.out.println("Storing comment for control " + ctrl.getId() + ": [" + foundComment + "]");
+                                orgServiceControlComments.put(ctrl.getId(), foundComment);
+                            }
+                            
                             Long answerIdMatch = null;
                             for (MaturityAnswer ans : allMaturityAnswers) {
                                 if (ans.getRating() == foundPercent) {
@@ -122,28 +139,50 @@ public class AssessmentDetailsController {
                     }
                 }
             }
-            // Defensive: ensure every catalog control gets a value in controlAnswerIsTakenOver (never null)
+            
+            // Defensive: ensure every catalog control gets a value
             if (assessment != null && assessment.getSecurityCatalog() != null && assessment.getSecurityCatalog().getSecurityControls() != null) {
                 for (var ctrl : assessment.getSecurityCatalog().getSecurityControls()) {
                     controlAnswerIsTakenOver.putIfAbsent(ctrl.getId(), false);
                 }
             }
+            
             // Build map for display: choose user answer if exists, else org service answer
             Map<Long, Long> controlDisplayAnswers = new HashMap<>();
+            Map<Long, String> controlComments = new HashMap<>();
             Set<com.govinc.assessment.AssessmentControlAnswer> detailAnswers = ad.getControlAnswers();
+            
             if (assessment != null && detailAnswers != null) {
                 for (var ctrl : assessment.getSecurityCatalog().getSecurityControls()) {
                     Long foundUserAnswerId = null;
+                    String foundUserComment = null;
+                    
                     for (com.govinc.assessment.AssessmentControlAnswer a : detailAnswers) {
                         if (a.getSecurityControl() != null && a.getSecurityControl().getId().equals(ctrl.getId()) && a.getMaturityAnswer() != null) {
                             foundUserAnswerId = a.getMaturityAnswer().getId();
+                            foundUserComment = a.getComment();
                             break;
                         }
                     }
+                    
                     if (foundUserAnswerId != null) {
                         controlDisplayAnswers.put(ctrl.getId(), foundUserAnswerId);
+                        if (foundUserComment != null && !foundUserComment.isEmpty()) {
+                            controlComments.put(ctrl.getId(), foundUserComment);
+                        } else if (orgServiceControlComments.containsKey(ctrl.getId())) {
+                            controlComments.put(ctrl.getId(), orgServiceControlComments.get(ctrl.getId()));
+                        }
                     } else if (orgServiceControlAnswers.containsKey(ctrl.getId())) {
                         controlDisplayAnswers.put(ctrl.getId(), orgServiceControlAnswers.get(ctrl.getId()));
+                        if (orgServiceControlComments.containsKey(ctrl.getId())) {
+                            controlComments.put(ctrl.getId(), orgServiceControlComments.get(ctrl.getId()));
+                        }
+                    }
+                }
+                
+                for (com.govinc.assessment.AssessmentControlAnswer a : detailAnswers) {
+                    if (a.getSecurityControl() != null && a.getComment() != null && !a.getComment().isEmpty()) {
+                        controlComments.put(a.getSecurityControl().getId(), a.getComment());
                     }
                 }
             }
@@ -159,16 +198,22 @@ public class AssessmentDetailsController {
                 model.addAttribute("assessment", ad);
                 model.addAttribute("selectedOrgServiceIds", java.util.Collections.emptyList());
             }
+            
+            System.out.println("Final controlComments size: " + controlComments.size());
+            
             model.addAttribute("controlAnswerIsTakenOver", controlAnswerIsTakenOver);
             model.addAttribute("controlTakenOverOrgServiceName", controlTakenOverOrgServiceName);
             model.addAttribute("answerSummary", answerSummary);
             model.addAttribute("users", userRepository.findAll());
             model.addAttribute("orgUnits", orgUnitService.getAllOrgUnits());
             model.addAttribute("controlDisplayAnswers", controlDisplayAnswers);
-            // DEBUG: Log to make sure we have org services:
+            model.addAttribute("controlComments", controlComments);
+            model.addAttribute("orgServiceControlComments", orgServiceControlComments);
+            
             java.util.List<com.govinc.organization.OrgService> allOrgSvcs = orgServiceService.getAllOrgServices();
-            System.out.println("OrgServicesAll for modal: size=" + allOrgSvcs.size() + " contents=" + allOrgSvcs);
+            System.out.println("OrgServicesAll for modal: size=" + allOrgSvcs.size());
             model.addAttribute("orgServicesAll", allOrgSvcs);
+            
             return "assessment-details";
         } else {
             return "redirect:/assessmentdetails/list";
@@ -188,14 +233,13 @@ public class AssessmentDetailsController {
 
     @PostMapping("/save")
     public String save(@ModelAttribute AssessmentDetails details) {
-        // Persist all maturity answers before setting them to AssessmentDetails
         if (details.getControlAnswers() != null) {
-    Set<AssessmentControlAnswer> savedAnswers = new java.util.HashSet<>();
-    for (AssessmentControlAnswer answer : details.getControlAnswers()) {
-        savedAnswers.add(assessmentControlAnswerRepository.save(answer));
-    }
-    details.setControlAnswers(savedAnswers);
-}
+            Set<AssessmentControlAnswer> savedAnswers = new java.util.HashSet<>();
+            for (AssessmentControlAnswer answer : details.getControlAnswers()) {
+                savedAnswers.add(assessmentControlAnswerRepository.save(answer));
+            }
+            details.setControlAnswers(savedAnswers);
+        }
         assessmentDetailsService.save(details);
         return "redirect:/assessmentdetails/list";
     }
@@ -206,7 +250,6 @@ public class AssessmentDetailsController {
         return "redirect:/assessmentdetails/list";
     }
 
-    // --- REST endpoint to provide org units for assessmentdetails.html ---
     @GetMapping("/orgunits")
     @ResponseBody
     public List<OrgUnit> getAllOrgUnitsForAssessment() {

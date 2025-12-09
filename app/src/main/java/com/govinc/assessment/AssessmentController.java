@@ -371,8 +371,31 @@ public class AssessmentController {
                     ? new HashSet<>(details.getControlAnswers())
                     : new HashSet<>();
 
-            // Gather comments as well
+            // Gather comments as well - including org service comments
             Map<Long, String> controlComments = new HashMap<>();
+            Map<Long, String> orgServiceControlComments = new HashMap<>();
+            
+            // Pre-populate org service comments if any org services are assigned
+            if (assessment.getOrgServices() != null) {
+                for (OrgService orgService : assessment.getOrgServices()) {
+                    List<OrgServiceAssessment> osaList = orgServiceAssessmentRepository
+                            .findByOrgServiceId(orgService.getId());
+                    if (osaList != null) {
+                        for (OrgServiceAssessment osa : osaList) {
+                            if (osa.getControls() != null) {
+                                for (OrgServiceAssessmentControl osac : osa.getControls()) {
+                                    if (osac.isApplicable() && osac.getSecurityControl() != null && osac.getPercent() >= 0) {
+                                        Long ctrlId = osac.getSecurityControl().getId();
+                                        if (osac.getComment() != null && !osac.getComment().isEmpty() && !orgServiceControlComments.containsKey(ctrlId)) {
+                                            orgServiceControlComments.put(ctrlId, osac.getComment());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
 
             for (SecurityControl control : controls) {
                 Long ctrlId = control.getId();
@@ -429,10 +452,16 @@ public class AssessmentController {
                             }
                         }
                     }
-                    // If inherited, try to fetch the comment from local (user) answer if exists, else set to empty
+                    // If inherited, try to fetch the comment from local (user) answer if exists, else use org service comment
                     if (localControlAnswers.containsKey(ctrlId)) {
                         String comment = localControlAnswers.get(ctrlId).getComment();
-                        if (comment != null) controlComments.put(ctrlId, comment);
+                        if (comment != null && !comment.isEmpty()) {
+                            controlComments.put(ctrlId, comment);
+                        } else if (orgServiceControlComments.containsKey(ctrlId)) {
+                            controlComments.put(ctrlId, orgServiceControlComments.get(ctrlId));
+                        }
+                    } else if (orgServiceControlComments.containsKey(ctrlId)) {
+                        controlComments.put(ctrlId, orgServiceControlComments.get(ctrlId));
                     }
                 } else if (localControlAnswers.containsKey(ctrlId)) {
                     AssessmentControlAnswer aca = localControlAnswers.get(ctrlId);
@@ -491,6 +520,7 @@ public class AssessmentController {
             model.addAttribute("controlAnswerIsTakenOver", controlAnswerIsTakenOver);
             model.addAttribute("controlTakenOverOrgServiceName", controlTakenOverOrgServiceName);
             model.addAttribute("controlAnswerIsOverridden", controlAnswerIsOverridden);
+            model.addAttribute("orgServiceControlComments", orgServiceControlComments);
 
             // Summary table by answer type
             model.addAttribute("answerSummary", assessmentDetailsService.computeAnswerSummary(details));

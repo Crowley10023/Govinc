@@ -229,8 +229,8 @@
                                                             th:name="${'comment_' + ctrl.id}"
                                                             th:data-control-id="${ctrl.id}"
                                                             th:disabled="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])}"
-                                                            th:placeholder="${(T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id]))} ? 'Comment from Org Service' : 'Add comment (optional)'"
-                                                            th:text="${controlComments != null and controlComments[ctrl.id] != null ? controlComments[ctrl.id] : ''}"></textarea>
+                                                            th:placeholder="${(T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id]))} ? 'No comment from Org Service' : 'Add comment (optional)'"
+                                                            th:text="${controlComments != null and controlComments[ctrl.id] != null ? controlComments[ctrl.id] : (orgServiceControlComments != null and orgServiceControlComments[ctrl.id] != null ? orgServiceControlComments[ctrl.id] : '')}" th:inline="text"></textarea>
                                                         <span class="comment-feedback"></span>
                                                     </div>
                                                 </div>
@@ -245,7 +245,7 @@
                                 <thead>
                                     <tr>
                                         <th>Control</th>
-                                        <th>Answer</th>
+                                        <th>Answer & Comment</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -264,8 +264,16 @@
                                                 </div>
                                             </td>
                                             <td>
-                                                <span
-                                                    th:text="${controlAnswers != null and controlAnswers[ctrl.id] != null ? controlAnswers[ctrl.id] : 'No answer'}"></span>
+                                                <div class="control-answer-comment-row">
+                                                    <div class="answer-display">
+                                                        <span
+                                                            th:text="${controlAnswers != null and controlAnswers[ctrl.id] != null ? controlAnswers[ctrl.id] : 'No answer'}"></span>
+                                                    </div>
+                                                    <div class="comment-display" th:if="${controlComments != null and controlComments[ctrl.id] != null}">
+                                                        <strong>Comment:</strong>
+                                                        <div th:text="${controlComments[ctrl.id]}" style="white-space: pre-wrap; word-wrap: break-word;"></div>
+                                                    </div>
+                                                </div>
                                             </td>
                                         </th:block>
                                     </tr>
