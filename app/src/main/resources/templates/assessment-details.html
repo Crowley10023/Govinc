@@ -14,6 +14,33 @@
 
 <body>
     <div th:replace="~{navigation :: mainNav}"></div>
+    <!-- Filter and Progress Bar (Sticky at Top) -->
+    <div class="controls-filter-bar sticky-filter-bar">
+        <div class="filter-section">
+            <div class="filter-item">
+                <label for="filter-unanswered-toggle">Show Only Unanswered:</label>
+                <input type="checkbox" id="filter-unanswered-toggle" class="filter-checkbox">
+            </div>
+            <div class="filter-item" id="maturity-filter-container">
+                <label for="filter-maturity-select">Filter by Maturity Level:</label>
+                <select id="filter-maturity-select" class="filter-select">
+                    <option value="">-- All Levels --</option>
+                </select>
+            </div>
+        </div>
+        <div class="progress-section">
+            <div class="progress-info">
+                <span class="progress-label">Completion:</span>
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" id="completion-bar-fill"></div>
+                </div>
+                <span class="progress-percentage" id="completion-percentage">0%</span>
+            </div>
+            <div class="answer-count-info">
+                <span id="answered-count">0</span> / <span id="total-count">0</span> answered
+            </div>
+        </div>
+    </div>
     <div class="container">
         <!-- Collapsible Assessment Details Section (Default: Collapsed) -->
         <div class="domain-outline card assessment-details-collapsible domain-collapsible">

@@ -685,11 +685,201 @@ function checkDomainCompleteness() {
     });
 }
 
+// =================== Filter and Completion Tracking ===================
+let filterState = {
+    showUnansweredOnly: false,
+    selectedMaturityLevel: '',
+    totalControls: 0,
+    answeredControls: 0,
+    maturityAnswers: []
+};
+
+function initializeFilterBar() {
+    // Get all answer selects to determine total and answered counts
+    var allSelects = document.querySelectorAll('.answer-select');
+    filterState.totalControls = allSelects.length;
+    
+    // Calculate initial answered count
+    updateAnsweredCount();
+    
+    // Update maturity filter options based on available answers
+    populateMaturityFilter();
+    
+    // Set up event listeners
+    var unansweredToggle = document.getElementById('filter-unanswered-toggle');
+    if (unansweredToggle) {
+        unansweredToggle.addEventListener('change', function(e) {
+            filterState.showUnansweredOnly = e.target.checked;
+            applyFilters();
+        });
+    }
+    
+    var maturitySelect = document.getElementById('filter-maturity-select');
+    if (maturitySelect) {
+        maturitySelect.addEventListener('change', function(e) {
+            filterState.selectedMaturityLevel = e.target.value;
+            applyFilters();
+        });
+    }
+    
+    // Initial update
+    updateCompletionDisplay();
+}
+
+function populateMaturityFilter() {
+    var selects = document.querySelectorAll('.answer-select');
+    var maturitySet = new Set();
+    
+    selects.forEach(function(select) {
+        select.querySelectorAll('option').forEach(function(option) {
+            var text = option.text.trim();
+            if (text && !text.includes('select an answer') && text !== '') {
+                maturitySet.add(text);
+            }
+        });
+    });
+    
+    filterState.maturityAnswers = Array.from(maturitySet).sort();
+    
+    // Populate the filter select
+    var filterSelect = document.getElementById('filter-maturity-select');
+    if (filterSelect && filterState.maturityAnswers.length > 0) {
+        while (filterSelect.options.length > 1) {
+            filterSelect.remove(1);
+        }
+        
+        filterState.maturityAnswers.forEach(function(level) {
+            var option = document.createElement('option');
+            option.value = level;
+            option.textContent = level;
+            filterSelect.appendChild(option);
+        });
+    }
+}
+
+function updateAnsweredCount() {
+    var allSelects = document.querySelectorAll('.answer-select');
+    filterState.answeredControls = 0;
+    
+    allSelects.forEach(function(select) {
+        if (select.value && select.value.trim() !== '') {
+            filterState.answeredControls++;
+        }
+    });
+    
+    updateCompletionDisplay();
+}
+
+function updateCompletionDisplay() {
+    var percentage = filterState.totalControls > 0 
+        ? Math.round((filterState.answeredControls / filterState.totalControls) * 100)
+        : 0;
+    
+    var answeredEl = document.getElementById('answered-count');
+    var totalEl = document.getElementById('total-count');
+    var percentEl = document.getElementById('completion-percentage');
+    var fillEl = document.getElementById('completion-bar-fill');
+    
+    if (answeredEl) answeredEl.textContent = filterState.answeredControls;
+    if (totalEl) totalEl.textContent = filterState.totalControls;
+    if (percentEl) percentEl.textContent = percentage + '%';
+    if (fillEl) fillEl.style.width = percentage + '%';
+}
+
+function applyFilters() {
+    var allRows = document.querySelectorAll('.controls-table tbody tr');
+    var visibleCount = 0;
+    var isFilterActive = filterState.showUnansweredOnly || filterState.selectedMaturityLevel;
+    
+    allRows.forEach(function(row) {
+        var select = row.querySelector('.answer-select');
+        var showRow = true;
+        
+        if (!select) return;
+        
+        // Check if control is unanswered (filter for unanswered)
+        if (filterState.showUnansweredOnly) {
+            if (select.value && select.value.trim() !== '') {
+                showRow = false;
+            }
+        }
+        
+        // Check maturity level filter
+        if (showRow && filterState.selectedMaturityLevel) {
+            if (select.value) {
+                var selectedOption = select.querySelector('option[value="' + select.value + '"]');
+                if (selectedOption && selectedOption.text.trim() !== filterState.selectedMaturityLevel) {
+                    showRow = false;
+                }
+            } else {
+                var matchingOption = false;
+                var options = select.querySelectorAll('option');
+                for (var i = 0; i < options.length; i++) {
+                    if (options[i].text.trim() === filterState.selectedMaturityLevel) {
+                        matchingOption = true;
+                        break;
+                    }
+                }
+                if (!matchingOption) {
+                    showRow = false;
+                }
+            }
+        }
+        
+        row.style.display = showRow ? '' : 'none';
+        if (showRow) visibleCount++;
+    });
+    
+    // Show/hide domains and empty state message
+    var domains = document.querySelectorAll('.domain-outline.domain-collapsible');
+    domains.forEach(function(domain) {
+        var table = domain.querySelector('.controls-table');
+        if (!table) return;
+        
+        var bodyRows = table.querySelectorAll('tbody tr');
+        var visibleRows = [];
+        bodyRows.forEach(function(row) {
+            if (row.style.display !== 'none' && !row.classList.contains('no-results-message')) {
+                visibleRows.push(row);
+            }
+        });
+        
+        if (visibleRows.length === 0) {
+            // Hide domain when filter is active and no rows match
+            if (isFilterActive) {
+                domain.style.display = 'none';
+            }
+            // Show empty state message when no filters active
+            if (!isFilterActive) {
+                if (!table.querySelector('.no-results-message')) {
+                    var emptyRow = document.createElement('tr');
+                    emptyRow.className = 'no-results-message';
+                    emptyRow.innerHTML = '<td colspan="2" style="text-align: center; padding: 20px; color: #999;">No controls match the current filters.</td>';
+                    table.querySelector('tbody').appendChild(emptyRow);
+                }
+                domain.style.display = '';
+            } else {
+                var emptyRow = table.querySelector('.no-results-message');
+                if (emptyRow) emptyRow.parentNode.removeChild(emptyRow);
+            }
+        } else {
+            // Show domain and remove empty state
+            domain.style.display = '';
+            var emptyRow = table.querySelector('.no-results-message');
+            if (emptyRow) emptyRow.parentNode.removeChild(emptyRow);
+        }
+    });
+}
+
 document.addEventListener("DOMContentLoaded", function () {
+    // Initialize filter bar first
+    initializeFilterBar();
+    
     checkDomainCompleteness();
     document.body.addEventListener("change", function (e) {
         if (e.target.classList.contains("answer-select")) {
             checkDomainCompleteness();
+            updateAnsweredCount();
         }
     });
     

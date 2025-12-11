@@ -1002,3 +1002,156 @@ input:focus, textarea:focus, select:focus {
 .override-slider-label:active .override-slider::after {
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
+
+/* ————— Filter Bar Sticky Styles ————— */
+.sticky-filter-bar {
+    position: fixed;
+    top: 56px; /* Below main navigation */
+    left: 0;
+    right: 0;
+    width: 100%;
+    z-index: 9998;
+    background: linear-gradient(90deg, #f8fbfd 0%, #f3f9fd 100%);
+    border-bottom: 2px solid var(--primary-blue);
+    box-shadow: 0 4px 12px rgba(34, 116, 165, 0.12);
+    padding: 0.9em 1.2em;
+    display: flex;
+    gap: 2em;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+}
+
+.controls-filter-bar.sticky-filter-bar .filter-section {
+    display: flex;
+    gap: 1.5em;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.controls-filter-bar.sticky-filter-bar .filter-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+}
+
+.controls-filter-bar.sticky-filter-bar .filter-item label {
+    font-weight: 500;
+    color: var(--primary-blue-dark);
+    font-size: 0.95em;
+    white-space: nowrap;
+    margin: 0;
+}
+
+.controls-filter-bar.sticky-filter-bar .filter-checkbox,
+.controls-filter-bar.sticky-filter-bar .filter-select {
+    padding: 0.35em 0.6em;
+    font-size: 0.9em;
+    border: 1.5px solid var(--primary-blue);
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+}
+
+.controls-filter-bar.sticky-filter-bar .filter-select {
+    min-width: 160px;
+}
+
+.controls-filter-bar.sticky-filter-bar .progress-section {
+    display: flex;
+    gap: 1.5em;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.controls-filter-bar.sticky-filter-bar .progress-info {
+    display: flex;
+    align-items: center;
+    gap: 0.8em;
+    min-width: 200px;
+}
+
+.controls-filter-bar.sticky-filter-bar .progress-label {
+    font-weight: 500;
+    color: var(--primary-blue-dark);
+    font-size: 0.95em;
+    white-space: nowrap;
+}
+
+.controls-filter-bar.sticky-filter-bar .progress-bar-container {
+    width: 120px;
+    height: 20px;
+    background: #e8e8e8;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid #d0d0d0;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.controls-filter-bar.sticky-filter-bar .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4CAF50 0%, #45a049 100%);
+    border-radius: 10px;
+    transition: width 0.3s ease;
+}
+
+.controls-filter-bar.sticky-filter-bar .progress-percentage {
+    font-weight: 600;
+    color: var(--primary-blue-dark);
+    font-size: 0.9em;
+    min-width: 35px;
+    text-align: right;
+}
+
+.controls-filter-bar.sticky-filter-bar .answer-count-info {
+    font-size: 0.9em;
+    color: var(--text-main);
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* Adjust container top margin to prevent overlap */
+.container {
+    margin-top: calc(56px + 60px); /* Navigation + sticky filter bar height */
+}
+
+@media (max-width: 1024px) {
+    .sticky-filter-bar {
+        flex-direction: column;
+        gap: 1em;
+        align-items: stretch;
+    }
+    .controls-filter-bar.sticky-filter-bar .filter-section,
+    .controls-filter-bar.sticky-filter-bar .progress-section {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .controls-filter-bar.sticky-filter-bar .filter-item,
+    .controls-filter-bar.sticky-filter-bar .progress-info {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .controls-filter-bar.sticky-filter-bar .progress-bar-container {
+        width: 100%;
+    }
+}
+
+@media (max-width: 600px) {
+    .sticky-filter-bar {
+        top: 56px;
+        padding: 0.7em 0.8em;
+        gap: 0.8em;
+    }
+    .controls-filter-bar.sticky-filter-bar .filter-section {
+        gap: 1em;
+    }
+    .controls-filter-bar.sticky-filter-bar .progress-section {
+        gap: 1em;
+    }
+    .controls-filter-bar.sticky-filter-bar .progress-info {
+        min-width: 100%;
+    }
+    .container {
+        margin-top: calc(56px + 100px); /* Adjust for mobile */
+    }
+}
