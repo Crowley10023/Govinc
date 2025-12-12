@@ -15,7 +15,7 @@
             position: fixed;
             z-index: 1000;
             left: 0;
-            top: 0;
+            top: 7em;
             width: 100%;
             height: 100%;
             background-color: rgba(0, 0, 0, 0.5);
@@ -754,6 +754,7 @@
         .btn-primary {
             background-color: #007bff;
             color: white;
+            min-width: 7em;
         }
 
         .btn-primary:hover {
@@ -847,7 +848,7 @@
 
         .filter-inputs {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
             gap: 15px;
         }
 
@@ -859,7 +860,8 @@
             color: #555;
         }
 
-        .filter-inputs input {
+        .filter-inputs input,
+        .filter-inputs select {
             width: 100%;
             padding: 8px;
             border: 1px solid #ddd;
@@ -899,6 +901,12 @@
             <div>
                 <label for="filterTag">Tag:</label>
                 <input type="text" id="filterTag" placeholder="Search by tag..." />
+            </div>
+            <div>
+                <label for="filterCatalog">Security Catalog:</label>
+                <select id="filterCatalog">
+                    <option value="">-- All Catalogs --</option>
+                </select>
             </div>
         </div>
     </div>
@@ -1217,9 +1225,12 @@ network segmentation","SC-7","Network"</div>
 
     <!-- Edit Modal -->
     <div id="editControlModal" class="modal">
-        <div class="modal-content" style="max-width: 900px; width: 95%; margin: 8vh ; height: 80vh; display: flex; flex-direction: column;">
-            <span class="close" onclick="closeEditModal()">&times;</span>
-            <div id="editFormContainer" style="flex: 1 1 auto; overflow-y: auto; margin-top: 10px;">
+        <div class="modal-content" style="max-width: 900px; width: 95%; max-height: 90vh; display: flex; flex-direction: column; padding: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 20px 30px; border-bottom: 1px solid #e0e0e0; flex-shrink: 0;">
+                <h2 style="margin: 0; color: #333; font-size: 24px;">Edit Security Control</h2>
+                <span class="close" onclick="closeEditModal()" style="margin: 0; float: none;">&times;</span>
+            </div>
+            <div id="editFormContainer" style="flex: 1 1 auto; overflow-y: auto; padding: 30px;">
                 <!-- Form will be loaded via AJAX -->
             </div>
         </div>
@@ -1238,7 +1249,7 @@ network segmentation","SC-7","Network"</div>
             </tr>
         </thead>
         <tbody id="controlsTableBody">
-            <tr th:each="control : ${controls}" class="control-row" th:attr="data-title=${control.name}, data-description=${control.detail}, data-tag=${control.tag}">
+            <tr th:each="control : ${controls}" class="control-row" th:attr="data-title=${control.name}, data-description=${control.detail}, data-tag=${control.tag}, data-catalogs=${control.securityCatalogs != null ? #strings.arrayJoin(control.securityCatalogs.![id], ',') : ''}">
                 <td th:text="${control.id}"></td>
                 <td th:text="${control.name}"></td>
                 <td th:text="${control.detail}"></td>
@@ -1248,7 +1259,7 @@ network segmentation","SC-7","Network"</div>
                 <td>
                     <div class="action-buttons">
                         <button class="btn btn-primary" type="button" th:data-id="${control.id}" onclick="openEditModal(this)">Edit</button>
-                        <button class="btn btn-danger" type="button" th:data-id="${control.id}" th:data-name="${control.name}" onclick="openDeleteModalFromBtn(this)">Delete</button>
+                        <button class="btn btn-primary" type="button" th:data-id="${control.id}" th:data-name="${control.name}" onclick="openDeleteModalFromBtn(this)">Delete</button>
                     </div>
                 </td>
             </tr>
@@ -1467,27 +1478,63 @@ network segmentation","SC-7","Network"</div>
     const filterTitle = document.getElementById('filterTitle');
     const filterDescription = document.getElementById('filterDescription');
     const filterTag = document.getElementById('filterTag');
+    const filterCatalog = document.getElementById('filterCatalog');
+    let availableCatalogs = [];
+
+    // Load available catalogs for filter
+    function loadCatalogsForFilter() {
+        fetch('/api/security-catalogs', {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="_csrf"]')?.getAttribute('content') || ''
+            }
+        })
+            .then(response => response.json())
+            .then(catalogs => {
+                availableCatalogs = catalogs || [];
+                // Populate the filter dropdown
+                catalogs.forEach(catalog => {
+                    const option = document.createElement('option');
+                    option.value = catalog.id;
+                    option.textContent = `${catalog.name}${catalog.revision ? ' (' + catalog.revision + ')' : ''}`;
+                    filterCatalog.appendChild(option);
+                });
+            })
+            .catch(error => {
+                console.error('Error loading catalogs:', error);
+            });
+    }
 
     function applyFilters() {
         const titleFilter = filterTitle.value.toLowerCase();
         const descriptionFilter = filterDescription.value.toLowerCase();
         const tagFilter = filterTag.value.toLowerCase();
+        const catalogFilter = filterCatalog.value;
 
         const rows = document.querySelectorAll('.control-row');
         rows.forEach(row => {
             const titleAttr = row.getAttribute('data-title') || '';
             const descriptionAttr = row.getAttribute('data-description') || '';
             const tagAttr = row.getAttribute('data-tag') || '';
+            const catalogsAttr = row.getAttribute('data-catalogs') || '';
 
             const title = titleAttr.toLowerCase();
             const description = descriptionAttr.toLowerCase();
             const tag = tagAttr.toLowerCase();
+            
+            // Parse catalog IDs from the data attribute
+            const controlCatalogs = catalogsAttr ? catalogsAttr.split(',').map(id => id.trim()) : [];
 
             const titleMatch = title.includes(titleFilter) || titleFilter === '';
             const descriptionMatch = description.includes(descriptionFilter) || descriptionFilter === '';
             const tagMatch = tag.includes(tagFilter) || tagFilter === '';
+            
+            // If a catalog filter is selected, check if the control is linked to that catalog
+            let catalogMatch = catalogFilter === '' || controlCatalogs.includes(catalogFilter);
 
-            if (titleMatch && descriptionMatch && tagMatch) {
+            if (titleMatch && descriptionMatch && tagMatch && catalogMatch) {
                 row.classList.remove('hidden');
             } else {
                 row.classList.add('hidden');
@@ -1498,6 +1545,7 @@ network segmentation","SC-7","Network"</div>
     filterTitle.addEventListener('keyup', applyFilters);
     filterDescription.addEventListener('keyup', applyFilters);
     filterTag.addEventListener('keyup', applyFilters);
+    filterCatalog.addEventListener('change', applyFilters);
 
     // Close modals when clicking outside
     window.addEventListener('click', function(event) {
@@ -1553,11 +1601,12 @@ network segmentation","SC-7","Network"</div>
                 msgAlert.style.display = 'none';
             }, 5000);
         }
+        // Load catalogs for filter on page load
+        loadCatalogsForFilter();
     });
 
     // Global variables for CSV import
     let csvData = [];
-    let availableCatalogs = [];
     let analysisResults = {};
     let analysisInProgress = {};
     let currentStep = 1;
@@ -2465,18 +2514,18 @@ network segmentation","SC-7","Network"</div>
             method: 'GET',
             headers: {
                 'Accept': 'application/json',
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': getCsrfToken()
             }
         })
             .then(response => response.json())
             .then(catalogs => {
-                availableCatalogs = catalogs || [];
-                populateCatalogSelect();
+                populateCatalogSelect(catalogs);
                 
                 const existingCatalogRadio = document.getElementById('existingCatalog');
                 const existingCatalogStatus = document.getElementById('existingCatalogStatus');
                 
-                if (availableCatalogs.length === 0) {
+                if (!catalogs || catalogs.length === 0) {
                     existingCatalogRadio.disabled = true;
                     existingCatalogStatus.textContent = 'No catalogs available';
                 } else {
@@ -2489,16 +2538,17 @@ network segmentation","SC-7","Network"</div>
             });
     }
 
-    function populateCatalogSelect() {
+    function populateCatalogSelect(catalogs) {
         const select = document.getElementById('catalogSelect');
         select.innerHTML = '<option value="">-- Select a Security Catalog --</option>';
         
-        for (let i = 0; i < availableCatalogs.length; i++) {
-            const catalog = availableCatalogs[i];
-            const option = document.createElement('option');
-            option.value = catalog.id;
-            option.textContent = `${catalog.name}${catalog.revision ? ' (' + catalog.revision + ')' : ''}`;
-            select.appendChild(option);
+        if (catalogs && catalogs.length > 0) {
+            catalogs.forEach(catalog => {
+                const option = document.createElement('option');
+                option.value = catalog.id;
+                option.textContent = `${catalog.name}${catalog.revision ? ' (' + catalog.revision + ')' : ''}`;
+                select.appendChild(option);
+            });
         }
     }
 
