@@ -1110,11 +1110,6 @@ input:focus, textarea:focus, select:focus {
     white-space: nowrap;
 }
 
-/* Adjust container top margin to prevent overlap */
-.container {
-    margin-top: calc(56px + 60px); /* Navigation + sticky filter bar height */
-}
-
 @media (max-width: 1024px) {
     .sticky-filter-bar {
         flex-direction: column;
