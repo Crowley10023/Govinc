@@ -790,20 +790,23 @@ function applyFilters() {
     var allRows = document.querySelectorAll('.controls-table tbody tr');
     var visibleCount = 0;
     var isFilterActive = filterState.showUnansweredOnly || filterState.selectedMaturityLevel;
-    
+
+    // Ensure domain completeness icons are up-to-date so we can rely on them
+    checkDomainCompleteness();
+
     allRows.forEach(function(row) {
         var select = row.querySelector('.answer-select');
         var showRow = true;
-        
+
         if (!select) return;
-        
+
         // Check if control is unanswered (filter for unanswered)
         if (filterState.showUnansweredOnly) {
             if (select.value && select.value.trim() !== '') {
                 showRow = false;
             }
         }
-        
+
         // Check maturity level filter
         if (showRow && filterState.selectedMaturityLevel) {
             if (select.value) {
@@ -825,17 +828,28 @@ function applyFilters() {
                 }
             }
         }
-        
+
         row.style.display = showRow ? '' : 'none';
         if (showRow) visibleCount++;
     });
-    
+
     // Show/hide domains and empty state message
     var domains = document.querySelectorAll('.domain-outline.domain-collapsible');
     domains.forEach(function(domain) {
         var table = domain.querySelector('.controls-table');
         if (!table) return;
-        
+
+        // If a filter is active and the domain is fully answered we should hide the whole domain
+        var checkmarkSpan = domain.querySelector('.domain-checkmark');
+        var domainComplete = checkmarkSpan && checkmarkSpan.innerHTML && checkmarkSpan.innerHTML.trim() !== '';
+        if (isFilterActive && domainComplete) {
+            domain.style.display = 'none';
+            // remove any empty-row messages if present
+            var existingEmpty = table.querySelector('.no-results-message');
+            if (existingEmpty) existingEmpty.parentNode.removeChild(existingEmpty);
+            return;
+        }
+
         var bodyRows = table.querySelectorAll('tbody tr');
         var visibleRows = [];
         bodyRows.forEach(function(row) {
@@ -843,7 +857,7 @@ function applyFilters() {
                 visibleRows.push(row);
             }
         });
-        
+
         if (visibleRows.length === 0) {
             // Hide domain when filter is active and no rows match
             if (isFilterActive) {
