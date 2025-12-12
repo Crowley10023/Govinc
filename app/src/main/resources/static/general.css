@@ -186,15 +186,19 @@ body::before {
 
 /* 4. BUTTON BAR (at bottom of container) */
 .general-button-bar {
-  display: flex;
+  position: fixed;
+  left: 0px;
+  bottom: 0px;
+  border-top: 2px solid rgba(34, 116, 165, 0.15);
+  box-shadow: 0 2px 8px rgba(34, 116, 165, 0.08);
+  background: linear-gradient(135deg,#fafdff 86%,#e6f2fe 99%);
+  padding: 1.25em 0.25em 1.25em 0.25em;
+  gap: 0.4em;
   flex-wrap: wrap;
-  gap: 0.8em;
-  align-items: center;
-  padding: 1.5em;
-  background: linear-gradient(135deg, rgba(34, 116, 165, 0.03) 0%, rgba(255, 149, 5, 0.02) 100%);
-  border: 1px solid rgba(34, 116, 165, 0.1);
-  border-radius: 8px;
-  margin-bottom: 2em;
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  background: #fff;
 }
 
 .modal-launch-btn {
@@ -306,10 +310,7 @@ body::before {
     text-align: left;
   }
 
-  .general-button-bar {
-    flex-direction: column;
-  }
-
+ 
   .general-button-bar button,
   .general-button-bar form {
     width: 100%;

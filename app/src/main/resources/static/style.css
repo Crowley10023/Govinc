@@ -783,15 +783,6 @@ input:focus, textarea:focus, select:focus {
     }
 }
 
-/* ——— General Button Bar & Styled Actions Panel ——— */
-.general-button-bar {
-    margin: 2.5em auto 2.5em auto;
-    padding: 1.2em 0 1.2em 0;
-    display: flex;
-    justify-content: center;
-    min-width: 90%;
-}
-
 .domain-header {
   display: flex;
   align-items: start;
