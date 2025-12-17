@@ -22,7 +22,7 @@ public class OrgServiceAssessmentController {
     @GetMapping("/edit/{orgServiceId}")
     public String editAssessment(@PathVariable Long orgServiceId, Model model) {
         OrgServiceAssessment assessment = assessmentService.findOrCreateAssessment(orgServiceId);
-        List<OrgServiceAssessmentControl> controls = assessmentService.enrichControlsWithLockInfo(assessment);
+        List<OrgServiceAssessmentControl> controls = assessmentService.getAllControlsForAssessment(assessment);
         long applicableCount = controls.stream().filter(OrgServiceAssessmentControl::isApplicable).count();
         model.addAttribute("assessment", assessment);
         model.addAttribute("controls", controls);

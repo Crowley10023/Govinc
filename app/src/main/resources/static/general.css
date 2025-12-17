@@ -663,6 +663,7 @@ body::before {
 .table td {
   padding: 0.8em 1em;
   border-bottom: 5px solid rgba(34, 116, 165, 0.05);
+  vertical-align: top;
 }
 
 .table tr:hover {

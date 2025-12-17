@@ -195,6 +195,13 @@
         .control-comment {
             background-color: white;
             transition: background-color 0.3s;
+            width: 100%;
+            min-height: 6em;
+            resize: vertical;
+            padding: 0.5em;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 1em;
         }
 
         .control-comment:disabled {
@@ -377,18 +384,23 @@
                     </div>
 
                     <div class="filter-group">
-                        <div class="filter-checkbox-group">
-                            <input type="checkbox" id="filterRated" />
-                            <label for="filterRated">Show only rated items</label>
-                        </div>
+                        <label for="filterCatalog">Security Catalog</label>
+                        <select id="filterCatalog">
+                            <option value="">-- All catalogs --</option>
+                        </select>
                     </div>
 
                     <div class="filter-group">
                         <div class="filter-checkbox-group">
                             <input type="checkbox" id="hideRatedByAnother" />
                             <label for="hideRatedByAnother">Hide rated by another</label>
+                        </div>                        
+                        <div class="filter-checkbox-group">
+                            <input type="checkbox" id="filterRated" />
+                            <label for="filterRated">Only applicable</label>
                         </div>
                     </div>
+
                 </div>
 
                 <div class="filter-stats">
@@ -397,7 +409,9 @@
                         <span class="stat-number"><span id="visibleCount" th:text="${controls.size()}"></span>/<span
                                 th:text="${controls.size()}"></span></span>
                     </div>
-                    <button type="button" id="clearFiltersBtn" class="btn btn-secondary">Clear Filters</button>
+                    <div class="filter-stat-item">
+                        <button type="button" id="clearFiltersBtn" class="btn btn-secondary">Clear Filters</button>
+                    </div>
                 </div>
             </div>
 
@@ -413,7 +427,8 @@
                         </tr>
                     </thead>
                     <tbody id="controlsTableBody">
-                        <tr th:each="control,stat : ${controls}" th:attr="data-control-id=${control.securityControl.id}"
+                        <tr th:each="control,stat : ${controls}"
+                            th:attr="data-control-id=${control.securityControl.id},data-catalog-id=${#lists.isEmpty(control.securityControl.securityCatalogs) ? '' : control.securityControl.securityCatalogs.iterator().next().id}"
                             class="control-row">
                             <td>
                                 <div class="control-name" th:text="${control.securityControl.name}"></div>
@@ -435,11 +450,11 @@
                                     th:disabled="${control.answeredByAnotherAssessment}"></select>
                             </td>
                             <td>
-                                <textarea class="control-comment" 
-                                    th:attr="data-control-id=${control.securityControl.id}"
-                                    style="min-width: 180px; min-height: 36px; resize: vertical; padding: 0.5em; border: 1px solid #ced4da; border-radius: 4px; font-size: 1em;"
+                                <textarea class="control-comment"
+                                    th:attr="data-control-id=${control.securityControl.id},data-catalog-id=${#lists.isEmpty(control.securityControl.securityCatalogs) ? '' : control.securityControl.securityCatalogs.iterator().next().id}"
                                     placeholder="Add comment (optional)"
-                                    th:disabled="${control.answeredByAnotherAssessment}" th:text="${control.comment}"></textarea>
+                                    th:disabled="${control.answeredByAnotherAssessment}"
+                                    th:text="${control.comment}"></textarea>
                             </td>
                         </tr>
                     </tbody>
@@ -480,6 +495,7 @@
         const filterTextInput = document.getElementById('filterText');
         const filterRatedCheckbox = document.getElementById('filterRated');
         const hideRatedByAnotherCheckbox = document.getElementById('hideRatedByAnother');
+        const filterCatalogSelect = document.getElementById('filterCatalog');
         const maturityModelSelect = document.getElementById('maturityModelSelect');
         const clearFiltersBtn = document.getElementById('clearFiltersBtn');
         const tableBody = document.getElementById('controlsTableBody');
@@ -512,7 +528,7 @@
         // Handle maturity model selection
         maturityModelSelect.addEventListener('change', function () {
             const modelId = this.value;
-            
+
             if (modelId === '') {
                 // Reset to normal input mode
                 currentMaturityModel = null;
@@ -542,16 +558,16 @@
             document.querySelectorAll('.control-row').forEach(row => {
                 const percentInput = row.querySelector('.control-percent');
                 const answerSelect = row.querySelector('.control-answer');
-                
+
                 // Clear previous options
                 answerSelect.innerHTML = '';
-                
+
                 // Add "-- Select an answer --" option
                 const defaultOption = document.createElement('option');
                 defaultOption.value = '';
                 defaultOption.textContent = '-- Select an answer --';
                 answerSelect.appendChild(defaultOption);
-                
+
                 // Add maturity answers as options
                 if (model.maturityAnswers && Array.isArray(model.maturityAnswers)) {
                     model.maturityAnswers.forEach(answer => {
@@ -561,13 +577,13 @@
                         answerSelect.appendChild(option);
                     });
                 }
-                
+
                 // Set current percent value to the select if a matching answer exists
                 const currentPercent = percentInput.value;
                 if (currentPercent && currentPercent !== '0') {
                     answerSelect.value = currentPercent;
                 }
-                
+
                 percentInput.style.display = 'none';
                 answerSelect.style.display = 'block';
                 answerSelect.addEventListener('change', handleAnswerChange);
@@ -580,16 +596,32 @@
             const answerSelect = event.target;
             const percentValue = answerSelect.value;
             const applicable = row.querySelector('.control-applicable').checked;
-            
+
             // Update the hidden percent value for backend submission
             const percentInput = row.querySelector('.control-percent');
             percentInput.value = percentValue;
-            
+
             // Save the change
             saveControlChange(controlId, applicable, percentValue);
         }
 
+        // Load security catalogs into dropdown
+        function loadSecurityCatalogs() {
+            fetch('/security-catalog/api')
+                .then(response => response.json())
+                .then(catalogs => {
+                    catalogs.forEach(catalog => {
+                        const option = document.createElement('option');
+                        option.value = catalog.id;
+                        option.textContent = catalog.name;
+                        filterCatalogSelect.appendChild(option);
+                    });
+                })
+                .catch(error => console.error('Error loading catalogs:', error));
+        }
+
         function applyFilters() {
+            const selectedCatalog = filterCatalogSelect.value;
             const searchText = filterTextInput.value.toLowerCase();
             const showOnlyRated = filterRatedCheckbox.checked;
             const hideRatedByAnother = hideRatedByAnotherCheckbox.checked;
@@ -607,9 +639,11 @@
 
                 const matchesRatedFilter = !showOnlyRated || isApplicable;
 
+                const catalogMatch = selectedCatalog === '' || (row.getAttribute('data-catalog-id') === selectedCatalog);
+
                 const matchesRatedByAnotherFilter = !hideRatedByAnother || !isDisabled;
 
-                if (matchesSearch && matchesRatedFilter && matchesRatedByAnotherFilter) {
+                if (matchesSearch && matchesRatedFilter && matchesRatedByAnotherFilter && catalogMatch) {
                     row.classList.remove('hidden');
                     visibleCount++;
                 } else {
@@ -747,7 +781,7 @@
             checkbox.addEventListener('change', function () {
                 const row = this.closest('.control-row');
                 const controlId = row.getAttribute('data-control-id');
-                
+
                 let percent;
                 if (currentMaturityModel) {
                     // In model mode, get from the select
@@ -757,7 +791,7 @@
                     // In input mode, get from the input
                     percent = row.querySelector('.control-percent').value;
                 }
-                
+
                 const applicable = this.checked;
 
                 // Update the field state
@@ -790,7 +824,7 @@
             textarea.addEventListener('input', function () {
                 const controlId = this.getAttribute('data-control-id');
                 const comment = this.value;
-                const feedback = this.nextElementSibling;
+
 
                 if (debounceTimers[controlId]) {
                     clearTimeout(debounceTimers[controlId]);
@@ -798,8 +832,8 @@
 
                 debounceTimers[controlId] = setTimeout(() => {
                     textarea.style.background = '';
-                    feedback.textContent = '';
-                    
+
+
                     if (comment.trim() !== '' || comment.length > 0) {
                         textarea.style.background = '#fffbe8';
                         saveControlComment(controlId, comment);
@@ -820,6 +854,8 @@
         filterRatedCheckbox.addEventListener('change', applyFilters);
         hideRatedByAnotherCheckbox.addEventListener('change', applyFilters);
         clearFiltersBtn.addEventListener('click', clearFilters);
+        filterCatalogSelect.addEventListener('change', applyFilters);
+        loadSecurityCatalogs();
     </script>
 </body>
 

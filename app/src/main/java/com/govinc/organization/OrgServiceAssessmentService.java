@@ -83,6 +83,29 @@ public class OrgServiceAssessmentService {
         return result;
     }
 
+    public List<OrgServiceAssessmentControl> getAllControlsForAssessment(OrgServiceAssessment assessment) {
+        List<SecurityControl> allControls = securityControlRepository.findAll();
+        Map<Long, OrgServiceAssessmentControl> existingMap = assessment.getControls().stream()
+                .collect(Collectors.toMap(c -> c.getSecurityControl().getId(), c -> c));
+        List<OrgServiceAssessmentControl> result = new ArrayList<>();
+        for (SecurityControl sc : allControls) {
+            OrgServiceAssessmentControl control = existingMap.getOrDefault(sc.getId(), null);
+            if (control == null) {
+                control = new OrgServiceAssessmentControl();
+                control.setSecurityControl(sc);
+                control.setApplicable(false);
+                control.setPercent(0);
+                control.setComment("");
+                control.setOrgServiceAssessment(assessment);
+            }
+            result.add(control);
+        }
+        // Update lock info as existing method does
+        OrgServiceAssessment temp = assessment;
+        temp.setControls(result);
+        return enrichControlsWithLockInfo(temp);
+    }
+
     public Optional<OrgServiceAssessment> getAssessment(Long assessmentId) {
         return assessmentRepository.findById(assessmentId);
     }
