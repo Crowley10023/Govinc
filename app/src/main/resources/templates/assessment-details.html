@@ -393,10 +393,17 @@
                     </div>
                     <div class="answering-guide-content">
                         <div id="answering-guide-control-name" class="guide-control-name"></div>
-                        <div id="answering-guide-loading" class="guide-loading">
-                            <p>Loading questions...</p>
+                        
+                        <!-- Loading state on modal open -->
+                        <div id="answering-guide-loading" class="guide-loading guide-loading-initial">
+                            <div class="loading-spinner"></div>
+                            <p>Generating questions from AI...</p>
                         </div>
+                        
+                        <!-- Questions section -->
                         <div id="answering-guide-questions" class="guide-questions"></div>
+                        
+                        <!-- Proposed answer section -->
                         <div id="answering-guide-proposed-answer" class="guide-proposed-answer">
                             <h4>Proposed Answer</h4>
                             <div id="guide-proposed-answer-text" class="proposed-answer-text"></div>
@@ -404,6 +411,12 @@
                                 <button type="button" class="guide-takeover-btn" onclick="takeoverProposedAnswer()">Take Over</button>
                                 <button type="button" class="guide-discard-btn" onclick="discardProposedAnswer()">Discard</button>
                             </div>
+                        </div>
+                        
+                        <!-- Loading state on submit -->
+                        <div id="answering-guide-generating" class="guide-loading guide-loading-submit">
+                            <div class="loading-spinner"></div>
+                            <p>Generating answer from AI...</p>
                         </div>
                     </div>
                     <div class="modal-btn-row">

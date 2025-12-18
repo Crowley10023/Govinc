@@ -59,7 +59,8 @@ public class AnsweringGuideController {
 
     /**
      * Generate answer proposal based on user's yes/no answers.
-     * AI returns a percentage, which is then matched to the closest maturity level.
+     * The proposal is constrained to maturity model answers provided in the request.
+     * This ensures the proposed answer fits to the assessment's maturity model.
      */
     @PostMapping("/generate-answer-from-guide")
     @ResponseBody
@@ -102,6 +103,8 @@ public class AnsweringGuideController {
         List<String> questions = (List<String>) request.get("questions");
         @SuppressWarnings("unchecked")
         List<String> answers = (List<String>) request.get("answers");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> maturityModelAnswers = (List<Map<String, Object>>) request.get("maturityModelAnswers");
 
         if (controlId == null) {
             Map<String, Object> errorResponse = new HashMap<>();
@@ -111,6 +114,7 @@ public class AnsweringGuideController {
         }
 
         // Use service to analyze answers and propose maturity level
-        return answeringGuideService.proposeAnswerFromGuide(controlId, securityCatalogId, questions, answers);
+        // The proposed answer will be constrained to the provided maturity model answers
+        return answeringGuideService.proposeAnswerFromGuide(controlId, securityCatalogId, questions, answers, maturityModelAnswers);
     }
 }

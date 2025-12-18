@@ -458,6 +458,7 @@ function openAnsweringGuideModal(controlId, controlName, controlDetail, security
     $('#answering-guide-control-name').html('<h4>' + $('<span/>').text(controlName).html() + '</h4><p>' + $('<span/>').text(controlDetail).html() + '</p>');
     $('#answering-guide-questions').empty();
     $('#answering-guide-proposed-answer').hide();
+    $('#answering-guide-generating').hide();
     $('#answering-guide-loading').show();
     $('#answering-guide-modal-bg').css('display', 'flex');
 
@@ -505,7 +506,7 @@ function displayAnsweringGuideQuestions(questions) {
     });
     html += '<button type="button" class="guide-submit-answers-btn" onclick="submitAnsweringGuideAnswers()">Submit Answers</button>';
     html += '</div>';
-    $('#answering-guide-questions').html(html);
+    $('#answering-guide-questions').html(html).css('display', 'flex');
 }
 
 function submitAnsweringGuideAnswers() {
@@ -527,6 +528,36 @@ function submitAnsweringGuideAnswers() {
     
     currentAnsweringGuideState.answers = answers;
 
+    // Get maturity model answers from the assessment dropdown
+    var controlId = currentAnsweringGuideState.controlId;
+    var selectElement = $('select[data-control-id="' + controlId + '"]');
+    var maturityModelAnswers = [];
+    
+    if (selectElement.length > 0) {
+        selectElement.find('option').each(function() {
+            var val = $(this).val();
+            var text = $(this).text();
+            // Skip empty option
+            if (val && text !== '-- select an answer --') {
+                maturityModelAnswers.push({
+                    id: val,
+                    answer: text
+                });
+            }
+        });
+    }
+    
+    // Validate that we have maturity model answers
+    if (maturityModelAnswers.length === 0) {
+        alert('Error: No maturity model answers found for this control.');
+        return;
+    }
+
+    // Show loading indicator on submit
+    $('#answering-guide-questions').hide();
+    $('#answering-guide-proposed-answer').hide();
+    $('#answering-guide-generating').show();
+
     // Send answers to backend to get proposed answer
     $.ajax({
         url: '/assessment/generate-answer-from-guide',
@@ -536,23 +567,31 @@ function submitAnsweringGuideAnswers() {
             controlId: currentAnsweringGuideState.controlId,
             securityCatalogId: currentAnsweringGuideState.securityCatalogId,
             questions: currentAnsweringGuideState.questions,
-            answers: answers
+            answers: answers,
+            maturityModelAnswers: maturityModelAnswers
         }),
         success: function(response) {
+            $('#answering-guide-generating').hide();
             if (response && response.proposedAnswer) {
                 currentAnsweringGuideState.proposedAnswer = response.proposedAnswer;
                 $('#guide-proposed-answer-text').text(response.proposedAnswer);
+                $('#answering-guide-questions').hide();
                 $('#answering-guide-proposed-answer').show();
             } else {
                 alert('Error generating answer. Please try again.');
+                $('#answering-guide-generating').hide();
+                $('#answering-guide-questions').show();
             }
         },
         error: function(xhr) {
+            $('#answering-guide-generating').hide();
             var errorMsg = 'Error generating answer. Please try again.';
             if (xhr.responseJSON && xhr.responseJSON.message) {
                 errorMsg = xhr.responseJSON.message;
             }
             alert(errorMsg);
+            // Show questions again on error
+            $('#answering-guide-questions').show();
         }
     });
 }
@@ -585,11 +624,24 @@ function takeoverProposedAnswer() {
 }
 
 function discardProposedAnswer() {
-    closeAnsweringGuideModal();
+    // Reset the modal to show questions again for reuse
+    $('#answering-guide-questions').show();
+    $('#answering-guide-proposed-answer').hide();
+    $('#answering-guide-generating').hide();
+    
+    // Reset answer selections
+    $('input[type="radio"][name^="question_"]').prop('checked', false);
 }
 
 function closeAnsweringGuideModal() {
     $('#answering-guide-modal-bg').css('display', 'none');
+    
+    // Reset all modal elements for next use
+    $('#answering-guide-loading').hide();
+    $('#answering-guide-questions').empty();
+    $('#answering-guide-proposed-answer').hide();
+    $('#answering-guide-generating').hide();
+    
     currentAnsweringGuideState = {
         controlId: null,
         securityCatalogId: null,

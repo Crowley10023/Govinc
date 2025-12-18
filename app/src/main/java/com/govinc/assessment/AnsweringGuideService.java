@@ -71,21 +71,30 @@ public class AnsweringGuideService {
     }
     
     /**
-     * Analyze user answers and propose a maturity level based on percentage.
-     * Always returns a valid maturity answer, never returns "IDONOTKNOW" or invalid values.
+     * Analyze user answers and propose a maturity level based on the maturity model answers.
+     * The proposed answer is constrained to answers available in the maturity model,
+     * ensuring the result always fits to the assessment's maturity model.
      */
     public Map<String, Object> proposeAnswerFromGuide(Long controlId, Long securityCatalogId, 
-                                                       List<String> questions, List<String> answers) {
+                                                       List<String> questions, List<String> answers,
+                                                       List<Map<String, Object>> maturityModelAnswers) {
         Map<String, Object> response = new HashMap<>();
-        System.out.println("01 : ");
+        
+        // Validate maturity model answers are provided
+        if (maturityModelAnswers == null || maturityModelAnswers.isEmpty()) {
+            response.put("success", false);
+            response.put("message", "Maturity model answers are required for proposing an answer");
+            return response;
+        }
+        
         if (questions == null || answers == null || questions.isEmpty() || answers.isEmpty()) {
-            // Fallback to a default valid answer
-            MaturityAnswer defaultAnswer = findDefaultMaturityAnswer();
-            if (defaultAnswer != null) {
+            // Fallback to the first valid answer from maturity model (most conservative)
+            if (!maturityModelAnswers.isEmpty()) {
+                Map<String, Object> defaultAnswer = maturityModelAnswers.get(0);
                 response.put("success", true);
-                response.put("proposedAnswer", defaultAnswer.getAnswer());
-                response.put("proposedAnswerId", defaultAnswer.getId());
-                response.put("matchedRating", defaultAnswer.getRating());
+                response.put("proposedAnswer", defaultAnswer.get("answer"));
+                response.put("proposedAnswerId", defaultAnswer.get("id"));
+                response.put("matchedRating", defaultAnswer.get("rating"));
                 response.put("message", "Using default answer due to invalid input");
             } else {
                 response.put("success", false);
@@ -95,13 +104,13 @@ public class AnsweringGuideService {
         }
         
         if (questions.size() != answers.size()) {
-            // Fallback to a default valid answer
-            MaturityAnswer defaultAnswer = findDefaultMaturityAnswer();
-            if (defaultAnswer != null) {
+            // Fallback to first answer from maturity model
+            if (!maturityModelAnswers.isEmpty()) {
+                Map<String, Object> defaultAnswer = maturityModelAnswers.get(0);
                 response.put("success", true);
-                response.put("proposedAnswer", defaultAnswer.getAnswer());
-                response.put("proposedAnswerId", defaultAnswer.getId());
-                response.put("matchedRating", defaultAnswer.getRating());
+                response.put("proposedAnswer", defaultAnswer.get("answer"));
+                response.put("proposedAnswerId", defaultAnswer.get("id"));
+                response.put("matchedRating", defaultAnswer.get("rating"));
                 response.put("message", "Using default answer due to question/answer mismatch");
             } else {
                 response.put("success", false);
@@ -122,119 +131,63 @@ public class AnsweringGuideService {
             qandAMatrix.append(answers.get(i)).append("\n");
         }
         
-        // Call AI to analyze and return percentage
-        String prompt = "You are a security maturity assessment expert. Based on the following yes/no Q&A responses, determine the maturity level as a percentage (0-100).\n\n" +
+        // Build list of available maturity answers for AI constraint
+        StringBuilder maturityAnswersStr = new StringBuilder();
+        for (Map<String, Object> ma : maturityModelAnswers) {
+            maturityAnswersStr.append("- ").append(ma.get("answer"))
+                    .append(" (Rating: ").append(ma.get("rating")).append("%");
+            if (ma.get("description") != null && !ma.get("description").toString().isEmpty()) {
+                maturityAnswersStr.append(" - ").append(ma.get("description"));
+            }
+            maturityAnswersStr.append(")\n");
+        }
+        
+        // Call AI to analyze and select the appropriate maturity answer
+        String prompt = "You are a security maturity assessment expert. Based on the following yes/no Q&A responses, determine which maturity level best fits the control's current state.\n\n" +
                 "Q&A Responses:\n" +
                 qandAMatrix.toString() + "\n" +
-                "Guidelines:\n" +
-                "- 0-20: Not Implemented (little to no practices)\n" +
-                "- 21-40: Informal (ad-hoc practices, not standardized)\n" +
-                "- 41-70: Repeatable (processes defined and repeatable)\n" +
-                "- 71-95: Managed (processes managed and monitored)\n" +
-                "- 96-100: Optimized (fully optimized with continuous improvement)\n\n" +
-                "Analyze the answers and return ONLY a single number between 0 and 100 (e.g., '75' or '45'). No text, just the number.";
+                "Available Maturity Answers for this control:\n" +
+                maturityAnswersStr.toString() + "\n" +
+                "Based on the Q&A responses, select the most appropriate maturity answer and return it EXACTLY as written in the list above. Return ONLY the answer text, nothing else.";
         
         String aiResponse = openAIUtil.askAI(prompt).trim();
-        System.out.println("ai answer::" + aiResponse);
         
-        int aiPercentage = yesPercentage; // Default to yes percentage if AI fails
+        // Find the proposed answer in the maturity model answers
+        Map<String, Object> proposedMaturityAnswer = null;
         
-        try {
-            // Extract percentage from response
-            String numericOnly = aiResponse.replaceAll("[^0-9]", "");
-            if (!numericOnly.isEmpty()) {
-                aiPercentage = Integer.parseInt(numericOnly);
-            }
-        } catch (NumberFormatException e) {
-            System.err.println("Failed to parse AI response as percentage: " + aiResponse);
-            // Use yesPercentage as fallback
-        }
-        
-        // Clamp between 0-100
-        if (aiPercentage < 0) aiPercentage = 0;
-        if (aiPercentage > 100) aiPercentage = 100;
-        
-        // Find closest maturity answer by rating
-        MaturityAnswer closestAnswer = findClosestMaturityAnswer(securityCatalogId, aiPercentage);
-        System.out.println("02 : " + closestAnswer);
-        
-        if (closestAnswer == null) {
-            // Fallback to default answer if no closest match found
-            closestAnswer = findDefaultMaturityAnswer();
-            if (closestAnswer == null) {
-                response.put("success", false);
-                response.put("message", "No maturity answers found for this catalog");
-                response.put("percentage", aiPercentage);
-                response.put("yesPercentage", yesPercentage);
-                return response;
+        // Try exact match first
+        for (Map<String, Object> ma : maturityModelAnswers) {
+            if (aiResponse.equalsIgnoreCase(ma.get("answer").toString())) {
+                proposedMaturityAnswer = ma;
+                break;
             }
         }
-        System.out.println("03 : " + closestAnswer.getAnswer());
+        
+        // If no exact match, try partial match or default to first answer
+        if (proposedMaturityAnswer == null) {
+            for (Map<String, Object> ma : maturityModelAnswers) {
+                if (ma.get("answer").toString().toLowerCase().contains(aiResponse.toLowerCase()) ||
+                    aiResponse.toLowerCase().contains(ma.get("answer").toString().toLowerCase())) {
+                    proposedMaturityAnswer = ma;
+                    break;
+                }
+            }
+        }
+        
+        // Fallback to first answer (most conservative) if still no match
+        if (proposedMaturityAnswer == null) {
+            proposedMaturityAnswer = maturityModelAnswers.get(0);
+        }
+        
         response.put("success", true);
-        response.put("proposedAnswer", closestAnswer.getAnswer());
-        response.put("proposedAnswerId", closestAnswer.getId());
-        response.put("aiPercentage", aiPercentage);
+        response.put("proposedAnswer", proposedMaturityAnswer.get("answer"));
+        response.put("proposedAnswerId", proposedMaturityAnswer.get("id"));
+        response.put("aiResponse", aiResponse);
         response.put("yesPercentage", yesPercentage);
         response.put("yesCount", yesCount);
         response.put("totalCount", totalCount);
-        response.put("matchedRating", closestAnswer.getRating());
+        response.put("matchedRating", proposedMaturityAnswer.get("rating"));
         
         return response;
-    }
-    
-    /**
-     * Find the closest maturity answer by rating to the given percentage
-     */
-    private MaturityAnswer findClosestMaturityAnswer(Long securityCatalogId, int targetPercentage) {
-        try {
-            // Get all maturity answers for this catalog
-            List<MaturityAnswer> answers = maturityAnswerRepository.findAll();
-            
-            if (answers.isEmpty()) {
-                return null;
-            }
-            
-            // Find answer with closest rating to target percentage
-            MaturityAnswer closest = answers.get(0);
-            int minDiff = Math.abs(closest.getRating() - targetPercentage);
-            
-            for (MaturityAnswer answer : answers) {
-                int diff = Math.abs(answer.getRating() - targetPercentage);
-                if (diff < minDiff) {
-                    minDiff = diff;
-                    closest = answer;
-                }
-            }
-            
-            return closest;
-        } catch (Exception e) {
-            return null;
-        }
-    }
-    
-    /**
-     * Find a default maturity answer to use as fallback.
-     * Returns the lowest rating (most conservative) answer if available.
-     */
-    private MaturityAnswer findDefaultMaturityAnswer() {
-        try {
-            List<MaturityAnswer> answers = maturityAnswerRepository.findAll();
-            
-            if (answers.isEmpty()) {
-                return null;
-            }
-            
-            // Return the answer with the lowest rating as default (most conservative)
-            MaturityAnswer defaultAnswer = answers.get(0);
-            for (MaturityAnswer answer : answers) {
-                if (answer.getRating() < defaultAnswer.getRating()) {
-                    defaultAnswer = answer;
-                }
-            }
-            
-            return defaultAnswer;
-        } catch (Exception e) {
-            return null;
-        }
     }
 }
