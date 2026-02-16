@@ -10,12 +10,12 @@
     "type" : "KEYCLOAK"
   },
   "azure" : {
-    "redirectUri" : "{baseUrl}/login/oauth2/code/{registrationId}",
-    "clientId" : "YOUR_AZURE_CLIENT_ID",
+    "redirectUri" : null,
+    "clientId" : "YO****ID",
     "issuerUri" : null,
     "displayName" : "Microsoft Azure",
-    "tenantId" : "YOUR_AZURE_TENANT_ID",
-    "clientSecret" : "YOUR_AZURE_CLIENT_SECRET",
+    "tenantId" : "88",
+    "clientSecret" : "hhh",
     "id" : "azure",
     "type" : "AZURE"
   }

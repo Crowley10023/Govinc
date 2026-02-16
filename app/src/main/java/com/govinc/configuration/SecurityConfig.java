@@ -33,6 +33,7 @@ import java.util.Map;
  * - Dynamically configures OAuth2 login when providers are available
  * - Loads users from application.properties for local authentication
  * - Excludes public endpoints from authentication
+ * - Requires ADMIN role for /admin/** endpoints
  */
 @Configuration
 public class SecurityConfig {
@@ -90,6 +91,7 @@ public class SecurityConfig {
         http
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(EXCLUDED_URLS).permitAll()
+                .requestMatchers("/admin/**").hasAnyRole("ADMIN")
                 .anyRequest().authenticated())
             .csrf(csrf -> csrf
                 .ignoringRequestMatchers(EXCLUDED_URLS))
@@ -225,7 +227,13 @@ public class SecurityConfig {
 
     /**
      * Creates UserDetailsService with users loaded from application.properties
-     * Format: users.<username>=<password>[,<email>]
+     * Format: users.<username>=<password> or users.<username>=<password>,ADMIN or users.<username>=<password>,USER,ADMIN
+     * 
+     * Examples:
+     *   users.admin=password123        (will get ADMIN role by default)
+     *   users.john=pass123,ADMIN       (explicitly set as ADMIN)
+     *   users.jane=pass456,USER        (set as USER only, no admin access)
+     *   users.bob=pass789,USER,ADMIN   (set with multiple roles)
      */
     @Bean
     public UserDetailsService userDetailsService() {
@@ -237,17 +245,25 @@ public class SecurityConfig {
                 String username = entry.getKey();
                 String value = entry.getValue();
                 
-                // Parse password and optional email from value
-                String[] parts = value.split(",");
+                // Parse password and optional roles from value (format: "password[,ROLE1,ROLE2]")
+                String[] parts = value.split(",", 2); // Split on first comma only
                 String password = parts[0].trim();
                 
-                // All local users get ADMIN role by default for backward compatibility
-                // Roles should be assigned via the database User entity
-                users.add(User.withUsername(username)
-                    .password(passwordEncoder().encode(password))
-                    .roles("USER", "ADMIN")
-                    .build());
+                var userBuilder = User.withUsername(username)
+                    .password(passwordEncoder().encode(password));
                 
+                // Parse roles if specified (format: "password,ROLE1,ROLE2,...")
+                if (parts.length > 1) {
+                    String[] roles = parts[1].split(",");
+                    for (String role : roles) {
+                        userBuilder.roles(role.trim());
+                    }
+                } else {
+                    // Default to ADMIN role for backward compatibility
+                    userBuilder.roles("ADMIN");
+                }
+                
+                users.add(userBuilder.build());
                 logger.debug("Loaded local user: " + username);
             }
         }

@@ -6,6 +6,10 @@
     <link rel="stylesheet" type="text/css" href="/style.css">
     <link rel="stylesheet" href="/general.css">
     <th:block th:replace="~{fragments/theme-css :: themeCss}" />
+    <!-- CSRF Token Meta Tags -->
+    <meta th:name="${_csrf.headerName}" th:content="${_csrf.token}">
+    <meta name="_csrf" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:content="${_csrf.headerName}">
     <style>
         .auth-config-container {
             max-width: 1000px;
@@ -340,6 +344,27 @@
     </div>
 
     <script>
+        /**
+         * Get CSRF token from meta tags
+         */
+        function getCsrfToken() {
+            let csrfToken = null;
+            let csrfHeader = 'X-CSRF-TOKEN';
+
+            // Get from meta tags
+            const tokenMeta = document.querySelector('meta[name="_csrf"]');
+            const headerMeta = document.querySelector('meta[name="_csrf_header"]');
+
+            if (tokenMeta) {
+                csrfToken = tokenMeta.getAttribute('content');
+            }
+            if (headerMeta) {
+                csrfHeader = headerMeta.getAttribute('content');
+            }
+
+            return { token: csrfToken, header: csrfHeader };
+        }
+
         function showMessage(message, type, permanent = false) {
             const messageArea = document.getElementById('message-area');
             messageArea.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
@@ -355,7 +380,15 @@
         }
 
         function refreshStatus() {
-            fetch('/admin/auth-config/status')
+            const csrf = getCsrfToken();
+            const headers = {};
+            if (csrf.token) {
+                headers[csrf.header] = csrf.token;
+            }
+
+            fetch('/admin/auth-config/status', {
+                headers: headers
+            })
                 .then(response => response.json())
                 .then(data => {
                     updateStatusDisplay(data);
@@ -438,9 +471,16 @@
             submitBtn.textContent = 'Configuring...';
             submitBtn.disabled = true;
 
+            const csrf = getCsrfToken();
+            const headers = {};
+            if (csrf.token) {
+                headers[csrf.header] = csrf.token;
+            }
+
             fetch('/admin/auth-config/keycloak', {
                 method: 'POST',
-                body: formData
+                body: formData,
+                headers: headers
             })
                 .then(response => response.json())
                 .then(data => {
@@ -472,9 +512,16 @@
             submitBtn.textContent = 'Configuring...';
             submitBtn.disabled = true;
 
+            const csrf = getCsrfToken();
+            const headers = {};
+            if (csrf.token) {
+                headers[csrf.header] = csrf.token;
+            }
+
             fetch('/admin/auth-config/azure', {
                 method: 'POST',
-                body: formData
+                body: formData,
+                headers: headers
             })
                 .then(response => response.json())
                 .then(data => {
@@ -500,8 +547,15 @@
                 return;
             }
 
+            const csrf = getCsrfToken();
+            const headers = {};
+            if (csrf.token) {
+                headers[csrf.header] = csrf.token;
+            }
+
             fetch(`/admin/auth-config/provider/${providerId}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: headers
             })
                 .then(response => response.json())
                 .then(data => {
@@ -594,8 +648,15 @@
                 btn.textContent = btn.textContent.includes('All') ? 'Checking All...' : 'Checking...';
             });
 
+            const csrf = getCsrfToken();
+            const headers = {};
+            if (csrf.token) {
+                headers[csrf.header] = csrf.token;
+            }
+
             fetch('/admin/auth-config/health-check', {
-                method: 'POST'
+                method: 'POST',
+                headers: headers
             })
                 .then(response => response.json())
                 .then(data => {
