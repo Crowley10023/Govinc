@@ -9,61 +9,62 @@
 <body>
     <div th:replace="~{navigation :: mainNav}"></div>
     <div class="container">
-        <h1>Create Assessment</h1>
-        <form th:action="@{/assessment/create}" method="post">
-            <table class="table" style="width:auto; margin: 0 auto;">
-                <tr>
-                    <td><label for="catalog">Select Security Catalog:</label></td>
-                    <td>
-                        <select id="catalog" name="catalogId" required>
+        <div class="orgservice-header">
+            <h1>Create Assessment</h1>
+        </div>
+        
+        <form th:action="@{/assessment/create}" method="post" class="create-assessment-form">
+            <div class="card">
+                <div class="card-body">
+                    <!-- Catalog Selection -->
+                    <div class="card-section">
+                        <label for="catalog">Security Catalog</label>
+                        <select id="catalog" name="catalogId" required class="form-control-select">
+                            <option disabled selected>-- Select a Catalog --</option>
                             <option th:each="catalog: ${catalogs}" 
                                     th:value="${catalog.id}" 
                                     th:text="${catalog.name}"></option>
                         </select>
-                    </td>
-                </tr>
-                <!-- Org Unit Choice Row start -->
-                <tr>
-                    <td><label for="orgUnit">Select Org Unit:</label></td>
-                    <td>
-                        <select id="orgUnit" name="orgUnitId" required>
-                            <option value="" disabled selected>-- Select Org Unit --</option>
+                    </div>
+
+                    <!-- Org Unit Selection -->
+                    <div class="card-section">
+                        <label for="orgUnit">Organizational Unit</label>
+                        <select id="orgUnit" name="orgUnitId" required class="form-control-select">
+                            <option value="" disabled selected>-- Select an Org Unit --</option>
                             <option th:each="orgUnit : ${orgUnits}"
                                     th:value="${orgUnit.id}"
                                     th:text="${orgUnit.name}"></option>
                         </select>
-                    </td>
-                </tr>
-                <!-- Org Unit Choice Row end -->
-                <!-- Org Service Choice Row start -->
-                <tr>
-                    <td><label for="orgService">Assign Org Services:</label></td>
-                    <td>
-                        <select name="orgServiceIds" id="orgService" multiple>
+                    </div>
+
+                    <!-- Org Services Selection -->
+                    <div class="card-section">
+                        <label for="orgService">Organizational Services</label>
+                        <select name="orgServiceIds" id="orgService" multiple class="form-control-select">
                             <option th:each="orgService : ${orgServices}"
                                     th:value="${orgService.id}"
                                     th:text="${orgService.name}"></option>
-                        </select><br/>
-                        <span style="font-size: 0.86em; color: #757575;">(Hold Ctrl or Cmd to select multiple)</span>
-                    </td>
-                </tr>
-                <!-- Org Service Choice Row end -->
-                <tr>
-                    <td><label for="users">Assign Users:</label></td>
-                    <td>
-                        <select name="userIds" id="users" multiple>
+                        </select>
+                        <p class="form-hint">(Hold Ctrl or Cmd to select multiple services)</p>
+                    </div>
+
+                    <!-- Users Selection -->
+                    <div class="card-section">
+                        <label for="users">Assign Users</label>
+                        <select name="userIds" id="users" multiple class="form-control-select">
                             <option th:each="user : ${users}"
                                     th:value="${user.id}"
                                     th:text="${user.name + ' (' + user.email + ')'}"></option>
                         </select>
-                    </td>
-                </tr>
-                <tr>
-                    <td colspan="2" style="text-align: center;">
-                        <button type="submit">Create Assessment</button>
-                    </td>
-                </tr>
-            </table>
+                        <p class="form-hint">(Hold Ctrl or Cmd to select multiple users)</p>
+                    </div>
+                </div>
+
+                <div class="card-actions">
+                    <button type="submit" class="btn-action btn-create-primary">Create Assessment</button>
+                </div>
+            </div>
         </form>
     </div>
 </body>

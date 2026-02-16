@@ -6,28 +6,308 @@
     <meta charset="UTF-8">
     <link rel="stylesheet" href="/style.css">
     <style>
-        .security-controls-group {
-            margin-bottom: 2em;
-            padding: 1em;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            background-color: #fafbfc;
+        .catalog-edit-container {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 2em;
         }
-        .security-control-domain {
-            font-weight: bold;
-            margin-bottom: 0.5em;
-            font-size: 1.1em;
-        }
-        .security-control-checkbox-list {
+
+        .catalog-general-section {
             display: flex;
             flex-direction: column;
-            row-gap: 0.5em;
-            margin-left: 1em;
+            gap: 1.5em;
         }
-        .checkbox-label {
+
+        .catalog-controls-section {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5em;
+        }
+
+        .form-field-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.6em;
+        }
+
+        .form-field-group label {
+            font-weight: 600;
+            color: var(--primary-blue);
+            font-size: 0.95em;
+        }
+
+        .form-input,
+        .form-textarea {
+            padding: 0.75em;
+            border: 1px solid rgba(34, 116, 165, 0.2);
+            border-radius: 6px;
+            font-size: 0.95em;
+            font-family: inherit;
+            transition: all 0.2s ease;
+        }
+
+        .form-input:hover:not(:disabled),
+        .form-textarea:hover:not(:disabled) {
+            border-color: rgba(34, 116, 165, 0.4);
+        }
+
+        .form-input:focus,
+        .form-textarea:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 3px rgba(34, 116, 165, 0.1);
+        }
+
+        .form-textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .security-controls-section {
+            background: #fff;
+            border-radius: 8px;
+            border: 1px solid rgba(34, 116, 165, 0.1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .security-controls-section-header {
+            background: linear-gradient(135deg, rgba(34, 116, 165, 0.08) 0%, rgba(255, 149, 5, 0.05) 100%);
+            padding: 1.2em 1.5em;
+            border-bottom: 1px solid rgba(34, 116, 165, 0.1);
+        }
+
+        .security-controls-section-header h3 {
+            margin: 0;
+            color: var(--primary-blue);
+            font-size: 1.1em;
+            font-weight: 700;
+        }
+
+        .security-controls-filter-bar {
+            padding: 1.2em 1.5em;
+            border-bottom: 1px solid rgba(34, 116, 165, 0.1);
+            background: rgba(34, 116, 165, 0.02);
+        }
+
+        .filter-input-wrapper {
             display: flex;
             align-items: center;
-            gap: 0.4em;
+            gap: 0.8em;
+        }
+
+        .filter-input-wrapper label {
+            font-weight: 600;
+            color: var(--primary-blue);
+            font-size: 0.9em;
+            white-space: nowrap;
+            margin: 0;
+        }
+
+        .filter-input {
+            flex: 1;
+            padding: 0.6em 0.8em;
+            border: 1px solid rgba(34, 116, 165, 0.2);
+            border-radius: 6px;
+            font-size: 0.9em;
+            font-family: inherit;
+            transition: all 0.2s ease;
+            min-width: 250px;
+        }
+
+        .filter-input:hover {
+            border-color: rgba(34, 116, 165, 0.4);
+        }
+
+        .filter-input:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 3px rgba(34, 116, 165, 0.1);
+        }
+
+        .security-controls-table-wrapper {
+            flex: 1;
+            overflow-y: auto;
+            max-height: 600px;
+        }
+
+        .security-controls-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .security-controls-domain-header-row {
+            background: linear-gradient(135deg, rgba(34, 116, 165, 0.06) 0%, rgba(255, 149, 5, 0.03) 100%);
+            border-bottom: 1px solid rgba(34, 116, 165, 0.1);
+        }
+
+        .security-controls-domain-header-row td {
+            padding: 0.9em 1.5em;
+            font-weight: 600;
+            color: var(--primary-blue);
+            font-size: 0.95em;
+        }
+
+        .security-control-row {
+            border-bottom: 1px solid rgba(34, 116, 165, 0.05);
+            transition: all 0.2s ease;
+        }
+
+        .security-control-row:hover {
+            background: rgba(34, 116, 165, 0.03);
+        }
+
+        .security-control-row.hidden {
+            display: none;
+        }
+
+        .security-control-row td {
+            padding: 1em 1.5em;
+            vertical-align: top;
+        }
+
+        .security-control-checkbox-cell {
+            width: 50px;
+            text-align: center;
+        }
+
+        .security-control-checkbox-cell input {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: var(--primary-blue);
+            margin: 0;
+        }
+
+        .security-control-name-cell {
+            width: 30%;
+            font-weight: 600;
+            color: #333;
+            font-size: 0.95em;
+            word-break: break-word;
+        }
+
+        .security-control-detail-cell {
+            flex: 1;
+            color: #666;
+            font-size: 0.9em;
+            line-height: 1.5;
+            word-break: break-word;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 1em;
+            justify-content: flex-start;
+            flex-wrap: wrap;
+            margin-top: 1em;
+        }
+
+        .btn-submit {
+            background: linear-gradient(135deg, var(--primary-blue) 0%, rgba(34, 116, 165, 0.9) 100%);
+            color: #fff;
+            border: none;
+            padding: 0.8em 1.5em;
+            font-size: 0.95em;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .btn-submit:hover {
+            background: linear-gradient(135deg, #003fa0 0%, #004499 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(34, 116, 165, 0.25);
+        }
+
+        .btn-back {
+            background: #eee;
+            color: #333;
+            border: 1px solid #ddd;
+            padding: 0.8em 1.5em;
+            font-size: 0.95em;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-back:hover {
+            background: #ddd;
+            transform: translateY(-2px);
+        }
+
+        .success-message {
+            padding: 1em 1.2em;
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 6px;
+            color: #2e7d32;
+            font-weight: 500;
+            border-left: 4px solid #4CAF50;
+        }
+
+        .entity-edit-frame {
+            display: contents;
+        }
+
+        .no-results-found {
+            padding: 2em;
+            text-align: center;
+            color: #999;
+            font-style: italic;
+        }
+
+        .sticky-buttons {
+            position: sticky;
+            bottom: 0;
+            background: #fff;
+            padding: 1em 0;
+            border-top: 1px solid rgba(34, 116, 165, 0.1);
+        }
+
+        @media (max-width: 1024px) {
+            .catalog-edit-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .security-controls-table-wrapper {
+                max-height: 400px;
+            }
+
+            .security-control-name-cell {
+                width: 35%;
+            }
+
+            .security-control-detail-cell {
+                font-size: 0.85em;
+                padding: 1em 0.8em;
+            }
+
+            .filter-input-wrapper {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .filter-input {
+                min-width: 100%;
+            }
+
+            .form-actions {
+                flex-direction: column;
+            }
+
+            .btn-submit,
+            .btn-back {
+                width: 100%;
+                text-align: center;
+            }
         }
     </style>
 </head>
@@ -38,58 +318,154 @@
     <div class="entity-edit-frame">
         <form th:action="@{/security-catalog/edit}" th:object="${securityCatalog}" method="post">
             <input type="hidden" th:field="*{id}" />
-            <table>
-                <tr>
-                    <td><label for="name">Name:</label></td>
-                    <td><input type="text" th:field="*{name}" id="name" required /></td>
-                </tr>
-                <tr>
-                    <td><label for="description">Description:</label></td>
-                    <td><textarea th:field="*{description}" id="description" required></textarea></td>
-                </tr>
-                <tr>
-                    <td><label for="revision">Revision:</label></td>
-                    <td><input type="text" th:field="*{revision}" id="revision" required /></td>
-                </tr>
-                <tr>
-                    <td valign="top"><label for="securityControls">Security Controls:</label></td>
-                    <td>
-                        <!-- Grouped by domain, using domain.securityControls per your model -->
-                        <div th:each="domain : ${securityControlDomains}" class="security-controls-group">
-                            <div class="security-control-domain" th:text="${domain.name}"></div>
-                            <div class="security-control-checkbox-list">
-                                <label class="checkbox-label" th:each="control : ${domain.securityControls}">
-                                    <input type="checkbox"
-                                           name="securityControls"
-                                           th:value="${control.id}"
-                                           th:checked="${securityCatalog.securityControls != null and securityCatalog.securityControls.contains(control)}" />
-                                    <span th:text="${control.name}"></span>
-                                </label>
+            
+            <div class="catalog-edit-container">
+                <!-- Left Column: General Information -->
+                <div class="catalog-general-section">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="form-field-group">
+                                <label for="name">Name:</label>
+                                <input type="text" th:field="*{name}" id="name" class="form-input" required />
+                            </div>
+
+                            <div class="form-field-group">
+                                <label for="description">Description:</label>
+                                <textarea th:field="*{description}" id="description" class="form-textarea" required></textarea>
+                            </div>
+
+                            <div class="form-field-group">
+                                <label for="revision">Revision:</label>
+                                <input type="text" th:field="*{revision}" id="revision" class="form-input" required />
+                            </div>
+
+                            <div class="form-field-group">
+                                <label for="maturityModelId">Maturity Model:</label>
+                                <select id="maturityModelId" name="maturityModelId" class="form-control-select" required>
+                                    <option value="" disabled th:selected="${securityCatalog.maturityModel == null}">-- Select one --</option>
+                                    <option th:each="maturityModel : ${maturityModels}"
+                                            th:value="${maturityModel.id}"
+                                            th:text="${maturityModel.name}"
+                                            th:selected="${securityCatalog.maturityModel != null and maturityModel.id == securityCatalog.maturityModel.id}">
+                                    </option>
+                                </select>
                             </div>
                         </div>
-                    </td>
-                </tr>
-                <tr>
-                    <td><label for="maturityModelId">Maturity Model:</label></td>
-                    <td>
-                        <select id="maturityModelId" name="maturityModelId" required>
-                            <option value="" disabled th:selected="${securityCatalog.maturityModel == null}">-- Select one --</option>
-                            <option th:each="maturityModel : ${maturityModels}"
-                                    th:value="${maturityModel.id}"
-                                    th:text="${maturityModel.name}"
-                                    th:selected="${securityCatalog.maturityModel != null and maturityModel.id == securityCatalog.maturityModel.id}">
-                            </option>
-                        </select>
-                    </td>
-                </tr>
-            </table>
-            <button type="submit">Save</button>
+                    </div>
+
+                    <div class="sticky-buttons">
+                        <div class="form-actions">
+                            <button type="submit" class="btn-submit">Save</button>
+                            <a href="/security-catalog/list" class="btn-back">Back to catalog list</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Security Controls -->
+                <div class="catalog-controls-section">
+                    <div class="security-controls-section">
+                        <div class="security-controls-section-header">
+                            <h3>Security Controls</h3>
+                        </div>
+
+                        <div class="security-controls-filter-bar">
+                            <div class="filter-input-wrapper">
+                                <label for="controlFilter">Search:</label>
+                                <input type="text" id="controlFilter" class="filter-input" placeholder="Search by control name or details..." />
+                            </div>
+                        </div>
+
+                        <div class="security-controls-table-wrapper">
+                            <table class="security-controls-table">
+                                <tbody>
+                                    <th:block th:each="domain : ${securityControlDomains}">
+                                        <tr class="security-controls-domain-header-row">
+                                            <td colspan="3" th:text="${domain.name}"></td>
+                                        </tr>
+                                        <th:block th:each="control : ${domain.securityControls}">
+                                            <tr class="security-control-row" th:data-name="${control.name}" th:data-detail="${control.detail}">
+                                                <td class="security-control-checkbox-cell">
+                                                    <input type="checkbox"
+                                                           name="securityControls"
+                                                           th:value="${control.id}"
+                                                           th:checked="${securityCatalog.securityControls != null and securityCatalog.securityControls.contains(control)}" />
+                                                </td>
+                                                <td class="security-control-name-cell" th:text="${control.name}"></td>
+                                                <td class="security-control-detail-cell" th:text="${control.detail}"></td>
+                                            </tr>
+                                        </th:block>
+                                    </th:block>
+                                </tbody>
+                            </table>
+                            <div id="noResults" class="no-results-found" style="display: none;">
+                                No controls found matching your search.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </form>
-        <div th:if="${success}">
-            <p style="color:green;">Security Catalog saved!</p>
+
+        <!-- Success Message -->
+        <div th:if="${success}" class="success-message">
+            Security Catalog saved successfully!
         </div>
-        <a href="/security-catalog/list">Back to catalog list</a>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const filterInput = document.getElementById('controlFilter');
+        const controlRows = document.querySelectorAll('.security-control-row');
+        const domainRows = document.querySelectorAll('.security-controls-domain-header-row');
+        const noResultsDiv = document.getElementById('noResults');
+        const table = document.querySelector('.security-controls-table');
+
+        filterInput.addEventListener('keyup', function() {
+            const filterText = filterInput.value.toLowerCase().trim();
+            let visibleCount = 0;
+            const visibleDomains = new Set();
+
+            // First pass: determine which rows match and which domains are visible
+            controlRows.forEach(row => {
+                const name = row.getAttribute('data-name').toLowerCase();
+                const detail = row.getAttribute('data-detail').toLowerCase();
+                const matches = filterText === '' || name.includes(filterText) || detail.includes(filterText);
+                
+                if (matches) {
+                    row.classList.remove('hidden');
+                    visibleCount++;
+                    // Mark all parent domains as visible
+                    let prevElement = row.previousElementSibling;
+                    while (prevElement) {
+                        if (prevElement.classList.contains('security-controls-domain-header-row')) {
+                            visibleDomains.add(prevElement);
+                            break;
+                        }
+                        prevElement = prevElement.previousElementSibling;
+                    }
+                } else {
+                    row.classList.add('hidden');
+                }
+            });
+
+            // Show/hide domain headers
+            domainRows.forEach(domainRow => {
+                if (visibleDomains.has(domainRow)) {
+                    domainRow.style.display = '';
+                } else {
+                    domainRow.style.display = 'none';
+                }
+            });
+
+            // Show/hide no results message
+            if (visibleCount === 0 && filterText !== '') {
+                noResultsDiv.style.display = 'block';
+            } else {
+                noResultsDiv.style.display = 'none';
+            }
+        });
+    });
+</script>
 </body>
 </html>

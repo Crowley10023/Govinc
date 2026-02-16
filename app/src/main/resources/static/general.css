@@ -1239,6 +1239,64 @@ body::before {
   color: #fff;
 }
 
+/* =========== FORM STYLES =========== */
+
+.create-assessment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5em;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.form-control-select {
+  width: 100%;
+  padding: 0.75em 0.9em;
+  border: 1.5px solid rgba(34, 116, 165, 0.2);
+  border-radius: 6px;
+  font-size: 0.95em;
+  background: #fff;
+  color: #333;
+  font-family: inherit;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.form-control-select:hover:not(:disabled) {
+  border-color: rgba(34, 116, 165, 0.4);
+  box-shadow: 0 2px 4px rgba(34, 116, 165, 0.06);
+}
+
+.form-control-select:focus {
+  outline: none;
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 3px rgba(34, 116, 165, 0.12);
+}
+
+.form-control-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: rgba(200, 200, 200, 0.05);
+}
+
+.form-control-select option {
+  padding: 0.6em 0.8em;
+  background: #fff;
+  color: #333;
+}
+
+.form-control-select option:checked {
+  background: linear-gradient(135deg, var(--primary-blue) 0%, rgba(34, 116, 165, 0.8) 100%);
+  color: #fff;
+}
+
+.form-hint {
+  margin: 0.5em 0 0 0;
+  font-size: 0.85em;
+  color: #999;
+  font-style: italic;
+}
+
 /* =========== UTILITY CLASSES =========== */
 
 .card {
