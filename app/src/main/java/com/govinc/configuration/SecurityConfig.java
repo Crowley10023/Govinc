@@ -170,20 +170,55 @@ public class SecurityConfig {
         }
     }
 
-
-
     @Bean
     public AuthenticationFailureHandler oauth2AuthenticationFailureHandler() {
-        return new SimpleUrlAuthenticationFailureHandler() {
-            @Override
-            public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
-                    org.springframework.security.core.AuthenticationException exception)
-                    throws IOException, ServletException {
-                logger.error("[OAUTH2-FLOW] OAuth2 login failure for request from " + request.getRemoteAddr() + ": " + exception.getMessage());
-                logger.debug("[OAUTH2-FLOW] OAuth2 login failure details", exception);
-                super.onAuthenticationFailure(request, response, exception);
+        return new OAuth2ErrorHandlingFailureHandler();
+    }
+
+    /**
+     * Custom OAuth2 failure handler that detects specific error types and provides user-friendly messages
+     */
+    private static class OAuth2ErrorHandlingFailureHandler extends SimpleUrlAuthenticationFailureHandler {
+        private static final Logger handlerLogger = LoggerFactory.getLogger(OAuth2ErrorHandlingFailureHandler.class);
+
+        @Override
+        public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
+                org.springframework.security.core.AuthenticationException exception)
+                throws IOException, ServletException {
+            handlerLogger.error("[OAUTH2-FLOW] OAuth2 login failure for request from " + request.getRemoteAddr() + ": " + exception.getMessage());
+            handlerLogger.debug("[OAUTH2-FLOW] OAuth2 login failure details", exception);
+
+            // Detect specific error types and provide user-friendly messages
+            String errorMessage = "oauth2_error";
+            String errorDetails = null;
+
+            String exceptionMessage = exception.getMessage();
+            if (exceptionMessage != null) {
+                if (exceptionMessage.contains("invalid_client") || exceptionMessage.contains("Client authentication failed")) {
+                    errorMessage = "invalid_secret";
+                    errorDetails = "The OAuth2 client secret is invalid or expired. Please update the Azure configuration.";
+                    handlerLogger.warn("[OAUTH2-FLOW] Detected invalid client secret error");
+                } else if (exceptionMessage.contains("invalid_grant")) {
+                    errorMessage = "invalid_grant";
+                    errorDetails = "Authorization code is invalid or expired. Please try logging in again.";
+                    handlerLogger.warn("[OAUTH2-FLOW] Detected invalid grant error");
+                } else if (exceptionMessage.contains("unauthorized_client")) {
+                    errorMessage = "unauthorized_client";
+                    errorDetails = "The application is not authorized. Please check the Azure app registration.";
+                    handlerLogger.warn("[OAUTH2-FLOW] Detected unauthorized client error");
+                }
             }
-        };
+
+            // Store error details in session for display on login page
+            if (errorDetails != null) {
+                request.getSession().setAttribute("oauth2_error_details", errorDetails);
+                handlerLogger.info("[OAUTH2-FLOW] Stored error details in session: {}", errorDetails);
+            }
+
+            // Redirect to login page with error parameter
+            setDefaultFailureUrl("/login?error=" + errorMessage);
+            super.onAuthenticationFailure(request, response, exception);
+        }
     }
 
     /**

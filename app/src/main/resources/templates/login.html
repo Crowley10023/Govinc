@@ -28,6 +28,7 @@
             margin: 8px 0 16px 0;
             border: 1px solid #ccc;
             border-radius: 4px;
+            box-sizing: border-box;
         }
 
         .login-container button {
@@ -67,6 +68,35 @@
         .error-message {
             color: #d63c3c;
             margin-bottom: 16px;
+        }
+
+        .oauth2-error-box {
+            background-color: #fde7e7;
+            border: 2px solid #d63c3c;
+            border-radius: 4px;
+            padding: 16px;
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .oauth2-error-box h3 {
+            color: #d63c3c;
+            margin: 0 0 8px 0;
+            font-size: 1.1em;
+        }
+
+        .oauth2-error-box p {
+            color: #333;
+            margin: 0;
+            font-size: 0.95em;
+            line-height: 1.5;
+        }
+
+        .oauth2-error-box .error-code {
+            color: #999;
+            font-size: 0.85em;
+            margin-top: 8px;
+            font-style: italic;
         }
 
         .oauth-btn {
@@ -120,8 +150,16 @@
                 alt="Default Compliance Incubator Logo" class="ci-logo-img-visible" />
         </div>
         <h2>Login</h2>
+        
+        <!-- OAuth2 Error Display -->
+        <div th:if="${errorMessage}" class="oauth2-error-box">
+            <h3 th:text="${errorMessage}">Error</h3>
+            <p th:text="${errorDetails}">Error details</p>
+            <div class="error-code" th:if="${param.error}" th:text="'Error code: ' + ${param.error}"></div>
+        </div>
+        
         <form th:action="@{/login}" method="post">
-            <div th:if="${param.error}" class="error-message">
+            <div th:if="${param.error and not errorMessage}" class="error-message">
                 Invalid username or password.
             </div>
             <input type="text" name="username" placeholder="Username" required autofocus>

@@ -10,8 +10,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -78,6 +76,59 @@ public class LoginController {
         // Check if any OAuth2 providers are available for display logic
         boolean hasOAuth2 = oauthProviders.values().stream().anyMatch(Boolean::booleanValue);
         model.addAttribute("hasOAuth2Providers", hasOAuth2);
+
+        // Handle OAuth2 error messages
+        String error = request.getParameter("error");
+        String errorMessage = null;
+        String errorDetails = null;
+
+        if (error != null) {
+            logger.info("[OAUTH2-FLOW] Login page error parameter: {}", error);
+            
+            switch (error) {
+                case "invalid_secret":
+                    errorMessage = "Azure Configuration Error";
+                    errorDetails = (String) request.getSession().getAttribute("oauth2_error_details");
+                    if (errorDetails == null) {
+                        errorDetails = "The OAuth2 client secret is invalid or expired. Please verify your Azure app registration credentials and update them in the configuration.";
+                    }
+                    break;
+                case "invalid_grant":
+                    errorMessage = "Authorization Error";
+                    errorDetails = (String) request.getSession().getAttribute("oauth2_error_details");
+                    if (errorDetails == null) {
+                        errorDetails = "The authorization code expired or is invalid. Please try logging in again.";
+                    }
+                    break;
+                case "unauthorized_client":
+                    errorMessage = "Application Not Authorized";
+                    errorDetails = (String) request.getSession().getAttribute("oauth2_error_details");
+                    if (errorDetails == null) {
+                        errorDetails = "The application is not authorized in Azure. Please check the app registration settings.";
+                    }
+                    break;
+                case "oauth2_error":
+                    errorMessage = "OAuth2 Authentication Failed";
+                    errorDetails = (String) request.getSession().getAttribute("oauth2_error_details");
+                    if (errorDetails == null) {
+                        errorDetails = "An authentication error occurred. Please check the Azure configuration and try again.";
+                    }
+                    break;
+                default:
+                    errorMessage = "Login Failed";
+                    errorDetails = "Invalid username or password.";
+                    break;
+            }
+            
+            // Clear the error details from session after displaying
+            request.getSession().removeAttribute("oauth2_error_details");
+        }
+
+        if (errorMessage != null) {
+            model.addAttribute("errorMessage", errorMessage);
+            model.addAttribute("errorDetails", errorDetails);
+            logger.warn("[OAUTH2-FLOW] Displaying error on login page: {} - {}", errorMessage, errorDetails);
+        }
 
         logger.info("[OAUTH2-FLOW] Rendering login page");
         return "login";
