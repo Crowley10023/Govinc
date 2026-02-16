@@ -60,6 +60,8 @@ public class SecurityConfig {
             "/config/image-upload/preview", // Allow logo preview access without authentication
             "/title.png", // Allow default logo access without authentication
             "/login", // Allow login page
+            "/oauth2",
+            "/login/oauth2",
             "/api/security-control/import/**", // Allow security control import API endpoints
             "/api/security-control/translate", // Allow security control translation API endpoint
             "/security-control/import", // Allow security control import form submission - CSRF exempt
