@@ -1,6 +1,8 @@
 package com.govinc.configuration;
 
 import com.govinc.service.AuthConfigService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -23,8 +25,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Logger;
-import java.util.logging.Level;
 
 /**
  * Spring Security configuration that supports dynamic authentication providers.
@@ -68,7 +68,7 @@ public class SecurityConfig {
             "/api/security-catalogs" // Allow catalog listing API endpoint
     };
 
-    private static final Logger logger = Logger.getLogger(SecurityConfig.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(SecurityConfig.class);
 
     @Autowired
     private CustomAuthenticationSuccessHandler customAuthenticationSuccessHandler;
@@ -94,31 +94,80 @@ public class SecurityConfig {
                 .anyRequest().authenticated())
             .csrf(csrf -> csrf
                 .ignoringRequestMatchers(EXCLUDED_URLS))
+            .addFilterBefore(new OAuth2AuthorizationRequestLoggingFilter(), org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(new OAuth2DebugLoggingFilter(), org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
             .formLogin(form -> form
                 .loginPage("/login")
                 .permitAll()
                 .successHandler(customAuthenticationSuccessHandler));
-        
+
         // Configure OAuth2 login if OAuth2 providers are available
         // Spring Security 6.x automatically uses HttpSessionOAuth2AuthorizationRequestRepository for session-based storage
         // The dynamic client registration repository will handle provider availability
         try {
             if (authConfigService != null && authConfigService.hasOAuth2Providers() && clientRegistrationRepository != null) {
+                logger.info("[OAUTH2-FLOW] Configuring OAuth2 login with dynamic client registration");
                 http.oauth2Login(oauth2 -> oauth2
                     .loginPage("/login") // Redirects to our login page for OAuth
                     .successHandler(customAuthenticationSuccessHandler)
                     .failureHandler(oauth2AuthenticationFailureHandler())
                     // Use the dynamic client registration repository
                     .clientRegistrationRepository(clientRegistrationRepository));
-                logger.info("OAuth2 login configured with " + (authConfigService.getAvailableProviders().size() - 1) + " OAuth2 providers"); // -1 for form auth
+                logger.info("[OAUTH2-FLOW] OAuth2 login configured with " + (authConfigService.getAvailableProviders().size() - 1) + " OAuth2 providers"); // -1 for form auth
             } else {
-                logger.info("No OAuth2 providers available - using form authentication only");
+                logger.info("[OAUTH2-FLOW] No OAuth2 providers available - using form authentication only");
             }
         } catch (Exception e) {
-            logger.warning("Failed to configure OAuth2 login - falling back to form authentication only: " + e.getMessage());
+            logger.warn("[OAUTH2-FLOW] Failed to configure OAuth2 login - falling back to form authentication only: " + e.getMessage());
         }
-        
+
         return http.build();
+    }
+
+    /**
+     * Debug logging filter to trace OAuth2 flow across requests
+     */
+    private static class OAuth2DebugLoggingFilter extends org.springframework.web.filter.OncePerRequestFilter {
+        private static final Logger filterLogger = LoggerFactory.getLogger("OAuth2DebugLoggingFilter");
+
+        @Override
+        protected void doFilterInternal(jakarta.servlet.http.HttpServletRequest request,
+                                       jakarta.servlet.http.HttpServletResponse response,
+                                       jakarta.servlet.FilterChain filterChain)
+                throws jakarta.servlet.ServletException, java.io.IOException {
+            String path = request.getRequestURI();
+            String queryString = request.getQueryString();
+            String sessionId = request.getSession().getId();
+
+            // Log OAuth2-related paths
+            if (path.contains("/oauth2") || path.contains("/login")) {
+                filterLogger.info("[OAUTH2-FLOW] " + request.getMethod() + " " + path +
+                    (queryString != null ? "?" + queryString : "") +
+                    " | SessionID: " + sessionId);
+
+                // Log cookies
+                jakarta.servlet.http.Cookie[] cookies = request.getCookies();
+                if (cookies != null) {
+                    for (jakarta.servlet.http.Cookie cookie : cookies) {
+                        if (cookie.getName().equals("JSESSIONID")) {
+                            filterLogger.info("[OAUTH2-FLOW] JSESSIONID Cookie: " + cookie.getValue() +
+                                " | Path: " + cookie.getPath() + " | Domain: " + cookie.getDomain() +
+                                " | Secure: " + cookie.getSecure() + " | HttpOnly: " + cookie.isHttpOnly());
+                        }
+                    }
+                } else {
+                    filterLogger.warn("[OAUTH2-FLOW] No cookies in request to " + path);
+                }
+
+                // Log relevant headers
+                filterLogger.info("[OAUTH2-FLOW] Headers - Referer: " + request.getHeader("Referer") +
+                    " | Host: " + request.getHeader("Host") +
+                    " | X-Forwarded-Proto: " + request.getHeader("X-Forwarded-Proto") +
+                    " | X-Forwarded-Host: " + request.getHeader("X-Forwarded-Host"));
+            }
+
+            filterChain.doFilter(request, response);
+        }
     }
 
 
@@ -130,8 +179,8 @@ public class SecurityConfig {
             public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
                     org.springframework.security.core.AuthenticationException exception)
                     throws IOException, ServletException {
-                //logger.severe("OAuth2 login failure for request from " + request.getRemoteAddr() + ": " + exception.getMessage());
-                //logger.log(java.util.logging.Level.FINE, "OAuth2 login failure details", exception);
+                logger.error("[OAUTH2-FLOW] OAuth2 login failure for request from " + request.getRemoteAddr() + ": " + exception.getMessage());
+                logger.debug("[OAUTH2-FLOW] OAuth2 login failure details", exception);
                 super.onAuthenticationFailure(request, response, exception);
             }
         };
@@ -162,7 +211,7 @@ public class SecurityConfig {
                     .roles("USER", "ADMIN")
                     .build());
                 
-                logger.fine("Loaded local user: " + username);
+                logger.debug("Loaded local user: " + username);
             }
         }
         
@@ -174,9 +223,9 @@ public class SecurityConfig {
                     .password(passwordEncoder().encode("admin"))
                     .roles("ADMIN")
                     .build());
-                logger.warning("No users configured in properties, using default admin/admin. Configure users in application.properties or database.");
+                logger.warn("No users configured in properties, using default admin/admin. Configure users in application.properties or database.");
             } else {
-                logger.warning("Production environment with no configured users. Admin access is disabled.");
+                logger.warn("Production environment with no configured users. Admin access is disabled.");
             }
         }
         

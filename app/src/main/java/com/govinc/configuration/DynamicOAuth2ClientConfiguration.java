@@ -63,14 +63,17 @@ public class DynamicOAuth2ClientConfiguration {
         
         @Override
         public ClientRegistration findByRegistrationId(String registrationId) {
+            logger.info("[OAUTH2-FLOW] findByRegistrationId called for: {}", registrationId);
             // Always refresh registrations to get latest configuration
             refreshRegistrations();
             
             ClientRegistration registration = registrations.get(registrationId);
             if (registration != null) {
-                logger.debug("Found client registration for: {}", registrationId);
+                logger.info("[OAUTH2-FLOW] Found client registration for: {} | ClientId: {}", 
+                    registrationId, registration.getClientId());
             } else {
-                logger.debug("No client registration found for: {}", registrationId);
+                logger.warn("[OAUTH2-FLOW] No client registration found for: {}", registrationId);
+                logger.warn("[OAUTH2-FLOW] Available registrations: {}", registrations.keySet());
             }
             return registration;
         }
@@ -79,35 +82,46 @@ public class DynamicOAuth2ClientConfiguration {
          * Refreshes all client registrations from current provider configuration
          */
         public synchronized void refreshRegistrations() {
+            logger.info("[OAUTH2-FLOW] Refreshing client registrations...");
             try {
                 registrations.clear();
                 
                 var providers = authConfigService.getAvailableProviders();
                 int configuredCount = 0;
                 
+                logger.info("[OAUTH2-FLOW] Total available providers: {}", providers.size());
+                
                 for (var provider : providers.values()) {
+                    logger.debug("[OAUTH2-FLOW] Checking provider: {} | Type: {} | Configured: {} | Healthy: {}",
+                        provider.getId(), provider.getType(), provider.isConfigured(), provider.isHealthy());
+                    
                     if (provider.getType() == AuthConfigService.AuthProviderType.FORM || !provider.isConfigured()) {
+                        logger.debug("[OAUTH2-FLOW] Skipping provider: {} (FORM provider or not configured)", provider.getId());
                         continue;
                     }
                     
                     try {
+                        logger.info("[OAUTH2-FLOW] Creating client registration for: {}", provider.getId());
                         ClientRegistration registration = createClientRegistration(provider);
                         if (registration != null) {
                             registrations.put(provider.getId(), registration);
                             configuredCount++;
-                            logger.debug("Refreshed OAuth2 client registration for: {}", provider.getId());
+                            logger.info("[OAUTH2-FLOW] Successfully created client registration for: {}", 
+                                provider.getId());
+                        } else {
+                            logger.warn("[OAUTH2-FLOW] createClientRegistration returned null for: {}", provider.getId());
                         }
                     } catch (Exception e) {
-                        logger.error("Failed to create client registration for provider {}: {}", 
-                                   provider.getId(), e.getMessage());
+                        logger.error("[OAUTH2-FLOW] Failed to create client registration for provider {}: {}", 
+                                   provider.getId(), e.getMessage(), e);
                         provider.setHealthy(false);
                     }
                 }
                 
-                logger.info("Refreshed client registrations: {} OAuth2 providers available", configuredCount);
+                logger.info("[OAUTH2-FLOW] Refreshed client registrations: {} OAuth2 providers configured", configuredCount);
                 
             } catch (Exception e) {
-                logger.error("Failed to refresh client registrations", e);
+                logger.error("[OAUTH2-FLOW] Failed to refresh client registrations", e);
             }
         }
         
@@ -148,7 +162,7 @@ public class DynamicOAuth2ClientConfiguration {
         
         private ClientRegistration createAzureRegistration(AuthConfigService.AuthProvider provider) {
             if (provider.getTenantId() == null || provider.getTenantId().trim().isEmpty()) {
-                logger.warn("Azure tenant ID not configured - skipping registration");
+                logger.warn("[OAUTH2-FLOW] Azure tenant ID not configured - skipping registration");
                 return null;
             }
             
@@ -157,7 +171,10 @@ public class DynamicOAuth2ClientConfiguration {
                 ? provider.getRedirectUri()
                 : "{baseUrl}/login/oauth2/code/{registrationId}";
             
-            return ClientRegistration.withRegistrationId("azure")
+            logger.info("[OAUTH2-FLOW] Creating Azure registration | TenantId: {} | ClientId: {} | RedirectUri: {}",
+                tenantId, provider.getClientId(), redirectUri);
+            
+            ClientRegistration registration = ClientRegistration.withRegistrationId("azure")
                 .clientId(provider.getClientId())
                 .clientSecret(provider.getClientSecret())
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST)
@@ -171,6 +188,10 @@ public class DynamicOAuth2ClientConfiguration {
                 .userNameAttributeName("sub")
                 .clientName("Microsoft")
                 .build();
+            
+            logger.info("[OAUTH2-FLOW] Azure registration created successfully");
+            
+            return registration;
         }
         
         /**
