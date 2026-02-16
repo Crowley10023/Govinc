@@ -8,7 +8,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
-import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -99,7 +98,8 @@ public class SecurityConfig {
             .formLogin(form -> form
                 .loginPage("/login")
                 .permitAll()
-                .successHandler(customAuthenticationSuccessHandler));
+                .successHandler(customAuthenticationSuccessHandler)
+                .failureUrl("/login?error=form_login_failed"));
 
         // Configure OAuth2 login if OAuth2 providers are available
         // Spring Security 6.x automatically uses HttpSessionOAuth2AuthorizationRequestRepository for session-based storage
@@ -176,9 +176,10 @@ public class SecurityConfig {
     }
 
     /**
-     * Custom OAuth2 failure handler that detects specific error types and provides user-friendly messages
+     * Custom OAuth2 failure handler that detects specific error types and provides user-friendly messages.
+     * Stores error details in session and redirects to login page.
      */
-    private static class OAuth2ErrorHandlingFailureHandler extends SimpleUrlAuthenticationFailureHandler {
+    private static class OAuth2ErrorHandlingFailureHandler implements AuthenticationFailureHandler {
         private static final Logger handlerLogger = LoggerFactory.getLogger(OAuth2ErrorHandlingFailureHandler.class);
 
         @Override
@@ -189,21 +190,21 @@ public class SecurityConfig {
             handlerLogger.debug("[OAUTH2-FLOW] OAuth2 login failure details", exception);
 
             // Detect specific error types and provide user-friendly messages
-            String errorMessage = "oauth2_error";
+            String errorType = "oauth2_error";
             String errorDetails = null;
 
             String exceptionMessage = exception.getMessage();
             if (exceptionMessage != null) {
                 if (exceptionMessage.contains("invalid_client") || exceptionMessage.contains("Client authentication failed")) {
-                    errorMessage = "invalid_secret";
+                    errorType = "invalid_secret";
                     errorDetails = "The OAuth2 client secret is invalid or expired. Please update the Azure configuration.";
                     handlerLogger.warn("[OAUTH2-FLOW] Detected invalid client secret error");
                 } else if (exceptionMessage.contains("invalid_grant")) {
-                    errorMessage = "invalid_grant";
+                    errorType = "invalid_grant";
                     errorDetails = "Authorization code is invalid or expired. Please try logging in again.";
                     handlerLogger.warn("[OAUTH2-FLOW] Detected invalid grant error");
                 } else if (exceptionMessage.contains("unauthorized_client")) {
-                    errorMessage = "unauthorized_client";
+                    errorType = "unauthorized_client";
                     errorDetails = "The application is not authorized. Please check the Azure app registration.";
                     handlerLogger.warn("[OAUTH2-FLOW] Detected unauthorized client error");
                 }
@@ -214,10 +215,11 @@ public class SecurityConfig {
                 request.getSession().setAttribute("oauth2_error_details", errorDetails);
                 handlerLogger.info("[OAUTH2-FLOW] Stored error details in session: {}", errorDetails);
             }
-
-            // Redirect to login page with error parameter
-            setDefaultFailureUrl("/login?error=" + errorMessage);
-            super.onAuthenticationFailure(request, response, exception);
+            
+            // Redirect to login page with error type parameter
+            String redirectUrl = "/login?error=" + errorType;
+            handlerLogger.info("[OAUTH2-FLOW] Redirecting to: {}", redirectUrl);
+            response.sendRedirect(request.getContextPath() + redirectUrl);
         }
     }
 

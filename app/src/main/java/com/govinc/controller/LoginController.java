@@ -81,47 +81,55 @@ public class LoginController {
         String error = request.getParameter("error");
         String errorMessage = null;
         String errorDetails = null;
+        Object sessionDetails = null;
 
-        if (error != null) {
+        if (error != null && !error.isEmpty()) {
             logger.info("[OAUTH2-FLOW] Login page error parameter: {}", error);
+            
+            // Retrieve session details once, before switch
+            sessionDetails = request.getSession().getAttribute("oauth2_error_details");
             
             switch (error) {
                 case "invalid_secret":
                     errorMessage = "Azure Configuration Error";
-                    errorDetails = (String) request.getSession().getAttribute("oauth2_error_details");
-                    if (errorDetails == null) {
-                        errorDetails = "The OAuth2 client secret is invalid or expired. Please verify your Azure app registration credentials and update them in the configuration.";
-                    }
+                    errorDetails = sessionDetails != null ? (String) sessionDetails : 
+                        "The OAuth2 client secret is invalid or expired. Please verify your Azure app registration credentials and update them in the configuration.";
                     break;
+                    
                 case "invalid_grant":
                     errorMessage = "Authorization Error";
-                    errorDetails = (String) request.getSession().getAttribute("oauth2_error_details");
-                    if (errorDetails == null) {
-                        errorDetails = "The authorization code expired or is invalid. Please try logging in again.";
-                    }
+                    errorDetails = sessionDetails != null ? (String) sessionDetails : 
+                        "The authorization code expired or is invalid. Please try logging in again.";
                     break;
+                    
                 case "unauthorized_client":
                     errorMessage = "Application Not Authorized";
-                    errorDetails = (String) request.getSession().getAttribute("oauth2_error_details");
-                    if (errorDetails == null) {
-                        errorDetails = "The application is not authorized in Azure. Please check the app registration settings.";
-                    }
+                    errorDetails = sessionDetails != null ? (String) sessionDetails : 
+                        "The application is not authorized in Azure. Please check the app registration settings.";
                     break;
+                    
                 case "oauth2_error":
                     errorMessage = "OAuth2 Authentication Failed";
-                    errorDetails = (String) request.getSession().getAttribute("oauth2_error_details");
-                    if (errorDetails == null) {
-                        errorDetails = "An authentication error occurred. Please check the Azure configuration and try again.";
-                    }
+                    errorDetails = sessionDetails != null ? (String) sessionDetails : 
+                        "An authentication error occurred. Please check the Azure configuration and try again.";
                     break;
-                default:
+                    
+                case "form_login_failed":
                     errorMessage = "Login Failed";
                     errorDetails = "Invalid username or password.";
                     break;
+                    
+                default:
+                    errorMessage = "Login Failed";
+                    errorDetails = "An error occurred during authentication.";
+                    break;
             }
             
-            // Clear the error details from session after displaying
-            request.getSession().removeAttribute("oauth2_error_details");
+            // Clear the error details from session after retrieving
+            if (sessionDetails != null) {
+                request.getSession().removeAttribute("oauth2_error_details");
+                logger.info("[OAUTH2-FLOW] Cleared oauth2_error_details from session");
+            }
         }
 
         if (errorMessage != null) {
