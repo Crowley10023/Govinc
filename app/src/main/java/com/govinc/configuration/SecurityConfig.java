@@ -14,6 +14,8 @@ import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestRepository;
+import org.springframework.security.oauth2.client.web.HttpSessionOAuth2AuthorizationRequestRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import jakarta.servlet.ServletException;
@@ -59,9 +61,9 @@ public class SecurityConfig {
             "/layoutConfig",
             "/config/image-upload/preview", // Allow logo preview access without authentication
             "/title.png", // Allow default logo access without authentication
-            "/login", // Allow login page
-            "/oauth2",
-            "/login/oauth2",
+            "/login/**", // Allow login page
+            "/oauth2/**",
+            "/login/oauth2/**",
             "/api/security-control/import/**", // Allow security control import API endpoints
             "/api/security-control/translate", // Allow security control translation API endpoint
             "/security-control/import", // Allow security control import form submission - CSRF exempt
@@ -108,7 +110,9 @@ public class SecurityConfig {
                     .successHandler(customAuthenticationSuccessHandler)
                     .failureHandler(oauth2AuthenticationFailureHandler())
                     // Use the dynamic client registration repository
-                    .clientRegistrationRepository(clientRegistrationRepository));
+                    .clientRegistrationRepository(clientRegistrationRepository)
+                    // Explicitly configure authorization request repository for session-based storage
+                    .authorizationRequestRepository(authorizationRequestRepository()));
                 logger.info("OAuth2 login configured with " + (authConfigService.getAvailableProviders().size() - 1) + " OAuth2 providers"); // -1 for form auth
             } else {
                 logger.info("No OAuth2 providers available - using form authentication only");
@@ -118,6 +122,11 @@ public class SecurityConfig {
         }
         
         return http.build();
+    }
+
+    @Bean
+    public OAuth2AuthorizationRequestRepository authorizationRequestRepository() {
+        return new HttpSessionOAuth2AuthorizationRequestRepository();
     }
 
     @Bean
