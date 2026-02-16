@@ -156,6 +156,7 @@
             <h3 th:text="${errorMessage}">Error</h3>
             <p th:text="${errorDetails}">Error details</p>
             <div class="error-code" th:if="${param.error != null}" th:text="'Error code: ' + ${param.error[0]}"></div>
+            <div class="error-code" th:text="Please check client secret"></div>
         </div>
         
         <form th:action="@{/login}" method="post">

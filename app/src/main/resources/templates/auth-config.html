@@ -271,7 +271,7 @@
                         </div>
                         <div class="form-group">
                             <label for="keycloak-client-secret">Client Secret:</label>
-                            <input type="password" id="keycloak-client-secret" name="clientSecret" required>
+                            <input type="text" id="keycloak-client-secret" name="clientSecret" required>
                         </div>
                         <div class="form-group">
                             <label for="keycloak-issuer-uri">Issuer URI:</label>
@@ -308,7 +308,7 @@
                         </div>
                         <div class="form-group">
                             <label for="azure-client-secret">Client Secret:</label>
-                            <input type="password" id="azure-client-secret" name="clientSecret" required>
+                            <input type="text" id="azure-client-secret" name="clientSecret" required>
                         </div>
                         <div class="form-group">
                             <label for="azure-tenant-id">Tenant ID:</label>
@@ -552,8 +552,14 @@
         }
 
         function fillProviderForm(providerId, info) {
-            // Fill current values into form fields (but mask sensitive data)
+            // Fill current values into form fields in clear text
             if (providerId === 'keycloak') {
+                if (info.clientId) {
+                    document.getElementById('keycloak-client-id').value = info.clientId;
+                }
+                if (info.clientSecret) {
+                    document.getElementById('keycloak-client-secret').value = info.clientSecret;
+                }
                 if (info.issuerUri) {
                     document.getElementById('keycloak-issuer-uri').value = info.issuerUri;
                 }
@@ -561,6 +567,12 @@
                     document.getElementById('keycloak-redirect-uri').value = info.redirectUri;
                 }
             } else if (providerId === 'azure') {
+                if (info.clientId) {
+                    document.getElementById('azure-client-id').value = info.clientId;
+                }
+                if (info.clientSecret) {
+                    document.getElementById('azure-client-secret').value = info.clientSecret;
+                }
                 if (info.tenantId) {
                     document.getElementById('azure-tenant-id').value = info.tenantId;
                 }
