@@ -18,7 +18,6 @@
                     <tr>
                         <th>Obfuscated URL</th>
                         <th>Assessment Name</th>
-                        <th>Responsible Person</th>
                         <th>Lifetime (days)</th>
                         <th>Actions</th>
                     </tr>
@@ -34,7 +33,6 @@
                                 th:text="${url.assessment.name}"></a>
                             <span th:if="${url.assessment == null}"></span>
                         </td>
-                        <td th:text="${url.responsiblePerson}"></td>
                         <td th:text="${url.lifetime}"></td>
                         <td>
                             <form th:action="@{'/assessment-direct/urls/' + ${url.id} + '/prolong'}" method="post"

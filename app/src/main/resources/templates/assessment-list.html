@@ -36,13 +36,16 @@
                 </thead>
                 <tbody id="assessmentTbody">
                     <tr th:each="assessment : ${assessments}"
-                        th:data-orgunitid="${assessment.orgUnit != null ? assessment.orgUnit.id : 0}">
+                        th:data-orgunitid="${assessment.orgUnit != null ? assessment.orgUnit.id : 0}"
+                        th:data-assessment-id="${assessment.id}"
+                        style="cursor: pointer;"
+                        class="assessment-row">
                         <td th:text="${assessment.name}"></td>
                         <td th:text="${assessment.date}"></td>
                         <td th:text="${assessment.status}"></td>
                         <td th:text="${assessment.securityCatalog.name}"></td>
                         <td>
-                            <a th:href="@{'/assessment/' + ${assessment.id}}">View</a>
+                            <button class="btn btn-danger btn-sm delete-btn" type="button">Delete</button>
                         </td>
                     </tr>
                 </tbody>
@@ -191,6 +194,40 @@
                     if (e.key === 'Escape') {
                         document.getElementById('orgUnitModal').style.display = 'none';
                     }
+                });
+
+                // Make assessment rows clickable
+                document.addEventListener('DOMContentLoaded', function () {
+                    const assessmentRows = document.querySelectorAll('.assessment-row');
+                    assessmentRows.forEach(row => {
+                        row.addEventListener('click', function (e) {
+                            // Don't navigate if delete button was clicked
+                            if (e.target.closest('.delete-btn')) {
+                                e.stopPropagation();
+                                return;
+                            }
+                            const assessmentId = this.getAttribute('data-assessment-id');
+                            window.location.href = '/assessment/' + assessmentId;
+                        });
+                    });
+
+                    // Delete button click handler
+                    const deleteButtons = document.querySelectorAll('.delete-btn');
+                    deleteButtons.forEach(btn => {
+                        btn.addEventListener('click', function (e) {
+                            e.stopPropagation();
+                            const row = this.closest('.assessment-row');
+                            const assessmentId = row.getAttribute('data-assessment-id');
+                            if (confirm('Are you sure you want to delete this assessment?')) {
+                                // Use form submission to POST to delete endpoint
+                                const form = document.createElement('form');
+                                form.method = 'POST';
+                                form.action = '/assessment/' + assessmentId + '/delete';
+                                document.body.appendChild(form);
+                                form.submit();
+                            }
+                        });
+                    });
                 });
             </script>
         </section>

@@ -255,6 +255,9 @@
                 var controlAnswers = data.controlAnswers || {};
                 var comments = data.controlComments || {};
                 var isOpen = data.isOpen;
+                // Hide finalize bar if finalized (read-only mode)
+                var finalizeBar = document.getElementById('finalize-button-sticky');
+                if (!isOpen && finalizeBar) { finalizeBar.style.display = 'none'; }
                 var controlsHtml = '';
                 domains.forEach(function (domain) {
                     controlsHtml += '<div class="domain-outline card domain-collapsible" style="margin-bottom:2.5em;">' +
@@ -274,24 +277,20 @@
                     controlsHtml += '<table class="table card controls-table"><thead><tr><th style="width:350px;">Control</th><th>Answer & Comment</th></tr></thead><tbody>';
                     controls.filter(function (ctrl) { return ctrl.domainId === domain.id; }).forEach(function (ctrl) {
                         var ansCell = '';
-                        if (isOpen) {
-                            var selectId = 'select-control-' + ctrl.id;
-                            ansCell = '<div class="control-actions-flex-row">' +
-                                '<div class="dropdown-row">' +
-                                '<select name="control_' + ctrl.id + '" data-control-id="' + ctrl.id + '" data-domain-id="' + domain.id + '" class="answer-select" id="' + selectId + '"><option value="">-- select an answer --</option>';
-                            answers.forEach(function (ans) {
-                                var selected = (controlAnswers && controlAnswers[ctrl.id] && ans.answer === controlAnswers[ctrl.id]) ? 'selected' : '';
-                                ansCell += '<option value="' + ans.id + '" ' + selected + '>' + ans.answer + '</option>';
-                            });
-                            ansCell += '</select><span class="answer-feedback"></span></div>' +
-                                '<div class="testarea-row">' +
-                                '<textarea class="comment-textarea" name="comment_' + ctrl.id + '" data-control-id="' + ctrl.id + '" style="min-width:180px;min-height:36px;resize:vertical;" placeholder="Add comment (optional)">' + (comments && comments[ctrl.id] ? comments[ctrl.id] : '') + '</textarea><span class="comment-feedback"></span>' +
-                                '</div>' +
-                                '</div>';
-                        } else {
-                            var ca = controlAnswers[ctrl.id] != null ? controlAnswers[ctrl.id] : 'No answer';
-                            ansCell = '<span>' + ca + '</span>';
-                        }
+                        var selectId = 'select-control-' + ctrl.id;
+                        var disabledAttr = isOpen ? '' : ' disabled';
+                        ansCell = '<div class="control-actions-flex-row">' +
+                            '<div class="dropdown-row">' +
+                            '<select name="control_' + ctrl.id + '" data-control-id="' + ctrl.id + '" data-domain-id="' + domain.id + '" class="answer-select" id="' + selectId + '"' + disabledAttr + '><option value="">-- select an answer --</option>';
+                        answers.forEach(function (ans) {
+                            var selected = (controlAnswers && controlAnswers[ctrl.id] && ans.answer === controlAnswers[ctrl.id]) ? 'selected' : '';
+                            ansCell += '<option value="' + ans.id + '" ' + selected + '>' + ans.answer + '</option>';
+                        });
+                        ansCell += '</select><span class="answer-feedback"></span></div>' +
+                            '<div class="testarea-row">' +
+                            '<textarea class="comment-textarea" name="comment_' + ctrl.id + '" data-control-id="' + ctrl.id + '" style="min-width:180px;min-height:36px;resize:vertical;" placeholder="Add comment (optional)"' + disabledAttr + '>' + (comments && comments[ctrl.id] ? comments[ctrl.id] : '') + '</textarea><span class="comment-feedback"></span>' +
+                            '</div>' +
+                            '</div>';
                         controlsHtml += '<tr><td class="ctrl-name-col"><div class="ctrl-desc-wrap"><span style="font-weight:bold">' + (ctrl.name != null ? ctrl.name : '-') + '</span>' +
                             '<div style="display: block;">' + ((ctrl.detail && ctrl.detail !== '') ? ctrl.detail : 'No detail') + '</div></div></td>' +
                             '<td>' + ansCell + '</td></tr>';
@@ -299,74 +298,78 @@
                     controlsHtml += '</tbody></table></div></div></div>';
                 });
                 document.getElementById('controls-container').innerHTML = controlsHtml;
-                document.querySelectorAll('.answer-select').forEach(function(select) {
-                    select.addEventListener('change', function() {
-                        var controlId = select.getAttribute('data-control-id');
-                        var answerId = select.value;
-                        var feedbackIcon = select.closest('.dropdown-row').querySelector('.answer-feedback');
-                        select.style.background = '';
-                        clearIcon(feedbackIcon);
-                        if (!answerId) {
+                if (isOpen) {
+                    document.querySelectorAll('.answer-select').forEach(function(select) {
+                        select.addEventListener('change', function() {
+                            var controlId = select.getAttribute('data-control-id');
+                            var answerId = select.value;
+                            var feedbackIcon = select.closest('.dropdown-row').querySelector('.answer-feedback');
+                            select.style.background = '';
                             clearIcon(feedbackIcon);
-                            return;
-                        }
-                        fetch('/assessment-direct/' + a.id + '/answer', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/x-www-form-urlencoded'
-                            },
-                            body: 'controlId=' + controlId + '&answerId=' + answerId
-                        })
-                        .then(function(resp) {
-                            select.style.background = '#d8ffd8';
-                            showSuccessIcon(feedbackIcon);
-                            setTimeout(function() { clearIcon(feedbackIcon); select.style.background = ''; }, 1500);
-                        })
-                        .catch(function() {
-                            select.style.background = '#ffd8d8';
-                            showErrorIcon(feedbackIcon);
-                        });
-                    });
-                });
-                var debounceTimers = {};
-                document.querySelectorAll('.comment-textarea').forEach(function(textarea) {
-                    textarea.addEventListener('input', function() {
-                        var controlId = textarea.getAttribute('data-control-id');
-                        var comment = textarea.value;
-                        var feedback = textarea.nextElementSibling;
-                        if (debounceTimers[controlId])
-                            clearTimeout(debounceTimers[controlId]);
-                        debounceTimers[controlId] = setTimeout(function() {
-                            fetch('/assessment-direct/' + a.id + '/control/' + controlId + '/comment', {
-                                method: 'PUT',
+                            if (!answerId) {
+                                clearIcon(feedbackIcon);
+                                return;
+                            }
+                            fetch('/assessment-direct/' + a.id + '/answer', {
+                                method: 'POST',
                                 headers: {
-                                    'Content-Type': 'application/json'
+                                    'Content-Type': 'application/x-www-form-urlencoded'
                                 },
-                                body: JSON.stringify({ comment: comment })
+                                body: 'controlId=' + controlId + '&answerId=' + answerId
                             })
-                            .then(function() {
-                                textarea.style.background = '#d8ffd8';
-                                feedback.innerHTML = '<span style="color:#228B22;font-weight:bold;">Saved</span>';
-                                setTimeout(function() {
-                                    feedback.innerHTML = '';
-                                    textarea.style.background = '';
-                                }, 1400);
+                            .then(function(resp) {
+                                select.style.background = '#d8ffd8';
+                                showSuccessIcon(feedbackIcon);
+                                setTimeout(function() { clearIcon(feedbackIcon); select.style.background = ''; }, 1500);
                             })
                             .catch(function() {
-                                textarea.style.background = '#ffd8d8';
-                                feedback.innerHTML = '<span style="color:red;font-weight:bold;">Error saving</span>';
+                                select.style.background = '#ffd8d8';
+                                showErrorIcon(feedbackIcon);
                             });
-                        }, 650);
+                        });
                     });
-                });
+                    var debounceTimers = {};
+                    document.querySelectorAll('.comment-textarea').forEach(function(textarea) {
+                        textarea.addEventListener('input', function() {
+                            var controlId = textarea.getAttribute('data-control-id');
+                            var comment = textarea.value;
+                            var feedback = textarea.nextElementSibling;
+                            if (debounceTimers[controlId])
+                                clearTimeout(debounceTimers[controlId]);
+                            debounceTimers[controlId] = setTimeout(function() {
+                                fetch('/assessment-direct/' + a.id + '/control/' + controlId + '/comment', {
+                                    method: 'PUT',
+                                    headers: {
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({ comment: comment })
+                                })
+                                .then(function() {
+                                    textarea.style.background = '#d8ffd8';
+                                    feedback.innerHTML = '<span style="color:#228B22;font-weight:bold;">Saved</span>';
+                                    setTimeout(function() {
+                                        feedback.innerHTML = '';
+                                        textarea.style.background = '';
+                                    }, 1400);
+                                })
+                                .catch(function() {
+                                    textarea.style.background = '#ffd8d8';
+                                    feedback.innerHTML = '<span style="color:red;font-weight:bold;">Error saving</span>';
+                                });
+                            }, 650);
+                        });
+                    });
+                }
                 checkDomainCompleteness();
                 updateCompletionBar(controls, controlAnswers);
-                document.body.addEventListener("change", function (e) {
-                    if (e.target.classList.contains("answer-select")) {
-                        checkDomainCompleteness();
-                        updateCompletionBar(controls, getUpdatedControlAnswers());
-                    }
-                });
+                if (isOpen) {
+                    document.body.addEventListener("change", function (e) {
+                        if (e.target.classList.contains("answer-select")) {
+                            checkDomainCompleteness();
+                            updateCompletionBar(controls, getUpdatedControlAnswers());
+                        }
+                    });
+                }
                 
                 // Store assessmentId globally for finalize button
                 window.assessmentId = a.id;

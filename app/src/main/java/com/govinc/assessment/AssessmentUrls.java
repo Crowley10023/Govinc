@@ -1,6 +1,7 @@
 package com.govinc.assessment;
 
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "assessments_urls")
@@ -16,6 +17,9 @@ public class AssessmentUrls {
 
     private int lifetime = 1; // in days, default is 1
 
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
     // Removed assessmentDetails link
     
     @OneToOne(fetch = FetchType.EAGER)
@@ -23,12 +27,14 @@ public class AssessmentUrls {
     private Assessment assessment;
 
     public AssessmentUrls() {
+        this.createdAt = LocalDateTime.now();
     }
 
     public AssessmentUrls(String url, String responsiblePerson, int lifetime) {
         this.url = url;
         this.responsiblePerson = responsiblePerson;
         this.lifetime = lifetime;
+        this.createdAt = LocalDateTime.now();
     }
 
     public Long getId() {
@@ -61,6 +67,14 @@ public class AssessmentUrls {
 
     public void setLifetime(int lifetime) {
         this.lifetime = lifetime;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
     }
 
     // No getter/setter for assessmentDetails anymore
