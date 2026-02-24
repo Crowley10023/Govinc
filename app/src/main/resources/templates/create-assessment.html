@@ -36,14 +36,108 @@
                     <!-- Org Unit Selection -->
                     <div class="card-section">
                         <label for="orgUnit">Organizational Unit</label>
-                        <select id="orgUnit" name="orgUnitId" required class="form-control-select">
-                            <option value="" disabled selected>-- Select an Org Unit --</option>
-                            <option th:each="orgUnit : ${orgUnits}"
-                                    th:value="${orgUnit.id}"
-                                    th:text="${orgUnit.name}"></option>
-                        </select>
+
+                        <!-- Hidden input to store selected org unit id -->
+                        <input type="hidden" id="orgUnitId" name="orgUnitId" required>
+
+                        <!-- Visible selector: button that opens a modal to search/filter org units -->
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <button type="button" id="openOrgUnitModal" class="btn-action">Select Org Unit</button>
+                            <span id="selectedOrgUnitName" class="muted">No org unit selected</span>
+                        </div>
+
+                        <!-- Modal for choosing org unit -->
+                        <div id="orgUnitModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;" aria-hidden="true">
+                            <div style="background:#fff;max-width:600px;margin:6% auto;padding:16px;border-radius:6px;max-height:70vh;overflow:auto;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                                    <h3 style="margin:0;">Choose Organizational Unit</h3>
+                                    <button type="button" id="closeOrgUnitModal" class="btn-action">Close</button>
+                                </div>
+
+                                <input type="text" id="orgUnitSearch" placeholder="Filter org units by name..." style="width:100%;padding:8px;margin-bottom:12px;border:1px solid #ccc;border-radius:4px;" />
+
+                                <ul id="orgUnitList" style="list-style:none;padding:0;margin:0;">
+                                    <li th:each="orgUnit : ${orgUnits}" th:attr="data-id=${orgUnit.id}" th:text="${orgUnit.name}" style="padding:8px;border-bottom:1px solid #eee;cursor:pointer;" onclick="selectOrgUnit(this)"></li>
+                                </ul>
+                            </div>
+                        </div>
+
                     </div>
 
+                    <script>
+                        (function(){
+                            var modal = document.getElementById('orgUnitModal');
+                            var openBtn = document.getElementById('openOrgUnitModal');
+                            var closeBtn = document.getElementById('closeOrgUnitModal');
+                            var searchInput = document.getElementById('orgUnitSearch');
+                            var list = document.getElementById('orgUnitList');
+                            var hiddenInput = document.getElementById('orgUnitId');
+                            var selectedName = document.getElementById('selectedOrgUnitName');
+
+                            if(openBtn){
+                                openBtn.addEventListener('click', function(){
+                                    modal.style.display = 'block';
+                                    modal.setAttribute('aria-hidden','false');
+                                    searchInput.value = '';
+                                    filterList('');
+                                    searchInput.focus();
+                                });
+                            }
+                            if(closeBtn){
+                                closeBtn.addEventListener('click', function(){
+                                    modal.style.display = 'none';
+                                    modal.setAttribute('aria-hidden','true');
+                                });
+                            }
+
+                            // Close modal when clicking outside content
+                            modal.addEventListener('click', function(e){
+                                if(e.target === modal){
+                                    modal.style.display = 'none';
+                                    modal.setAttribute('aria-hidden','true');
+                                }
+                            });
+
+                            // Close on Escape
+                            document.addEventListener('keydown', function(e){
+                                if(e.key === 'Escape' && modal.style.display === 'block'){
+                                    modal.style.display = 'none';
+                                    modal.setAttribute('aria-hidden','true');
+                                }
+                            });
+
+                            // Filter function
+                            function filterList(term){
+                                term = (term || '').toLowerCase();
+                                var items = list.querySelectorAll('li');
+                                items.forEach(function(li){
+                                    var text = li.textContent || li.innerText;
+                                    if(text.toLowerCase().indexOf(term) !== -1){
+                                        li.style.display = '';
+                                    } else {
+                                        li.style.display = 'none';
+                                    }
+                                });
+                            }
+
+                            // Attach input handler
+                            searchInput.addEventListener('input', function(){
+                                filterList(this.value);
+                            });
+
+                            // Expose select function globally for inline onclicks
+                            window.selectOrgUnit = function(el){
+                                var id = el.getAttribute('data-id');
+                                var name = el.textContent || el.innerText;
+                                hiddenInput.value = id;
+                                selectedName.textContent = name;
+                                // close modal
+                                modal.style.display = 'none';
+                                modal.setAttribute('aria-hidden','true');
+                            };
+
+                        })();
+                    </script>
                     <!-- Org Services Selection -->
                     <div class="card-section">
                         <label for="orgService">Organizational Services</label>

@@ -848,7 +848,7 @@
 
         .filter-inputs {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr 1fr;
+            grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
             gap: 15px;
         }
 
@@ -906,6 +906,12 @@
                 <label for="filterCatalog">Security Catalog:</label>
                 <select id="filterCatalog">
                     <option value="">-- All Catalogs --</option>
+                </select>
+            </div>
+            <div>
+                <label for="filterDomain">Domain:</label>
+                <select id="filterDomain">
+                    <option value="">-- All Domains --</option>
                 </select>
             </div>
         </div>
@@ -1249,7 +1255,7 @@ network segmentation","SC-7","Network"</div>
             </tr>
         </thead>
         <tbody id="controlsTableBody">
-            <tr th:each="control : ${controls}" class="control-row" th:attr="data-title=${control.name}, data-description=${control.detail}, data-tag=${control.tag}, data-catalogs=${control.securityCatalogs != null ? #strings.arrayJoin(control.securityCatalogs.![id], ',') : ''}">
+            <tr th:each="control : ${controls}" class="control-row" th:attr="data-title=${control.name}, data-description=${control.detail}, data-tag=${control.tag}, data-catalogs=${control.securityCatalogs != null ? #strings.arrayJoin(control.securityCatalogs.![id], ',') : ''}, data-domain=${control.securityControlDomain != null ? control.securityControlDomain.name : ''}">
                 <td th:text="${control.id}"></td>
                 <td th:text="${control.name}"></td>
                 <td th:text="${control.detail}"></td>
@@ -1536,6 +1542,7 @@ network segmentation","SC-7","Network"</div>
     const filterDescription = document.getElementById('filterDescription');
     const filterTag = document.getElementById('filterTag');
     const filterCatalog = document.getElementById('filterCatalog');
+    const filterDomain = document.getElementById('filterDomain');
     let availableCatalogs = [];
 
     // Load available catalogs for filter
@@ -1564,11 +1571,35 @@ network segmentation","SC-7","Network"</div>
             });
     }
 
+    // Populate domain filter from the rendered table rows to avoid extra API
+    function populateDomainFilter() {
+        try {
+            const rows = Array.from(document.querySelectorAll('.control-row'));
+            const domains = rows
+                .map(r => (r.getAttribute('data-domain') || '').trim())
+                .filter(d => d && d.length > 0);
+
+            const uniqueDomains = Array.from(new Set(domains)).sort((a, b) => a.localeCompare(b));
+
+            // Clear existing options except the first placeholder
+            filterDomain.innerHTML = '<option value="">-- All Domains --</option>';
+            uniqueDomains.forEach(d => {
+                const option = document.createElement('option');
+                option.value = d;
+                option.textContent = d;
+                filterDomain.appendChild(option);
+            });
+        } catch (err) {
+            console.error('Error populating domain filter:', err);
+        }
+    }
+
     function applyFilters() {
         const titleFilter = filterTitle.value.toLowerCase();
         const descriptionFilter = filterDescription.value.toLowerCase();
         const tagFilter = filterTag.value.toLowerCase();
         const catalogFilter = filterCatalog.value;
+        const domainFilter = filterDomain.value;
 
         const rows = document.querySelectorAll('.control-row');
         rows.forEach(row => {
@@ -1576,22 +1607,26 @@ network segmentation","SC-7","Network"</div>
             const descriptionAttr = row.getAttribute('data-description') || '';
             const tagAttr = row.getAttribute('data-tag') || '';
             const catalogsAttr = row.getAttribute('data-catalogs') || '';
+            const domainAttr = row.getAttribute('data-domain') || '';
 
             const title = titleAttr.toLowerCase();
             const description = descriptionAttr.toLowerCase();
             const tag = tagAttr.toLowerCase();
-            
+            const domain = domainAttr;
+
             // Parse catalog IDs from the data attribute
             const controlCatalogs = catalogsAttr ? catalogsAttr.split(',').map(id => id.trim()) : [];
 
             const titleMatch = title.includes(titleFilter) || titleFilter === '';
             const descriptionMatch = description.includes(descriptionFilter) || descriptionFilter === '';
             const tagMatch = tag.includes(tagFilter) || tagFilter === '';
-            
+
             // If a catalog filter is selected, check if the control is linked to that catalog
             let catalogMatch = catalogFilter === '' || controlCatalogs.includes(catalogFilter);
+            // If a domain filter is selected, check if the control's domain matches
+            let domainMatch = domainFilter === '' || domain === domainFilter;
 
-            if (titleMatch && descriptionMatch && tagMatch && catalogMatch) {
+            if (titleMatch && descriptionMatch && tagMatch && catalogMatch && domainMatch) {
                 row.classList.remove('hidden');
             } else {
                 row.classList.add('hidden');
@@ -1603,6 +1638,12 @@ network segmentation","SC-7","Network"</div>
     filterDescription.addEventListener('keyup', applyFilters);
     filterTag.addEventListener('keyup', applyFilters);
     filterCatalog.addEventListener('change', applyFilters);
+    filterDomain.addEventListener('change', applyFilters);
+
+    // Ensure domain filter is populated after page load
+    window.addEventListener('load', function() {
+        populateDomainFilter();
+    });
 
     // Close modals when clicking outside
     window.addEventListener('click', function(event) {

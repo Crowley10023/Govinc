@@ -17,38 +17,46 @@ public class GlobalUserSessionAdvice {
     
     @ModelAttribute("userName")
     public String addUserNameToModel() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.isAuthenticated() &&
-            !(authentication.getPrincipal() instanceof String principal && principal.equals("anonymousUser"))) {
-            Object principal = authentication.getPrincipal();
-            if (principal instanceof OidcUser oidcUser) {
-                if (oidcUser.getFullName() != null) return oidcUser.getFullName();
-                if (oidcUser.getPreferredUsername() != null) return oidcUser.getPreferredUsername();
-                if (oidcUser.getEmail() != null) return oidcUser.getEmail();
-            } else if (principal instanceof UserDetails userDetails) {
-                return userDetails.getUsername();
-            } else if (principal instanceof String str) {
-                return str;
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication != null && authentication.isAuthenticated() &&
+                !(authentication.getPrincipal() instanceof String principal && principal.equals("anonymousUser"))) {
+                Object principal = authentication.getPrincipal();
+                if (principal instanceof OidcUser oidcUser) {
+                    if (oidcUser.getFullName() != null) return oidcUser.getFullName();
+                    if (oidcUser.getPreferredUsername() != null) return oidcUser.getPreferredUsername();
+                    if (oidcUser.getEmail() != null) return oidcUser.getEmail();
+                } else if (principal instanceof UserDetails userDetails) {
+                    return userDetails.getUsername();
+                } else if (principal instanceof String str) {
+                    return str;
+                }
             }
+        } catch (Throwable t) {
+            // Safely ignore and return null so page rendering can continue
         }
         return null;
     }
     
     @ModelAttribute("userId")
     public String addUserIdToModel() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.isAuthenticated() &&
-            !(authentication.getPrincipal() instanceof String principal && principal.equals("anonymousUser"))) {
-            Object principal = authentication.getPrincipal();
-            if (principal instanceof OidcUser oidcUser) {
-                if (oidcUser.getSubject() != null) return oidcUser.getSubject();
-                if (oidcUser.getPreferredUsername() != null) return oidcUser.getPreferredUsername();
-                if (oidcUser.getEmail() != null) return oidcUser.getEmail();
-            } else if (principal instanceof UserDetails userDetails) {
-                return userDetails.getUsername();
-            } else if (principal instanceof String str) {
-                return str;
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication != null && authentication.isAuthenticated() &&
+                !(authentication.getPrincipal() instanceof String principal && principal.equals("anonymousUser"))) {
+                Object principal = authentication.getPrincipal();
+                if (principal instanceof OidcUser oidcUser) {
+                    if (oidcUser.getSubject() != null) return oidcUser.getSubject();
+                    if (oidcUser.getPreferredUsername() != null) return oidcUser.getPreferredUsername();
+                    if (oidcUser.getEmail() != null) return oidcUser.getEmail();
+                } else if (principal instanceof UserDetails userDetails) {
+                    return userDetails.getUsername();
+                } else if (principal instanceof String str) {
+                    return str;
+                }
             }
+        } catch (Throwable t) {
+            // ignore
         }
         return null;
     }
@@ -58,41 +66,73 @@ public class GlobalUserSessionAdvice {
      */
     @ModelAttribute("canAccessConfig")
     public boolean canAccessConfig() {
-        return authorizationService.canAccessConfig();
+        try {
+            return authorizationService != null && authorizationService.canAccessConfig();
+        } catch (Throwable t) {
+            return false;
+        }
     }
     
     @ModelAttribute("canAccessSecurityFramework")
     public boolean canAccessSecurityFramework() {
-        return authorizationService.canAccessSecurityFramework();
+        try {
+            return authorizationService != null && authorizationService.canAccessSecurityFramework();
+        } catch (Throwable t) {
+            return false;
+        }
     }
     
     @ModelAttribute("canAccessOrganization")
     public boolean canAccessOrganization() {
-        return authorizationService.canAccessOrganization();
+        try {
+            return authorizationService != null && authorizationService.canAccessOrganization();
+        } catch (Throwable t) {
+            return false;
+        }
     }
     
     @ModelAttribute("canCreateAssessment")
     public boolean canCreateAssessment() {
-        return authorizationService.canCreateAssessment();
+        try {
+            return authorizationService != null && authorizationService.canCreateAssessment();
+        } catch (Throwable t) {
+            return false;
+        }
     }
     
     @ModelAttribute("canViewAssessmentList")
     public boolean canViewAssessmentList() {
-        return authorizationService.canViewAssessmentList();
+        try {
+            return authorizationService != null && authorizationService.canViewAssessmentList();
+        } catch (Throwable t) {
+            return false;
+        }
     }
     
     @ModelAttribute("canAccessCompliance")
     public boolean canAccessCompliance() {
-        return authorizationService.canAccessCompliance();
+        try {
+            return authorizationService != null && authorizationService.canAccessCompliance();
+        } catch (Throwable t) {
+            return false;
+        }
     }
     
     @ModelAttribute("canAccessStatistics")
     public boolean canAccessStatistics() {
-        return authorizationService.canAccessStatistics();
+        try {
+            return authorizationService != null && authorizationService.canAccessStatistics();
+        } catch (Throwable t) {
+            return false;
+        }
     }
     
     @ModelAttribute("canAccessAssessmentUrls")
     public boolean canAccessAssessmentUrls() {
-        return authorizationService.canAccessAssessmentUrls();
+        try {
+            return authorizationService != null && authorizationService.canAccessAssessmentUrls();
+        } catch (Throwable t) {
+            return false;
+        }
     }
 }
