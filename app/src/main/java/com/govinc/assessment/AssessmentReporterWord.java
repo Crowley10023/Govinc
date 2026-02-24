@@ -30,6 +30,8 @@ import org.docx4j.wml.Tbl;
 import org.docx4j.wml.Tr;
 import org.docx4j.wml.Tc;
 import org.docx4j.wml.Style;
+import org.docx4j.wml.Color;
+import org.docx4j.wml.BooleanDefaultTrue;
 import org.docx4j.XmlUtils;
 import jakarta.xml.bind.JAXBElement;
 
@@ -40,6 +42,8 @@ import java.io.File;
 import java.io.ByteArrayOutputStream;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Enhanced implementation using docx4j with template-aware AI prompt generation.
@@ -306,20 +310,11 @@ public class AssessmentReporterWord {
         sb.append("  - Subsections: use 'Heading2' style if available\n");
         sb.append("  - Body content: use 'Normal' style\n\n");
 
-        // Table instructions
-        sb.append("If you need a real Word table, set the section's contentStyle to 'Table' (case-insensitive) and include a 'table' object in the section.\n");
-        sb.append("The 'table' object should be either an array of arrays (first row can be headers) or an object with 'headers' (array) and 'rows' (array of arrays).\n");
-        sb.append("Example:\n");
-        sb.append("  \"sections\": [\n");
-        sb.append("    {\n");
-        sb.append("      \"heading\": \"Summary\",\n");
-        sb.append("      \"contentStyle\": \"Table\",\n");
-        sb.append("      \"table\": {\n");
-        sb.append("        \"headers\": [\"Control\", \"Maturity\", \"Score\"],\n");
-        sb.append("        \"rows\": [[\"Control A\", \"High\", \"3\"], [\"Control B\", \"Low\", \"1\"]]\n");
-        sb.append("      }\n");
-        sb.append("    }\n");
-        sb.append("  ]\n\n");
+        // Styling markup instructions
+        sb.append("You MAY apply simple inline styling for color and bold. Use XML-like inline tags: <style color=\"#RRGGBB\" bold=\"true|false\">text</style>.\n");
+        sb.append("The AI should only use these tags around spans that need different color/bold; otherwise return plain text.\n");
+        sb.append("For tables, cells may be provided as objects with 'text' and optional 'color' and 'bold' fields.\n");
+        sb.append("Example table cell: { \"text\": \"Control A\", \"color\": \"#FF0000\", \"bold\": true }\n\n");
 
         // ============ OUTPUT SCHEMA ============
         sb.append("========================================\n");
@@ -563,31 +558,290 @@ public class AssessmentReporterWord {
         if ("none".equalsIgnoreCase(aiResp)) return "Normal";
 
         // If the AI returned a display name, map to id if possible
-        // check direct id
         if (ta.getStyleIdToStyleMap().containsKey(aiResp)) return aiResp;
-        // check id in availableStyles
-        for (String s : ta.getAvailableStyles()) {
-            if (s.equals(aiResp)) return s;
-        }
-        // check display name map
-        Map<String, String> nameToId = ta.styleNameToId; // access inner class map
+        for (String s : ta.getAvailableStyles()) if (s.equals(aiResp)) return s;
+
+        // try mapping via styleNameToId
+        Map<String, String> nameToId = ta.styleNameToId;
         if (nameToId != null) {
             String mapped = nameToId.get(aiResp);
             if (mapped != null) return mapped;
-            // try case-insensitive / normalized
             for (Map.Entry<String, String> e : nameToId.entrySet()) {
                 if (e.getKey() != null && e.getKey().equalsIgnoreCase(aiResp)) return e.getValue();
                 if (e.getKey() != null && e.getKey().replaceAll("\\s+", "").equalsIgnoreCase(aiResp.replaceAll("\\s+", ""))) return e.getValue();
             }
         }
 
-        // fallback: try to normalize the aiResp and match
         String norm = aiResp.replaceAll("\\s+", "").toLowerCase();
-        for (String s : ta.getAvailableStyles()) {
-            if (s != null && s.replaceAll("\\s+", "").toLowerCase().equals(norm)) return s;
-        }
+        for (String s : ta.getAvailableStyles()) if (s != null && s.replaceAll("\\s+", "").toLowerCase().equals(norm)) return s;
 
         return "Normal";
+    }
+
+    private static final Pattern STYLE_TAG = Pattern.compile("(?is)<style\\s+([^>]*)>(.*?)</style>");
+
+    /**
+     * Parse text with optional inline <style ...>...</style> tags into runs.
+     * Returns a list of RunData which include text and optional color/bold attributes.
+     */
+    private static class RunData {
+        String text;
+        String color; // #RRGGBB or null
+        boolean bold;
+
+        RunData(String text, String color, boolean bold) {
+            this.text = text;
+            this.color = color;
+            this.bold = bold;
+        }
+    }
+
+    private List<RunData> parseStyledRuns(String text) {
+        List<RunData> runs = new ArrayList<>();
+        if (text == null || text.isEmpty()) return runs;
+
+        Matcher m = STYLE_TAG.matcher(text);
+        int last = 0;
+        while (m.find()) {
+            if (m.start() > last) {
+                String plain = text.substring(last, m.start());
+                runs.add(new RunData(plain, null, false));
+            }
+            String attrs = m.group(1);
+            String inner = m.group(2);
+            String color = null;
+            boolean bold = false;
+            // parse attributes like color="#FF0000" bold="true"
+            Matcher aM = Pattern.compile("(\\w+)\\s*=\\s*\"([^\"]*)\"").matcher(attrs);
+            while (aM.find()) {
+                String k = aM.group(1).toLowerCase(Locale.ROOT);
+                String v = aM.group(2);
+                if ("color".equals(k)) color = v;
+                if ("bold".equals(k)) bold = "true".equalsIgnoreCase(v) || "1".equals(v);
+            }
+            runs.add(new RunData(inner, color, bold));
+            last = m.end();
+        }
+        if (last < text.length()) {
+            runs.add(new RunData(text.substring(last), null, false));
+        }
+        return runs;
+    }
+
+    /**
+     * Create a paragraph and attempt to apply the template's style.
+     * Use type-safe access to the StyleDefinitionsPart and apply paragraph and run properties.
+     * Also processes inline styling tags parsed from AI.
+     */
+    private P createParagraphWithStyle(ObjectFactory factory, String text, String styleName, TemplateAnalysis ta) {
+        P p = factory.createP();
+
+        List<RunData> runs = parseStyledRuns(text);
+
+        // determine style id to apply
+        String styleId = ta != null ? ta.resolveStyle(styleName, styleName) : styleName;
+
+        // gather style-level RPr if available
+        RPr styleRPr = null;
+        if (ta != null && ta.getStyleDefinitionsPart() != null) {
+            StyleDefinitionsPart sdp = ta.getStyleDefinitionsPart();
+            try {
+                Style style = sdp.getStyleById(styleId);
+                if (style != null && style.getRPr() != null) {
+                    styleRPr = (RPr) XmlUtils.deepCopy(style.getRPr());
+                }
+            } catch (Exception e) {
+                // ignore
+            }
+        }
+
+        // set paragraph style reference
+        if (styleId != null && !styleId.isBlank()) {
+            PPr pprRef = factory.createPPr();
+            PStyle pstyle = factory.createPPrBasePStyle();
+            pstyle.setVal(styleId);
+            pprRef.setPStyle(pstyle);
+            // If style has paragraph properties, prefer copying them
+            if (ta != null && ta.getStyleIdToStyleMap().containsKey(styleId)) {
+                Style s = ta.getStyleIdToStyleMap().get(styleId);
+                if (s != null && s.getPPr() != null) {
+                    try {
+                        PPr copied = (PPr) XmlUtils.deepCopy(s.getPPr());
+                        // ensure pStyle set
+                        copied.setPStyle(pstyle);
+                        p.setPPr(copied);
+                    } catch (Exception e) {
+                        p.setPPr(pprRef);
+                    }
+                } else {
+                    p.setPPr(pprRef);
+                }
+            } else {
+                p.setPPr(pprRef);
+            }
+        }
+
+        // Create runs and apply run-level styling merged with styleRPr
+        for (RunData rd : runs) {
+            R run = factory.createR();
+            Text t = factory.createText();
+            t.setValue(rd.text);
+            t.setSpace("preserve");
+            run.getContent().add(t);
+
+            RPr runRpr = null;
+            if (styleRPr != null) {
+                try {
+                    runRpr = (RPr) XmlUtils.deepCopy(styleRPr);
+                } catch (Exception e) {
+                    runRpr = factory.createRPr();
+                }
+            } else {
+                runRpr = factory.createRPr();
+            }
+
+            // apply inline attrs
+            if (rd.bold) {
+                runRpr.setB(new BooleanDefaultTrue());
+            }
+            if (rd.color != null && !rd.color.isBlank()) {
+                try {
+                    Color c = factory.createColor();
+                    String val = rd.color.trim();
+                    if (val.startsWith("#")) val = val.substring(1);
+                    c.setVal(val);
+                    runRpr.setColor(c);
+                } catch (Exception e) {
+                    // ignore
+                }
+            }
+
+            // Only set RPr if it has properties (avoid null/empty)
+            if (runRpr != null) run.setRPr(runRpr);
+
+            p.getContent().add(run);
+        }
+
+        return p;
+    }
+
+    /**
+     * Create a simple summary table from controls and answers
+     */
+    private Tbl createSummaryTable(ObjectFactory factory, List<SecurityControl> controls, Map<Long, AssessmentControlAnswer> answerMap, TemplateAnalysis ta) {
+        Tbl tbl = factory.createTbl();
+
+        // Header row
+        Tr header = factory.createTr();
+        header.getContent().add(createTableCell(factory, "Control", null, false));
+        header.getContent().add(createTableCell(factory, "Maturity", null, false));
+        header.getContent().add(createTableCell(factory, "Score", null, false));
+        header.getContent().add(createTableCell(factory, "Reference", null, false));
+        tbl.getContent().add(header);
+
+        for (SecurityControl sc : controls) {
+            Tr row = factory.createTr();
+            AssessmentControlAnswer aca = answerMap.get(sc.getId());
+            String maturity = "-";
+            String score = "-";
+            if (aca != null) {
+                if (aca.getMaturityAnswer() != null && aca.getMaturityAnswer().getAnswer() != null) maturity = aca.getMaturityAnswer().getAnswer();
+                score = String.valueOf(aca.getScore());
+            }
+            row.getContent().add(createTableCell(factory, sc.getName() == null ? "-" : sc.getName(), null, false));
+            row.getContent().add(createTableCell(factory, maturity, null, false));
+            row.getContent().add(createTableCell(factory, score, null, false));
+            row.getContent().add(createTableCell(factory, sc.getReference() == null ? "-" : sc.getReference(), null, false));
+            tbl.getContent().add(row);
+        }
+
+        return tbl;
+    }
+
+    private Tc createTableCell(ObjectFactory factory, String text, String color, boolean bold) {
+        Tc tc = factory.createTc();
+        P p = factory.createP();
+        // create runs with styling
+        List<RunData> runs = parseStyledRuns(text);
+        if (runs.isEmpty()) runs = Collections.singletonList(new RunData(text == null ? "" : text, color, bold));
+
+        for (RunData rd : runs) {
+            R r = factory.createR();
+            Text t = factory.createText();
+            t.setValue(rd.text == null ? "" : rd.text);
+            t.setSpace("preserve");
+            r.getContent().add(t);
+
+            RPr rpr = factory.createRPr();
+            if (rd.bold) rpr.setB(new BooleanDefaultTrue());
+            String cval = rd.color != null ? rd.color : color;
+            if (cval != null && !cval.isBlank()) {
+                try {
+                    Color c = factory.createColor();
+                    String val = cval.trim();
+                    if (val.startsWith("#")) val = val.substring(1);
+                    c.setVal(val);
+                    rpr.setColor(c);
+                } catch (Exception e) {
+                    // ignore
+                }
+            }
+            if (rpr != null) r.setRPr(rpr);
+            p.getContent().add(r);
+        }
+
+        tc.getContent().add(p);
+        return tc;
+    }
+
+    private Tbl createTableFromJson(ObjectFactory factory, JSONArray headers, JSONArray rows) {
+        Tbl tbl = factory.createTbl();
+        // header row
+        if (headers != null) {
+            Tr hr = factory.createTr();
+            for (int c = 0; c < headers.length(); c++) {
+                Object hv = headers.opt(c);
+                if (hv instanceof JSONObject) {
+                    JSONObject ho = (JSONObject) hv;
+                    String text = ho.optString("text", "");
+                    String color = ho.optString("color", null);
+                    boolean bold = ho.optBoolean("bold", false);
+                    hr.getContent().add(createTableCell(factory, text, color, bold));
+                } else {
+                    String text = headers.optString(c, "");
+                    hr.getContent().add(createTableCell(factory, text, null, false));
+                }
+            }
+            tbl.getContent().add(hr);
+        }
+        if (rows != null) {
+            for (int r = 0; r < rows.length(); r++) {
+                Tr row = factory.createTr();
+                Object rowObj = rows.opt(r);
+                if (rowObj instanceof JSONArray) {
+                    JSONArray rowArr = (JSONArray) rowObj;
+                    for (int c = 0; c < rowArr.length(); c++) {
+                        Object cv = rowArr.opt(c);
+                        if (cv instanceof JSONObject) {
+                            JSONObject co = (JSONObject) cv;
+                            String text = co.optString("text", "");
+                            String color = co.optString("color", null);
+                            boolean bold = co.optBoolean("bold", false);
+                            row.getContent().add(createTableCell(factory, text, color, bold));
+                        } else {
+                            String text = rowArr.optString(c, "");
+                            row.getContent().add(createTableCell(factory, text, null, false));
+                        }
+                    }
+                } else {
+                    // unexpected - try to coerce
+                    String text = rows.optString(r, "");
+                    row.getContent().add(createTableCell(factory, text, null, false));
+                }
+                tbl.getContent().add(row);
+            }
+        }
+        return tbl;
     }
 
     private JSONObject extractJson(String aiText) {
@@ -624,150 +878,6 @@ public class AssessmentReporterWord {
             }
         }
         return null;
-    }
-
-    /**
-     * Create a paragraph and attempt to apply the template's style.
-     * Use type-safe access to the StyleDefinitionsPart and apply paragraph and run properties.
-     */
-    private P createParagraphWithStyle(ObjectFactory factory, String text, String styleName, TemplateAnalysis ta) {
-        P p = factory.createP();
-        R run = factory.createR();
-        Text t = factory.createText();
-        t.setValue(text == null ? "" : text);
-        t.setSpace("preserve");
-        run.getContent().add(t);
-        p.getContent().add(run);
-
-        if (styleName != null && !styleName.isBlank()) {
-            try {
-                String styleId = ta != null ? ta.resolveStyle(styleName, styleName) : styleName;
-
-                // set pStyle
-                PPr ppr = factory.createPPr();
-                PStyle pstyle = factory.createPPrBasePStyle();
-                pstyle.setVal(styleId);
-                ppr.setPStyle(pstyle);
-
-                // If we have the StyleDefinitionsPart, look up the Style by id (type-safe)
-                if (ta != null && ta.getStyleDefinitionsPart() != null) {
-                    StyleDefinitionsPart sdp = ta.getStyleDefinitionsPart();
-                    Style style = null;
-                    try {
-                        style = sdp.getStyleById(styleId);
-                    } catch (Exception ex) {
-                        // ignore
-                    }
-
-                    if (style != null) {
-                        // copy paragraph properties
-                        if (style.getPPr() != null) {
-                            try {
-                                PPr copied = (PPr) XmlUtils.deepCopy(style.getPPr());
-                                // ensure we set pStyle referencing the style id
-                                copied.setPStyle(pstyle);
-                                p.setPPr(copied);
-                            } catch (Exception e) {
-                                p.setPPr(ppr);
-                            }
-                        } else {
-                            p.setPPr(ppr);
-                        }
-
-                        // copy run properties from style (if any) into the run
-                        if (style.getRPr() != null) {
-                            try {
-                                RPr copiedR = (RPr) XmlUtils.deepCopy(style.getRPr());
-                                run.setRPr(copiedR);
-                            } catch (Exception e) {
-                                // ignore
-                            }
-                        }
-
-                        return p;
-                    }
-                }
-
-                // fallback
-                p.setPPr(ppr);
-            } catch (Exception e) {
-                System.err.println("[AssessmentReporterWord] Error applying style '" + styleName + "': " + e.getMessage());
-            }
-        }
-        return p;
-    }
-
-    /**
-     * Create a simple summary table from controls and answers
-     */
-    private Tbl createSummaryTable(ObjectFactory factory, List<SecurityControl> controls, Map<Long, AssessmentControlAnswer> answerMap, TemplateAnalysis ta) {
-        Tbl tbl = factory.createTbl();
-
-        // Header row
-        Tr header = factory.createTr();
-        header.getContent().add(createTableCell(factory, "Control"));
-        header.getContent().add(createTableCell(factory, "Maturity"));
-        header.getContent().add(createTableCell(factory, "Score"));
-        header.getContent().add(createTableCell(factory, "Reference"));
-        tbl.getContent().add(header);
-
-        for (SecurityControl sc : controls) {
-            Tr row = factory.createTr();
-            AssessmentControlAnswer aca = answerMap.get(sc.getId());
-            String maturity = "-";
-            String score = "-";
-            if (aca != null) {
-                if (aca.getMaturityAnswer() != null && aca.getMaturityAnswer().getAnswer() != null) maturity = aca.getMaturityAnswer().getAnswer();
-                score = String.valueOf(aca.getScore());
-            }
-            row.getContent().add(createTableCell(factory, sc.getName() == null ? "-" : sc.getName()));
-            row.getContent().add(createTableCell(factory, maturity));
-            row.getContent().add(createTableCell(factory, score));
-            row.getContent().add(createTableCell(factory, sc.getReference() == null ? "-" : sc.getReference()));
-            tbl.getContent().add(row);
-        }
-
-        return tbl;
-    }
-
-    private Tc createTableCell(ObjectFactory factory, String text) {
-        Tc tc = factory.createTc();
-        P p = factory.createP();
-        R r = factory.createR();
-        Text t = factory.createText();
-        t.setValue(text == null ? "" : text);
-        t.setSpace("preserve");
-        r.getContent().add(t);
-        p.getContent().add(r);
-        tc.getContent().add(p);
-        return tc;
-    }
-
-    private Tbl createTableFromJson(ObjectFactory factory, JSONArray headers, JSONArray rows) {
-        Tbl tbl = factory.createTbl();
-        // header row
-        if (headers != null) {
-            Tr hr = factory.createTr();
-            for (int c = 0; c < headers.length(); c++) {
-                String hv = headers.optString(c, "");
-                hr.getContent().add(createTableCell(factory, hv));
-            }
-            tbl.getContent().add(hr);
-        }
-        if (rows != null) {
-            for (int r = 0; r < rows.length(); r++) {
-                Tr row = factory.createTr();
-                JSONArray rowArr = rows.optJSONArray(r);
-                if (rowArr != null) {
-                    for (int c = 0; c < rowArr.length(); c++) {
-                        String cv = rowArr.optString(c, "");
-                        row.getContent().add(createTableCell(factory, cv));
-                    }
-                }
-                tbl.getContent().add(row);
-            }
-        }
-        return tbl;
     }
 
     /**
