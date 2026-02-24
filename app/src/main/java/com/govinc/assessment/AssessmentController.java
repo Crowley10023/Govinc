@@ -73,6 +73,9 @@ public class AssessmentController {
     private AssessmentReporter assessmentReporter;
 
     @Autowired
+    private AssessmentReporterWord assessmentReporterWord;
+
+    @Autowired
     private OrganisationDetailsRepository organisationDetailsRepository;
 
     @Autowired
@@ -724,7 +727,7 @@ public class AssessmentController {
     @GetMapping("/{id}/word-report-progress")
     @ResponseBody
     public Map<String, Object> getWordReportProgress(@PathVariable Long id) {
-        ReportProgress progress = assessmentReporter.getProgress(id);
+        ReportProgress progress = assessmentReporterWord.getProgress(id);
         Map<String, Object> response = new HashMap<>();
         response.put("percent", progress.getPercent());
         response.put("status", progress.getStatus());
@@ -770,7 +773,7 @@ public class AssessmentController {
         }
         
         try {
-            byte[] wordBytes = assessmentReporter.createWordReport(assessment, details, users, orgUnit, answers, templatePath);
+            byte[] wordBytes = assessmentReporterWord.createWordReport(assessment, details, users, orgUnit, answers, templatePath);
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=assessment_" + id + ".docx")
                     .contentType(MediaType
