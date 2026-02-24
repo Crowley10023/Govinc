@@ -62,4 +62,13 @@ public class AssessmentRestController {
                 .map(a -> a.getOrgServices().stream().map(OrgService::getId).collect(Collectors.toList()))
                 .orElse(java.util.Collections.emptyList());
     }
+
+    // Endpoint to get all org services (accessible to authenticated users for assessment context)
+    // This bypasses the /orgservices/** security restriction to allow team leaders and delegates to see org services
+    @GetMapping("/all-orgservices")
+    public List<OrgService> getAllOrgServices() {
+        // This endpoint is accessible to all authenticated users
+        // Authorization for modifying an assessment's org services is checked in updateOrgServices()
+        return orgServiceService.getAllOrgServices();
+    }
 }

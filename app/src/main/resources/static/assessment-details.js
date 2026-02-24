@@ -290,7 +290,7 @@ $(document).ready(function () {
         $('#orgservice-modal').css('display', 'flex');
         $('#orgservice-list').html('<em>Loading...</em>');
         
-        $.getJSON('/orgservices/all', function (allServices) {
+        $.getJSON('/assessment/all-orgservices', function (allServices) {
             $.getJSON('/assessment/' + assessmentId + '/orgservice-ids', function (assignedIds) {
                 var html = '';
                 if (Array.isArray(allServices) && allServices.length > 0) {
