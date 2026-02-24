@@ -18,15 +18,19 @@ import org.springframework.stereotype.Component;
 
 import org.docx4j.openpackaging.packages.WordprocessingMLPackage;
 import org.docx4j.openpackaging.parts.WordprocessingML.MainDocumentPart;
+import org.docx4j.openpackaging.parts.WordprocessingML.StyleDefinitionsPart;
 import org.docx4j.wml.ObjectFactory;
 import org.docx4j.wml.P;
 import org.docx4j.wml.R;
 import org.docx4j.wml.Text;
 import org.docx4j.wml.PPr;
+import org.docx4j.wml.RPr;
 import org.docx4j.wml.PPrBase.PStyle;
 import org.docx4j.wml.Tbl;
 import org.docx4j.wml.Tr;
 import org.docx4j.wml.Tc;
+import org.docx4j.wml.Style;
+import org.docx4j.XmlUtils;
 import jakarta.xml.bind.JAXBElement;
 
 import org.json.JSONObject;
@@ -413,7 +417,6 @@ public class AssessmentReporterWord {
         sb.append("9. Return ONLY valid JSON - no markdown, no HTML, no extra text.\n");
         sb.append("10. Ensure the report is actionable and aligned with security best practices.\n\n");
         sb.append("11. Be complete, do not shorten anything nor miss anything.\n\n");
-        sb.append("12. Do never write in the report your own comments or repeats of instructions..\n\n");
 
         sb.append("Now generate the complete report in JSON format:\n");
 
@@ -430,8 +433,8 @@ public class AssessmentReporterWord {
         if (reportJson.has("title")) {
             String title = reportJson.optString("title");
             String requestedStyle = reportJson.optString("titleStyle", "Title");
-            String resolved = templateAnalysis.resolveStyle(requestedStyle, "Title");
-            elements.add(createParagraphWithStyle(factory, title, resolved));
+            String resolved = resolveStylePreferAI(requestedStyle, templateAnalysis);
+            elements.add(createParagraphWithStyle(factory, title, resolved, templateAnalysis));
         }
 
         // Add sections
@@ -444,13 +447,12 @@ public class AssessmentReporterWord {
                 if (section.has("heading")) {
                     String heading = section.getString("heading");
                     String requestedHeadingStyle = section.optString("headingStyle", "Heading1");
-                    String resolvedHeading = templateAnalysis.resolveStyle(requestedHeadingStyle, "Heading1");
-                    System.out.println("... resolved syle: " + resolvedHeading);
-                    elements.add(createParagraphWithStyle(factory, heading, resolvedHeading));
+                    String resolvedHeading = resolveStylePreferAI(requestedHeadingStyle, templateAnalysis);
+                    elements.add(createParagraphWithStyle(factory, heading, resolvedHeading, templateAnalysis));
                 }
 
                 String requestedContentStyle = section.optString("contentStyle", "Normal");
-                String resolvedContentStyle = templateAnalysis.resolveStyle(requestedContentStyle, "Normal");
+                String resolvedContentStyle = resolveStylePreferAI(requestedContentStyle, templateAnalysis);
                 String contentStyleNormalized = requestedContentStyle == null ? "" : requestedContentStyle.trim().toLowerCase(Locale.ROOT);
 
                 // If contentStyle indicates a table, try to build a real table
@@ -508,7 +510,7 @@ public class AssessmentReporterWord {
                     for (String part : parts) {
                         String trimmed = part.trim();
                         if (!trimmed.isEmpty()) {
-                            elements.add(createParagraphWithStyle(factory, trimmed, resolvedContentStyle));
+                            elements.add(createParagraphWithStyle(factory, trimmed, resolvedContentStyle, templateAnalysis));
                         }
                     }
                 }
@@ -516,6 +518,76 @@ public class AssessmentReporterWord {
         }
 
         return elements;
+    }
+
+    /**
+     * Try to resolve a requested style with local template analysis first;
+     * if no clear match, ask the AI to pick the closest style from the list.
+     * Returns a style id usable in the document (falls back to 'Normal').
+     */
+    private String resolveStylePreferAI(String requested, TemplateAnalysis ta) {
+        if (requested == null || requested.isBlank()) return "Normal";
+        String req = requested.trim();
+
+        // quick local resolution
+        String local = ta.resolveStyle(req, null);
+        if (local != null && !local.isBlank()) {
+            return local;
+        }
+
+        // Build a concise prompt for the AI to pick the most appropriate style id/name
+        StringBuilder p = new StringBuilder();
+        p.append("You are a helper that selects the best matching Microsoft Word paragraph style from a provided list.\n");
+        p.append("Available styles (styleId or display name):\n");
+        int i = 0;
+        for (String s : ta.getAvailableStyles()) {
+            p.append(++i).append(". ").append(s).append("\n");
+        }
+        p.append("\n");
+        p.append("Requested style name: '" + req + "'\n");
+        p.append("Return EXACTLY one of the available styles above (style id or display name) that best matches the requested name.\n");
+        p.append("If none are appropriate, return the word NONE. Respond with a single token only, no explanation.\n");
+
+        String aiResp = null;
+        try {
+            aiResp = openAIUtil.askAI(p.toString());
+            if (aiResp != null) aiResp = aiResp.trim();
+        } catch (Exception e) {
+            System.err.println("[AssessmentReporterWord] AI style matching failed: " + e.getMessage());
+            aiResp = null;
+        }
+
+        if (aiResp == null || aiResp.isBlank()) return "Normal";
+        // strip quotes
+        aiResp = aiResp.replaceAll("^[\"']+|[\"']+$", "");
+        if ("none".equalsIgnoreCase(aiResp)) return "Normal";
+
+        // If the AI returned a display name, map to id if possible
+        // check direct id
+        if (ta.getStyleIdToStyleMap().containsKey(aiResp)) return aiResp;
+        // check id in availableStyles
+        for (String s : ta.getAvailableStyles()) {
+            if (s.equals(aiResp)) return s;
+        }
+        // check display name map
+        Map<String, String> nameToId = ta.styleNameToId; // access inner class map
+        if (nameToId != null) {
+            String mapped = nameToId.get(aiResp);
+            if (mapped != null) return mapped;
+            // try case-insensitive / normalized
+            for (Map.Entry<String, String> e : nameToId.entrySet()) {
+                if (e.getKey() != null && e.getKey().equalsIgnoreCase(aiResp)) return e.getValue();
+                if (e.getKey() != null && e.getKey().replaceAll("\\s+", "").equalsIgnoreCase(aiResp.replaceAll("\\s+", ""))) return e.getValue();
+            }
+        }
+
+        // fallback: try to normalize the aiResp and match
+        String norm = aiResp.replaceAll("\\s+", "").toLowerCase();
+        for (String s : ta.getAvailableStyles()) {
+            if (s != null && s.replaceAll("\\s+", "").toLowerCase().equals(norm)) return s;
+        }
+
+        return "Normal";
     }
 
     private JSONObject extractJson(String aiText) {
@@ -554,22 +626,73 @@ public class AssessmentReporterWord {
         return null;
     }
 
-    private P createParagraphWithStyle(ObjectFactory factory, String text, String styleName) {
+    /**
+     * Create a paragraph and attempt to apply the template's style.
+     * Use type-safe access to the StyleDefinitionsPart and apply paragraph and run properties.
+     */
+    private P createParagraphWithStyle(ObjectFactory factory, String text, String styleName, TemplateAnalysis ta) {
         P p = factory.createP();
         R run = factory.createR();
         Text t = factory.createText();
-        t.setValue(text);
+        t.setValue(text == null ? "" : text);
         t.setSpace("preserve");
         run.getContent().add(t);
         p.getContent().add(run);
 
         if (styleName != null && !styleName.isBlank()) {
-            // Ensure we write the style id (not display name) to the paragraph style value
-            PPr ppr = factory.createPPr();
-            PStyle pstyle = factory.createPPrBasePStyle();
-            pstyle.setVal(styleName);
-            ppr.setPStyle(pstyle);
-            p.setPPr(ppr);
+            try {
+                String styleId = ta != null ? ta.resolveStyle(styleName, styleName) : styleName;
+
+                // set pStyle
+                PPr ppr = factory.createPPr();
+                PStyle pstyle = factory.createPPrBasePStyle();
+                pstyle.setVal(styleId);
+                ppr.setPStyle(pstyle);
+
+                // If we have the StyleDefinitionsPart, look up the Style by id (type-safe)
+                if (ta != null && ta.getStyleDefinitionsPart() != null) {
+                    StyleDefinitionsPart sdp = ta.getStyleDefinitionsPart();
+                    Style style = null;
+                    try {
+                        style = sdp.getStyleById(styleId);
+                    } catch (Exception ex) {
+                        // ignore
+                    }
+
+                    if (style != null) {
+                        // copy paragraph properties
+                        if (style.getPPr() != null) {
+                            try {
+                                PPr copied = (PPr) XmlUtils.deepCopy(style.getPPr());
+                                // ensure we set pStyle referencing the style id
+                                copied.setPStyle(pstyle);
+                                p.setPPr(copied);
+                            } catch (Exception e) {
+                                p.setPPr(ppr);
+                            }
+                        } else {
+                            p.setPPr(ppr);
+                        }
+
+                        // copy run properties from style (if any) into the run
+                        if (style.getRPr() != null) {
+                            try {
+                                RPr copiedR = (RPr) XmlUtils.deepCopy(style.getRPr());
+                                run.setRPr(copiedR);
+                            } catch (Exception e) {
+                                // ignore
+                            }
+                        }
+
+                        return p;
+                    }
+                }
+
+                // fallback
+                p.setPPr(ppr);
+            } catch (Exception e) {
+                System.err.println("[AssessmentReporterWord] Error applying style '" + styleName + "': " + e.getMessage());
+            }
         }
         return p;
     }
@@ -693,37 +816,30 @@ public class AssessmentReporterWord {
                 // Map of styleId -> displayName (if available)
                 Map<String, String> styleIdToName = new HashMap<>();
                 Map<String, String> styleNameToId = new HashMap<>();
+                Map<String, Style> styleIdToStyle = new HashMap<>();
 
-                // Try to extract from StyleDefinitionsPart
+                // Try to extract from StyleDefinitionsPart (type-safe)
                 try {
-                    Object styleDefsPart = mdp.getStyleDefinitionsPart();
-                    if (styleDefsPart != null) {
+                    StyleDefinitionsPart sdp = mdp.getStyleDefinitionsPart();
+                    if (sdp != null) {
                         System.out.println("[TemplateAnalyzer.extractParagraphStyles] StyleDefinitionsPart found");
-                        Object stylesObj = ((org.docx4j.openpackaging.parts.WordprocessingML.StyleDefinitionsPart) styleDefsPart).getContents();
-                        if (stylesObj != null && stylesObj instanceof org.docx4j.wml.Styles) {
-                            org.docx4j.wml.Styles stylesElement = (org.docx4j.wml.Styles) stylesObj;
-                            java.util.List<org.docx4j.wml.Style> styleList = stylesElement.getStyle();
-                            if (styleList != null) {
-                                System.out.println("[TemplateAnalyzer.extractParagraphStyles] Found " + styleList.size() + " style definitions");
-                                for (org.docx4j.wml.Style style : styleList) {
-                                    if (style.getStyleId() != null) {
-                                        String styleId = style.getStyleId();
-                                        styles.add(styleId);
-                                        String displayName = null;
-                                        try {
-                                            if (style.getName() != null && style.getName().getVal() != null) {
-                                                displayName = style.getName().getVal();
-                                                // keep both id and display name as available styles
-                                                styles.add(displayName);
-                                                styleIdToName.put(styleId, displayName);
-                                                styleNameToId.put(displayName, styleId);
-                                                System.out.println("[TemplateAnalyzer.extractParagraphStyles]   Found style from definitions: id='" + styleId + "' name='" + displayName + "'");
-                                            } else {
-                                                System.out.println("[TemplateAnalyzer.extractParagraphStyles]   Found style from definitions: id='" + styleId + "' (no display name)");
-                                            }
-                                        } catch (Exception e) {
-                                            System.out.println("[TemplateAnalyzer.extractParagraphStyles]   Could not read display name for style id='" + styleId + "': " + e.getMessage());
-                                        }
+                        analysis.setStyleDefinitionsPart(sdp);
+                        // sdp.getJaxbElement() is Styles; iterate type-safely
+                        org.docx4j.wml.Styles stylesElement = sdp.getJaxbElement();
+                        if (stylesElement != null && stylesElement.getStyle() != null) {
+                            for (org.docx4j.wml.Style style : stylesElement.getStyle()) {
+                                if (style.getStyleId() != null) {
+                                    String styleId = style.getStyleId();
+                                    styles.add(styleId);
+                                    styleIdToStyle.put(styleId, style);
+                                    String displayName = null;
+                                    if (style.getName() != null && style.getName().getVal() != null) {
+                                        displayName = style.getName().getVal();
+                                        styles.add(displayName);
+                                        styleIdToName.put(styleId, displayName);
+                                        styleNameToId.put(displayName, styleId);
+                                        // also add normalized keys for lookups
+                                        styleNameToId.put(displayName.toLowerCase(Locale.ROOT).replaceAll("\\s+", ""), styleId);
                                     }
                                 }
                             }
@@ -733,6 +849,7 @@ public class AssessmentReporterWord {
                     // Store mappings in analysis so resolution can use them later
                     analysis.setStyleIdToNameMap(styleIdToName);
                     analysis.setStyleNameToIdMap(styleNameToId);
+                    analysis.setStyleIdToStyleMap(styleIdToStyle);
 
                 } catch (Exception e) {
                     System.out.println("[TemplateAnalyzer.extractParagraphStyles] Could not read StyleDefinitionsPart: " + e.getClass().getSimpleName() + " - " + e.getMessage());
@@ -893,6 +1010,8 @@ public class AssessmentReporterWord {
         // Helpful mappings to resolve a requested style name (display name) to a style id used in the document
         private Map<String, String> styleNameToId = new HashMap<>();
         private Map<String, String> styleIdToName = new HashMap<>();
+        private Map<String, Style> styleIdToStyle = new HashMap<>();
+        private StyleDefinitionsPart styleDefinitionsPart;
 
         public Set<String> getAvailableStyles() {
             return availableStyles;
@@ -926,6 +1045,22 @@ public class AssessmentReporterWord {
             if (map != null) this.styleIdToName.putAll(map);
         }
 
+        public void setStyleIdToStyleMap(Map<String, Style> map) {
+            if (map != null) this.styleIdToStyle.putAll(map);
+        }
+
+        public void setStyleDefinitionsPart(StyleDefinitionsPart sdp) {
+            this.styleDefinitionsPart = sdp;
+        }
+
+        public StyleDefinitionsPart getStyleDefinitionsPart() {
+            return this.styleDefinitionsPart;
+        }
+
+        public Map<String, Style> getStyleIdToStyleMap() {
+            return styleIdToStyle;
+        }
+
         /**
          * Resolve a requested style (which might be a display name like "Heading 1" or a style id like "Heading1")
          * to a style id that can be used in the document. If not found, return the provided fallback.
@@ -936,18 +1071,13 @@ public class AssessmentReporterWord {
             // Trim and normalize
             String reqTrim = requested.trim();
 
+            // direct id match
+            if (styleIdToStyle.containsKey(reqTrim)) return reqTrim;
+
             // If we already have a mapping from display name to id, prefer returning id
             if (styleNameToId.containsKey(reqTrim)) return styleNameToId.get(reqTrim);
 
-            // Direct match to available styles (could be id or display name)
-            if (availableStyles.contains(reqTrim)) {
-                // if it's actually a display name that maps to an id, return the id
-                if (styleNameToId.containsKey(reqTrim)) return styleNameToId.get(reqTrim);
-                // otherwise assume it's a style id
-                return reqTrim;
-            }
-
-            // case-insensitive match on display names
+            // case-insensitive display name match
             for (Map.Entry<String, String> e : styleNameToId.entrySet()) {
                 if (e.getKey() != null && e.getKey().equalsIgnoreCase(reqTrim)) return e.getValue();
             }
@@ -961,6 +1091,7 @@ public class AssessmentReporterWord {
                 if (name != null && name.replaceAll("\\s+", "").toLowerCase().equals(norm)) return styleNameToId.get(name);
             }
 
+            // last resort: return fallback
             return fallback;
         }
     }
