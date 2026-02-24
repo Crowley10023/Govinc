@@ -5,6 +5,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.List;
 import java.util.HashMap;
+import java.util.HashSet;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -17,6 +18,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import com.govinc.user.UserRepository;
+import com.govinc.user.User;
+import com.govinc.user.Role;
 import com.govinc.organization.OrgUnitService;
 import com.govinc.organization.OrgUnit;
 import com.govinc.organization.OrgServiceService;
@@ -25,8 +28,10 @@ import com.govinc.organization.OrgServiceAssessment;
 import com.govinc.organization.OrgService;
 import com.govinc.organization.OrgServiceAssessmentControl;
 import com.govinc.assessment.Assessment;
+import com.govinc.assessment.AssessmentRepository;
 import com.govinc.maturity.MaturityAnswer;
 import com.govinc.maturity.MaturityAnswerRepository;
+import com.govinc.authorization.AuthorizationService;
 
 @Controller
 @RequestMapping("/assessmentdetails")
@@ -45,6 +50,10 @@ public class AssessmentDetailsController {
     private OrgServiceAssessmentService orgServiceAssessmentService;
     @Autowired
     private MaturityAnswerRepository maturityAnswerRepository;
+    @Autowired
+    private AuthorizationService authorizationService;
+    @Autowired
+    private AssessmentRepository assessmentRepository;
 
     @GetMapping("/list")
     public String list(Model model) {
@@ -266,6 +275,40 @@ public class AssessmentDetailsController {
     @GetMapping("/orgunits")
     @ResponseBody
     public List<OrgUnit> getAllOrgUnitsForAssessment() {
-        return orgUnitService.getAllOrgUnits();
+        User currentUser = authorizationService.getCurrentUser();
+        if (currentUser == null) {
+            return java.util.Collections.emptyList();
+        }
+
+        Role userRole = currentUser.getRole();
+
+        // ADMIN and ISM can see all org units
+        if (userRole == Role.ADMIN || userRole == Role.INFORMATION_SECURITY_MANAGER) {
+            return orgUnitService.getAllOrgUnits();
+        }
+
+        // ORGANISATION_TEAM_LEADER: return their org units and children
+        if (userRole == Role.ORGANISATION_TEAM_LEADER) {
+            Set<OrgUnit> accessibleOrgUnits = authorizationService.getAccessibleOrgUnits();
+            return new java.util.ArrayList<>(accessibleOrgUnits);
+        }
+
+        // ASSESSMENT_DELEGATE: return org units from assessments they are assigned to
+        if (userRole == Role.ASSESSMENT_DELEGATE) {
+            Set<OrgUnit> orgUnitsForDelegate = new HashSet<>();
+            List<Assessment> allAssessments = assessmentRepository.findAll();
+            for (Assessment assessment : allAssessments) {
+                // Check if current user is assigned to this assessment
+                if (assessment.getUsers() != null && assessment.getUsers().contains(currentUser)) {
+                    if (assessment.getOrgUnit() != null) {
+                        orgUnitsForDelegate.add(assessment.getOrgUnit());
+                    }
+                }
+            }
+            return new java.util.ArrayList<>(orgUnitsForDelegate);
+        }
+
+        // Default: return empty list for unknown roles
+        return java.util.Collections.emptyList();
     }
 }

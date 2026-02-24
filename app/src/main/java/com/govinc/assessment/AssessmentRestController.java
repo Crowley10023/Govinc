@@ -2,6 +2,8 @@ package com.govinc.assessment;
 
 import com.govinc.organization.OrgService;
 import com.govinc.organization.OrgServiceService;
+import com.govinc.authorization.AuthorizationService;
+import com.govinc.authorization.UnauthorizedException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,15 +17,22 @@ import java.util.stream.Collectors;
 public class AssessmentRestController {
     private final AssessmentRepository assessmentRepository;
     private final OrgServiceService orgServiceService;
+    private final AuthorizationService authorizationService;
 
     @Autowired
-    public AssessmentRestController(AssessmentRepository assessmentRepository, OrgServiceService orgServiceService) {
+    public AssessmentRestController(AssessmentRepository assessmentRepository, OrgServiceService orgServiceService, AuthorizationService authorizationService) {
         this.assessmentRepository = assessmentRepository;
         this.orgServiceService = orgServiceService;
+        this.authorizationService = authorizationService;
     }
 
     @PutMapping("/{id}/orgservices")
     public void updateOrgServices(@PathVariable Long id, @RequestBody List<Long> orgServiceIds) {
+        // Authorization check: user must be able to modify the assessment
+        if (!authorizationService.canModifyAssessment(id)) {
+            throw new UnauthorizedException("You do not have permission to modify this assessment's org services.");
+        }
+        
         System.out.println("[REST] updateOrgServices called for Assessment ID: " + id + " with OrgServiceIds: " + orgServiceIds);
         Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
         if (assessmentOpt.isPresent()) {
@@ -44,9 +53,13 @@ public class AssessmentRestController {
     // New endpoint: get assigned orgservice ids for an assessment
     @GetMapping("/{id}/orgservice-ids")
     public List<Long> assignedOrgServiceIds(@PathVariable Long id) {
+        // Authorization check: user must be able to access the assessment
+        if (!authorizationService.canAccessAssessment(id)) {
+            throw new UnauthorizedException("You do not have permission to access this assessment.");
+        }
+        
         return assessmentRepository.findById(id)
                 .map(a -> a.getOrgServices().stream().map(OrgService::getId).collect(Collectors.toList()))
                 .orElse(java.util.Collections.emptyList());
     }
 }
-

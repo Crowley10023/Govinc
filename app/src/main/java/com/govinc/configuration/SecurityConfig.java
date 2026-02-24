@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -60,7 +61,10 @@ public class SecurityConfig {
             // Login and OAuth endpoints must be reachable without prior authentication
             "/login",
             "/oauth2/**",
-            "/login/oauth2/**"
+            "/login/oauth2/**",
+            
+            // Access denied page
+            "/not-authorized"
             };
 
     // Only the anonymous assessment-direct write endpoints are exempt from CSRF
@@ -115,6 +119,8 @@ public class SecurityConfig {
                 .anyRequest().authenticated())
             // Enable CSRF but ignore assessment-direct anonymous write endpoints only
             .csrf(csrf -> csrf.ignoringRequestMatchers(CSRF_IGNORED_URLS))
+            .exceptionHandling(exception -> exception
+                .accessDeniedHandler(accessDeniedHandler()))
             .addFilterBefore(new OAuth2AuthorizationRequestLoggingFilter(), org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(new OAuth2DebugLoggingFilter(), org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
             .formLogin(form -> form
@@ -141,6 +147,54 @@ public class SecurityConfig {
         }
 
         return http.build();
+    }
+
+    /**
+     * Custom access denied handler that displays a not-authorized page
+     */
+    @Bean
+    public AccessDeniedHandler accessDeniedHandler() {
+        return new SecurityAccessDeniedHandler();
+    }
+
+    /**
+     * Implementation of AccessDeniedHandler that displays the not-authorized view
+     */
+    private static class SecurityAccessDeniedHandler implements AccessDeniedHandler {
+        private static final Logger accessDeniedLogger = LoggerFactory.getLogger("SecurityAccessDeniedHandler");
+
+        @Override
+        public void handle(HttpServletRequest request, HttpServletResponse response,
+                org.springframework.security.access.AccessDeniedException accessDeniedException)
+                throws IOException, ServletException {
+            String username = request.getUserPrincipal() != null ? request.getUserPrincipal().getName() : "anonymous";
+            accessDeniedLogger.warn("Access denied for user: {} | Path: {} | Method: {}",
+                username, request.getRequestURI(), request.getMethod());
+
+            // For API calls, return JSON
+            if (isApiCall(request)) {
+                response.setContentType("application/json");
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                response.getWriter().write("{\"error\":\"Forbidden\",\"message\":\"You do not have permission to access this resource\",\"status\":403}");
+                return;
+            }
+
+            // For page requests, set status and forward to the not-authorized view
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            request.setAttribute("message", "You do not have the necessary permissions to access this page.");
+            request.getRequestDispatcher("/not-authorized").forward(request, response);
+        }
+
+        private boolean isApiCall(HttpServletRequest request) {
+            String accept = request.getHeader("Accept");
+            String contentType = request.getHeader("Content-Type");
+            String requestUri = request.getRequestURI();
+
+            return (accept != null && accept.contains("application/json")) ||
+                   (contentType != null && contentType.contains("application/json")) ||
+                   (requestUri != null && requestUri.contains("/api/")) ||
+                   "XMLHttpRequest".equals(request.getHeader("X-Requested-With"));
+        }
     }
 
     /**

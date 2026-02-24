@@ -39,13 +39,11 @@ public class GlobalExceptionHandler {
             response.put("status", 403);
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
         }
-        
+
         // Return HTML response for page requests
         ModelAndView mav = new ModelAndView();
-        mav.setViewName("error");
-        mav.addObject("message", ex.getMessage() != null ? ex.getMessage() : "Access Denied");
-        mav.addObject("showDetails", false);
-        mav.addObject("statusCode", 403);
+        mav.setViewName("not-authorized");
+        mav.addObject("message", ex.getMessage() != null ? ex.getMessage() : "You do not have permission to access this page or perform this action");
         addLayoutConfigToView(mav);
         return new ResponseEntity<>(mav, HttpStatus.FORBIDDEN);
     }

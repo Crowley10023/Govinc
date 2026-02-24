@@ -14,7 +14,7 @@
     <div class="container">
          <section>
             <div class="filters" style="margin-bottom: 1em; display: flex; align-items: center; gap: 1em;">
-                <button id="orgUnitFilterBtn" class="btn btn-secondary" type="button">Org Unit</button>
+                <button id="orgUnitFilterBtn" class="btn btn-secondary" type="button" style="display: none;">Org Unit</button>
                 <span id="activeOrgUnitFilter" style="display:none; align-items: center;" class="badge">
                     <span id="orgUnitFilterName"></span>
                     <svg id="clearOrgUnitFilter" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16"
@@ -63,29 +63,35 @@
                 let orgUnitsCache = null;
                 let selectedOrgUnit = null;
 
-                // Check for orgUnit parameter on page load
+                // Check for orgUnit parameter on page load and initialize filter button visibility
                 document.addEventListener('DOMContentLoaded', function () {
                     const urlParams = new URLSearchParams(window.location.search);
                     const orgUnitParam = urlParams.get('orgUnit');
-                    if (orgUnitParam) {
-                        // Fetch org units and find the one matching the parameter
-                        fetch('/orgunits')
-                            .then(res => res.json())
-                            .then(orgUnits => {
-                                orgUnitsCache = orgUnits;
+
+                    // Check if user can filter by org units (fetch available org units)
+                    fetch('/assessmentdetails/orgunits')
+                        .then(res => res.json())
+                        .then(orgUnits => {
+                            orgUnitsCache = orgUnits;
+                            // Show filter button only if user has accessible org units
+                            if (orgUnits && orgUnits.length > 0) {
+                                document.getElementById('orgUnitFilterBtn').style.display = 'inline-block';
+                            }
+
+                            if (orgUnitParam) {
                                 const matchedOrgUnit = orgUnits.find(u => u.id == orgUnitParam);
                                 if (matchedOrgUnit) {
                                     selectedOrgUnit = matchedOrgUnit;
                                     applyOrgUnitFilter();
                                 }
-                            });
-                    }
+                            }
+                        });
                 });
 
                 document.getElementById('orgUnitFilterBtn').addEventListener('click', function () {
                     document.getElementById('orgUnitModal').style.display = 'block';
                     if (!orgUnitsCache) {
-                        fetch('/orgunits')
+                        fetch('/assessmentdetails/orgunits')
                             .then(res => res.json())
                             .then(orgUnits => {
                                 orgUnitsCache = orgUnits;

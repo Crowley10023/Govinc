@@ -177,6 +177,7 @@ public class AssessmentController {
         }
         
         model.addAttribute("assessments", filtered);
+        model.addAttribute("isAdminOrISM", authorizationService.isAdmin() || authorizationService.isInformationSecurityManager());
         return "assessment-list";
     }
 
@@ -545,6 +546,10 @@ public class AssessmentController {
             model.addAttribute("securityControlDomains", securityControlDomains);
             // Also pass orgServices for details view
             model.addAttribute("orgServices", assessment.getOrgServices());
+
+            // Pass authorization info for UI restrictions
+            model.addAttribute("isAdminOrISM", authorizationService.isAdmin() || authorizationService.isInformationSecurityManager());
+
             return "assessment-details";
         } else {
             return "assessment-not-found";
