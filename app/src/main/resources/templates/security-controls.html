@@ -1420,6 +1420,63 @@ network segmentation","SC-7","Network"</div>
                             submitEditForm(submitForm);
                         });
                     }
+
+                    // Initialize tag buttons for modal
+                    const tagContainer = container.querySelector('#tag-selection');
+                    if (tagContainer) {
+                        setTimeout(() => {
+                            // Update tag buttons visual state
+                            const tagInput = container.querySelector('#tag');
+                            if (tagInput) {
+                                const tagButtons = container.querySelectorAll('.tag-pill');
+                                tagButtons.forEach(btn => {
+                                    btn.addEventListener('click', function(event) {
+                                        event.preventDefault();
+                                        event.stopPropagation();
+
+                                        const clickedTag = this.getAttribute('data-tag');
+                                        if (!tagInput || !clickedTag) return;
+
+                                        let inputValue = tagInput.value;
+                                        let selectedTags = [];
+                                        if (inputValue && inputValue.trim().length > 0) {
+                                            selectedTags = inputValue.split(',').map(t => t.trim()).filter(t => t.length > 0);
+                                        }
+
+                                        const index = selectedTags.indexOf(clickedTag);
+                                        if (index > -1) {
+                                            selectedTags.splice(index, 1);
+                                        } else {
+                                            selectedTags.push(clickedTag);
+                                        }
+
+                                        tagInput.value = selectedTags.length > 0 ? selectedTags.join(', ') : '';
+
+                                        // Update button states
+                                        tagButtons.forEach(b => {
+                                            const bTag = b.getAttribute('data-tag');
+                                            if (selectedTags.includes(bTag)) {
+                                                b.classList.add('active');
+                                            } else {
+                                                b.classList.remove('active');
+                                            }
+                                        });
+                                    });
+                                });
+
+                                // Initial state update
+                                const initialTags = tagInput.value ? tagInput.value.split(',').map(t => t.trim()).filter(t => t.length > 0) : [];
+                                tagButtons.forEach(btn => {
+                                    const btnTag = btn.getAttribute('data-tag');
+                                    if (initialTags.includes(btnTag)) {
+                                        btn.classList.add('active');
+                                    } else {
+                                        btn.classList.remove('active');
+                                    }
+                                });
+                            }
+                        }, 50);
+                    }
                 }
             })
             .catch(error => {
