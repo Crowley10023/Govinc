@@ -68,7 +68,6 @@ public class GlobalLayoutConfigAdvice {
             if (resu.getToolNameColor() == null) resu.setToolNameColor("#6c757d");
             if (resu.getToolNameFontSize() == null) resu.setToolNameFontSize("14px");
             
-            System.out.println("GlobalLayoutConfigAdvice - PrimaryColor initialized: " + resu.getPrimaryColor());
         }
         return resu;
     }

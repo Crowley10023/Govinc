@@ -1,39 +1,65 @@
 package com.govinc.assessment;
 
+import com.govinc.catalog.SecurityCatalog;
 import com.govinc.catalog.SecurityControl;
 import com.govinc.maturity.MaturityAnswer;
 import com.govinc.user.User;
 import com.govinc.organization.OrgUnit;
-
+import com.govinc.organization.OrgService;
+import com.govinc.organization.OrgServiceAssessmentService;
+import com.govinc.util.OpenAIUtil;
+import com.govinc.entity.OrganisationDetails;
+import com.govinc.entity.OrganisationDetailsRepository;
 import com.govinc.entity.OpenAIConfiguration;
 import com.govinc.repository.OpenAIConfigurationRepository;
-import com.govinc.util.OpenAIUtil;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import org.apache.poi.xwpf.usermodel.*;
-import java.io.File;
-import java.io.FileInputStream;
+import org.docx4j.openpackaging.packages.WordprocessingMLPackage;
+import org.docx4j.openpackaging.parts.WordprocessingML.MainDocumentPart;
+import org.docx4j.wml.ObjectFactory;
+import org.docx4j.wml.P;
+import org.docx4j.wml.R;
+import org.docx4j.wml.Text;
+import org.docx4j.wml.PPr;
+import org.docx4j.wml.PPrBase.PStyle;
+import org.docx4j.wml.Tbl;
+import org.docx4j.wml.Tr;
+import org.docx4j.wml.Tc;
+import jakarta.xml.bind.JAXBElement;
 
+import org.json.JSONObject;
+import org.json.JSONArray;
+
+import java.io.File;
+import java.io.ByteArrayOutputStream;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+
+/**
+ * Enhanced implementation using docx4j with template-aware AI prompt generation.
+ */
 @Component
 public class AssessmentReporterWord {
 
-    private final com.govinc.organization.OrgServiceAssessmentService orgServiceAssessmentService;
+    private final OrgServiceAssessmentService orgServiceAssessmentService;
     private final OpenAIConfigurationRepository openAIConfigurationRepository;
     private final OpenAIUtil openAIUtil;
+    private final OrganisationDetailsRepository organisationDetailsRepository;
 
-    // Progress tracking for word report generation
-    private final java.util.Map<Long, ReportProgress> progressMap = new java.util.concurrent.ConcurrentHashMap<>();
+    // Progress tracking
+    private final Map<Long, ReportProgress> progressMap = new java.util.concurrent.ConcurrentHashMap<>();
 
     @Autowired
-    public AssessmentReporterWord(
-            com.govinc.organization.OrgServiceAssessmentService orgServiceAssessmentService,
-            OpenAIConfigurationRepository openAIConfigurationRepository,
-            OpenAIUtil openAIUtil) {
+    public AssessmentReporterWord(OrgServiceAssessmentService orgServiceAssessmentService,
+                                  OpenAIConfigurationRepository openAIConfigurationRepository,
+                                  OpenAIUtil openAIUtil,
+                                  OrganisationDetailsRepository organisationDetailsRepository) {
         this.orgServiceAssessmentService = orgServiceAssessmentService;
         this.openAIConfigurationRepository = openAIConfigurationRepository;
         this.openAIUtil = openAIUtil;
+        this.organisationDetailsRepository = organisationDetailsRepository;
     }
 
     public ReportProgress getProgress(Long assessmentId) {
@@ -49,575 +75,893 @@ public class AssessmentReporterWord {
     }
 
     /**
-     * Creates a Word report (DOCX) using Apache POI with optional template.
-     * Tracks progress during generation.
+     * Main entrypoint: Creates a Word report by analyzing the template FIRST, then generating
+     * AI content that respects the template's formatting and structure.
      */
     public byte[] createWordReport(Assessment assessment, AssessmentDetails details, java.util.List<User> users,
-            OrgUnit orgUnit, java.util.List<AssessmentControlAnswer> answers, String templatePath) throws Exception {
+                                   OrgUnit orgUnit, java.util.List<AssessmentControlAnswer> answers, String templatePath) throws Exception {
         Long assessmentId = assessment.getId();
-        updateProgress(assessmentId, 5, "Initializing...");
+        updateProgress(assessmentId, 5, "Initializing report generation...");
 
-        XWPFDocument doc = null;
-        boolean templateLoaded = false;
-
+        // Step 1: Load template
+        updateProgress(assessmentId, 10, "Loading template...");
+        String tplPath = templatePath;
         try {
-            // Try to load template if provided
-            if (templatePath != null && !templatePath.isEmpty()) {
-                updateProgress(assessmentId, 10, "Loading template...");
-                File templateFile = new File(templatePath);
-                if (templateFile.exists()) {
-                    doc = new XWPFDocument(new FileInputStream(templateFile));
-                    templateLoaded = true;
-                    System.out.println("[AssessmentReporterWord] Loaded template from: " + templatePath);
-                } else {
-                    System.out.println("[AssessmentReporterWord] Template file not found at: " + templatePath);
-                    doc = new XWPFDocument();
+            if (tplPath == null || tplPath.isBlank()) {
+                OrganisationDetails orgDetails = organisationDetailsRepository.findAll().stream().findFirst().orElse(null);
+                if (orgDetails != null && orgDetails.getWordTemplatePath() != null && !orgDetails.getWordTemplatePath().isBlank()) {
+                    tplPath = orgDetails.getWordTemplatePath();
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[AssessmentReporterWord] Could not read organisation details: " + e.getMessage());
+        }
+
+        WordprocessingMLPackage wordMLPackage = null;
+        TemplateAnalysis templateAnalysis = new TemplateAnalysis();
+
+        if (tplPath != null && !tplPath.isBlank()) {
+            File tplFile = new File(tplPath);
+            if (tplFile.exists()) {
+                try {
+                    wordMLPackage = WordprocessingMLPackage.load(tplFile);
+
+                    // Step 2: Analyze template BEFORE building prompt
+                    updateProgress(assessmentId, 15, "Analyzing template structure...");
+                    TemplateAnalyzer analyzer = new TemplateAnalyzer(wordMLPackage);
+                    templateAnalysis = analyzer.analyze();
+
+                    System.out.println("[AssessmentReporterWord] Template analysis complete:");
+                    System.out.println("  - Available styles: " + templateAnalysis.getAvailableStyles());
+                    System.out.println("  - Template structure sections: " + templateAnalysis.getTemplateStructure().size());
+                    System.out.println("  - Placeholder paragraphs: " + templateAnalysis.getPlaceholders().size());
+                } catch (Exception e) {
+                    System.err.println("[AssessmentReporterWord] Failed to load template: " + e.getMessage());
+                    wordMLPackage = WordprocessingMLPackage.createPackage();
                 }
             } else {
-                updateProgress(assessmentId, 10, "Creating new document...");
-                doc = new XWPFDocument();
+                System.out.println("[AssessmentReporterWord] Template file not found at: " + tplPath);
+                wordMLPackage = WordprocessingMLPackage.createPackage();
+            }
+        } else {
+            updateProgress(assessmentId, 10, "No template configured, creating empty document");
+            wordMLPackage = WordprocessingMLPackage.createPackage();
+        }
+
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            // Step 3: Build prompt that includes template information
+            updateProgress(assessmentId, 20, "Building AI prompt with template information...");
+            String prompt = buildPrompt(assessment, details, users, orgUnit, answers, templateAnalysis);
+
+            // Step 4: Generate content via AI
+            updateProgress(assessmentId, 35, "Generating report content from AI...");
+            String aiResult = openAIUtil.askAI(prompt);
+
+            // Validate AI response
+            if (aiResult == null || aiResult.isBlank()) {
+                throw new Exception("AI returned an empty response");
+            }
+            String aiResultTrim = aiResult.trim();
+            String lower = aiResultTrim.toLowerCase();
+            if (lower.startsWith("no ai provider") || lower.startsWith("the configured") || lower.startsWith("error")
+                    || lower.contains("openai api response") || lower.contains("openai returned code")
+                    || lower.contains("error calling")) {
+                throw new Exception("AI returned an error: " + aiResultTrim);
             }
 
-            try (java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream()) {
+            // Step 5: Parse AI response
+            updateProgress(assessmentId, 55, "Parsing AI response...");
+            JSONObject reportJson = extractJson(aiResultTrim);
+            if (reportJson == null) {
+                throw new Exception("AI response did not contain valid JSON. Response: " + aiResultTrim);
+            }
 
-                // If template was successfully loaded, replace placeholders in template
-                if (templateLoaded) {
-                    updateProgress(assessmentId, 30, "Processing template placeholders...");
-                    replacePlaceholdersInTemplate(doc, assessment, details, users, orgUnit, answers);
-                } else {
-                    // Generate content from scratch if no template
-                    updateProgress(assessmentId, 30, "Generating report content...");
-                    generateDefaultReport(doc, assessment, details, users, orgUnit, answers);
+            // Step 6: Build document from generated content
+            updateProgress(assessmentId, 70, "Inserting content into template...");
+            MainDocumentPart mdp = wordMLPackage.getMainDocumentPart();
+            ObjectFactory factory = new ObjectFactory();
+
+            // Now we accept that AI may provide paragraphs and also real tables.
+            List<Object> generatedElements = buildElementsFromAiResponse(factory, reportJson, templateAnalysis);
+
+            // Determine if a real table should still be inserted based on security catalog instructions
+            SecurityCatalog cat = assessment.getSecurityCatalog();
+            boolean needTable = false;
+            if (cat != null && cat.getReportInstructions() != null) {
+                String ri = cat.getReportInstructions().toLowerCase(Locale.ROOT);
+                if (ri.contains("table") || ri.contains("tabelle")) {
+                    needTable = true;
                 }
-
-                updateProgress(assessmentId, 85, "Formatting and finalizing...");
-                // Serialize document
-                doc.write(baos);
-                updateProgress(assessmentId, 95, "Preparing download...");
-
-                byte[] result = baos.toByteArray();
-                updateProgress(assessmentId, 100, "Complete!");
-                return result;
             }
+
+            // Prepare table data: controls and answers (used only as fallback if AI didn't include a table)
+            List<SecurityControl> allControls = assessment.getSecurityCatalog() != null ?
+                    assessment.getSecurityCatalog().getSecurityControls() : Collections.emptyList();
+            Map<Long, AssessmentControlAnswer> answerMap = new HashMap<>();
+            for (AssessmentControlAnswer a : answers) {
+                if (a.getSecurityControl() != null) answerMap.put(a.getSecurityControl().getId(), a);
+            }
+
+            Tbl summaryTable = null;
+            boolean aiProvidedTable = false;
+            for (Object el : generatedElements) {
+                if (el instanceof Tbl) {
+                    aiProvidedTable = true;
+                    break;
+                }
+            }
+
+            if (needTable && !aiProvidedTable && !allControls.isEmpty()) {
+                try {
+                    summaryTable = createSummaryTable(factory, allControls, answerMap, templateAnalysis);
+                    System.out.println("[AssessmentReporterWord] Summary table created (as requested by report instructions)");
+                } catch (Exception e) {
+                    System.err.println("[AssessmentReporterWord] Failed to create summary table: " + e.getMessage());
+                }
+            }
+
+            // Step 7: Insert into template at placeholder location
+            List<P> placeholders = templateAnalysis.getPlaceholders();
+            if (!placeholders.isEmpty()) {
+                updateProgress(assessmentId, 80, "Replacing placeholder with generated content...");
+                List<Object> content = mdp.getContent();
+                List<Integer> indexes = new ArrayList<>();
+                for (P p : placeholders) {
+                    int idx = content.indexOf(p);
+                    if (idx >= 0) {
+                        indexes.add(idx);
+                    }
+                }
+                Collections.sort(indexes, Collections.reverseOrder());
+                if (!indexes.isEmpty()) {
+                    int insertAt = indexes.get(indexes.size() - 1);
+                    for (int idx : indexes) {
+                        if (idx >= 0 && idx < content.size()) {
+                            content.remove(idx);
+                        }
+                    }
+                    // Build combined content objects (paragraphs and optional table)
+                    List<Object> combined = new ArrayList<>();
+                    combined.addAll(generatedElements);
+                    if (summaryTable != null) combined.add(summaryTable);
+
+                    content.addAll(insertAt, combined);
+                }
+            } else {
+                updateProgress(assessmentId, 80, "No placeholder found, appending content to document...");
+                if (summaryTable != null) {
+                    mdp.getContent().addAll(new ArrayList<Object>(generatedElements));
+                    mdp.getContent().add(summaryTable);
+                } else {
+                    mdp.getContent().addAll(new ArrayList<Object>(generatedElements));
+                }
+            }
+
+            // Step 8: Save document
+            updateProgress(assessmentId, 90, "Saving document...");
+            wordMLPackage.save(baos);
+            updateProgress(assessmentId, 100, "Report generation complete");
+
+            return baos.toByteArray();
         } finally {
-            // Clear progress after generation completes or fails
+            // Clear progress shortly after completion
             java.util.Timer timer = new java.util.Timer();
             timer.schedule(new java.util.TimerTask() {
                 @Override
                 public void run() {
                     clearProgress(assessmentId);
                 }
-            }, 3000); // Clear after 3 seconds to allow UI to display completion
+            }, 3000);
         }
     }
 
     /**
-     * Backwards compatibility overload without template path
+     * Backwards compatible overload
      */
     public byte[] createWordReport(Assessment assessment, AssessmentDetails details, java.util.List<User> users,
-            OrgUnit orgUnit, java.util.List<AssessmentControlAnswer> answers) throws Exception {
+                                   OrgUnit orgUnit, java.util.List<AssessmentControlAnswer> answers) throws Exception {
         return createWordReport(assessment, details, users, orgUnit, answers, null);
     }
 
     /**
-     * Replaces placeholders in a template Word document with actual assessment data.
-     * Looks for patterns like {{PLACEHOLDER_NAME}} in paragraphs and table cells.
-     * If placeholders are found, only replacements are done.
-     * If no placeholders are found, the full report content is appended to the template.
+     * Build the prompt with detailed template information so AI knows what to generate
      */
-    private void replacePlaceholdersInTemplate(XWPFDocument doc, Assessment assessment, AssessmentDetails details,
-            java.util.List<User> users, OrgUnit orgUnit, java.util.List<AssessmentControlAnswer> answers) throws Exception {
+    private String buildPrompt(Assessment assessment, AssessmentDetails details, List<User> users, OrgUnit orgUnit,
+                               List<AssessmentControlAnswer> answers, TemplateAnalysis templateAnalysis) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("You are an AI assistant that generates a structured JSON representation of a Microsoft Word report.\n");
+        sb.append("You MUST follow the template structure provided below to ensure your output integrates correctly.\n\n");
 
-        System.out.println("[AssessmentReporterWord] Processing " + doc.getParagraphs().size() + " paragraphs");
+        // ============ TEMPLATE STRUCTURE ============
+        sb.append("========================================\n");
+        sb.append("TEMPLATE STRUCTURE AND FORMATTING\n");
+        sb.append("========================================\n\n");
 
-        // Track if any placeholders were found and replaced
-        boolean foundPlaceholders = false;
+        sb.append("IMPORTANT: The template already has predefined sections and styles.\n");
+        sb.append("Your generated content MUST follow this structure:\n\n");
 
-        // Replace placeholders in paragraphs
-        for (XWPFParagraph para : doc.getParagraphs()) {
-            if (replacePlaceholdersInParagraph(para, assessment, details, users, orgUnit)) {
-                foundPlaceholders = true;
+        sb.append("You may generate sections that contain only paragraphs (i.e., no heading).\n");
+        sb.append("When creating plain paragraphs, omit the 'heading' field and provide 'content' only.\n\n");
+
+        if (!templateAnalysis.getTemplateStructure().isEmpty()) {
+            sb.append("Template sections and headings found:\n");
+            int i = 1;
+            for (TemplateSection section : templateAnalysis.getTemplateStructure()) {
+                sb.append(String.format("%d. Text (style=%s): %s\n", i, section.getStyle(), section.getText().length() > 100 ? section.getText().substring(0, 100) + "..." : section.getText()));
+                i++;
             }
+            sb.append("\n");
         }
 
-        // Replace placeholders in tables
-        for (XWPFTable table : doc.getTables()) {
-            for (XWPFTableRow row : table.getRows()) {
-                for (XWPFTableCell cell : row.getTableCells()) {
-                    for (XWPFParagraph para : cell.getParagraphs()) {
-                        if (replacePlaceholdersInParagraph(para, assessment, details, users, orgUnit)) {
-                            foundPlaceholders = true;
+        sb.append("Available paragraph styles in template (you MUST use these):\n");
+        sb.append(templateAnalysis.getAvailableStyles()).append("\n\n");
+
+        sb.append("Preferred style mapping for your sections:\n");
+        sb.append("  - Report title: use 'Title' style (or the equivalent in the template)\n");
+        sb.append("  - Major sections: use 'Heading1' style if available\n");
+        sb.append("  - Subsections: use 'Heading2' style if available\n");
+        sb.append("  - Body content: use 'Normal' style\n\n");
+
+        // Table instructions
+        sb.append("If you need a real Word table, set the section's contentStyle to 'Table' (case-insensitive) and include a 'table' object in the section.\n");
+        sb.append("The 'table' object should be either an array of arrays (first row can be headers) or an object with 'headers' (array) and 'rows' (array of arrays).\n");
+        sb.append("Example:\n");
+        sb.append("  \"sections\": [\n");
+        sb.append("    {\n");
+        sb.append("      \"heading\": \"Summary\",\n");
+        sb.append("      \"contentStyle\": \"Table\",\n");
+        sb.append("      \"table\": {\n");
+        sb.append("        \"headers\": [\"Control\", \"Maturity\", \"Score\"],\n");
+        sb.append("        \"rows\": [[\"Control A\", \"High\", \"3\"], [\"Control B\", \"Low\", \"1\"]]\n");
+        sb.append("      }\n");
+        sb.append("    }\n");
+        sb.append("  ]\n\n");
+
+        // ============ OUTPUT SCHEMA ============
+        sb.append("========================================\n");
+        sb.append("OUTPUT JSON SCHEMA\n");
+        sb.append("========================================\n\n");
+        sb.append("You MUST return ONLY valid JSON (no markdown, no HTML, no commentary):\n\n");
+        sb.append("{\n");
+        sb.append("  \"title\": \"Report title text\",\n");
+        sb.append("  \"titleStyle\": \"Title\",\n");
+        sb.append("  \"sections\": [\n");
+        sb.append("    {\n");
+        sb.append("      \"heading\": \"Section heading\",\n");
+        sb.append("      \"headingStyle\": \"Heading1\",  // must match available styles from template\n");
+        sb.append("      \"contentStyle\": \"Normal\",    // must match available styles from template (or 'Table' for tables)\n");
+        sb.append("      \"content\": \"Paragraph text. Use double-newline (\\\\n\\\\n) to separate paragraphs.\"\n");
+        sb.append("    }\n");
+        sb.append("  ]\n");
+        sb.append("}\n\n");
+
+        // ============ SECURITY CATALOG INSTRUCTIONS ============
+        sb.append("========================================\n");
+        sb.append("SECURITY CATALOG REPORT INSTRUCTIONS\n");
+        sb.append("========================================\n\n");
+
+        SecurityCatalog cat = assessment.getSecurityCatalog();
+        if (cat != null && cat.getReportInstructions() != null && !cat.getReportInstructions().isBlank()) {
+            sb.append("Instructions from Security Catalog '").append(cat.getName()).append("':\n\n");
+            sb.append(cat.getReportInstructions()).append("\n\n");
+        } else {
+            sb.append("No specific instructions defined in security catalog.\n");
+            sb.append("Use standard security assessment report best practices.\n\n");
+        }
+
+        // ============ ASSESSMENT DATA ============
+        sb.append("========================================\n");
+        sb.append("ASSESSMENT DATA\n");
+        sb.append("========================================\n\n");
+
+        sb.append("Assessment Metadata:\n");
+        sb.append("  ID: ").append(assessment.getId()).append("\n");
+        sb.append("  Name: ").append(assessment.getName() == null ? "-" : assessment.getName()).append("\n");
+        sb.append("  Date: ").append(assessment.getDate() == null ? "-" : assessment.getDate().toString()).append("\n");
+        sb.append("  Organization: ").append(orgUnit == null ? "-" : orgUnit.getName()).append("\n");
+        sb.append("  Completed: ").append(details == null || details.getDate() == null ? "-" : details.getDate().toString()).append("\n");
+        sb.append("  Security Catalog: ").append(cat == null ? "-" : cat.getName() + " (Rev. " + (cat.getRevision() == null ? "-" : cat.getRevision()) + ")").append("\n\n");
+
+        sb.append("Assessment Participants:\n");
+        for (User u : users) {
+            sb.append("  - ").append(u.getName()).append(" <").append(u.getEmail()).append(">\n");
+        }
+        sb.append("\n");
+
+        // ============ CONTROLS AND ANSWERS ============
+        sb.append("========================================\n");
+        sb.append("SECURITY CONTROLS AND ASSESSMENT RESULTS\n");
+        sb.append("========================================\n\n");
+
+        List<SecurityControl> allControls = assessment.getSecurityCatalog() != null ?
+                assessment.getSecurityCatalog().getSecurityControls() : Collections.emptyList();
+        Map<Long, AssessmentControlAnswer> answerMap = new HashMap<>();
+        for (AssessmentControlAnswer a : answers) {
+            if (a.getSecurityControl() != null) answerMap.put(a.getSecurityControl().getId(), a);
+        }
+
+        for (SecurityControl ctrl : allControls) {
+            AssessmentControlAnswer aca = answerMap.get(ctrl.getId());
+            sb.append("CONTROL: ").append(ctrl.getName() == null ? "-" : ctrl.getName()).append("\n");
+            if (ctrl.getDetail() != null && !ctrl.getDetail().isBlank()) {
+                sb.append("  Description: ").append(ctrl.getDetail()).append("\n");
+            }
+            if (ctrl.getReference() != null && !ctrl.getReference().isBlank()) {
+                sb.append("  Reference: ").append(ctrl.getReference()).append("\n");
+            }
+            if (aca != null) {
+                MaturityAnswer ma = aca.getMaturityAnswer();
+                if (ma != null && ma.getAnswer() != null) {
+                    sb.append("  Maturity Level: ").append(ma.getAnswer()).append("\n");
+                }
+                sb.append("  Score: ").append(aca.getScore()).append("\n");
+            } else {
+                sb.append("  Status: Not yet assessed\n");
+            }
+            sb.append("\n");
+        }
+
+        // ============ GUIDANCE ============
+        sb.append("========================================\n");
+        sb.append("REPORT WRITING GUIDANCE\n");
+        sb.append("========================================\n\n");
+        sb.append("1. Generate a professional security assessment report.\n");
+        sb.append("2. Follow the security catalog's report instructions strictly.\n");
+        sb.append("3. Use the template's available styles EXACTLY as specified.\n");
+        sb.append("7. Write for a management audience (balance technical detail with clarity).\n");
+        sb.append("8. Use double-newlines (\\\\n\\\\n) to separate paragraphs within sections.\n");
+        sb.append("9. Return ONLY valid JSON - no markdown, no HTML, no extra text.\n");
+        sb.append("10. Ensure the report is actionable and aligned with security best practices.\n\n");
+        sb.append("11. Be complete, do not shorten anything nor miss anything.\n\n");
+        sb.append("12. Do never write in the report your own comments or repeats of instructions..\n\n");
+
+        sb.append("Now generate the complete report in JSON format:\n");
+
+        return sb.toString();
+    }
+
+    /**
+     * Build a mixed list of docx elements (paragraphs and tables) from AI JSON response.
+     */
+    private List<Object> buildElementsFromAiResponse(ObjectFactory factory, JSONObject reportJson, TemplateAnalysis templateAnalysis) {
+        List<Object> elements = new ArrayList<>();
+
+        // Add title
+        if (reportJson.has("title")) {
+            String title = reportJson.optString("title");
+            String requestedStyle = reportJson.optString("titleStyle", "Title");
+            String resolved = templateAnalysis.resolveStyle(requestedStyle, "Title");
+            elements.add(createParagraphWithStyle(factory, title, resolved));
+        }
+
+        // Add sections
+        if (reportJson.has("sections")) {
+            JSONArray sections = reportJson.getJSONArray("sections");
+            for (int i = 0; i < sections.length(); i++) {
+                JSONObject section = sections.getJSONObject(i);
+
+                // Add section heading if present
+                if (section.has("heading")) {
+                    String heading = section.getString("heading");
+                    String requestedHeadingStyle = section.optString("headingStyle", "Heading1");
+                    String resolvedHeading = templateAnalysis.resolveStyle(requestedHeadingStyle, "Heading1");
+                    System.out.println("... resolved syle: " + resolvedHeading);
+                    elements.add(createParagraphWithStyle(factory, heading, resolvedHeading));
+                }
+
+                String requestedContentStyle = section.optString("contentStyle", "Normal");
+                String resolvedContentStyle = templateAnalysis.resolveStyle(requestedContentStyle, "Normal");
+                String contentStyleNormalized = requestedContentStyle == null ? "" : requestedContentStyle.trim().toLowerCase(Locale.ROOT);
+
+                // If contentStyle indicates a table, try to build a real table
+                if ("table".equals(contentStyleNormalized) || section.has("table")) {
+                    try {
+                        Tbl tbl = null;
+                        if (section.has("table")) {
+                            Object tblObj = section.get("table");
+                            if (tblObj instanceof JSONObject) {
+                                JSONObject tjo = (JSONObject) tblObj;
+                                JSONArray headers = tjo.optJSONArray("headers");
+                                JSONArray rows = tjo.optJSONArray("rows");
+                                tbl = createTableFromJson(factory, headers, rows);
+                            } else if (tblObj instanceof JSONArray) {
+                                JSONArray tarr = (JSONArray) tblObj;
+                                // assume first row headers
+                                if (tarr.length() > 0) {
+                                    JSONArray headers = tarr.getJSONArray(0);
+                                    JSONArray rows = new JSONArray();
+                                    for (int r = 1; r < tarr.length(); r++) rows.put(tarr.getJSONArray(r));
+                                    tbl = createTableFromJson(factory, headers, rows);
+                                }
+                            }
+                        } else if (section.has("content")) {
+                            // try to parse content as JSON array-of-arrays
+                            String content = section.optString("content");
+                            try {
+                                JSONArray arr = new JSONArray(content);
+                                if (arr.length() > 0 && arr.get(0) instanceof JSONArray) {
+                                    JSONArray headers = arr.getJSONArray(0);
+                                    JSONArray rows = new JSONArray();
+                                    for (int r = 1; r < arr.length(); r++) rows.put(arr.getJSONArray(r));
+                                    tbl = createTableFromJson(factory, headers, rows);
+                                }
+                            } catch (Exception e) {
+                                // ignore parse error
+                                System.out.println("[AssessmentReporterWord] Could not parse content into table JSON: " + e.getMessage());
+                            }
+                        }
+
+                        if (tbl != null) elements.add(tbl);
+                    } catch (Exception e) {
+                        System.err.println("[AssessmentReporterWord] Error creating table from AI response: " + e.getMessage());
+                    }
+
+                    // continue to next section
+                    continue;
+                }
+
+                // Add section content as paragraphs (allow sections without heading)
+                if (section.has("content")) {
+                    String content = section.getString("content");
+                    // Split by double newline
+                    String[] parts = content.split("\\n\\n");
+                    for (String part : parts) {
+                        String trimmed = part.trim();
+                        if (!trimmed.isEmpty()) {
+                            elements.add(createParagraphWithStyle(factory, trimmed, resolvedContentStyle));
                         }
                     }
                 }
             }
         }
 
-        System.out.println("[AssessmentReporterWord] Placeholders found: " + foundPlaceholders);
-
-        // If no placeholders were found, append full report content to the template
-        if (!foundPlaceholders) {
-            System.out.println("[AssessmentReporterWord] No placeholders found. Appending full report content to template.");
-            appendFullReportToTemplate(doc, assessment, details, users, orgUnit, answers);
-        } else {
-            System.out.println("[AssessmentReporterWord] Template placeholders replaced successfully");
-        }
+        return elements;
     }
 
-    /**
-     * Appends the full default report content to an existing template document.
-     */
-    private void appendFullReportToTemplate(XWPFDocument doc, Assessment assessment, AssessmentDetails details,
-            java.util.List<User> users, OrgUnit orgUnit, java.util.List<AssessmentControlAnswer> answers) throws Exception {
-
-        System.out.println("[AssessmentReporterWord] Appending full report to template");
-
-        // Add separator
-        XWPFParagraph separator = doc.createParagraph();
-        separator.createRun().setText("--- Assessment Report Content ---");
-        doc.createParagraph();
-
-        // Generate and append the full report content
-        generateDefaultReport(doc, assessment, details, users, orgUnit, answers);
-    }
-
-    /**
-     * Replaces placeholders in a single paragraph, handling multi-run text properly.
-     * Returns true if any placeholder was replaced, false otherwise.
-     */
-    private boolean replacePlaceholdersInParagraph(XWPFParagraph para, Assessment assessment, AssessmentDetails details,
-            java.util.List<User> users, OrgUnit orgUnit) {
-
-        // Collect all text from all runs
-        StringBuilder fullText = new StringBuilder();
-        java.util.List<XWPFRun> allRuns = new java.util.ArrayList<>(para.getRuns());
-        for (int i = 0; i < allRuns.size(); i++) {
-            XWPFRun run = allRuns.get(i);
-            String runText = run.getText(0);
-            if (runText != null) {
-                fullText.append(runText);
-            }
-        }
-
-        String text = fullText.toString();
-
-        // Define replacements map
-        java.util.Map<String, String> replacements = new java.util.HashMap<>();
-        replacements.put("{{TITLE}}", "Assessment Report");
-        replacements.put("{{ASSESSMENT_NAME}}", assessment.getName() != null ? assessment.getName() : "");
-        replacements.put("{{ASSESSMENT_ID}}", String.valueOf(assessment.getId()));
-        replacements.put("{{ASSESSMENT_DATE}}", assessment.getDate() != null ? assessment.getDate().toString() : "-");
-        replacements.put("{{CATALOG_NAME}}", assessment.getSecurityCatalog() != null ? assessment.getSecurityCatalog().getName() : "-");
-        replacements.put("{{COMPLETED_DATE}}", details.getDate() != null ? details.getDate().toString() : "-");
-        replacements.put("{{ORG_UNIT}}", orgUnit != null ? orgUnit.getName() : "-");
-        replacements.put("{{GENERATED_DATE}}", java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
-        replacements.put("{{USERS_COUNT}}", String.valueOf(users.size()));
-
-        String modifiedText = text;
-        boolean foundAny = false;
-        for (java.util.Map.Entry<String, String> entry : replacements.entrySet()) {
-            if (text.contains(entry.getKey())) {
-                foundAny = true;
-                modifiedText = modifiedText.replace(entry.getKey(), entry.getValue());
-            }
-        }
-
-        if (foundAny) {
-            System.out.println("[AssessmentReporterWord] Replacing: '" + text + "' -> '" + modifiedText + "'");
-
-            // Preserve formatting from first run if available
-            XWPFRun templateRun = (allRuns.size() > 0) ? allRuns.get(0) : null;
-
-            // Remove all existing runs from back to front to preserve indices
-            for (int i = allRuns.size() - 1; i >= 0; i--) {
-                para.removeRun(i);
-            }
-
-            // Create new run with modified text
-            XWPFRun newRun = para.createRun();
-            newRun.setText(modifiedText);
-
-            // Copy formatting from template run if available
-            if (templateRun != null) {
-                try {
-                    if (templateRun.isBold()) newRun.setBold(true);
-                    if (templateRun.isItalic()) newRun.setItalic(true);
-                    if (templateRun.getUnderline() != null) newRun.setUnderline(templateRun.getUnderline());
-                    if (templateRun.getFontSize() > 0) newRun.setFontSize(templateRun.getFontSize());
-                    if (templateRun.getFontName() != null) newRun.setFontFamily(templateRun.getFontName());
-                    String color = templateRun.getColor();
-                    if (color != null && !color.isEmpty()) newRun.setColor(color);
-                } catch (Exception e) {
-                    System.out.println("[AssessmentReporterWord] Could not copy formatting: " + e.getMessage());
-                }
-            }
-        }
-
-        return foundAny;
-    }
-
-    /**
-     * Generates a default Word report from scratch when no template is available.
-     */
-    private void generateDefaultReport(XWPFDocument doc, Assessment assessment, AssessmentDetails details,
-            java.util.List<User> users, OrgUnit orgUnit, java.util.List<AssessmentControlAnswer> answers) throws Exception {
-
-        // --------- Title Page ---------
-        XWPFParagraph title = doc.createParagraph();
-        XWPFRun run = title.createRun();
-        run.setText("Assessment Report");
-        run.setBold(true);
-        run.setFontSize(22);
-        run.setColor("1F2E8B");
-        run.addBreak();
-
-        XWPFParagraph meta = doc.createParagraph();
-        XWPFRun metarun = meta.createRun();
-        metarun.setText("Generated on: " + java.time.LocalDateTime.now()
-                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
-        metarun.setFontSize(12);
-        metarun.addBreak();
-        metarun.addBreak();
-
-        doc.createParagraph(); // blank
-
-        // --------- Table of Contents (manual entry) -----------
-        XWPFParagraph tocTitle = doc.createParagraph();
-        XWPFRun tocRun = tocTitle.createRun();
-        tocRun.setText("Contents");
-        tocRun.setBold(true);
-        tocRun.setFontSize(16);
-        tocRun.setColor("1F2E8B");
-        tocRun.addBreak();
-        String[] toc = new String[] { "1. General Information", "2. Users and Organization",
-                "3. Assessment Summary", "4. Domain Overview Table", "5. Controls by Domain" };
-        for (String item : toc) {
-            XWPFParagraph p = doc.createParagraph();
-            XWPFRun r = p.createRun();
-            r.setText(item);
-            r.setFontSize(12);
-        }
-        doc.createParagraph();
-        // -------------------------------------------------------
-
-        // Gather all controls, answers, and scoring
-        java.util.List<SecurityControl> allControls = assessment.getSecurityCatalog().getSecurityControls();
-        java.util.Map<Long, AssessmentControlAnswer> answerMap = answers.stream()
-                .collect(java.util.stream.Collectors.toMap(
-                        a -> a.getSecurityControl().getId(),
-                        a -> a,
-                        (a1, a2) -> a1
-                ));
-
-        // --- 1. General Info ---
-        XWPFParagraph genInfoHeader = doc.createParagraph();
-        XWPFRun genInfoRun = genInfoHeader.createRun();
-        genInfoRun.setText("1. General Information");
-        genInfoRun.setBold(true);
-        genInfoRun.setFontSize(16);
-        genInfoRun.setColor("1F2E8B");
-
-        addKeyValueFormatted(doc, "Assessment Name: ", assessment.getName());
-        addKeyValueFormatted(doc, "Assessment ID: ", String.valueOf(assessment.getId()));
-        addKeyValueFormatted(doc, "Date: ", assessment.getDate() != null ? assessment.getDate().toString() : "-");
-        addKeyValueFormatted(doc, "Catalog: ",
-                (assessment.getSecurityCatalog() != null ? assessment.getSecurityCatalog().getName() : "-"));
-        addKeyValueFormatted(doc, "Completed On: ", details.getDate() != null ? details.getDate().toString() : "-");
-        doc.createParagraph();
-
-        // --- 2. Users & Organization ---
-        XWPFParagraph usersHeader = doc.createParagraph();
-        XWPFRun usersRun = usersHeader.createRun();
-        usersRun.setText("2. Users and Organization");
-        usersRun.setBold(true);
-        usersRun.setFontSize(16);
-        usersRun.setColor("1F2E8B");
-
-        if (orgUnit != null) {
-            addKeyValueFormatted(doc, "Org Unit: ", orgUnit.getName());
-        } else {
-            addKeyValueFormatted(doc, "Org Unit: ", "-");
-        }
-        if (!users.isEmpty()) {
-            XWPFParagraph up = doc.createParagraph();
-            XWPFRun ur = up.createRun();
-            ur.setBold(true);
-            ur.setText("Users Participating:");
-            for (User u : users) {
-                XWPFParagraph userline = doc.createParagraph();
-                XWPFRun userrun = userline.createRun();
-                userrun.setText(u.getName() + " <" + u.getEmail() + ">");
-            }
-        } else {
-            addKeyValueFormatted(doc, "Users: ", "-");
-        }
-        doc.createParagraph();
-
-        // --- 3. Assessment Summary ---
-        XWPFParagraph summaryHeader = doc.createParagraph();
-        XWPFRun summaryRun = summaryHeader.createRun();
-        summaryRun.setText("3. Assessment Summary");
-        summaryRun.setBold(true);
-        summaryRun.setFontSize(16);
-        summaryRun.setColor("1F2E8B");
-        doc.createParagraph();
-
-        // --- AI-Generated Summary ---
-        OpenAIConfiguration config = openAIConfigurationRepository.findAll().stream().findFirst().orElse(null);
-        if (config != null && config.getSummaryPrompt() != null && !config.getSummaryPrompt().isBlank()) {
-            java.util.List<String> answerTexts = answers.stream()
-                    .map(a -> {
-                        MaturityAnswer ma = a.getMaturityAnswer();
-                        return ma != null ? ma.getAnswer() : null;
-                    })
-                    .filter(s -> s != null && !s.isBlank())
-                    .collect(java.util.stream.Collectors.toList());
-            String prompt = config.getSummaryPrompt() + "\n---\n" + String.join("\n", answerTexts);
-            String summary;
+    private JSONObject extractJson(String aiText) {
+        int first = aiText.indexOf('{');
+        int last = aiText.lastIndexOf('}');
+        if (first >= 0 && last > first) {
+            String sub = aiText.substring(first, last + 1);
             try {
-                summary = openAIUtil.askAI(prompt);
-                System.out.println("[OpenAI AssessmentReporter] API result: " + summary);
-            } catch (Exception ex) {
-                summary = "AI-generated summary: Not available (OpenAI API not reachable)";
-                System.err.println("[OpenAI AssessmentReporter] OpenAI API call failed: " + ex.getMessage());
-            }
-            XWPFParagraph summaryAI = doc.createParagraph();
-            XWPFRun aiRun = summaryAI.createRun();
-            aiRun.setBold(true);
-            aiRun.setItalic(true);
-            aiRun.setFontSize(13);
-            aiRun.setText("Assessment AI-generated summary:");
+                return new JSONObject(sub);
+            } catch (Exception e) {
+                System.out.println("[AssessmentReporterWord] First JSON parsing attempt failed: " + e.getMessage());
+                System.out.println("[AssessmentReporterWord] Attempting lenient parsing...");
 
-            XWPFParagraph summaryText = doc.createParagraph();
-            XWPFRun sumRun = summaryText.createRun();
-            sumRun.setText(summary);
-        }
+                String lenient = sub;
 
-        if (assessment.getOrgServices() != null && !assessment.getOrgServices().isEmpty()) {
-            XWPFParagraph orgSvcHead = doc.createParagraph();
-            XWPFRun osvRun = orgSvcHead.createRun();
-            osvRun.setText("3.1 Assigned Org Services");
-            osvRun.setBold(true);
-            osvRun.setFontSize(13);
-            osvRun.setColor("434BA3");
-            XWPFTable svcTable = doc.createTable();
-            XWPFTableRow tRow = svcTable.getRow(0);
-            setTableCellBackground(tRow.getCell(0), "434BA3");
-            setTableCellText(tRow.getCell(0), "Org Service", true, "FFFFFF");
-            tRow.addNewTableCell();
-            setTableCellBackground(tRow.getCell(1), "434BA3");
-            setTableCellText(tRow.getCell(1), "Description", true, "FFFFFF");
-            for (com.govinc.organization.OrgService orgService : assessment.getOrgServices()) {
-                XWPFTableRow row = svcTable.createRow();
-                row.getCell(0).setText(orgService.getName());
-                row.getCell(1).setText(orgService.getDescription() != null ? orgService.getDescription() : "-");
-            }
-        }
+                // Fix 1: Remove trailing commas before closing braces/brackets
+                lenient = lenient.replaceAll(",\\s*([\\]}])", "$1");
 
-        // Score summary
-        int totalScore = 0;
-        int numAnswered = 0;
-        java.util.Map<Long, Integer> scoresByControl = new java.util.HashMap<>();
-        for (SecurityControl ctrl : allControls) {
-            if (answerMap.containsKey(ctrl.getId())) {
-                AssessmentControlAnswer aca = answerMap.get(ctrl.getId());
-                int score = aca.getScore();
-                scoresByControl.put(ctrl.getId(), score);
-                totalScore += score;
-                numAnswered++;
-            }
-        }
-        double avgScore = numAnswered > 0 ? (totalScore / (double) numAnswered) : 0.0;
+                // Fix 2: Replace single quotes with double quotes for property names
+                lenient = lenient.replaceAll("'([^']*)'\\s*:", "\"$1\":");
 
-        XWPFParagraph summaryTableIntro = doc.createParagraph();
-        XWPFRun summaryTableIntroRun = summaryTableIntro.createRun();
-        summaryTableIntroRun.setText("Assessment Summary Table:");
-        summaryTableIntroRun.setBold(true);
-        XWPFTable summaryTable = doc.createTable();
-        XWPFTableRow stRow = summaryTable.getRow(0);
-        setTableCellBackground(stRow.getCell(0), "434BA3");
-        setTableCellText(stRow.getCell(0), "# Security Controls", true, "FFFFFF");
-        stRow.addNewTableCell();
-        setTableCellBackground(stRow.getCell(1), "434BA3");
-        setTableCellText(stRow.getCell(1), "Average Score (%)", true, "FFFFFF");
-        stRow.addNewTableCell();
-        setTableCellBackground(stRow.getCell(2), "434BA3");
-        setTableCellText(stRow.getCell(2), "Org Unit", true, "FFFFFF");
-        XWPFTableRow stData = summaryTable.createRow();
-        stData.getCell(0).setText(String.valueOf(allControls.size()));
-        stData.getCell(1).setText(String.format("%.1f", avgScore));
-        stData.getCell(2).setText(orgUnit != null ? orgUnit.getName() : "-");
+                // Fix 3: Replace single quotes with double quotes for property values
+                lenient = lenient.replaceAll(":\\s*'([^']*)'([,\\n\\r\\s}])", ": \"$1\"$2");
 
-        doc.createParagraph();
-
-        // --- 4. Domain Overview Table ---
-        XWPFParagraph domainOverviewHeader = doc.createParagraph();
-        XWPFRun domainOverviewRun = domainOverviewHeader.createRun();
-        domainOverviewRun.setText("4. Domain Overview Table");
-        domainOverviewRun.setBold(true);
-        domainOverviewRun.setFontSize(16);
-        domainOverviewRun.setColor("1F2E8B");
-
-        java.util.Map<String, java.util.List<SecurityControl>> controlsPerDomain = allControls.stream()
-                .collect(java.util.stream.Collectors.groupingBy(
-                        ctrl -> ctrl.getSecurityControlDomain() != null ? ctrl.getSecurityControlDomain().getName()
-                                : "Unknown"));
-        XWPFTable overviewTable = doc.createTable();
-        XWPFTableRow ovwHeader = overviewTable.getRow(0);
-        setTableCellBackground(ovwHeader.getCell(0), "434BA3");
-        setTableCellText(ovwHeader.getCell(0), "Security Control Domain", true, "FFFFFF");
-        ovwHeader.addNewTableCell();
-        setTableCellBackground(ovwHeader.getCell(1), "434BA3");
-        setTableCellText(ovwHeader.getCell(1), "Score (%)", true, "FFFFFF");
-        for (String domain : controlsPerDomain.keySet()) {
-            java.util.List<SecurityControl> domainCtrls = controlsPerDomain.get(domain);
-            int sc = 0, n = 0;
-            for (SecurityControl ctrl : domainCtrls) {
-                if (scoresByControl.containsKey(ctrl.getId())) {
-                    sc += scoresByControl.get(ctrl.getId());
-                    n++;
+                try {
+                    JSONObject result = new JSONObject(lenient);
+                    System.out.println("[AssessmentReporterWord] Lenient parsing successful");
+                    return result;
+                } catch (Exception e2) {
+                    System.err.println("[AssessmentReporterWord] Lenient parsing also failed: " + e2.getMessage());
+                    System.err.println("[AssessmentReporterWord] Original JSON (first 500 chars): " + sub.substring(0, Math.min(500, sub.length())));
+                    return null;
                 }
             }
-            double perc = n > 0 ? (sc / (double) n) : 0.0;
-            XWPFTableRow rw = overviewTable.createRow();
-            rw.getCell(0).setText(domain);
-            rw.getCell(1).setText(String.format("%.1f", perc));
+        }
+        return null;
+    }
+
+    private P createParagraphWithStyle(ObjectFactory factory, String text, String styleName) {
+        P p = factory.createP();
+        R run = factory.createR();
+        Text t = factory.createText();
+        t.setValue(text);
+        t.setSpace("preserve");
+        run.getContent().add(t);
+        p.getContent().add(run);
+
+        if (styleName != null && !styleName.isBlank()) {
+            // Ensure we write the style id (not display name) to the paragraph style value
+            PPr ppr = factory.createPPr();
+            PStyle pstyle = factory.createPPrBasePStyle();
+            pstyle.setVal(styleName);
+            ppr.setPStyle(pstyle);
+            p.setPPr(ppr);
+        }
+        return p;
+    }
+
+    /**
+     * Create a simple summary table from controls and answers
+     */
+    private Tbl createSummaryTable(ObjectFactory factory, List<SecurityControl> controls, Map<Long, AssessmentControlAnswer> answerMap, TemplateAnalysis ta) {
+        Tbl tbl = factory.createTbl();
+
+        // Header row
+        Tr header = factory.createTr();
+        header.getContent().add(createTableCell(factory, "Control"));
+        header.getContent().add(createTableCell(factory, "Maturity"));
+        header.getContent().add(createTableCell(factory, "Score"));
+        header.getContent().add(createTableCell(factory, "Reference"));
+        tbl.getContent().add(header);
+
+        for (SecurityControl sc : controls) {
+            Tr row = factory.createTr();
+            AssessmentControlAnswer aca = answerMap.get(sc.getId());
+            String maturity = "-";
+            String score = "-";
+            if (aca != null) {
+                if (aca.getMaturityAnswer() != null && aca.getMaturityAnswer().getAnswer() != null) maturity = aca.getMaturityAnswer().getAnswer();
+                score = String.valueOf(aca.getScore());
+            }
+            row.getContent().add(createTableCell(factory, sc.getName() == null ? "-" : sc.getName()));
+            row.getContent().add(createTableCell(factory, maturity));
+            row.getContent().add(createTableCell(factory, score));
+            row.getContent().add(createTableCell(factory, sc.getReference() == null ? "-" : sc.getReference()));
+            tbl.getContent().add(row);
         }
 
-        doc.createParagraph();
+        return tbl;
+    }
 
-        // --- 5. Controls by Domain (detailed) ---
-        XWPFParagraph controlsDomainHeader = doc.createParagraph();
-        XWPFRun controlsDomainRun = controlsDomainHeader.createRun();
-        controlsDomainRun.setText("5. Controls by Domain");
-        controlsDomainRun.setBold(true);
-        controlsDomainRun.setFontSize(16);
-        controlsDomainRun.setColor("1F2E8B");
-        doc.createParagraph();
+    private Tc createTableCell(ObjectFactory factory, String text) {
+        Tc tc = factory.createTc();
+        P p = factory.createP();
+        R r = factory.createR();
+        Text t = factory.createText();
+        t.setValue(text == null ? "" : text);
+        t.setSpace("preserve");
+        r.getContent().add(t);
+        p.getContent().add(r);
+        tc.getContent().add(p);
+        return tc;
+    }
 
-        java.util.List<String> domainOrder = new java.util.ArrayList<>(controlsPerDomain.keySet());
-        java.util.Collections.sort(domainOrder);
-        int domainNum = 1;
-
-        for (String domain : domainOrder) {
-            java.util.List<SecurityControl> ctrlList = controlsPerDomain.get(domain);
-            XWPFParagraph domP = doc.createParagraph();
-            XWPFRun domRun = domP.createRun();
-            domRun.setText("5." + domainNum + " " + domain);
-            domRun.setBold(true);
-            domRun.setFontSize(13);
-            domRun.setColor("434BA3");
-
-            XWPFTable t = doc.createTable();
-            XWPFTableRow h = t.getRow(0);
-            String[] headers = {"Title", "Description", "Reference", "Answer", "Answer Source"};
-            for (int i = 0; i < headers.length; i++) {
-                if (i == 0) {
-                    setTableCellBackground(h.getCell(i), "434BA3");
-                    setTableCellText(h.getCell(i), headers[i], true, "FFFFFF");
-                } else {
-                    h.addNewTableCell();
-                    setTableCellBackground(h.getCell(i), "434BA3");
-                    setTableCellText(h.getCell(i), headers[i], true, "FFFFFF");
-                }
+    private Tbl createTableFromJson(ObjectFactory factory, JSONArray headers, JSONArray rows) {
+        Tbl tbl = factory.createTbl();
+        // header row
+        if (headers != null) {
+            Tr hr = factory.createTr();
+            for (int c = 0; c < headers.length(); c++) {
+                String hv = headers.optString(c, "");
+                hr.getContent().add(createTableCell(factory, hv));
             }
-            for (SecurityControl ctrl : ctrlList) {
-                String tt = ctrl.getName() != null ? ctrl.getName() : "-";
-                String desc = ctrl.getDetail() != null ? ctrl.getDetail() : "-";
-                String ref = ctrl.getReference() != null ? ctrl.getReference() : "-";
-                String answ = "-";
-                String src = "-";
-                boolean foundServiceAnswer = false;
-                if (assessment.getOrgServices() != null) {
-                    for (com.govinc.organization.OrgService orgService : assessment.getOrgServices()) {
-                        com.govinc.organization.OrgServiceAssessment osa = orgServiceAssessmentService
-                                .findOrCreateAssessment(orgService.getId());
-                        if (osa != null && osa.getControls() != null) {
-                            for (com.govinc.organization.OrgServiceAssessmentControl osac : osa.getControls()) {
-                                if (osac.getSecurityControl() != null
-                                        && osac.getSecurityControl().getId().equals(ctrl.getId())
-                                        && osac.isApplicable()) {
-                                    Integer osPercent = osac.getPercent();
-                                    if (osPercent != null) {
-                                        java.util.Set<com.govinc.maturity.MaturityAnswer> maturityAnswersSet = assessment
-                                                .getSecurityCatalog().getMaturityModel().getMaturityAnswers();
-                                        com.govinc.maturity.MaturityAnswer closest = maturityAnswersSet.stream()
-                                                .min(java.util.Comparator
-                                                        .comparingInt(ma -> Math.abs(ma.getScore() - osPercent)))
-                                                .orElse(null);
-                                        if (closest != null) {
-                                            answ = closest.getAnswer();
-                                        } else {
-                                            answ = String.valueOf(osPercent) + "%";
+            tbl.getContent().add(hr);
+        }
+        if (rows != null) {
+            for (int r = 0; r < rows.length(); r++) {
+                Tr row = factory.createTr();
+                JSONArray rowArr = rows.optJSONArray(r);
+                if (rowArr != null) {
+                    for (int c = 0; c < rowArr.length(); c++) {
+                        String cv = rowArr.optString(c, "");
+                        row.getContent().add(createTableCell(factory, cv));
+                    }
+                }
+                tbl.getContent().add(row);
+            }
+        }
+        return tbl;
+    }
+
+    /**
+     * Analyzes Word template to extract styles, structure, and placeholders
+     */
+    private static class TemplateAnalyzer {
+        private final WordprocessingMLPackage wordMLPackage;
+
+        public TemplateAnalyzer(WordprocessingMLPackage wordMLPackage) {
+            this.wordMLPackage = wordMLPackage;
+        }
+
+        public TemplateAnalysis analyze() {
+            TemplateAnalysis analysis = new TemplateAnalysis();
+            try {
+                MainDocumentPart mdp = wordMLPackage.getMainDocumentPart();
+                System.out.println("[TemplateAnalyzer] Starting template analysis...");
+
+                // Extract all paragraph styles
+                Set<String> styles = extractParagraphStyles(mdp, analysis);
+                analysis.setAvailableStyles(styles);
+                System.out.println("[TemplateAnalyzer] Found " + styles.size() + " paragraph styles: " + styles);
+
+                // Extract template structure (headings, sections, content)
+                List<TemplateSection> structure = extractTemplateStructure(mdp);
+                analysis.setTemplateStructure(structure);
+                System.out.println("[TemplateAnalyzer] Extracted " + structure.size() + " template sections");
+
+                // Find placeholder paragraphs
+                List<P> placeholders = findPlaceholderParagraphs(mdp);
+                analysis.setPlaceholders(placeholders);
+                System.out.println("[TemplateAnalyzer] Found " + placeholders.size() + " placeholder paragraphs");
+                System.out.println("[TemplateAnalyzer] Template analysis complete");
+
+            } catch (Exception e) {
+                System.err.println("[AssessmentReporterWord] Error analyzing template: " + e.getMessage());
+            }
+            return analysis;
+        }
+
+        private Set<String> extractParagraphStyles(MainDocumentPart mdp, TemplateAnalysis analysis) {
+            Set<String> styles = new LinkedHashSet<>();
+            try {
+                System.out.println("[TemplateAnalyzer.extractParagraphStyles] Scanning document for paragraph styles...");
+
+                // Map of styleId -> displayName (if available)
+                Map<String, String> styleIdToName = new HashMap<>();
+                Map<String, String> styleNameToId = new HashMap<>();
+
+                // Try to extract from StyleDefinitionsPart
+                try {
+                    Object styleDefsPart = mdp.getStyleDefinitionsPart();
+                    if (styleDefsPart != null) {
+                        System.out.println("[TemplateAnalyzer.extractParagraphStyles] StyleDefinitionsPart found");
+                        Object stylesObj = ((org.docx4j.openpackaging.parts.WordprocessingML.StyleDefinitionsPart) styleDefsPart).getContents();
+                        if (stylesObj != null && stylesObj instanceof org.docx4j.wml.Styles) {
+                            org.docx4j.wml.Styles stylesElement = (org.docx4j.wml.Styles) stylesObj;
+                            java.util.List<org.docx4j.wml.Style> styleList = stylesElement.getStyle();
+                            if (styleList != null) {
+                                System.out.println("[TemplateAnalyzer.extractParagraphStyles] Found " + styleList.size() + " style definitions");
+                                for (org.docx4j.wml.Style style : styleList) {
+                                    if (style.getStyleId() != null) {
+                                        String styleId = style.getStyleId();
+                                        styles.add(styleId);
+                                        String displayName = null;
+                                        try {
+                                            if (style.getName() != null && style.getName().getVal() != null) {
+                                                displayName = style.getName().getVal();
+                                                // keep both id and display name as available styles
+                                                styles.add(displayName);
+                                                styleIdToName.put(styleId, displayName);
+                                                styleNameToId.put(displayName, styleId);
+                                                System.out.println("[TemplateAnalyzer.extractParagraphStyles]   Found style from definitions: id='" + styleId + "' name='" + displayName + "'");
+                                            } else {
+                                                System.out.println("[TemplateAnalyzer.extractParagraphStyles]   Found style from definitions: id='" + styleId + "' (no display name)");
+                                            }
+                                        } catch (Exception e) {
+                                            System.out.println("[TemplateAnalyzer.extractParagraphStyles]   Could not read display name for style id='" + styleId + "': " + e.getMessage());
                                         }
-                                        src = orgService.getName();
-                                        foundServiceAnswer = true;
-                                        break;
                                     }
                                 }
                             }
                         }
-                        if (foundServiceAnswer)
-                            break;
+                    }
+
+                    // Store mappings in analysis so resolution can use them later
+                    analysis.setStyleIdToNameMap(styleIdToName);
+                    analysis.setStyleNameToIdMap(styleNameToId);
+
+                } catch (Exception e) {
+                    System.out.println("[TemplateAnalyzer.extractParagraphStyles] Could not read StyleDefinitionsPart: " + e.getClass().getSimpleName() + " - " + e.getMessage());
+                }
+
+                // Also extract styles directly from paragraphs in the document
+                List<Object> content = mdp.getContent();
+                int paragraphCount = 0;
+                for (Object c : content) {
+                    Object unwrapped = org.docx4j.XmlUtils.unwrap(c);
+                    if (unwrapped instanceof P) {
+                        P p = (P) unwrapped;
+                        paragraphCount++;
+                        String styleNameOrId = extractStyleFromParagraph(p);
+                        if (styleNameOrId != null && !styleNameOrId.isBlank()) {
+                            if (styles.add(styleNameOrId)) {
+                                System.out.println("[TemplateAnalyzer.extractParagraphStyles]   Found new style from paragraph: '" + styleNameOrId + "'");
+                            }
+                        }
                     }
                 }
-                if (!foundServiceAnswer && answerMap.containsKey(ctrl.getId())) {
-                    MaturityAnswer ma = answerMap.get(ctrl.getId()).getMaturityAnswer();
-                    if (ma != null) {
-                        answ = ma.getAnswer();
-                        src = "Assessment";
-                    }
-                }
-                XWPFTableRow row = t.createRow();
-                row.getCell(0).setText(tt);
-                row.getCell(1).setText(desc);
-                row.getCell(2).setText(ref);
-                row.getCell(3).setText(answ);
-                row.getCell(4).setText(src);
+                System.out.println("[TemplateAnalyzer.extractParagraphStyles] Processed " + paragraphCount + " paragraphs");
+
+                // Add common default styles
+                System.out.println("[TemplateAnalyzer.extractParagraphStyles] Adding default styles: Normal, Title, Heading1, Heading2, Heading3");
+                styles.addAll(Arrays.asList("Normal", "Title", "Heading1", "Heading2", "Heading3"));
+                System.out.println("[TemplateAnalyzer.extractParagraphStyles] Total unique styles available: " + styles.size());
+            } catch (Exception e) {
+                System.err.println("[AssessmentReporterWord] Error extracting styles: " + e.getMessage());
+                e.printStackTrace();
             }
-            domainNum++;
+            return styles;
         }
 
-        // Footer paragraph
-        XWPFParagraph footer = doc.createParagraph();
-        XWPFRun footerRun = footer.createRun();
-        footerRun.setItalic(true);
-        footerRun.setFontSize(10);
-        footerRun.setText("Generated by GovInc Assessment System on: " + java.time.LocalDateTime.now()
-                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
-    }
+        private List<TemplateSection> extractTemplateStructure(MainDocumentPart mdp) {
+            List<TemplateSection> sections = new ArrayList<>();
+            try {
+                System.out.println("[TemplateAnalyzer.extractTemplateStructure] Extracting template structure and sections...");
+                List<Object> content = mdp.getContent();
+                int sectionCount = 0;
+                int totalParagraphs = 0;
+                int emptyParagraphs = 0;
+                for (Object c : content) {
+                    Object unwrapped = org.docx4j.XmlUtils.unwrap(c);
+                    if (unwrapped instanceof P) {
+                        P p = (P) unwrapped;
+                        totalParagraphs++;
+                        String style = extractStyleFromParagraph(p);
+                        String text = extractTextFromParagraph(p);
+                        if (text != null && !text.isBlank()) {
+                            String finalStyle = style != null ? style : "Normal";
+                            sections.add(new TemplateSection(text, finalStyle));
+                            sectionCount++;
+                            String truncatedText = text.length() > 80 ? text.substring(0, 80) + "..." : text;
+                            System.out.println("[TemplateAnalyzer.extractTemplateStructure]   Section " + sectionCount + " (style='" + finalStyle + "'): " + truncatedText);
+                        } else {
+                            emptyParagraphs++;
+                        }
+                    }
+                }
+                System.out.println("[TemplateAnalyzer.extractTemplateStructure] Total sections extracted: " + sectionCount + " from " + totalParagraphs + " total paragraphs (" + emptyParagraphs + " were empty)");
+            } catch (Exception e) {
+                System.err.println("[AssessmentReporterWord] Error extracting template structure: " + e.getMessage());
+                e.printStackTrace();
+            }
+            return sections;
+        }
 
-    // Helper: Add formatted key-value pair to document with improved styling
-    private void addKeyValueFormatted(XWPFDocument doc, String key, String value) {
-        XWPFParagraph p = doc.createParagraph();
-        XWPFRun k = p.createRun();
-        k.setBold(true);
-        k.setText(key);
-        k.setColor("434BA3");
-        XWPFRun v = p.createRun();
-        v.setText(value);
-        v.setColor("2C3E50");
-    }
+        private String extractStyleFromParagraph(P p) {
+            try {
+                PPr ppr = p.getPPr();
+                if (ppr != null) {
+                    PStyle pstyle = ppr.getPStyle();
+                    if (pstyle != null && pstyle.getVal() != null) {
+                        return pstyle.getVal();
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("[AssessmentReporterWord] Error extracting paragraph style: " + e.getMessage());
+            }
+            return null;
+        }
 
-    // Helper: Set table cell background color
-    private void setTableCellBackground(XWPFTableCell cell, String color) {
-        try {
-            org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTcPr tcPr = cell.getCTTc().addNewTcPr();
-            org.openxmlformats.schemas.wordprocessingml.x2006.main.CTShd ctShd = org.openxmlformats.schemas.wordprocessingml.x2006.main.CTShd.Factory.newInstance();
-            ctShd.setFill(color);
-            tcPr.setShd(ctShd);
-        } catch (Exception e) {
-            System.err.println("[AssessmentReporterWord] Error setting table cell background: " + e.getMessage());
+        private List<P> findPlaceholderParagraphs(MainDocumentPart mdp) {
+            List<P> result = new ArrayList<>();
+            try {
+                List<Object> content = mdp.getContent();
+                for (Object c : content) {
+                    Object unwrapped = org.docx4j.XmlUtils.unwrap(c);
+                    if (unwrapped instanceof P) {
+                        P p = (P) unwrapped;
+                        String txt = extractTextFromParagraph(p);
+                        if (txt != null && txt.contains("{{REPORT_CONTENT}}")) {
+                            result.add(p);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("[AssessmentReporterWord] Error finding placeholder paragraphs: " + e.getMessage());
+            }
+            return result;
+        }
+
+        private String extractTextFromParagraph(P p) {
+            StringBuilder sb = new StringBuilder();
+            try {
+                for (Object o : p.getContent()) {
+                    Object unwrapped = org.docx4j.XmlUtils.unwrap(o);
+                    if (unwrapped instanceof R) {
+                        R r = (R) unwrapped;
+                        for (Object rc : r.getContent()) {
+                            Object rcUnwrapped = org.docx4j.XmlUtils.unwrap(rc);
+                            if (rcUnwrapped instanceof Text) {
+                                Text t = (Text) rcUnwrapped;
+                                if (t.getValue() != null) {
+                                    sb.append(t.getValue());
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("[AssessmentReporterWord] Error extracting text from paragraph: " + e.getMessage());
+            }
+            return sb.toString();
         }
     }
 
-    // Helper: Set table cell text with formatting
-    private void setTableCellText(XWPFTableCell cell, String text, boolean bold, String color) {
-        cell.setText("");
-        XWPFParagraph p = cell.getParagraphs().get(0);
-        XWPFRun r = p.createRun();
-        r.setText(text);
-        if (bold) r.setBold(true);
-        r.setColor(color);
+    /**
+     * Represents a section in the template with its text and style
+     */
+    private static class TemplateSection {
+        private final String text;
+        private final String style;
+
+        public TemplateSection(String text, String style) {
+            this.text = text;
+            this.style = style;
+        }
+
+        public String getText() {
+            return text;
+        }
+
+        public String getStyle() {
+            return style;
+        }
+    }
+
+    /**
+     * Results of template analysis
+     */
+    private static class TemplateAnalysis {
+        private Set<String> availableStyles = new LinkedHashSet<>();
+        private List<TemplateSection> templateStructure = new ArrayList<>();
+        private List<P> placeholders = new ArrayList<>();
+
+        // Helpful mappings to resolve a requested style name (display name) to a style id used in the document
+        private Map<String, String> styleNameToId = new HashMap<>();
+        private Map<String, String> styleIdToName = new HashMap<>();
+
+        public Set<String> getAvailableStyles() {
+            return availableStyles;
+        }
+
+        public void setAvailableStyles(Set<String> availableStyles) {
+            this.availableStyles = availableStyles;
+        }
+
+        public List<TemplateSection> getTemplateStructure() {
+            return templateStructure;
+        }
+
+        public void setTemplateStructure(List<TemplateSection> templateStructure) {
+            this.templateStructure = templateStructure;
+        }
+
+        public List<P> getPlaceholders() {
+            return placeholders;
+        }
+
+        public void setPlaceholders(List<P> placeholders) {
+            this.placeholders = placeholders;
+        }
+
+        public void setStyleNameToIdMap(Map<String, String> map) {
+            if (map != null) this.styleNameToId.putAll(map);
+        }
+
+        public void setStyleIdToNameMap(Map<String, String> map) {
+            if (map != null) this.styleIdToName.putAll(map);
+        }
+
+        /**
+         * Resolve a requested style (which might be a display name like "Heading 1" or a style id like "Heading1")
+         * to a style id that can be used in the document. If not found, return the provided fallback.
+         */
+        public String resolveStyle(String requested, String fallback) {
+            if (requested == null || requested.isBlank()) return fallback;
+
+            // Trim and normalize
+            String reqTrim = requested.trim();
+
+            // If we already have a mapping from display name to id, prefer returning id
+            if (styleNameToId.containsKey(reqTrim)) return styleNameToId.get(reqTrim);
+
+            // Direct match to available styles (could be id or display name)
+            if (availableStyles.contains(reqTrim)) {
+                // if it's actually a display name that maps to an id, return the id
+                if (styleNameToId.containsKey(reqTrim)) return styleNameToId.get(reqTrim);
+                // otherwise assume it's a style id
+                return reqTrim;
+            }
+
+            // case-insensitive match on display names
+            for (Map.Entry<String, String> e : styleNameToId.entrySet()) {
+                if (e.getKey() != null && e.getKey().equalsIgnoreCase(reqTrim)) return e.getValue();
+            }
+
+            // try normalize (remove spaces, lower-case) to match common id/display name differences
+            String norm = reqTrim.replaceAll("\\s+", "").toLowerCase();
+            for (String id : availableStyles) {
+                if (id != null && id.replaceAll("\\s+", "").toLowerCase().equals(norm)) return id;
+            }
+            for (String name : styleNameToId.keySet()) {
+                if (name != null && name.replaceAll("\\s+", "").toLowerCase().equals(norm)) return styleNameToId.get(name);
+            }
+
+            return fallback;
+        }
     }
 }

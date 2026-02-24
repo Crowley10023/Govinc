@@ -17,7 +17,8 @@ import java.security.MessageDigest;
 import java.nio.charset.StandardCharsets;
 
 /**
- * OpenAIUtil handles AI requests by routing them to the configured active provider.
+ * OpenAIUtil handles AI requests by routing them to the configured active
+ * provider.
  * Supports multiple providers: OpenAI, Ollama, etc.
  */
 @Component
@@ -27,45 +28,53 @@ public class OpenAIUtil {
     private final AIPromptCacheRepository cacheRepository;
 
     @Autowired
-    public OpenAIUtil(OpenAIConfigurationRepository configRepository, AIProviderRepository providerRepository, AIPromptCacheRepository cacheRepository) {
+    public OpenAIUtil(OpenAIConfigurationRepository configRepository, AIProviderRepository providerRepository,
+            AIPromptCacheRepository cacheRepository) {
         this.configRepository = configRepository;
         this.providerRepository = providerRepository;
         this.cacheRepository = cacheRepository;
+    }
+
+    public String askAI(String prompt) {
+        return askAI(prompt, true);
     }
 
     /**
      * Main method to ask AI using the active provider
      * Checks cache first for exact prompt matches before making API calls
      */
-    public String askAI(String prompt) {
+    public String askAI(String prompt, boolean cache) {
         System.out.println("prompt: " + prompt);
         OpenAIConfiguration config = configRepository.findAll().stream().findFirst().orElse(null);
-        
+
         if (config == null || config.getActiveProvider() == null) {
             return "No AI provider configured. Please configure a provider in AI settings.";
         }
 
         AIProvider provider = config.getActiveProvider();
-        
+
         if (!provider.isActive()) {
             return "The configured AI provider (" + provider.getDisplayName() + ") is not active.";
         }
 
         // Check cache for exact prompt match
-        String cachedResult = getCachedResponse(prompt, provider.getName());
-        if (cachedResult != null) {
-            System.out.println("Cache hit for prompt: " + prompt);
-            return cachedResult;
+        if (cache) {
+            String cachedResult = getCachedResponse(prompt, provider.getName());
+            if (cachedResult != null) {
+                System.out.println("Cache hit for prompt: " + prompt);
+                return cachedResult;
+            }
         }
 
         String result = routeToProvider(prompt, provider);
         System.out.println("... --> " + result);
-        
+
         // Cache the result if it's not an error
-        if (!result.startsWith("Error") && !result.startsWith("No AI provider") && !result.startsWith("The configured")) {
+        if (!result.startsWith("Error") && !result.startsWith("No AI provider")
+                && !result.startsWith("The configured")) {
             cacheResponse(prompt, result, provider.getName());
         }
-        
+
         return result;
     }
 
@@ -95,7 +104,7 @@ public class OpenAIUtil {
     private void cacheResponse(String prompt, String response, String providerName) {
         try {
             String hash = hashPrompt(prompt);
-            
+
             // Check if already exists
             Optional<AIPromptCache> existing = cacheRepository.findByPromptHashAndProviderName(hash, providerName);
             if (existing.isPresent()) {
@@ -121,7 +130,8 @@ public class OpenAIUtil {
         StringBuilder hexString = new StringBuilder();
         for (byte b : hash) {
             String hex = Integer.toHexString(0xff & b);
-            if (hex.length() == 1) hexString.append('0');
+            if (hex.length() == 1)
+                hexString.append('0');
             hexString.append(hex);
         }
         return hexString.toString();
@@ -260,7 +270,8 @@ public class OpenAIUtil {
             JSONObject requestObj = new JSONObject();
             requestObj.put("model", model);
             requestObj.put("messages", List.of(Map.of("role", "user", "content", prompt)));
-            // Set stream to false to get the complete response in one go, not streaming tokens
+            // Set stream to false to get the complete response in one go, not streaming
+            // tokens
             requestObj.put("stream", false);
 
             String url = baseUrl + "/api/chat";
@@ -285,7 +296,8 @@ public class OpenAIUtil {
 
     /**
      * Call OpenAI-compatible API with custom headers and configuration
-     * Supports proprietary OpenAI-compatible APIs that use custom authentication headers
+     * Supports proprietary OpenAI-compatible APIs that use custom authentication
+     * headers
      */
     private String askOpenAICustom(String prompt, AIProvider provider) {
         String errorMsg = "OpenAI Custom API error";
@@ -321,7 +333,7 @@ public class OpenAIUtil {
             JSONObject requestObj = new JSONObject();
             requestObj.put("model", model);
             requestObj.put("messages", List.of(Map.of("role", "user", "content", prompt)));
-            
+
             // Add max_completion_tokens if configured
             if (maxTokens != null && !maxTokens.trim().isEmpty()) {
                 try {
@@ -330,8 +342,6 @@ public class OpenAIUtil {
                     // Ignore if not a valid number
                 }
             }
-
-            
 
             String url = baseUrl + "/chat/completions";
             HttpEntity<String> entity = new HttpEntity<>(requestObj.toString(), headers);
@@ -346,7 +356,7 @@ public class OpenAIUtil {
                 JSONObject body = new JSONObject(response.getBody());
                 return body.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
             } else if (response.getStatusCode().value() == 401) {
-                String body = response.getBody();                
+                String body = response.getBody();
                 if (body != null && !body.isEmpty()) {
                     try {
                         JSONObject errorObj = new JSONObject(body);

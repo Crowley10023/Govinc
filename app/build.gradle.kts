@@ -20,7 +20,7 @@ dependencies {
     implementation("jakarta.persistence:jakarta.persistence-api:3.1.0") // Jakarta Persistence
     implementation("org.springframework.boot:spring-boot-starter") // Spring Application core dependency
     implementation("org.hibernate.orm:hibernate-core:6.4.4.Final") // Hibernate Core with MariaDB dialect
-    implementation("javax.servlet:javax.servlet-api:4.0.1") // Added for servlet support
+    //implementation("javax.servlet:javax.servlet-api:4.0.1") // Added for servlet support
     implementation("org.apache.pdfbox:pdfbox:2.0.30") // Apache PDFBox for PDF processing
     implementation("com.github.librepdf:openpdf:1.3.30") // OpenPDF for PDF generation/processing
     implementation("com.itextpdf:itextpdf:5.5.13.3") // iText PDF library (classic open source)
@@ -32,6 +32,11 @@ dependencies {
     implementation("org.json:json:20240303") // For JSON processing in OpenAIUtil
     implementation("org.webjars:jquery:3.6.0") // jQuery as WebJars dependency
 
+    // docx4j for manipulating Word documents (used by AssessmentReporterWord)
+    implementation("org.docx4j:docx4j-JAXB-ReferenceImpl:11.5.9")
+    // JAXB runtime required by docx4j on Jakarta platform
+    //implementation("org.glassfish.jaxb:jaxb-runtime:4.0.2")
+    //implementation("jakarta.xml.bind:jakarta.xml.bind-api:4.0.0")
 }
 
 application {
