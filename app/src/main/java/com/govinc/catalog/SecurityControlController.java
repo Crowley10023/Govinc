@@ -53,7 +53,7 @@ public class SecurityControlController {
                 .toList();
         model.addAttribute("existingTags", existingTags);
 
-        return "edit-security-control";
+        return "security-control-editor";
     }
 
     @PostMapping("/edit")
@@ -129,7 +129,21 @@ public class SecurityControlController {
     public String createSecurityControl(Model model) {
         model.addAttribute("securityControl", new SecurityControl());
         model.addAttribute("securityControlDomains", securityControlDomainService.findAll());
-        return "edit-security-control";
+
+        // Collect distinct existing tags from all security controls (non-null, non-empty),
+        // splitting comma-separated tag lists like "SOC, MDR" into individual tags.
+        List<String> existingTags = service.findAll().stream()
+                .map(SecurityControl::getTag)
+                .filter(tag -> tag != null && !tag.trim().isEmpty())
+                .flatMap(tag -> java.util.Arrays.stream(tag.split(",")))
+                .map(String::trim)
+                .filter(tag -> !tag.isEmpty())
+                .distinct()
+                .sorted(String::compareToIgnoreCase)
+                .toList();
+        model.addAttribute("existingTags", existingTags);
+
+        return "security-control-editor";
     }
 
     @PostMapping("/import")

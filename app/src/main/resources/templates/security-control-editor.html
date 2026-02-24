@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <title th:text="${securityControl.id == null ? 'Create Security Control' : 'Edit Security Control'}">Security Control</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/general.css">
+    <th:block th:replace="~{fragments/theme-css :: themeCss}" />
+    <style>
+        /* ===== Security Control Editor Page Styles ===== */
+        body {
+            display: flex;
+            flex-direction: column;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            background-color: var(--background-light, #f5f5f5);
+        }
+
+        .page-wrapper {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 100vh;
+        }
+
+        .navigation-wrapper {
+            flex-shrink: 0;
+        }
+
+        .content-wrapper {
+            flex: 1;
+            padding: 20px;
+            max-width: 1200px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        .page-header {
+            margin-bottom: 30px;
+        }
+
+        .page-header h1 {
+            font-size: 28px;
+            color: #333;
+            margin: 0 0 10px 0;
+            font-weight: 600;
+        }
+
+        .page-header p {
+            color: #666;
+            font-size: 14px;
+            margin: 0;
+        }
+
+        .editor-card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+        }
+
+        /* ===== Security Control Editor Form Styles ===== */
+
+        .security-control-editor {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+
+        .editor-form {
+            width: 100%;
+        }
+
+        .editor-form form {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 25px;
+            padding: 0;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            color: #333;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+        }
+
+        .form-group.description-group {
+            grid-column: 1 / -1;
+        }
+
+        .form-group textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .tag-suggestions {
+            margin-top: 8px;
+        }
+
+        .tag-suggestions-label {
+            font-size: 11px;
+            color: #666;
+            font-weight: 500;
+            margin-bottom: 6px;
+            display: block;
+        }
+
+        .tag-suggestions-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .tag-pill {
+            display: inline-block;
+            padding: 4px 10px;
+            background-color: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 16px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tag-pill:hover {
+            background-color: #007bff;
+            color: #fff;
+            border-color: #007bff;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            margin: 25px 0 20px 0;
+        }
+
+        .btn-submit,
+        .btn-cancel {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-submit {
+            background-color: #28a745;
+            color: white;
+            flex: 0 0 auto;
+            min-width: 120px;
+        }
+
+        .btn-submit:hover {
+            background-color: #218838;
+        }
+
+        .btn-cancel {
+            background-color: #6c757d;
+            color: white;
+            flex: 0 0 auto;
+            min-width: 100px;
+        }
+
+        .btn-cancel:hover {
+            background-color: #5a6268;
+        }
+
+        .catalog-info {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-left: 3px solid #007bff;
+            border-radius: 4px;
+        }
+
+        .catalog-info p {
+            margin: 0 0 8px 0;
+            font-weight: 600;
+            font-size: 13px;
+            color: #333;
+        }
+
+        .catalog-info ul {
+            margin: 0;
+            padding: 0 0 0 20px;
+            list-style: none;
+        }
+
+        .catalog-info li {
+            margin: 4px 0;
+            padding: 0 0 0 6px;
+            font-size: 13px;
+            color: #666;
+            position: relative;
+        }
+
+        .catalog-info li:before {
+            content: "•";
+            position: absolute;
+            left: -12px;
+            color: #007bff;
+            font-weight: bold;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .content-wrapper {
+                padding: 15px;
+            }
+
+            .editor-card {
+                padding: 20px;
+            }
+
+            .page-header h1 {
+                font-size: 22px;
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+                gap: 15px;
+                margin-bottom: 20px;
+            }
+
+            .form-group.description-group {
+                grid-column: 1;
+            }
+
+            .form-actions {
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .btn-submit,
+            .btn-cancel {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+        <!-- Navigation Bar -->
+        <div class="navigation-wrapper">
+            <div th:replace="~{navigation :: mainNav}"></div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="content-wrapper">
+            <div class="page-header">
+                <h1 th:text="${securityControl.id == null ? 'Create New Security Control' : 'Edit Security Control'}">Security Control</h1>
+                <p th:text="${securityControl.id == null ? 'Add a new security control to the system' : 'Update existing security control details'}">Subtitle</p>
+            </div>
+
+            <div class="editor-card">
+                <div class="security-control-editor">
+                    <div class="editor-form">
+                        <form th:action="@{/security-control/edit}" th:object="${securityControl}" method="post">
+                            <input type="hidden" th:field="*{id}" class="hidden-input" />
+
+                            <div class="form-grid">
+                                <!-- Name Field -->
+                                <div class="form-group">
+                                    <label for="name">Control Name</label>
+                                    <input type="text" th:field="*{name}" id="name" placeholder="Enter security control name" required />
+                                </div>
+
+                                <!-- Reference Field -->
+                                <div class="form-group">
+                                    <label for="reference">Reference (Optional)</label>
+                                    <input type="text" th:field="*{reference}" id="reference" placeholder="e.g., AC-2, IA-4" />
+                                </div>
+
+                                <!-- Tag Field -->
+                                <div class="form-group">
+                                    <label for="tag">Tag (Optional)</label>
+                                    <input type="text" th:field="*{tag}" id="tag" placeholder="e.g., critical, network, compliance" />
+
+                                    <!-- Existing Tags -->
+                                    <div class="tag-suggestions" th:if="${existingTags != null and !existingTags.isEmpty()}">
+                                        <label class="tag-suggestions-label">Existing Tags</label>
+                                        <div class="tag-suggestions-list">
+                                            <button type="button" class="tag-pill"
+                                                    th:each="t : ${existingTags}"
+                                                    th:text="${t}"
+                                                    th:attr="data-tag=${t}"
+                                                    onclick="document.getElementById('tag').value=this.getAttribute('data-tag')">
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Security Control Domain Field -->
+                                <div class="form-group">
+                                    <label for="securityControlDomain">Security Control Domain</label>
+                                    <select th:field="*{securityControlDomain.id}" id="securityControlDomain">
+                                        <option value="" disabled th:selected="${securityControl.securityControlDomain == null}">-- Select Domain --</option>
+                                        <option th:each="domain : ${securityControlDomains}"
+                                                th:value="${domain.id}"
+                                                th:text="${domain.name}"
+                                                th:selected="${securityControl.securityControlDomain != null and domain.id == securityControl.securityControlDomain.id}">
+                                        </option>
+                                    </select>
+                                </div>
+
+                                <!-- Description Field (Large, full width) -->
+                                <div class="form-group description-group">
+                                    <label for="detail">Description</label>
+                                    <textarea th:field="*{detail}" id="detail" placeholder="Enter a detailed description of the security control..." required></textarea>
+                                </div>
+                            </div>
+
+                            <!-- Action Buttons -->
+                            <div class="form-actions">
+                                <button type="submit" class="btn-submit">Save Control</button>
+                                <a href="/security-control/list" class="btn-cancel" style="text-decoration: none; text-align: center; display: flex; align-items: center; justify-content: center;">Cancel</a>
+                            </div>
+
+                            <!-- Info: Catalogs this control is part of -->
+                            <div class="catalog-info" th:if="${securityControl.securityCatalogs != null and !securityControl.securityCatalogs.isEmpty()}">
+                                <p>Part of security catalogs:</p>
+                                <ul>
+                                    <li th:each="catalog : ${securityControl.securityCatalogs}"
+                                        th:text="${catalog.name + (catalog.revision != null && !#strings.isEmpty(catalog.revision) ? ' (' + catalog.revision + ')' : '')}"></li>
+                                </ul>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <a href="/security-control/list" style="color: #007bff; text-decoration: none; font-size: 14px;">← Back to Security Controls</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="/general.js"></script>
+    <script src="/authorization.js"></script>
+</body>
+</html>
