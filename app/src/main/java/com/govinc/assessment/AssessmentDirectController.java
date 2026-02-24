@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -16,6 +17,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Comparator;
 import java.util.Objects;
+import java.time.LocalDate;
 
 import com.govinc.maturity.MaturityAnswer;
 import com.govinc.maturity.MaturityAnswerRepository;
@@ -33,6 +35,10 @@ public class AssessmentDirectController {
     private AssessmentDetailsService detailsService;
     @Autowired
     private MaturityAnswerRepository maturityAnswerRepository; // Added for maturity answers
+    @Autowired
+    private AssessmentRepository assessmentRepository;
+    @Autowired
+    private AssessmentDetailsService assessmentDetailsService;
 
     // Replaced Thymeleaf mapping with RESTful endpoints
 
@@ -111,7 +117,8 @@ public class AssessmentDirectController {
             Object summary = detailsService.computeAnswerSummary(details);
             out.put("answerSummary", summary);
 
-            out.put("isOpen", "CLOSED".equals(assessment.getStatus()) ? false : true);
+            // Assessment is open only if status is OPEN
+            out.put("isOpen", AssessmentStatus.OPEN.equals(assessment.getStatus()));
 
             return org.springframework.http.ResponseEntity.ok(out);
         } else {
@@ -252,5 +259,30 @@ public class AssessmentDirectController {
         } else {
             return org.springframework.http.ResponseEntity.status(404).body(java.util.Map.of("error", "Not found"));
         }
+    }
+
+    // Finalize assessment via assessment-direct (POST by obfuscated ID)
+    @PostMapping("/assessment-direct/{obfuscatedId}/finalize")
+    public String finalizeAssessmentDirect(@PathVariable String obfuscatedId) {
+        Optional<AssessmentUrls> maybeUrl = assessmentUrlsService.findByObfuscated(obfuscatedId);
+        if (!maybeUrl.isPresent()) {
+            return "redirect:/assessment-direct/" + obfuscatedId; // Invalid URL, stay on page
+        }
+
+        Assessment assessment = maybeUrl.get().getAssessment();
+        
+        // Set assessment status to CLOSED (finalized) to align with existing DB values
+        assessment.setStatus(AssessmentStatus.CLOSED);
+        assessmentRepository.save(assessment);
+        
+        // Update assessment details with completion date
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(assessment.getId());
+        if (detailsOpt.isPresent()) {
+            AssessmentDetails details = detailsOpt.get();
+            details.setCompletedDate(LocalDate.now());
+            assessmentDetailsService.save(details);
+        }
+        
+        return "redirect:/assessment-direct/" + obfuscatedId;
     }
 }

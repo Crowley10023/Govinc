@@ -30,62 +30,100 @@
             </div>
         </div>
     </nav>
-    <div class="container" style="margin:3em;">
-        <div class="domain-outline card domain-collapsible assessment-details-collapsible"
-            style="margin-bottom: 2.8em;">
-            <div class="domain-header" onclick="toggleAssessmentDetails(this)">
-                <div class="domain-header-info">
-                    <span class="domain-title">Assessment Details</span>
-                </div>
-                <div class="domain-header-actions">
-                    <span class="domain-checkmark"></span>
-                    <span class="domain-chevron">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
-                            <polyline points="4,7 9,12 14,7" fill="none" stroke="#2274A5" stroke-width="2"
-                                stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                    </span>
-                </div>
-            </div>
-            <div class="domain-controls assessment-details-body" style="display:none;">
-                <div class="domain-controls-tbl">
-                    <table class="table card" id="public-assessment-table">
-                        <tr>
-                            <th>Assessment Name</th>
-                            <td id="ad-name">-</td>
-                        </tr>
-                        <tr>
-                            <th>Date</th>
-                            <td id="ad-date">-</td>
-                        </tr>
-                        <tr>
-                            <th>Org Unit</th>
-                            <td id="ad-orgunit">-</td>
-                        </tr>
-                        <tr>
-                            <th>Status</th>
-                            <td id="ad-status">-</td>
-                        </tr>
-                    </table>
-                    <h2>Summary of Answers</h2>
-                    <table class="table card summary-table">
-                        <thead>
-                            <tr>
-                                <th>Answer Category</th>
-                                <th>Count</th>
-                                <th>Percent (%)</th>
-                            </tr>
-                        </thead>
-                        <tbody id="ad-summary-tbody">
-                            <tr>
-                                <td colspan="3">No answers yet</td>
-                            </tr>
-                        </tbody>
-                    </table>
+    <div class="container">
+        <!-- Filter and Progress Bar (Sticky at Top) -->
+        <div class="controls-filter-bar sticky-filter-bar" id="progress-bar-sticky">
+            <div class="progress-section">
+                <div class="progress-info">
+                    <span class="progress-label">Completion:</span>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar-fill" id="completion-bar-fill"></div>
+                    </div>
+                    <span class="progress-percentage" id="completion-percentage">0%</span>
+                    <span id="answered-count">0</span> / <span id="total-count">0</span>
                 </div>
             </div>
         </div>
-        <div id="controls-container" class="controls-viewport"></div>
+
+        <div style="margin: 3em 0; padding: 0 3em;">
+            <div class="domain-outline card domain-collapsible assessment-details-collapsible"
+                style="margin-bottom: 2.8em;">
+                <div class="domain-header" onclick="toggleAssessmentDetails(this)">
+                    <div class="domain-header-info">
+                        <span class="domain-title">Assessment Details</span>
+                    </div>
+                    <div class="domain-header-actions">
+                        <span class="domain-checkmark"></span>
+                        <span class="domain-chevron">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+                                <polyline points="4,7 9,12 14,7" fill="none" stroke="#2274A5" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                        </span>
+                    </div>
+                </div>
+                <div class="domain-controls assessment-details-body" style="display:none;">
+                    <div class="domain-controls-tbl">
+                        <table class="table card" id="public-assessment-table">
+                            <tr>
+                                <th>Assessment Name</th>
+                                <td id="ad-name">-</td>
+                            </tr>
+                            <tr>
+                                <th>Date</th>
+                                <td id="ad-date">-</td>
+                            </tr>
+                            <tr>
+                                <th>Org Unit</th>
+                                <td id="ad-orgunit">-</td>
+                            </tr>
+                            <tr>
+                                <th>Status</th>
+                                <td id="ad-status">-</td>
+                            </tr>
+                        </table>
+                        <h2>Summary of Answers</h2>
+                        <table class="table card summary-table">
+                            <thead>
+                                <tr>
+                                    <th>Answer Category</th>
+                                    <th>Count</th>
+                                    <th>Percent (%)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ad-summary-tbody">
+                                <tr>
+                                    <td colspan="3">No answers yet</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div id="controls-container" class="controls-viewport"></div>
+        </div>
+
+        <!-- Finalize Button Section (Sticky at Bottom) -->
+        <section class="general-button-bar sticky-button-bar" id="finalize-button-sticky">
+            <button id="finalize-btn" type="button" class="btn-nav">Finalize</button>
+        </section>
+
+        <!-- Finalize Confirmation Modal -->
+        <div id="finalize-modal-bg" class="modal-bg">
+            <div class="modal-popup">
+                <h3>Finalize Assessment</h3>
+                <div class="modal-content">
+                    <p>Are you sure you want to finalize this assessment?</p>
+                    <p style="color: #666; font-size: 0.95em; margin-top: 10px;">
+                        <strong>⚠️ Important:</strong> Once finalized, this assessment will be locked and no further edits will be allowed.
+                    </p>
+                </div>
+                <div class="modal-btn-row">
+                    <button type="button" id="finalize-cancel-btn" class="btn-secondary">Cancel</button>
+                    <button type="button" id="finalize-confirm-btn" class="btn-primary">Finalize Assessment</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -122,10 +160,41 @@
                 }
             }
         }
+        
+        // Helper function to update completion bar
+        function updateCompletionBar(controls, controlAnswers) {
+            var answered = 0;
+            if (controlAnswers) {
+                for (var ctrlId in controlAnswers) {
+                    if (controlAnswers[ctrlId]) {
+                        answered++;
+                    }
+                }
+            }
+            var total = controls ? controls.length : 0;
+            var percent = total > 0 ? Math.round((answered / total) * 100) : 0;
+            
+            document.getElementById('completion-percentage').textContent = percent + '%';
+            document.getElementById('answered-count').textContent = answered;
+            document.getElementById('total-count').textContent = total;
+            document.getElementById('completion-bar-fill').style.width = percent + '%';
+        }
+
+        // Helper function to get updated control answers from DOM
+        function getUpdatedControlAnswers() {
+            var answers = {};
+            document.querySelectorAll('.answer-select').forEach(function(select) {
+                var controlId = select.getAttribute('data-control-id');
+                answers[controlId] = select.value || null;
+            });
+            return answers;
+        }
+        
         document.addEventListener('DOMContentLoaded', function () {
             var adBody = document.querySelector('.assessment-details-body');
             if (adBody) adBody.style.display = 'none';
         });
+        
         function checkDomainCompleteness() {
             document.querySelectorAll(".domain-checkmark").forEach(function (checkmarkSpan) {
                 var domainId = checkmarkSpan.getAttribute("data-domain-id");
@@ -136,6 +205,7 @@
                 checkmarkSpan.innerHTML = allAnswered ? CHECKMARK_SVG : "";
             });
         }
+        
         document.addEventListener("DOMContentLoaded", function () {
             var pathMatch = window.location.pathname.match(/\/assessment-direct\/([^/]+)/);
             var obfuscatedId = null;
@@ -290,15 +360,83 @@
                     });
                 });
                 checkDomainCompleteness();
+                updateCompletionBar(controls, controlAnswers);
                 document.body.addEventListener("change", function (e) {
                     if (e.target.classList.contains("answer-select")) {
                         checkDomainCompleteness();
+                        updateCompletionBar(controls, getUpdatedControlAnswers());
                     }
                 });
+                
+                // Store assessmentId globally for finalize button
+                window.assessmentId = a.id;
                 })
                 .catch(function() {
                     document.getElementById('ad-date').innerHTML = '<h1>Failed to load assessment</h1>';
                 });
+        });
+
+        // Finalize Modal Handler
+        document.addEventListener('DOMContentLoaded', function() {
+            var finalizeBtn = document.getElementById('finalize-btn');
+            var finalizeModal = document.getElementById('finalize-modal-bg');
+            var finalizeCancelBtn = document.getElementById('finalize-cancel-btn');
+            var finalizeConfirmBtn = document.getElementById('finalize-confirm-btn');
+
+            if (finalizeBtn) {
+                finalizeBtn.addEventListener('click', function() {
+                    finalizeModal.style.display = 'flex';
+                });
+            }
+
+            if (finalizeCancelBtn) {
+                finalizeCancelBtn.addEventListener('click', function() {
+                    finalizeModal.style.display = 'none';
+                });
+            }
+
+            if (finalizeConfirmBtn) {
+                finalizeConfirmBtn.addEventListener('click', function() {
+                    // Get obfuscated ID from URL
+                    var pathMatch = window.location.pathname.match(/\/assessment-direct\/([^/]+)/);
+                    var obfuscatedId = null;
+                    if (pathMatch && pathMatch[1]) {
+                        obfuscatedId = pathMatch[1];
+                    }
+
+                    if (!obfuscatedId) {
+                        alert('Error: Could not determine assessment link ID');
+                        return;
+                    }
+
+                    fetch('/assessment-direct/' + obfuscatedId + '/finalize', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded'
+                        }
+                    })
+                    .then(function(response) {
+                        if (response.ok) {
+                            // Reload to show finalized status
+                            window.location.href = '/assessment-direct/' + obfuscatedId;
+                        } else {
+                            alert('Error finalizing assessment. Please try again.');
+                        }
+                    })
+                    .catch(function(error) {
+                        console.error('Error:', error);
+                        alert('Error finalizing assessment. Please try again.');
+                    });
+                });
+            }
+
+            if (finalizeModal) {
+                finalizeModal.addEventListener('mousedown', function(event) {
+                    if (event.target === this) {
+                        this.style.display = 'none';
+                    }
+                });
+            }
         });
     </script>
     <style>
@@ -352,6 +490,178 @@
             text-align: left;
             white-space: normal;
             margin-top: 0.25em;
+        }
+
+        .general-button-bar {
+            margin: 2em 0;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            padding: 0 3em;
+        }
+
+        .sticky-button-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+            z-index: 9997;
+            margin: 0;
+            padding: 1em 1.2em;
+            border-top: 2px solid var(--primary-blue);
+            background: linear-gradient(90deg, #f8fbfd 0%, #f3f9fd 100%);
+            box-shadow: 0 -4px 12px rgba(34, 116, 165, 0.12);
+        }
+
+        .btn-nav {
+            background-color: #0066cc;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+
+        .btn-nav:hover {
+            background-color: #0052a3;
+        }
+
+        .btn-primary {
+            background-color: #0066cc;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+
+        .btn-primary:hover {
+            background-color: #0052a3;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+
+        .modal-bg {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-popup {
+            background-color: white;
+            border-radius: 8px;
+            padding: 2em;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .modal-popup h3 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        .modal-content {
+            margin: 20px 0;
+            line-height: 1.6;
+        }
+
+        .modal-btn-row {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+
+        .progress-label {
+            margin-right: 10px;
+            font-weight: 500;
+        }
+
+        .progress-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .progress-bar-container {
+            width: 200px;
+            height: 20px;
+            background-color: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #dee2e6;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background-color: #28a745;
+            transition: width 0.3s ease;
+        }
+
+        .progress-percentage {
+            min-width: 50px;
+            text-align: right;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .controls-filter-bar {
+            padding: 15px 0;
+            border-bottom: 1px solid #dee2e6;
+            margin-bottom: 0;
+        }
+
+        #progress-bar-sticky {
+            position: fixed;
+            top: 56px;
+            left: 0;
+            right: 0;
+            width: 100%;
+            z-index: 9998;
+            padding: 0.9em 1.2em;
+            border-bottom: 2px solid var(--primary-blue);
+            background: linear-gradient(90deg, #f8fbfd 0%, #f3f9fd 100%);
+            box-shadow: 0 4px 12px rgba(34, 116, 165, 0.12);
+            margin-bottom: 0;
+        }
+
+        .progress-section {
+            display: flex;
+            justify-content: flex-start;
+        }
+
+        .container {
+            margin-top: calc(56px + 80px);
+            margin-bottom: 80px;
         }
     </style>
 </body>

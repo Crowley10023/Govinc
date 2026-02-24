@@ -48,6 +48,7 @@ public class SecurityConfig {
             // Public (anonymous) assessment direct write endpoints (obfuscated URLs) - must be permitAll
             "/assessment-direct/*/answer",
             "/assessment-direct/*/control/*/comment",
+            "/assessment-direct/*/finalize",
 
             // Static assets and theme
             "/static/**",
@@ -72,7 +73,8 @@ public class SecurityConfig {
     // endpoints must require a CSRF token.
     private static final String[] CSRF_IGNORED_URLS = {
             "/assessment-direct/*/answer",
-            "/assessment-direct/*/control/*/comment"
+            "/assessment-direct/*/control/*/comment",
+            "/assessment-direct/*/finalize"
     };
 
     private static final Logger logger = LoggerFactory.getLogger(SecurityConfig.class);

@@ -30,8 +30,10 @@ public class AssessmentDetails {
     // No direct URLs attached anymore; view only via Assessments if needed
 
     private LocalDate date;
-    
+
     private String name; // Added field
+
+    private LocalDate completedDate; // Date when assessment was finalized
 
     public AssessmentDetails() {}
 
@@ -76,4 +78,12 @@ public class AssessmentDetails {
     public void setName(String name) {
         this.name = name;
     }
-}
+
+    // Getter and Setter for completedDate
+    public LocalDate getCompletedDate() {
+        return completedDate;
+    }
+    public void setCompletedDate(LocalDate completedDate) {
+        this.completedDate = completedDate;
+    }
+    }

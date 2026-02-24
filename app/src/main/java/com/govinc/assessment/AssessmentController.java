@@ -546,6 +546,8 @@ public class AssessmentController {
             model.addAttribute("securityControlDomains", securityControlDomains);
             // Also pass orgServices for details view
             model.addAttribute("orgServices", assessment.getOrgServices());
+            // Pass details object to template for completedDate access
+            model.addAttribute("details", details);
 
             // Pass authorization info for UI restrictions
             model.addAttribute("isAdminOrISM", authorizationService.isAdmin() || authorizationService.isInformationSecurityManager());
@@ -668,18 +670,31 @@ public class AssessmentController {
         return "ok";
     }
 
-    // Finalize assessment (POST)
+    // Finalize assessment (POST) - Only ADMIN and INFORMATION_SECURITY_MANAGER can finalize
     @PostMapping("/{id}/finalize")
     public String finalizeAssessment(@PathVariable Long id) {
+        // Only ADMIN and INFORMATION_SECURITY_MANAGER can finalize
+        boolean isAdmin = authorizationService.isAdmin();
+        boolean isISM = authorizationService.isInformationSecurityManager();
+        if (!isAdmin && !isISM) {
+            throw new UnauthorizedException("You do not have permission to finalize assessments.");
+        }
+        
+        Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
+        if (assessmentOpt.isPresent()) {
+            Assessment assessment = assessmentOpt.get();
+            // Adhere to existing DB values: use CLOSED to indicate finalized
+            assessment.setStatus(AssessmentStatus.CLOSED);
+            assessmentRepository.save(assessment);
+        }
+        
         Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
         if (detailsOpt.isPresent()) {
             AssessmentDetails details = detailsOpt.get();
-            // Mark as finalized (add a field for this in AssessmentDetails if you want
-            // persistently lock it)
-            // Here we just simulate finalization
-            // details.setFinalized(true);
+            details.setCompletedDate(LocalDate.now());
             assessmentDetailsService.save(details);
         }
+        
         return "redirect:/assessment/" + id;
     }
 
@@ -821,8 +836,7 @@ public class AssessmentController {
                         .append(answer).append("\n");
             }
         }
-        byte[] excelBytes = builder.toString().getBytes(StandardCharsets.UTF_8); // Should convert to real Excel if
-                                                                                 // needed
+        byte[] excelBytes = builder.toString().getBytes(StandardCharsets.UTF_8);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=assessment_" + id + ".csv")
                 .contentType(MediaType.parseMediaType("text/csv"))
