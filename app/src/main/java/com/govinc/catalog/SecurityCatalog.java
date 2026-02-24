@@ -24,6 +24,9 @@ public class SecurityCatalog {
     private String description;
     private String revision;
 
+    @Column(length = 100000)
+    private String reportInstructions;
+
     @ManyToMany
     @JoinTable(
         name = "security_catalog_controls",
@@ -61,6 +64,12 @@ public class SecurityCatalog {
     }
     public void setRevision(String revision) {
         this.revision = revision;
+    }
+    public String getReportInstructions() {
+        return reportInstructions;
+    }
+    public void setReportInstructions(String reportInstructions) {
+        this.reportInstructions = reportInstructions;
     }
     /**
      * Returns security controls sorted by name.
