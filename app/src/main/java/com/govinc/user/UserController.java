@@ -113,8 +113,17 @@ public class UserController {
             throw new UnauthorizedException("You do not have permission to update users.");
         }
         user.setId(id);
+
+        // Get the current authenticated user
+        User currentUser = authorizationService.getCurrentUser();
+
         // Ensure "admin" user always has ADMIN role
         if ("admin".equalsIgnoreCase(user.getName())) {
+            user.setRole(Role.ADMIN);
+        }
+
+        // Prevent an ADMIN user from removing their own ADMIN role
+        if (currentUser != null && currentUser.getId().equals(id) && currentUser.getRole() == Role.ADMIN) {
             user.setRole(Role.ADMIN);
         }
         
@@ -160,7 +169,15 @@ public class UserController {
         if (!authorizationService.isAdmin()) {
             throw new UnauthorizedException("You do not have permission to delete users.");
         }
-        
+
+        // Get the current authenticated user
+        User currentUser = authorizationService.getCurrentUser();
+
+        // Prevent ADMIN users from deleting themselves
+        if (currentUser != null && currentUser.getId().equals(id)) {
+            throw new UnauthorizedException("You cannot delete your own user account.");
+        }
+
         // Remove user from any org units they lead
         Optional<User> userOpt = userRepository.findById(id);
         if (userOpt.isPresent()) {
@@ -170,7 +187,7 @@ public class UserController {
                 orgUnitService.addOrgUnit(orgUnit);
             }
         }
-        
+
         userRepository.deleteById(id);
         return "redirect:/users";
     }

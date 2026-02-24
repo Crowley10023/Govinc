@@ -27,61 +27,64 @@ import java.util.Map;
 
 /**
  * Spring Security configuration that supports dynamic authentication providers.
- * 
- * This configuration:
- * - Always provides form-based authentication as a fallback
- * - Dynamically configures OAuth2 login when providers are available
- * - Loads users from application.properties for local authentication
- * - Excludes public endpoints from authentication
- * - Requires ADMIN role for /admin/** endpoints
+ *
+ * This configuration implements the security architecture requirements:
+ *  - Only explicitly allowed public endpoints are permitAll (minimal surface)
+ *  - All backend endpoints require authentication and, where applicable, authorization
+ *  - CSRF protection is enabled for all non-exempt endpoints; only the anonymous
+ *    assessment-direct write endpoints are exempt (they are intentionally obfuscated)
+ *  - /config/** and /admin/** are restricted to ADMIN role
  */
 @Configuration
 public class SecurityConfig {
-    // URLs to exclude from authentication (publicly accessible endpoints)
-    private static final String[] EXCLUDED_URLS = {
+    // Minimal public URL surface per security architecture
+    private static final String[] PUBLIC_URLS = {
+            // Public (anonymous) assessment direct endpoints (read-only summaries and full data)
             "/assessment-direct/*/alldata",
             "/assessment-direct/*/data",
-            "/assessment-direct/*/answer",
-            "/assessment-direct/*/control/*/comment",
             "/assessment-direct.html",
             "/assessment-direct/*",
-            "/assessment/*/answer",
+            // Public (anonymous) assessment direct write endpoints (obfuscated URLs) - must be permitAll
+            "/assessment-direct/*/answer",
+            "/assessment-direct/*/control/*/comment",
+
+            // Static assets and theme
             "/static/**",
             "/favicon.ico",
-            "style.css",
-            "/style.css",
-            "/general.css",            
-            "/config/openai/suggest-theme",
+            "/title.png",
             "/theme-css",
-            "/config/layout/**",
-            "/layoutConfig/**",
-            "/config/layout",
-            "/layoutConfig",
-            "/config/image-upload/preview", // Allow logo preview access without authentication
-            "/title.png", // Allow default logo access without authentication
-            "/login", // Allow login page
-            "/oauth2",
-            "/login/oauth2",
-            "/api/security-control/import/**", // Allow security control import API endpoints
-            "/api/security-control/translate", // Allow security control translation API endpoint
-            "/security-control/import", // Allow security control import form submission - CSRF exempt
-            "/api/security-catalogs" // Allow catalog listing API endpoint
+            "/style.css",
+            "/general.css",
+            "/config/image-upload/preview",
+
+            // Login and OAuth endpoints must be reachable without prior authentication
+            "/login",
+            "/oauth2/**",
+            "/login/oauth2/**"
+            };
+
+    // Only the anonymous assessment-direct write endpoints are exempt from CSRF
+    // because they are used without authentication. All other state-changing
+    // endpoints must require a CSRF token.
+    private static final String[] CSRF_IGNORED_URLS = {
+            "/assessment-direct/*/answer",
+            "/assessment-direct/*/control/*/comment"
     };
 
     private static final Logger logger = LoggerFactory.getLogger(SecurityConfig.class);
 
     @Autowired
     private CustomAuthenticationSuccessHandler customAuthenticationSuccessHandler;
-    
+
     @Autowired(required = false)
     private AuthConfigService authConfigService;
-    
+
     @Autowired(required = false)
     private ClientRegistrationRepository clientRegistrationRepository;
-    
+
     @Autowired
     private Environment environment;
-    
+
     // Load users from properties for form-based authentication
     @Value("#{${users:{:}}}")
     private Map<String, String> userProperties;
@@ -90,11 +93,28 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers(EXCLUDED_URLS).permitAll()
-                .requestMatchers("/admin/**").hasAnyRole("ADMIN")
+                .requestMatchers(PUBLIC_URLS).permitAll()
+                // CONFIG and admin areas must be ADMIN only per security architecture
+                .requestMatchers("/config/**").hasRole("ADMIN")
+                .requestMatchers("/admin/**").hasRole("ADMIN")
+                // Security framework and management pages accessible to ADMIN and Information Security Manager
+                .requestMatchers(
+                    "/security-catalog/**",
+                    "/security-control/**",
+                    "/security-control-domain/**",
+                    "/maturitymodel/**",
+                    "/maturityanswer/**",
+                    "/compliance/**",
+                    "/orgservice-assessment/**",
+                    "/orgservices/**",
+                    "/orgunits/**",
+                    "/users/**",
+                    "/statistics/**"
+                ).hasAnyRole("ADMIN", "INFORMATION_SECURITY_MANAGER")
+                // All other requests require authentication; fine-grained checks are performed in controllers
                 .anyRequest().authenticated())
-            .csrf(csrf -> csrf
-                .ignoringRequestMatchers(EXCLUDED_URLS))
+            // Enable CSRF but ignore assessment-direct anonymous write endpoints only
+            .csrf(csrf -> csrf.ignoringRequestMatchers(CSRF_IGNORED_URLS))
             .addFilterBefore(new OAuth2AuthorizationRequestLoggingFilter(), org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(new OAuth2DebugLoggingFilter(), org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
             .formLogin(form -> form
@@ -104,18 +124,15 @@ public class SecurityConfig {
                 .failureUrl("/login?error=form_login_failed"));
 
         // Configure OAuth2 login if OAuth2 providers are available
-        // Spring Security 6.x automatically uses HttpSessionOAuth2AuthorizationRequestRepository for session-based storage
-        // The dynamic client registration repository will handle provider availability
         try {
             if (authConfigService != null && authConfigService.hasOAuth2Providers() && clientRegistrationRepository != null) {
                 logger.info("[OAUTH2-FLOW] Configuring OAuth2 login with dynamic client registration");
                 http.oauth2Login(oauth2 -> oauth2
-                    .loginPage("/login") // Redirects to our login page for OAuth
+                    .loginPage("/login")
                     .successHandler(customAuthenticationSuccessHandler)
                     .failureHandler(oauth2AuthenticationFailureHandler())
-                    // Use the dynamic client registration repository
                     .clientRegistrationRepository(clientRegistrationRepository));
-                logger.info("[OAUTH2-FLOW] OAuth2 login configured with " + (authConfigService.getAvailableProviders().size() - 1) + " OAuth2 providers"); // -1 for form auth
+                logger.info("[OAUTH2-FLOW] OAuth2 login configured with " + (authConfigService.getAvailableProviders().size() - 1) + " OAuth2 providers");
             } else {
                 logger.info("[OAUTH2-FLOW] No OAuth2 providers available - using form authentication only");
             }
@@ -179,7 +196,6 @@ public class SecurityConfig {
 
     /**
      * Custom OAuth2 failure handler that detects specific error types and provides user-friendly messages.
-     * Stores error details in session and redirects to login page.
      */
     private static class OAuth2ErrorHandlingFailureHandler implements AuthenticationFailureHandler {
         private static final Logger handlerLogger = LoggerFactory.getLogger(OAuth2ErrorHandlingFailureHandler.class);
@@ -191,7 +207,6 @@ public class SecurityConfig {
             handlerLogger.error("[OAUTH2-FLOW] OAuth2 login failure for request from " + request.getRemoteAddr() + ": " + exception.getMessage());
             handlerLogger.debug("[OAUTH2-FLOW] OAuth2 login failure details", exception);
 
-            // Detect specific error types and provide user-friendly messages
             String errorType = "oauth2_error";
             String errorDetails = null;
 
@@ -212,13 +227,11 @@ public class SecurityConfig {
                 }
             }
 
-            // Store error details in session for display on login page
             if (errorDetails != null) {
                 request.getSession().setAttribute("oauth2_error_details", errorDetails);
                 handlerLogger.info("[OAUTH2-FLOW] Stored error details in session: {}", errorDetails);
             }
-            
-            // Redirect to login page with error type parameter
+
             String redirectUrl = "/login?error=" + errorType;
             handlerLogger.info("[OAUTH2-FLOW] Redirecting to: {}", redirectUrl);
             response.sendRedirect(request.getContextPath() + redirectUrl);
@@ -226,49 +239,36 @@ public class SecurityConfig {
     }
 
     /**
-     * Creates UserDetailsService with users loaded from application.properties
-     * Format: users.<username>=<password> or users.<username>=<password>,ADMIN or users.<username>=<password>,USER,ADMIN
-     * 
-     * Examples:
-     *   users.admin=password123        (will get ADMIN role by default)
-     *   users.john=pass123,ADMIN       (explicitly set as ADMIN)
-     *   users.jane=pass456,USER        (set as USER only, no admin access)
-     *   users.bob=pass789,USER,ADMIN   (set with multiple roles)
+     * Creates UserDetailsService with users loaded from properties for form-based authentication
      */
     @Bean
     public UserDetailsService userDetailsService() {
         List<org.springframework.security.core.userdetails.UserDetails> users = new ArrayList<>();
-        
-        // Add users from properties
+
         if (userProperties != null && !userProperties.isEmpty()) {
             for (Map.Entry<String, String> entry : userProperties.entrySet()) {
                 String username = entry.getKey();
                 String value = entry.getValue();
-                
-                // Parse password and optional roles from value (format: "password[,ROLE1,ROLE2]")
-                String[] parts = value.split(",", 2); // Split on first comma only
+                String[] parts = value.split(",", 2);
                 String password = parts[0].trim();
-                
+
                 var userBuilder = User.withUsername(username)
                     .password(passwordEncoder().encode(password));
-                
-                // Parse roles if specified (format: "password,ROLE1,ROLE2,...")
+
                 if (parts.length > 1) {
                     String[] roles = parts[1].split(",");
                     for (String role : roles) {
                         userBuilder.roles(role.trim());
                     }
                 } else {
-                    // Default to ADMIN role for backward compatibility
                     userBuilder.roles("ADMIN");
                 }
-                
+
                 users.add(userBuilder.build());
                 logger.debug("Loaded local user: " + username);
             }
         }
-        
-        // Always ensure at least one admin user exists for fallback (unless in production mode)
+
         if (users.isEmpty()) {
             boolean isProduction = "true".equalsIgnoreCase(environment.getProperty("app.production", "false"));
             if (!isProduction) {
@@ -281,7 +281,7 @@ public class SecurityConfig {
                 logger.warn("Production environment with no configured users. Admin access is disabled.");
             }
         }
-        
+
         logger.info("Configured " + users.size() + " local users for form-based authentication");
         return new InMemoryUserDetailsManager(users);
     }

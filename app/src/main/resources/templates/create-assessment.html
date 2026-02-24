@@ -16,6 +16,12 @@
         <form th:action="@{/assessment/create}" method="post" class="create-assessment-form">
             <div class="card">
                 <div class="card-body">
+                    <!-- Assessment Name -->
+                    <div class="card-section">
+                        <label for="name">Assessment Name (Optional)</label>
+                        <input type="text" id="name" name="name" class="form-control-input" placeholder="Enter assessment name">
+                    </div>
+
                     <!-- Catalog Selection -->
                     <div class="card-section">
                         <label for="catalog">Security Catalog</label>

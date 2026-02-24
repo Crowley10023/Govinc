@@ -12,9 +12,17 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/security-control/import")
 public class SecurityControlImportRestController {
-    
+
     @Autowired
     private SecurityControlSimilarityAnalyzer similarityAnalyzer;
+
+    @Autowired
+    private com.govinc.authorization.AuthorizationService authorizationService;
+
+    private boolean isAuthorized() {
+        // Only ADMIN and Information Security Manager may perform import analyses
+        return authorizationService != null && authorizationService.canAccessSecurityFramework();
+    }
     
     /**
      * Analyze a batch of security controls for similarity
@@ -23,6 +31,9 @@ public class SecurityControlImportRestController {
     @PostMapping("/analyze")
     public ResponseEntity<List<SecurityControlSimilarityAnalyzer.SimilarityAnalysisResult>> analyzeControls(
             @RequestBody List<SecurityControlSimilarityAnalyzer.SecurityControlImportDTO> controls) {
+        if (!isAuthorized()) {
+            return ResponseEntity.status(403).build();
+        }
         
         try {
             System.out.println("\n========================================");
@@ -72,6 +83,9 @@ public class SecurityControlImportRestController {
     @PostMapping("/analyze-single")
     public ResponseEntity<SecurityControlSimilarityAnalyzer.SimilarityAnalysisResult> analyzeSingleControl(
             @RequestBody SecurityControlSimilarityAnalyzer.SecurityControlImportDTO control) {
+        if (!isAuthorized()) {
+            return ResponseEntity.status(403).build();
+        }
         
         try {
             System.out.println("\n========================================");

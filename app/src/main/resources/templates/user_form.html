@@ -226,6 +226,21 @@
             display: block;
         }
 
+        .info-box {
+            display: none;
+            margin-top: 0.8em;
+            padding: 1em;
+            background: rgba(34, 116, 165, 0.08);
+            border-left: 3px solid var(--primary-blue);
+            border-radius: 4px;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .info-box.show {
+            display: block;
+        }
+
         @media (max-width: 768px) {
             .user-form-container {
                 margin: 1em;
@@ -308,14 +323,18 @@
                         <select id="role" 
                                 th:field="*{role}" 
                                 required
-                                onchange="updateRoleInfo()">
+                                onchange="updateRoleInfo()"
+                                th:data-is-edit="${user.id != null}">
                             <option value="">-- Select a Role --</option>
-                            <option th:each="role : ${T(com.govinc.user.Role).values()}" 
-                                    th:value="${role}" 
-                                    th:text="${role.displayName}">Role</option>
+                            <option value="ADMIN" th:text="'Admin'">Admin</option>
+                            <option value="INFORMATION_SECURITY_MANAGER" th:text="'Information Security Manager'">Information Security Manager</option>
+                            <option value="ASSESSMENT_DELEGATE" th:text="'Assessment Delegate'">Assessment Delegate</option>
                         </select>
                         <p class="field-hint" id="roleHint"></p>
                         <div id="roleInfo" class="role-info"></div>
+                        <div th:if="${user.id != null}" class="info-box show">
+                            <strong>ℹ️ Info:</strong> Organisation Team Leader role can only be assigned during user creation. Contact an administrator if role change is needed.
+                        </div>
                     </div>
 
                     <!-- Organization Unit Selection (for Team Leaders - Multiple) -->
@@ -360,7 +379,7 @@
     const roleDescriptions = {
         'ADMIN': 'Full administrative access to all systems and features',
         'INFORMATION_SECURITY_MANAGER': 'Access to security frameworks and user/organization management (no configuration)',
-        'ORGANISATION_TEAM_LEADER': 'Access to assessments in their assigned organization and its child units. Can lead multiple organization units.',
+        'ORGANISATION_TEAM_LEADER': 'Access to assessments in their assigned organization and its child units. Can lead multiple organization units. (Available at user creation only)',
         'ASSESSMENT_DELEGATE': 'Access only to assigned assessments'
     };
 
@@ -370,9 +389,11 @@
         const roleHint = document.getElementById('roleHint');
         const roleInfo = document.getElementById('roleInfo');
         const selectedRole = roleSelect.value;
+        const isEdit = roleSelect.getAttribute('data-is-edit') === 'true';
 
         // Show/hide organization unit selection
-        if (selectedRole === 'ORGANISATION_TEAM_LEADER') {
+        // Only show if role is ORGANISATION_TEAM_LEADER and we're in create mode (not editing)
+        if (selectedRole === 'ORGANISATION_TEAM_LEADER' && !isEdit) {
             orgUnitSection.classList.add('show');
             updateOrgUnitOptions();
         } else {

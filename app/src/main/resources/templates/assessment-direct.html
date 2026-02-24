@@ -51,6 +51,10 @@
                 <div class="domain-controls-tbl">
                     <table class="table card" id="public-assessment-table">
                         <tr>
+                            <th>Assessment Name</th>
+                            <td id="ad-name">-</td>
+                        </tr>
+                        <tr>
                             <th>Date</th>
                             <td id="ad-date">-</td>
                         </tr>
@@ -159,6 +163,7 @@
                     return;
                 }
                 var a = data.assessment;
+                document.getElementById('ad-name').textContent = a.name || '-';
                 document.getElementById('ad-date').textContent = a.date || '-';
                 document.getElementById('ad-orgunit').textContent = a.orgUnit || '-';
                 document.getElementById('ad-status').textContent = a.status || '-';

@@ -1,0 +1,223 @@
+com.govinc.util.OpenAIEndpoint
+  POST /api/openai/askAI
+
+com.govinc.catalog.SecurityCatalogRestController
+  GET  /api/security-catalogs
+  GET  /api/security-catalogs/test
+
+com.govinc.catalog.SecurityControlTranslationRestController
+  POST /api/security-control/detect-language
+  POST /api/security-control/translate
+
+com.govinc.catalog.SecurityControlImportRestController
+  POST /api/security-control/import/analyze
+  POST /api/security-control/import/analyze-single
+
+com.govinc.catalog.SecurityCatalogController
+  GET  /security-catalog/list
+  GET  /security-catalog/edit
+  POST /security-catalog/edit
+  POST /security-catalog/delete
+  GET  /security-catalog/create
+  GET  /security-catalog/api
+  GET  /security-catalog/api/test
+
+com.govinc.catalog.SecurityControlController
+  GET    /security-control/list
+  GET    /security-control/edit
+  POST   /security-control/edit
+  POST   /security-control/delete
+  POST   /security-control/delete/api
+  GET    /security-control/create
+  POST   /security-control/import
+
+com.govinc.catalog.SecurityControlDomainController
+  GET  /security-control-domain/list
+  GET  /security-control-domain/edit
+  POST /security-control-domain/edit
+  POST /security-control-domain/delete
+  GET  /security-control-domain/create
+
+com.govinc.catalog.SecurityControlTranslationRestController (translation cache helpers)
+  (utility methods: clearTranslationCache, clearExpiredCacheEntries, getCacheSize)
+
+com.govinc.assessment.AnsweringGuideController
+  POST /assessment/generate-answering-guide-questions
+  POST /assessment/generate-answer-from-guide
+
+com.govinc.assessment.AssessmentRestController
+  PUT  /assessment/{id}/orgservices
+  GET  /assessment/{id}/orgservice-ids
+
+com.govinc.assessment.AssessmentController
+  GET    /assessment/create
+  POST   /assessment/create
+  GET    /assessment/list
+  GET    /assessment/{id}/controls
+  POST   /assessment/{id}/controls
+  GET    /assessment/{id}
+  POST   /assessment/{id}/answer
+  PUT    /assessment/{assessmentId}/control/{controlId}/comment
+  POST   /assessment/{id}/finalize
+  POST   /assessment/{id}/delete
+  GET    /assessment/{id}/word-report-progress
+  GET    /assessment/{id}/word-report
+  GET    /assessment/{id}/report
+  GET    /assessment/{id}/excel
+  POST   /assessment/{id}/create-url
+  POST   /assessment/{id}/set-orgunit
+  PUT    /assessment/{id}/users
+  POST   /assessment/{id}/answer-override
+  POST   /assessment/{id}/control/{controlId}/remove-override
+  GET    /assessment/{id}/control/{controlId}/state
+
+com.govinc.assessment.AssessmentDetailsController
+  GET  /assessmentdetails/list
+  GET  /assessmentdetails/details/{id}
+  GET  /assessmentdetails/edit/{id}
+  POST /assessmentdetails/save
+  GET  /assessmentdetails/delete/{id}
+  GET  /assessmentdetails/orgunits
+
+com.govinc.assessment.AssessmentUrlsController
+  POST   /assessment-direct/{id}/urls/create
+  POST   /assessment-direct/urls/{id}/prolong
+  POST   /assessment-direct/urls/{id}/delete
+  DELETE /assessment-direct/urls/{id}
+  GET    /assessment-direct/urls
+
+com.govinc.assessment.AssessmentDirectController
+  GET  /assessment-direct/{obfuscatedId}/alldata
+  GET  /assessment-direct/{obfuscatedId}           (deprecated, page fallback)
+  GET  /assessment-direct.html?id=...              (fallback)
+  POST /assessment-direct/{id}/answer
+  PUT  /assessment-direct/{id}/control/{controlId}/comment
+  GET  /assessment-urls-list
+  GET  /assessment-direct/{obfuscatedId}/data
+
+com.govinc.compliance.ComplianceCheckController
+  GET  /compliance/view
+  GET  /compliance/checks
+  GET  /compliance/create
+  GET  /compliance/checks/create
+  GET  /compliance/edit/{id}
+  POST /compliance/save
+  POST /compliance/delete/{id}
+
+com.govinc.ComplianceViewPageController
+  GET  /compliance-view
+
+com.govinc.controller.AIPromptCacheController
+  GET    /config/ai-cache
+  GET    /config/ai-cache/list
+  DELETE /config/ai-cache/{id}
+  POST   /config/ai-cache/clear-all
+  GET    /config/ai-cache/{id}
+
+com.govinc.controller.AuthConfigController
+  GET    /admin/auth-config
+  GET    /admin/auth-config/status
+  POST   /admin/auth-config/keycloak
+  POST   /admin/auth-config/azure
+  DELETE /admin/auth-config/provider/{providerId}
+  POST   /admin/auth-config/health-check
+  GET    /admin/auth-config/health/{providerId}
+  PUT    /admin/auth-config/provider/{providerId}/redirect-uri
+
+com.govinc.controller.DatabaseConfigController
+  GET  /config/database
+  GET  /config/database/info
+  POST /config/database/migrate/{toVersion}
+
+com.govinc.controller.ImageUploadController
+  GET  /config/image-upload
+  POST /config/image-upload
+  POST /config/image-upload/delete
+  GET  /config/image-upload/preview
+
+com.govinc.controller.LayoutConfigController
+  GET  /config/layout
+  POST /config/layout
+
+com.govinc.controller.OrganisationDetailsController
+  GET  /config/organisation-details
+  POST /config/organisation-details
+  POST /config/organisation-details/upload-template
+  POST /config/organisation-details/remove-template
+  GET  /config/organisation-details/template-path
+
+com.govinc.controller.OpenAIConfigController
+  GET    /config/openai
+  POST   /config/openai
+  POST   /config/openai/provider/create
+  PUT    /config/openai/provider/{id}
+  POST   /config/openai/provider/{id}/activate
+  DELETE /config/openai/provider/{id}
+  GET    /config/openai/provider/{id}
+  POST   /config/openai/test
+  POST   /config/openai/suggest-theme
+
+com.govinc.controller.ThemeController
+  GET  /theme-css
+
+com.govinc.controller.LoginController
+  GET  /login
+
+com.govinc.maturity.MaturityAnswerController
+  GET  /maturityanswer/list
+  GET  /maturityanswer/edit
+  POST /maturityanswer/edit
+  POST /maturityanswer/delete
+  GET  /maturityanswer/create
+
+com.govinc.maturity.MaturityModelController
+  GET  /maturitymodel/list
+  GET  /maturitymodel/edit
+  GET  /maturitymodel/edit/{id}
+  POST /maturitymodel/save
+  GET  /maturitymodel/delete/{id}
+  GET  /maturitymodel/api/all
+
+com.govinc.organization.OrgServiceAssessmentController
+  GET  /orgservice-assessment/edit/{orgServiceId}
+  POST /orgservice-assessment/save-control
+  PUT  /orgservice-assessment/save-control-comment
+
+com.govinc.organization.OrgServiceController
+  GET    /orgservices/all
+  GET    /orgservices/list (and /orgservices/list.html)
+  GET    /orgservices/create
+  GET    /orgservices/edit/{id}
+  POST   /orgservices/save
+  GET    /orgservices
+  GET    /orgservices/{id}
+  POST   /orgservices
+  DELETE /orgservices/{id}
+
+com.govinc.organization.OrgUnitController
+  GET    /orgunits/list (and /orgunits/list.html)
+  GET    /orgunits/create
+  GET    /orgunits/edit/{id}
+  POST   /orgunits/save
+  GET    /orgunits (JSON)
+  GET    /orgunits/{id} (JSON)
+  GET    /orgunits/children/{id}
+  POST   /orgunits (add via JSON)
+  DELETE /orgunits/{id}
+  GET    /orgunits/tree/{id}/fulltree
+  GET    /orgunits/tree-view/{id}
+
+com.govinc.StatisticsController
+  GET  /statistics
+
+com.govinc.user.UserController
+  GET  /users
+  GET  /users/new
+  POST /users
+  GET  /users/edit/{id}
+  POST /users/update/{id}
+  GET  /users/delete/{id}
+  POST /users/set-session-user
+  GET  /users/api
+  GET  /users/api/orgUnits
+  GET  /users/me

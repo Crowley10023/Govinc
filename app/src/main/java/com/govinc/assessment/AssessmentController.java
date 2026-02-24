@@ -105,6 +105,7 @@ public class AssessmentController {
     @PostMapping("/create")
     public String createAssessment(
             @RequestParam("catalogId") Long catalogId,
+            @RequestParam(value = "name", required = false) String providedName,
             @RequestParam(value = "orgUnitId", required = false) Long orgUnitId,
             @RequestParam(value = "userIds", required = false) List<Long> userIds,
             @RequestParam(value = "orgServiceIds", required = false) List<Long> orgServiceIds) {
@@ -114,16 +115,21 @@ public class AssessmentController {
             return "redirect:/assessment/list";
         }
         Assessment assessment = new Assessment();
-        // Generate assessment name as OrgUnitName_YYYY-MM-DD
-        String generatedName = "Assessment_" + java.time.LocalDate.now();
-        if (orgUnitId != null) {
-            OrgUnit orgUnit = orgUnitService.getOrgUnit(orgUnitId).orElse(null);
-            if (orgUnit != null) {
-                generatedName = orgUnit.getName().replaceAll("[^a-zA-Z0-9]+", "_") + "_" + java.time.LocalDate.now();
-                assessment.setOrgUnit(orgUnit);
+        // Use provided name if given, otherwise generate one
+        String assessmentName;
+        if (providedName != null && !providedName.trim().isEmpty()) {
+            assessmentName = providedName.trim();
+        } else {
+            // Generate assessment name as OrgUnitName_YYYY-MM-DD or Assessment_YYYY-MM-DD
+            assessmentName = "Assessment_" + java.time.LocalDate.now();
+            if (orgUnitId != null) {
+                OrgUnit orgUnit = orgUnitService.getOrgUnit(orgUnitId).orElse(null);
+                if (orgUnit != null) {
+                    assessmentName = orgUnit.getName().replaceAll("[^a-zA-Z0-9]+", "_") + "_" + java.time.LocalDate.now();
+                }
             }
         }
-        assessment.setName(generatedName);
+        assessment.setName(assessmentName);
         assessment.setSecurityCatalog(catalog);
         assessment.setDate(LocalDate.now());
         // Persist org unit if set

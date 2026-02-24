@@ -14,9 +14,17 @@ import java.util.*;
 @RestController
 @RequestMapping("/api/security-control")
 public class SecurityControlTranslationRestController {
-    
+
     @Autowired
     private OpenAIUtil openAIUtil;
+
+    @Autowired
+    private com.govinc.authorization.AuthorizationService authorizationService;
+
+    private boolean isAuthorized() {
+        // Only ADMIN and INFORMATION_SECURITY_MANAGER should be able to call translation endpoints
+        return authorizationService != null && authorizationService.canAccessSecurityFramework();
+    }
     
     /**
      * Cache for translation requests to avoid redundant API calls during import
@@ -59,6 +67,9 @@ public class SecurityControlTranslationRestController {
     @PostMapping("/detect-language")
     public ResponseEntity<Map<String, Object>> detectLanguage(
             @RequestBody LanguageDetectionRequest request) {
+        if (!isAuthorized()) {
+            return ResponseEntity.status(403).body(Map.of("success", false, "error", "forbidden"));
+        }
         
         Map<String, Object> response = new HashMap<>();
         
@@ -112,6 +123,9 @@ public class SecurityControlTranslationRestController {
     @PostMapping("/translate")
     public ResponseEntity<Map<String, Object>> translateControl(
             @RequestBody TranslationRequest request) {
+        if (!isAuthorized()) {
+            return ResponseEntity.status(403).body(Map.of("success", false, "error", "forbidden"));
+        }
         
         Map<String, Object> response = new HashMap<>();
         
