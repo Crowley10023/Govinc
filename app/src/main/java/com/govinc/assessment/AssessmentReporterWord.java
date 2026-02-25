@@ -367,6 +367,36 @@ public class AssessmentReporterWord {
         }
         sb.append("\n");
 
+        // Include assigned Org Services so AI knows which services were used in this assessment
+        sb.append("Assigned Org Services:\n");
+        if (assessment.getOrgServices() != null && !assessment.getOrgServices().isEmpty()) {
+            for (OrgService svc : assessment.getOrgServices()) {
+                sb.append("  - ").append(svc.getName() == null ? "-" : svc.getName());
+                if (svc.getDescription() != null && !svc.getDescription().isBlank()) sb.append(": ").append(svc.getDescription());
+                sb.append("\n");
+            }
+        } else {
+            sb.append("  - None\n");
+        }
+        sb.append("\n");
+
+        // Provide a concise list of security control domains present in this assessment
+        sb.append("Security Control Domains:\n");
+        Set<String> domains = new java.util.TreeSet<>();
+        if (assessment.getSecurityCatalog() != null && assessment.getSecurityCatalog().getSecurityControls() != null) {
+            for (SecurityControl ctrl : assessment.getSecurityCatalog().getSecurityControls()) {
+                if (ctrl.getSecurityControlDomain() != null && ctrl.getSecurityControlDomain().getName() != null) {
+                    domains.add(ctrl.getSecurityControlDomain().getName());
+                }
+            }
+        }
+        if (!domains.isEmpty()) {
+            for (String d : domains) sb.append("  - ").append(d).append("\n");
+        } else {
+            sb.append("  - None\n");
+        }
+        sb.append("\n");
+
         // ============ CONTROLS AND ANSWERS ============
         sb.append("========================================\n");
         sb.append("SECURITY CONTROLS AND ASSESSMENT RESULTS\n");
@@ -450,10 +480,12 @@ public class AssessmentReporterWord {
                 String resolvedContentStyle = resolveStylePreferAI(requestedContentStyle, templateAnalysis);
                 String contentStyleNormalized = requestedContentStyle == null ? "" : requestedContentStyle.trim().toLowerCase(Locale.ROOT);
 
-                // If contentStyle indicates a table, try to build a real table
-                if ("table".equals(contentStyleNormalized) || section.has("table")) {
+                // If contentStyle indicates a table, or the section contains table-like data, try to build a real table
+                if (contentStyleNormalized.contains("table") || section.has("table") || section.has("headers") || section.has("rows") || section.has("columns")) {
                     try {
                         Tbl tbl = null;
+
+                        // Case 1: Explicit "table" field (could be object or array)
                         if (section.has("table")) {
                             Object tblObj = section.get("table");
                             if (tblObj instanceof JSONObject) {
@@ -465,26 +497,68 @@ public class AssessmentReporterWord {
                                 JSONArray tarr = (JSONArray) tblObj;
                                 // assume first row headers
                                 if (tarr.length() > 0) {
-                                    JSONArray headers = tarr.getJSONArray(0);
-                                    JSONArray rows = new JSONArray();
-                                    for (int r = 1; r < tarr.length(); r++) rows.put(tarr.getJSONArray(r));
-                                    tbl = createTableFromJson(factory, headers, rows);
+                                    if (tarr.get(0) instanceof JSONArray) {
+                                        JSONArray headers = tarr.getJSONArray(0);
+                                        JSONArray rows = new JSONArray();
+                                        for (int r = 1; r < tarr.length(); r++) rows.put(tarr.getJSONArray(r));
+                                        tbl = createTableFromJson(factory, headers, rows);
+                                    } else {
+                                        // treat as rows only (no header)
+                                        JSONArray rows = tarr;
+                                        tbl = createTableFromJson(factory, null, rows);
+                                    }
                                 }
                             }
-                        } else if (section.has("content")) {
-                            // try to parse content as JSON array-of-arrays
-                            String content = section.optString("content");
+                        }
+
+                        // Case 2: Separate headers/rows fields at section level
+                        if (tbl == null && (section.has("headers") || section.has("rows"))) {
+                            JSONArray headers = section.optJSONArray("headers");
+                            JSONArray rows = section.optJSONArray("rows");
+                            tbl = createTableFromJson(factory, headers, rows);
+                        }
+
+                        // Case 3: content field may contain JSON array-of-arrays or a JSON representation of table
+                        if (tbl == null && section.has("content")) {
+                            Object contentObj = section.get("content");
                             try {
-                                JSONArray arr = new JSONArray(content);
-                                if (arr.length() > 0 && arr.get(0) instanceof JSONArray) {
-                                    JSONArray headers = arr.getJSONArray(0);
-                                    JSONArray rows = new JSONArray();
-                                    for (int r = 1; r < arr.length(); r++) rows.put(arr.getJSONArray(r));
-                                    tbl = createTableFromJson(factory, headers, rows);
+                                if (contentObj instanceof JSONArray) {
+                                    JSONArray arr = (JSONArray) contentObj;
+                                    if (arr.length() > 0 && arr.get(0) instanceof JSONArray) {
+                                        JSONArray headers = arr.getJSONArray(0);
+                                        JSONArray rows = new JSONArray();
+                                        for (int r = 1; r < arr.length(); r++) rows.put(arr.getJSONArray(r));
+                                        tbl = createTableFromJson(factory, headers, rows);
+                                    } else {
+                                        // treat as rows only
+                                        tbl = createTableFromJson(factory, null, arr);
+                                    }
+                                } else if (contentObj instanceof JSONObject) {
+                                    JSONObject obj = (JSONObject) contentObj;
+                                    JSONArray headers = obj.optJSONArray("headers");
+                                    JSONArray rows = obj.optJSONArray("rows");
+                                    if (headers != null || rows != null) {
+                                        tbl = createTableFromJson(factory, headers, rows);
+                                    }
+                                } else {
+                                    // try parsing string content as JSON
+                                    String content = section.optString("content");
+                                    try {
+                                        JSONArray arr = new JSONArray(content);
+                                        if (arr.length() > 0 && arr.get(0) instanceof JSONArray) {
+                                            JSONArray headers = arr.getJSONArray(0);
+                                            JSONArray rows = new JSONArray();
+                                            for (int r = 1; r < arr.length(); r++) rows.put(arr.getJSONArray(r));
+                                            tbl = createTableFromJson(factory, headers, rows);
+                                        } else {
+                                            tbl = createTableFromJson(factory, null, arr);
+                                        }
+                                    } catch (Exception e) {
+                                        System.out.println("[AssessmentReporterWord] Could not parse content into table JSON: " + e.getMessage());
+                                    }
                                 }
                             } catch (Exception e) {
-                                // ignore parse error
-                                System.out.println("[AssessmentReporterWord] Could not parse content into table JSON: " + e.getMessage());
+                                System.out.println("[AssessmentReporterWord] Error while interpreting section.content for table: " + e.getMessage());
                             }
                         }
 
