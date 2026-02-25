@@ -37,6 +37,9 @@ dependencies {
     // JAXB runtime required by docx4j on Jakarta platform
     //implementation("org.glassfish.jaxb:jaxb-runtime:4.0.2")
     //implementation("jakarta.xml.bind:jakarta.xml.bind-api:4.0.0")
+
+    // JFreeChart for generating charts to embed in reports
+    implementation("org.jfree:jfreechart:1.5.4")
 }
 
 application {

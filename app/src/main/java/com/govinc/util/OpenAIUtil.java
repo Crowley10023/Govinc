@@ -79,6 +79,34 @@ public class OpenAIUtil {
     }
 
     /**
+     * Return a short description of charting capabilities that can be included in
+     * prompts so the AI knows what chart types the system can generate.
+     * Currently supported chart types: pie, bar, line.
+     *
+     * The AI may include a "chart" object in the JSON it returns with the
+     * following schema:
+     * {
+     *   "type": "pie|bar|line",
+     *   "title": "Chart title",
+     *   "data": { "labels": ["A","B"], "values": [10,20] },
+     *   "options": { "width": 600, "height": 400 }
+     * }
+     *
+     * The report generator will attempt to render such charts using JFreeChart.
+     */
+    public String getChartCapabilities() {
+        return "Available chart types: pie, bar, line.\n" +
+               "If you want a chart included in the report, include a \"chart\" object in the section JSON with the following schema:\n" +
+               "{\n" +
+               "  \"type\": \"pie|bar|line\",\n" +
+               "  \"title\": \"Chart title\",\n" +
+               "  \"data\": { \"labels\": [\"A\", \"B\"], \"values\": [10, 20] },\n" +
+               "  \"options\": { \"width\": 600, \"height\": 400 }\n" +
+               "}\n" +
+               "The report generator will render the chart using JFreeChart and embed it into the Word report.";
+    }
+
+    /**
      * Check cache for an exact prompt match
      * Uses SHA-256 hash for exact matching
      */

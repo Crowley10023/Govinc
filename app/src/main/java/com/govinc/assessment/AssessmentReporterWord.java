@@ -45,6 +45,17 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import java.awt.image.BufferedImage;
+import org.jfree.chart.ChartFactory;
+import org.jfree.chart.JFreeChart;
+import org.jfree.chart.ChartUtils;
+import org.jfree.data.general.DefaultPieDataset;
+import org.jfree.data.category.DefaultCategoryDataset;
+import org.jfree.chart.plot.PlotOrientation;
+import org.docx4j.openpackaging.parts.WordprocessingML.BinaryPartAbstractImage;
+import org.docx4j.wml.Drawing;
+import org.docx4j.dml.wordprocessingDrawing.Inline;
+
 /**
  * Enhanced implementation using docx4j with template-aware AI prompt generation.
  */
@@ -141,6 +152,9 @@ public class AssessmentReporterWord {
             updateProgress(assessmentId, 20, "Building AI prompt with template information...");
             String prompt = buildPrompt(assessment, details, users, orgUnit, answers, templateAnalysis);
 
+            // Add chart capability hint to the prompt
+            prompt += "\n\n" + openAIUtil.getChartCapabilities();
+
             // Step 4: Generate content via AI
             updateProgress(assessmentId, 35, "Generating report content from AI...");
             String aiResult = openAIUtil.askAI(prompt);
@@ -169,8 +183,8 @@ public class AssessmentReporterWord {
             MainDocumentPart mdp = wordMLPackage.getMainDocumentPart();
             ObjectFactory factory = new ObjectFactory();
 
-            // Now we accept that AI may provide paragraphs and also real tables.
-            List<Object> generatedElements = buildElementsFromAiResponse(factory, reportJson, templateAnalysis);
+            // Now we accept that AI may provide paragraphs, tables and charts.
+            List<Object> generatedElements = buildElementsFromAiResponse(factory, wordMLPackage, reportJson, templateAnalysis);
 
             // Determine if a real table should still be inserted based on security catalog instructions
             SecurityCatalog cat = assessment.getSecurityCatalog();
@@ -228,7 +242,7 @@ public class AssessmentReporterWord {
                             content.remove(idx);
                         }
                     }
-                    // Build combined content objects (paragraphs and optional table)
+                    // Build combined content objects (paragraphs, tables and charts)
                     List<Object> combined = new ArrayList<>();
                     combined.addAll(generatedElements);
                     if (summaryTable != null) combined.add(summaryTable);
@@ -312,7 +326,7 @@ public class AssessmentReporterWord {
 
         // Styling markup instructions
         sb.append("You MAY apply simple inline styling for color and bold. Use XML-like inline tags: <style color=\"#RRGGBB\" bold=\"true|false\">text</style>.\n");
-        sb.append("The AI should only use these tags around spans that need different color/bold; otherwise return plain text.\n");
+        sb.append("The AI should only use these tags around spans that need different color/bold; otherwise return plain text.\n\n");
         sb.append("For tables, cells may be provided as objects with 'text' and optional 'color' and 'bold' fields.\n");
         sb.append("Example table cell: { \"text\": \"Control A\", \"color\": \"#FF0000\", \"bold\": true }\n\n");
 
@@ -332,6 +346,15 @@ public class AssessmentReporterWord {
         sb.append("      \"content\": \"Paragraph text. Use double-newline (\\\\n\\\\n) to separate paragraphs.\"\n");
         sb.append("    }\n");
         sb.append("  ]\n");
+        sb.append("}\n\n");
+
+        // Chart schema instructions
+        sb.append("If you want the report to include a chart, include a \"chart\" object in a section with this schema:\n");
+        sb.append("{\n");
+        sb.append("  \"type\": \"pie|bar|line\",\n");
+        sb.append("  \"title\": \"Chart title\",\n");
+        sb.append("  \"data\": { \"labels\": [\"A\", \"B\"], \"values\": [10, 20] },\n");
+        sb.append("  \"options\": { \"width\": 600, \"height\": 400 }\n");
         sb.append("}\n\n");
 
         // ============ SECURITY CATALOG INSTRUCTIONS ============
@@ -449,9 +472,9 @@ public class AssessmentReporterWord {
     }
 
     /**
-     * Build a mixed list of docx elements (paragraphs and tables) from AI JSON response.
+     * Build a mixed list of docx elements (paragraphs, tables and charts) from AI JSON response.
      */
-    private List<Object> buildElementsFromAiResponse(ObjectFactory factory, JSONObject reportJson, TemplateAnalysis templateAnalysis) {
+    private List<Object> buildElementsFromAiResponse(ObjectFactory factory, WordprocessingMLPackage wordMLPackage, JSONObject reportJson, TemplateAnalysis templateAnalysis) {
         List<Object> elements = new ArrayList<>();
 
         // Add title
@@ -474,6 +497,18 @@ public class AssessmentReporterWord {
                     String requestedHeadingStyle = section.optString("headingStyle", "Heading1");
                     String resolvedHeading = resolveStylePreferAI(requestedHeadingStyle, templateAnalysis);
                     elements.add(createParagraphWithStyle(factory, heading, resolvedHeading, templateAnalysis));
+                }
+
+                // Handle chart object if present
+                if (section.has("chart")) {
+                    try {
+                        P chartPara = createChartImage(factory, wordMLPackage, section.getJSONObject("chart"));
+                        if (chartPara != null) elements.add(chartPara);
+                    } catch (Exception e) {
+                        System.err.println("[AssessmentReporterWord] Error creating chart: " + e.getMessage());
+                    }
+                    // continue to next section after chart
+                    continue;
                 }
 
                 String requestedContentStyle = section.optString("contentStyle", "Normal");
@@ -918,6 +953,85 @@ public class AssessmentReporterWord {
         return tbl;
     }
 
+    /**
+     * Create a chart image using JFreeChart based on the provided JSON chart
+     * specification and return it as a docx paragraph containing the image.
+     */
+    private P createChartImage(ObjectFactory factory, WordprocessingMLPackage wordMLPackage, JSONObject chartObj) throws Exception {
+        if (chartObj == null) return null;
+        String type = chartObj.optString("type", "").toLowerCase(Locale.ROOT);
+        String title = chartObj.optString("title", "");
+        JSONObject data = chartObj.optJSONObject("data");
+        JSONObject options = chartObj.optJSONObject("options");
+        int width = 600;
+        int height = 400;
+        if (options != null) {
+            width = options.optInt("width", width);
+            height = options.optInt("height", height);
+        }
+
+        byte[] imgBytes = null;
+
+        if ("pie".equals(type)) {
+            DefaultPieDataset dataset = new DefaultPieDataset();
+            if (data != null) {
+                JSONArray labels = data.optJSONArray("labels");
+                JSONArray values = data.optJSONArray("values");
+                if (labels != null && values != null) {
+                    int n = Math.min(labels.length(), values.length());
+                    for (int i = 0; i < n; i++) {
+                        String lbl = labels.optString(i, "");
+                        double val = values.optDouble(i, 0.0);
+                        dataset.setValue(lbl, val);
+                    }
+                }
+            }
+            JFreeChart chart = ChartFactory.createPieChart(title, dataset, true, true, false);
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            ChartUtils.writeChartAsPNG(bos, chart, width, height);
+            imgBytes = bos.toByteArray();
+        } else if ("bar".equals(type) || "line".equals(type)) {
+            DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+            if (data != null) {
+                JSONArray labels = data.optJSONArray("labels");
+                JSONArray values = data.optJSONArray("values");
+                if (labels != null && values != null) {
+                    int n = Math.min(labels.length(), values.length());
+                    for (int i = 0; i < n; i++) {
+                        String lbl = labels.optString(i, "");
+                        double val = values.optDouble(i, 0.0);
+                        dataset.addValue(val, "Series1", lbl);
+                    }
+                }
+            }
+            JFreeChart chart;
+            if ("bar".equals(type)) {
+                chart = ChartFactory.createBarChart(title, "Category", "Value", dataset, PlotOrientation.VERTICAL, false, true, false);
+            } else {
+                chart = ChartFactory.createLineChart(title, "Category", "Value", dataset, PlotOrientation.VERTICAL, false, true, false);
+            }
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            ChartUtils.writeChartAsPNG(bos, chart, width, height);
+            imgBytes = bos.toByteArray();
+        } else {
+            System.out.println("[AssessmentReporterWord] Unknown chart type requested: " + type);
+            return null;
+        }
+
+        if (imgBytes == null || imgBytes.length == 0) return null;
+
+        // Create image inline using docx4j
+        BinaryPartAbstractImage imagePart = BinaryPartAbstractImage.createImagePart(wordMLPackage, imgBytes);
+        Inline inline = imagePart.createImageInline("chart.png", title == null ? "" : title, 0, 1, false);
+        Drawing drawing = factory.createDrawing();
+        drawing.getAnchorOrInline().add(inline);
+        R run = factory.createR();
+        run.getContent().add(drawing);
+        P p = factory.createP();
+        p.getContent().add(run);
+        return p;
+    }
+
     private JSONObject extractJson(String aiText) {
         int first = aiText.indexOf('{');
         int last = aiText.lastIndexOf('}');
@@ -1112,7 +1226,7 @@ public class AssessmentReporterWord {
                     }
                 }
             } catch (Exception e) {
-                System.err.println("[AssessmentReporterWord] Error extracting paragraph style: " + e.getMessage());
+                System.err.println("[TemplateReporterWord] Error extracting paragraph style: " + e.getMessage());
             }
             return null;
         }
