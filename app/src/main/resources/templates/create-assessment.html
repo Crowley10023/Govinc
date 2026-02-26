@@ -13,7 +13,7 @@
             <h1>Create Assessment</h1>
         </div>
         
-        <form th:action="@{/assessment/create}" method="post" class="create-assessment-form">
+        <form th:action="@{/assessment/create}" method="post" class="create-assessment-form" id="createAssessmentForm">
             <div class="card">
                 <div class="card-body">
                     <!-- Assessment Name -->
@@ -31,6 +31,7 @@
                                     th:value="${catalog.id}" 
                                     th:text="${catalog.name}"></option>
                         </select>
+                        <span id="catalogError" class="form-error" style="color:#b00020;display:none;margin-top:6px;">Please select a catalog.</span>
                     </div>
 
                     <!-- Org Unit Selection -->
@@ -45,6 +46,7 @@
                             <button type="button" id="openOrgUnitModal" class="btn-action">Select Org Unit</button>
                             <span id="selectedOrgUnitName" class="muted">No org unit selected</span>
                         </div>
+                        <span id="orgUnitError" class="form-error" style="color:#b00020;display:none;margin-top:6px;">Please select an organizational unit.</span>
 
                         <!-- Modal for choosing org unit -->
                         <div id="orgUnitModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;" aria-hidden="true">
@@ -167,5 +169,50 @@
             </div>
         </form>
     </div>
+
+    <script>
+        (function(){
+            var form = document.getElementById('createAssessmentForm');
+            if(!form) return;
+
+            var catalog = document.getElementById('catalog');
+            var orgUnitId = document.getElementById('orgUnitId');
+            var catalogError = document.getElementById('catalogError');
+            var orgUnitError = document.getElementById('orgUnitError');
+
+            function clearErrors(){
+                if(catalogError){ catalogError.style.display = 'none'; }
+                if(orgUnitError){ orgUnitError.style.display = 'none'; }
+                catalog.classList.remove('input-error');
+                document.getElementById('selectedOrgUnitName').classList.remove('input-error');
+            }
+
+            form.addEventListener('submit', function(e){
+                clearErrors();
+                var valid = true;
+
+                // Catalog must be selected (first option is placeholder)
+                if(!catalog || !catalog.value){
+                    if(catalogError){ catalogError.style.display = 'block'; }
+                    catalog.classList.add('input-error');
+                    valid = false;
+                }
+
+                // Org unit must be selected
+                if(!orgUnitId || !orgUnitId.value || orgUnitId.value.trim() === ''){
+                    if(orgUnitError){ orgUnitError.style.display = 'block'; }
+                    document.getElementById('selectedOrgUnitName').classList.add('input-error');
+                    valid = false;
+                }
+
+                if(!valid){
+                    e.preventDefault();
+                    // focus first invalid field
+                    if(!catalog.value){ catalog.focus(); }
+                    else { document.getElementById('openOrgUnitModal').focus(); }
+                }
+            });
+        })();
+    </script>
 </body>
 </html>
