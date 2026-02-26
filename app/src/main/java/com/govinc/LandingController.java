@@ -3,6 +3,8 @@ package com.govinc;
 import com.govinc.assessment.Assessment;
 import com.govinc.assessment.AssessmentRepository;
 import com.govinc.authorization.AuthorizationService;
+import com.govinc.user.UserRepository;
+import com.govinc.catalog.SecurityCatalogRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -20,6 +22,12 @@ public class LandingController {
 
     @Autowired
     private AuthorizationService authorizationService;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private SecurityCatalogRepository securityCatalogRepository;
 
     @GetMapping("/")
     public String home(Model model) {
@@ -40,9 +48,16 @@ public class LandingController {
             filtered.sort(Comparator.comparing(Assessment::getCreationDate, Comparator.nullsLast(Comparator.reverseOrder())));
             List<Assessment> latest = filtered.size() > 10 ? filtered.subList(0, 10) : filtered;
             model.addAttribute("latestAssessments", latest);
+
+            // Populate users and catalogs for filter dropdowns
+            model.addAttribute("filterUsers", userRepository.findAll());
+            model.addAttribute("filterCatalogs", securityCatalogRepository.findAll());
+
         } catch (Exception ex) {
             // Protect landing page from failing; show empty dashboard if something goes wrong
             model.addAttribute("latestAssessments", new ArrayList<Assessment>());
+            model.addAttribute("filterUsers", new ArrayList<>());
+            model.addAttribute("filterCatalogs", new ArrayList<>());
         }
         return "landing";
     }
