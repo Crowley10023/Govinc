@@ -313,6 +313,10 @@ public class AssessmentController {
                 controls.sort(Comparator.comparing(SecurityControl::getName, Comparator.nullsLast(String::compareTo)));
             }
             model.addAttribute("controls", controls);
+            // Also prepare controls sorted by 'reference' for template grouping
+            List<SecurityControl> controlsByReference = new ArrayList<>(controls);
+            controlsByReference.sort(Comparator.comparing(SecurityControl::getReference, Comparator.nullsLast(String::compareTo)));
+            model.addAttribute("controlsByReference", controlsByReference);
             System.out.println("getAssessmentById, controls: " + controls.size());
 
             // Prepare maturity answers/answers by percent

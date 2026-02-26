@@ -17,16 +17,24 @@
     <!-- Filter and Progress Bar (Sticky at Top) -->
     <div class="controls-filter-bar sticky-filter-bar">
         <div class="filter-section">
-            <div class="filter-item">
-                <label for="filter-unanswered-toggle">Show Only Unanswered:</label>
-                <input type="checkbox" id="filter-unanswered-toggle" class="filter-checkbox">
-            </div>
-            <div class="filter-item" id="maturity-filter-container">
-                <label for="filter-maturity-select">Filter by Maturity Level:</label>
-                <select id="filter-maturity-select" class="filter-select">
-                    <option value="">-- All Levels --</option>
-                </select>
-            </div>
+        <div class="filter-item">
+            <label for="filter-unanswered-toggle">Show Only Unanswered:</label>
+            <input type="checkbox" id="filter-unanswered-toggle" class="filter-checkbox">
+        </div>
+        <div class="filter-item" id="maturity-filter-container">
+            <label for="filter-maturity-select">Filter by Maturity Level:</label>
+            <select id="filter-maturity-select" class="filter-select">
+                <option value="">-- All Levels --</option>
+            </select>
+        </div>
+        <div class="filter-item" id="sort-filter-container">
+            <label for="filter-sort-select">Sort Controls By:</label>
+            <select id="filter-sort-select" class="filter-select" title="Sort controls within each domain">
+                <option value="name">Name</option>
+                <option value="reference">Reference</option>
+                <option value="tag">Tag</option>
+            </select>
+        </div>
         </div>
         <div class="progress-section">
             <div class="progress-info">
@@ -170,8 +178,9 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr th:each="ctrl : ${assessment.securityCatalog.securityControls}">
-                                    <th:block th:if="${ctrl.securityControlDomain != null && domain != null && ctrl.securityControlDomain.id == domain.id}">
+                                <tr th:each="ctrl : ${controlsByReference}"
+                                    th:if="${ctrl.securityControlDomain != null && domain != null && ctrl.securityControlDomain.id == domain.id}"
+                                    th:attr="data-control-id=${ctrl.id},data-control-name=${ctrl.name},data-control-reference=${ctrl.reference},data-control-tag=${ctrl.tag}">
                                         <td class="ctrl-name-col">
                                             <div class="ctrl-desc-wrap">
                                                 <span th:text="${ctrl.name}"></span>
@@ -244,7 +253,6 @@
                                                 </div>
                                             </div>
                                         </td>
-                                    </th:block>
                                 </tr>
                             </tbody>
                         </table>

@@ -750,13 +750,13 @@ function initializeFilterBar() {
     // Get all answer selects to determine total and answered counts
     var allSelects = document.querySelectorAll('.answer-select');
     filterState.totalControls = allSelects.length;
-    
+
     // Calculate initial answered count
     updateAnsweredCount();
-    
+
     // Update maturity filter options based on available answers
     populateMaturityFilter();
-    
+
     // Set up event listeners
     var unansweredToggle = document.getElementById('filter-unanswered-toggle');
     if (unansweredToggle) {
@@ -765,7 +765,7 @@ function initializeFilterBar() {
             applyFilters();
         });
     }
-    
+
     var maturitySelect = document.getElementById('filter-maturity-select');
     if (maturitySelect) {
         maturitySelect.addEventListener('change', function(e) {
@@ -773,7 +773,19 @@ function initializeFilterBar() {
             applyFilters();
         });
     }
-    
+
+    var sortSelect = document.getElementById('filter-sort-select');
+    if (sortSelect) {
+        sortSelect.addEventListener('change', function(e) {
+            var sortBy = e.target.value || 'name';
+            sortControls(sortBy);
+            // After sorting, reapply filters to ensure visibility is preserved
+            applyFilters();
+        });
+        // Initial sort based on current value
+        sortControls(sortSelect.value || 'name');
+    }
+
     // Initial update
     updateCompletionDisplay();
 }
@@ -823,19 +835,45 @@ function updateAnsweredCount() {
 }
 
 function updateCompletionDisplay() {
-    var percentage = filterState.totalControls > 0 
+    var percentage = filterState.totalControls > 0
         ? Math.round((filterState.answeredControls / filterState.totalControls) * 100)
         : 0;
-    
+
     var answeredEl = document.getElementById('answered-count');
     var totalEl = document.getElementById('total-count');
     var percentEl = document.getElementById('completion-percentage');
     var fillEl = document.getElementById('completion-bar-fill');
-    
+
     if (answeredEl) answeredEl.textContent = filterState.answeredControls;
     if (totalEl) totalEl.textContent = filterState.totalControls;
     if (percentEl) percentEl.textContent = percentage + '%';
     if (fillEl) fillEl.style.width = percentage + '%';
+}
+
+// Sort controls within each domain table by the given attribute (name / reference / tag)
+function sortControls(sortBy) {
+    if (!sortBy) sortBy = 'name';
+    var domains = document.querySelectorAll('.domain-outline.domain-collapsible');
+    domains.forEach(function(domain) {
+        var tbody = domain.querySelector('table.controls-table tbody');
+        if (!tbody) return;
+        var rows = Array.from(tbody.querySelectorAll('tr'));
+        // Filter out any rows that don't represent a control (no data-control-id)
+        rows = rows.filter(function(r) { return r.getAttribute('data-control-id') !== null; });
+
+        rows.sort(function(a, b) {
+            var va = (a.getAttribute('data-control-' + sortBy) || '').trim();
+            var vb = (b.getAttribute('data-control-' + sortBy) || '').trim();
+            // Empty values should be sorted last
+            if (!va && !vb) return 0;
+            if (!va) return 1;
+            if (!vb) return -1;
+            return va.localeCompare(vb, undefined, {numeric: true, sensitivity: 'base'});
+        });
+
+        // Re-append in sorted order
+        rows.forEach(function(r) { tbody.appendChild(r); });
+    });
 }
 
 function applyFilters() {

@@ -127,6 +127,8 @@
         }
 
         .assessment-link {
+            display: block;
+            width: 100%;
             color: var(--primary-blue-dark);
             text-decoration: none;
             font-weight: 600;
@@ -344,20 +346,19 @@
                             class="assessment-item"
                             th:attr="data-creation-date=${assessment.creationDate}, data-status=${assessment.status}, data-security=${assessment.securityCatalog != null ? assessment.securityCatalog.name : ''}, data-users=${assessment.createdBy != null ? assessment.createdBy.name : ''}">
 
-                            <a th:href="@{/assessment/{id}(id=${assessment.id})}" th:text="${assessment.name}"
-                                class="assessment-link"></a>
+                            <a th:href="@{/assessment/{id}(id=${assessment.id})}" class="assessment-link">
+                                <span th:text="${assessment.name}" class="assessment-title"></span>
 
-                            <div class="assessment-meta">
-                                <span class="assessment-org"
-                                    th:text="${assessment.orgUnit != null ? assessment.orgUnit.name : 'N/A'}"></span>
-                                <span class="assessment-date"
-                                    th:text="${assessment.creationDate != null ? #temporals.format(assessment.creationDate, 'yyyy-MM-dd') : 'N/A'}"></span>
-                            </div>
+                                <div class="assessment-meta">
+                                    <span class="assessment-org" th:text="${assessment.orgUnit != null ? assessment.orgUnit.name : 'N/A'}"></span>
+                                    <span class="assessment-date" th:text="${assessment.creationDate != null ? #temporals.format(assessment.creationDate, 'yyyy-MM-dd') : 'N/A'}"></span>
+                                </div>
 
-                            <!-- Hidden: render other involved users (if any) for client-side collection -->
-                            <div style="display:none;" class="involved-users">
-                                <span th:each="u : ${assessment.users}" th:text="${u.name}"></span>
-                            </div>
+                                <!-- Hidden: render other involved users (if any) for client-side collection -->
+                                <div style="display:none;" class="involved-users">
+                                    <span th:each="u : ${assessment.users}" th:text="${u.name}"></span>
+                                </div>
+                            </a>
 
                         </li>
                     </ul>
