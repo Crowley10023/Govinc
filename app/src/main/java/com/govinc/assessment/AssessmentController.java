@@ -134,7 +134,13 @@ public class AssessmentController {
         }
         assessment.setName(assessmentName);
         assessment.setSecurityCatalog(catalog);
-        assessment.setDate(LocalDate.now());
+        assessment.setCreationDate(LocalDate.now());
+        // Set createdBy to current user if available
+        try {
+            assessment.setCreatedBy(authorizationService.getCurrentUser());
+        } catch (Exception e) {
+            // ignore if current user cannot be determined
+        }
         // Persist org unit if set
         if (orgUnitId != null) {
             OrgUnit orgUnit = orgUnitService.getOrgUnit(orgUnitId).orElse(null);
@@ -180,6 +186,7 @@ public class AssessmentController {
         }
         
         model.addAttribute("assessments", filtered);
+        // Ensure the template and client-side filtering always use creationDate
         model.addAttribute("isAdminOrISM", authorizationService.isAdmin() || authorizationService.isInformationSecurityManager());
         return "assessment-list";
     }
@@ -688,15 +695,16 @@ public class AssessmentController {
             Assessment assessment = assessmentOpt.get();
             // Adhere to existing DB values: use CLOSED to indicate finalized
             assessment.setStatus(AssessmentStatus.CLOSED);
+            assessment.setCloseDate(LocalDate.now());
             assessmentRepository.save(assessment);
-        }
-        
-        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
-        if (detailsOpt.isPresent()) {
+            }
+
+            Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
+            if (detailsOpt.isPresent()) {
             AssessmentDetails details = detailsOpt.get();
             details.setCompletedDate(LocalDate.now());
             assessmentDetailsService.save(details);
-        }
+            }
         
         return "redirect:/assessment/" + id;
     }

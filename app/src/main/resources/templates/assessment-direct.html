@@ -70,9 +70,18 @@
                                 <td id="ad-name">-</td>
                             </tr>
                             <tr>
-                                <th>Date</th>
+                                <th>Creation Date</th>
                                 <td id="ad-date">-</td>
                             </tr>
+                            <tr>
+                                <th>Created By</th>
+                                <td id="ad-created-by">-</td>
+                            </tr>
+                            <tr>
+                                <th>Close Date</th>
+                                <td id="ad-close-date">-</td>
+                            </tr>
+                            <tr>
                             <tr>
                                 <th>Org Unit</th>
                                 <td id="ad-orgunit">-</td>
@@ -228,13 +237,15 @@
                     document.getElementById('ad-date').innerHTML = '<h1>Assessment Not Found</h1>';
                     return;
                 }
-                if (!data.assessment || data.assessment.status === 'CLOSED' || data.isOpen === false) {
-                    document.getElementById('ad-date').innerHTML = '<h1>SORRY NOT LONGER AVAILABLE</h1>';
+                if (!data.assessment) {
+                    document.getElementById('ad-date').innerHTML = '<h1>Assessment Not Found</h1>';
                     return;
                 }
                 var a = data.assessment;
                 document.getElementById('ad-name').textContent = a.name || '-';
-                document.getElementById('ad-date').textContent = a.date || '-';
+                document.getElementById('ad-date').textContent = a.creationDate || '-';
+                document.getElementById('ad-created-by').textContent = a.createdBy || '-';
+                document.getElementById('ad-close-date').textContent = a.closeDate || '-';
                 document.getElementById('ad-orgunit').textContent = a.orgUnit || '-';
                 document.getElementById('ad-status').textContent = a.status || '-';
                 var summaryRows = '';

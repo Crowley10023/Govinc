@@ -29,7 +29,7 @@ public class StatisticsController {
         // Assessments per year
         List<Assessment> allAssessments = assessmentRepository.findAll();
         Map<Integer, Long> yearToCount = allAssessments.stream()
-                .collect(Collectors.groupingBy(a -> a.getDate().getYear() + 1900, Collectors.counting()));
+                .collect(Collectors.groupingBy(a -> a.getCreationDate().getYear() + 1900, Collectors.counting()));
         List<AssessmentYearStat> assessmentsPerYear = yearToCount.entrySet().stream()
                 .map(e -> new AssessmentYearStat(e.getKey(), e.getValue()))
                 .sorted(Comparator.comparingInt(AssessmentYearStat::getYear))

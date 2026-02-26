@@ -26,7 +26,8 @@ public class Assessment {
     private OrgUnit orgUnit;
     // ------------------------------------------------
 
-    private LocalDate date;
+    private LocalDate creationDate;
+    private LocalDate closeDate;
 
     private String name;
 
@@ -55,9 +56,9 @@ public class Assessment {
         this.status = AssessmentStatus.OPEN;
     }
 
-    public Assessment(SecurityCatalog securityCatalog, LocalDate date, String name, AssessmentStatus status) {
+    public Assessment(SecurityCatalog securityCatalog, LocalDate creationDate, String name, AssessmentStatus status) {
         this.securityCatalog = securityCatalog;
-        this.date = date;
+        this.creationDate = creationDate;
         this.name = name;
         this.status = status != null ? status : AssessmentStatus.OPEN;
     }
@@ -88,12 +89,23 @@ public class Assessment {
     }
     // -------------------------------
 
-    public LocalDate getDate() {
-        return date;
+    public LocalDate getCreationDate() {
+        if (creationDate == null) {
+            return LocalDate.now();
+        }
+        return creationDate;
     }
 
-    public void setDate(LocalDate date) {
-        this.date = date;
+    public void setCreationDate(LocalDate creationDate) {
+        this.creationDate = creationDate;
+    }
+
+    public LocalDate getCloseDate() {
+        return closeDate;
+    }
+
+    public void setCloseDate(LocalDate closeDate) {
+        this.closeDate = closeDate;
     }
 
     public String getName() {
@@ -145,6 +157,19 @@ public class Assessment {
         this.users = users;
     }
 
+    // CREATED BY: single user reference
+    @ManyToOne
+    @JoinColumn(name = "created_by_id")
+    private User createdBy;
+
+    public User getCreatedBy() {
+        return createdBy;
+    }
+
+    public void setCreatedBy(User createdBy) {
+        this.createdBy = createdBy;
+    }
+
     // NEW: Getter and Setter for predecessor
     public Assessment getPredecessor() {
         return predecessor;
@@ -158,4 +183,4 @@ public class Assessment {
         return orgServices;
     }
 
-}
+    }

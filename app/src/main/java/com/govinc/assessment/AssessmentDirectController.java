@@ -52,13 +52,15 @@ public class AssessmentDirectController {
             Assessment assessment = urlEntity.getAssessment();
             Map<String, Object> out = new HashMap<>();
 
-            out.put("assessment", Map.of(
-                "id", assessment.getId(),
-                "date", assessment.getDate(),
-                "status", assessment.getStatus(),
-                "name", assessment.getName(),
-                "orgUnit", assessment.getOrgUnit() != null ? assessment.getOrgUnit().getName() : "-"
-            ));
+            Map<String, Object> assessmentMap = new HashMap<>();
+            assessmentMap.put("id", assessment.getId());
+            assessmentMap.put("creationDate", assessment.getCreationDate());
+            assessmentMap.put("closeDate", assessment.getCloseDate());
+            assessmentMap.put("status", assessment.getStatus());
+            assessmentMap.put("name", assessment.getName());
+            assessmentMap.put("orgUnit", assessment.getOrgUnit() != null ? assessment.getOrgUnit().getName() : "-");
+            assessmentMap.put("createdBy", assessment.getCreatedBy() != null ? (assessment.getCreatedBy().getName() + " (" + assessment.getCreatedBy().getEmail() + ")") : null);
+            out.put("assessment", assessmentMap);
 
             // Controls, sorted
             List<SecurityControl> controls = new ArrayList<>();
@@ -66,11 +68,15 @@ public class AssessmentDirectController {
                 controls.addAll(assessment.getSecurityCatalog().getSecurityControls());
                 controls.sort(Comparator.comparing(SecurityControl::getName, Comparator.nullsLast(String::compareTo)));
             }
-            out.put("controls", controls.stream().map(ctrl -> Map.of(
-                "id", ctrl.getId(),
-                "name", ctrl.getName(),
-                "detail", ctrl.getDetail(),
-                "domainId", ctrl.getSecurityControlDomain() != null ? ctrl.getSecurityControlDomain().getId() : null)).collect(Collectors.toList()));
+            List<Map<String, Object>> controlsList = controls.stream().map(ctrl -> {
+                Map<String, Object> m = new HashMap<>();
+                m.put("id", ctrl.getId());
+                m.put("name", ctrl.getName());
+                m.put("detail", ctrl.getDetail());
+                m.put("domainId", ctrl.getSecurityControlDomain() != null ? ctrl.getSecurityControlDomain().getId() : null);
+                return m;
+            }).collect(Collectors.toList());
+            out.put("controls", controlsList);
 
             // Control Domains, sorted
             List<SecurityControlDomain> securityControlDomains = controls.stream()
@@ -79,10 +85,14 @@ public class AssessmentDirectController {
                 .distinct()
                 .sorted(Comparator.comparing(SecurityControlDomain::getName, Comparator.nullsLast(String::compareTo)))
                 .collect(Collectors.toList());
-            out.put("securityControlDomains", securityControlDomains.stream().map(domain -> Map.of(
-                "id", domain.getId(),
-                "name", domain.getName(),
-                "description", domain.getDescription())).collect(Collectors.toList()));
+            List<Map<String, Object>> domainsList = securityControlDomains.stream().map(domain -> {
+                Map<String, Object> dm = new HashMap<>();
+                dm.put("id", domain.getId());
+                dm.put("name", domain.getName());
+                dm.put("description", domain.getDescription());
+                return dm;
+            }).collect(Collectors.toList());
+            out.put("securityControlDomains", domainsList);
 
             // Pass sorted maturity answers from the associated maturity model only
             List<MaturityAnswer> maturityAnswers = new ArrayList<>();
@@ -90,10 +100,13 @@ public class AssessmentDirectController {
                 maturityAnswers.addAll(assessment.getSecurityCatalog().getMaturityModel().getMaturityAnswers());
                 maturityAnswers.sort(Comparator.comparing(MaturityAnswer::getAnswer, Comparator.nullsLast(String::compareTo)));
             }
-            out.put("maturityAnswers", maturityAnswers.stream().map(ans -> Map.of(
-                "id", ans.getId(),
-                "answer", ans.getAnswer()
-            )).collect(Collectors.toList()));
+            List<Map<String, Object>> maturityList = maturityAnswers.stream().map(ans -> {
+                Map<String, Object> am = new HashMap<>();
+                am.put("id", ans.getId());
+                am.put("answer", ans.getAnswer());
+                return am;
+            }).collect(Collectors.toList());
+            out.put("maturityAnswers", maturityList);
 
             // Control Answers (ctrlId -> answer text if answered)
             Optional<AssessmentDetails> detailsOpt = detailsService.findById(assessment.getId());
@@ -248,13 +261,15 @@ public class AssessmentDirectController {
             java.util.Map<String, Object> result = new java.util.HashMap<>();
             result.put("id", assessment.getId());
             result.put("name", assessment.getName());
-            result.put("date", assessment.getDate());
+            result.put("creationDate", assessment.getCreationDate());
+            result.put("closeDate", assessment.getCloseDate());
             result.put("status", assessment.getStatus());
             if (assessment.getOrgUnit() != null) {
                 result.put("orgUnit", assessment.getOrgUnit().getName());
             } else {
                 result.put("orgUnit", "-");
             }
+            result.put("createdBy", assessment.getCreatedBy() != null ? assessment.getCreatedBy().getName() + " (" + assessment.getCreatedBy().getEmail() + ")" : null);
             return org.springframework.http.ResponseEntity.ok(result);
         } else {
             return org.springframework.http.ResponseEntity.status(404).body(java.util.Map.of("error", "Not found"));
@@ -273,8 +288,9 @@ public class AssessmentDirectController {
         
         // Set assessment status to CLOSED (finalized) to align with existing DB values
         assessment.setStatus(AssessmentStatus.CLOSED);
+        assessment.setCloseDate(LocalDate.now());
         assessmentRepository.save(assessment);
-        
+
         // Update assessment details with completion date
         Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(assessment.getId());
         if (detailsOpt.isPresent()) {

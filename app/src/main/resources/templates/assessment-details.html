@@ -65,8 +65,16 @@
                             <td th:text="${assessment.name}"></td>
                         </tr>
                         <tr>
-                            <th>Date</th>
-                            <td th:text="${assessment.date}"></td>
+                            <th>Creation Date</th>
+                            <td th:text="${assessment.creationDate}"></td>
+                        </tr>
+                        <tr>
+                            <th>Created By</th>
+                            <td th:text="${assessment.createdBy != null ? (assessment.createdBy.name + ' (' + assessment.createdBy.email + ')') : 'Unknown'}"></td>
+                        </tr>
+                        <tr th:if="${assessment.closeDate != null}">
+                            <th>Close Date</th>
+                            <td th:text="${assessment.closeDate}"></td>
                         </tr>
                         <tr>
                             <th>Organization Unit</th>

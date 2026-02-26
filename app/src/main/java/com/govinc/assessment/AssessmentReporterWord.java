@@ -379,9 +379,9 @@ public class AssessmentReporterWord {
         sb.append("Assessment Metadata:\n");
         sb.append("  ID: ").append(assessment.getId()).append("\n");
         sb.append("  Name: ").append(assessment.getName() == null ? "-" : assessment.getName()).append("\n");
-        sb.append("  Date: ").append(assessment.getDate() == null ? "-" : assessment.getDate().toString()).append("\n");
+        sb.append("  Creation Date: ").append(assessment.getCreationDate() == null ? "-" : assessment.getCreationDate().toString()).append("\n");
         sb.append("  Organization: ").append(orgUnit == null ? "-" : orgUnit.getName()).append("\n");
-        sb.append("  Completed: ").append(details == null || details.getDate() == null ? "-" : details.getDate().toString()).append("\n");
+        sb.append("  Completed: ").append(details == null || details.getCompletedDate() == null ? "-" : details.getCompletedDate().toString()).append("\n");
         sb.append("  Security Catalog: ").append(cat == null ? "-" : cat.getName() + " (Rev. " + (cat.getRevision() == null ? "-" : cat.getRevision()) + ")").append("\n\n");
 
         sb.append("Assessment Participants:\n");

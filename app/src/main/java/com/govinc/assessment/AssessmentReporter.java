@@ -107,8 +107,8 @@ public class AssessmentReporter {
             p1.add(new Chunk(String.valueOf(assessment.getId()), regularFont));
             doc.add(p1);
             p1 = new Paragraph();
-            p1.add(new Chunk("Date: ", boldFont));
-            p1.add(new Chunk(assessment.getDate() != null ? assessment.getDate().toString() : "-", regularFont));
+            p1.add(new Chunk("Creation Date: ", boldFont));
+            p1.add(new Chunk(assessment.getCreationDate() != null ? assessment.getCreationDate().toString() : "-", regularFont));
             doc.add(p1);
             p1 = new Paragraph();
             p1.add(new Chunk("Catalog: ", boldFont));
@@ -118,7 +118,7 @@ public class AssessmentReporter {
             doc.add(p1);
             p1 = new Paragraph();
             p1.add(new Chunk("Completed On: ", boldFont));
-            p1.add(new Chunk(details.getDate() != null ? details.getDate().toString() : "-", regularFont));
+            p1.add(new Chunk(details.getCompletedDate() != null ? details.getCompletedDate().toString() : "-", regularFont));
             doc.add(p1);
             doc.add(Chunk.NEWLINE);
             doc.add(new LineSeparator(0.5f, 100, BaseColor.LIGHT_GRAY, Element.ALIGN_CENTER, -4));

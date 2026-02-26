@@ -36,7 +36,8 @@ public class LandingController {
                     // In case of any authorization or null id issues, skip this assessment
                 }
             }
-            filtered.sort(Comparator.comparing(Assessment::getDate, Comparator.nullsLast(Comparator.reverseOrder())));
+            // Sort by creationDate (new field) descending, with nulls last
+            filtered.sort(Comparator.comparing(Assessment::getCreationDate, Comparator.nullsLast(Comparator.reverseOrder())));
             List<Assessment> latest = filtered.size() > 10 ? filtered.subList(0, 10) : filtered;
             model.addAttribute("latestAssessments", latest);
         } catch (Exception ex) {

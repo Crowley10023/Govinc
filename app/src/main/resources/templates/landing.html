@@ -337,7 +337,7 @@
                                 <span class="assessment-org"
                                     th:text="${assessment.orgUnit != null ? assessment.orgUnit.name : 'N/A'}"></span>
                                 <span class="assessment-date"
-                                    th:text="${assessment.date != null ? #temporals.format(assessment.date, 'yyyy-MM-dd') : 'N/A'}"></span>
+                                    th:text="${assessment.creationDate != null ? #temporals.format(assessment.creationDate, 'yyyy-MM-dd') : 'N/A'}"></span>
                             </div>
                         </li>
                     </ul>

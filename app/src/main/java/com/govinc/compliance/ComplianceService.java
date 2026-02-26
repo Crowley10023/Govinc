@@ -217,7 +217,7 @@ public class ComplianceService {
                     && unitIds.contains(a.getOrgUnit().getId())) {
                 Assessment prev = latest.get(a.getOrgUnit().getId());
                 if (prev == null ||
-                        (a.getDate() != null && (prev.getDate() == null || a.getDate().isAfter(prev.getDate())))) {
+                        (a.getCreationDate() != null && (prev.getCreationDate() == null || a.getCreationDate().isAfter(prev.getCreationDate())))) {
                     latest.put(a.getOrgUnit().getId(), a);
                 }
             }
