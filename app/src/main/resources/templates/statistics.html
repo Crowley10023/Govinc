@@ -3,43 +3,165 @@
 <head>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <meta charset="UTF-8">
-    <title>Statistics</title>
+    <title>Dashboard</title>
     <link rel="stylesheet" href="/style.css">
+    <style>
+        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 1rem; margin-bottom: 1rem; }
+        .card { background: #fff; border-radius: 6px; padding: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .card h3 { margin: 0 0 .5rem 0; font-size: 1rem; color: #333; }
+        .metric { font-size: 2rem; font-weight: 600; }
+        .small { color: #666; font-size: .9rem; }
+        .table { width: 100%; border-collapse: collapse; }
+        .table th, .table td { text-align: left; padding: .5rem; border-bottom: 1px solid #eee; }
+        .recent-list { list-style: none; padding: 0; margin: 0; }
+        .recent-item { padding: .5rem 0; border-bottom: 1px dashed #eee; }
+        .muted { color: #777; font-size: .9rem; }
+        /* simple bar chart */
+        .chart { display: flex; align-items: flex-end; gap: .5rem; padding: 1rem 0; height: 220px; }
+        .chart-bar { background: #4a90e2; border-radius: 4px 4px 0 0; width: 36px; display:flex; align-items:flex-end; justify-content:center; color:#fff; font-size:0.8rem; }
+        .chart-labels { display:flex; gap:.5rem; margin-top:.5rem; }
+        .chart-label { width:36px; text-align:center; font-size:.75rem; color:#333; }
+        .chart-wrap { overflow-x:auto; }
+    </style>
 </head>
 <body>
     <div th:replace="~{navigation :: mainNav}"></div>
     <div class="container">
-        <h1>Statistics</h1>
-        <section>
-            <h2>Assessments Per Year</h2>
-            <table class="table card">
+        <h1>Dashboard</h1>
+
+        <div class="dashboard-grid">
+            <div class="card">
+                <h3>Assessments</h3>
+                <div id="assessmentsCount" class="metric">—</div>
+                <div class="small">Total number of assessments</div>
+            </div>
+            <div class="card">
+                <h3>Answers given in assessments</h3>
+                <div id="maturityAnswers" class="metric">—</div>
+                <div class="small">Number of maturity answers recorded as part of assessments</div>
+            </div>
+            <div class="card">
+                <h3>Security Catalogs</h3>
+                <div id="catalogsCount" class="metric">—</div>
+                <div class="small">Number of security catalogs</div>
+            </div>
+            <div class="card">
+                <h3>Recent Activity</h3>
+                <div id="recentSummary" class="muted">Latest assessments and updates</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Assessments created (last 12 months)</h2>
+            <div class="chart-wrap">
+                <div id="monthlyChart" class="chart">Loading…</div>
+                <div id="monthlyLabels" class="chart-labels"></div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top:1rem">
+            <h2>Distribution of Assessments by Security Catalog</h2>
+            <table class="table" id="distributionTable">
                 <thead>
-                    <tr>
-                        <th>Year</th>
-                        <th>Number of Assessments</th>
-                    </tr>
+                    <tr><th>Catalog</th><th>Assessments</th></tr>
                 </thead>
                 <tbody>
-                    <tr th:each="stat : ${assessmentsPerYear}">
-                        <td th:text="${stat.year}"></td>
-                        <td th:text="${stat.count}"></td>
-                    </tr>
+                    <tr><td colspan="2" class="muted">Loading…</td></tr>
                 </tbody>
             </table>
-        </section>
-        <section>
-            <h2>Security Controls Overview</h2>
-            <table class="table card">
-                <tr>
-                    <th>Total Security Controls</th>
-                    <td th:text="${totalControls}"></td>
-                </tr>
-                <tr>
-                    <th>Total Controls Answered</th>
-                    <td th:text="${totalAnswered}"></td>
-                </tr>
-            </table>
-        </section>
+        </div>
+
+        <div class="card" style="margin-top:1rem">
+            <h2>Recent Assessments</h2>
+            <ul class="recent-list" id="recentList">
+                <li class="muted">Loading…</li>
+            </ul>
+        </div>
     </div>
+
+    <script>
+        function el(id){return document.getElementById(id);}
+
+        function renderMonthlyChart(monthly){
+            var container = el('monthlyChart');
+            var labels = el('monthlyLabels');
+            container.innerHTML = '';
+            labels.innerHTML = '';
+            if(!monthly || monthly.length===0){
+                container.textContent = 'No data';
+                return;
+            }
+            var max = Math.max.apply(null, monthly.map(function(m){return m.count;}));
+            if(max === 0) max = 1;
+            monthly.forEach(function(m){
+                var h = Math.round((m.count / max) * 200); // scale to chart height
+                var bar = document.createElement('div');
+                bar.className = 'chart-bar';
+                bar.style.height = (h+20)+'px'; // add some min height for label
+                bar.title = m.label + ': ' + m.count;
+                bar.textContent = m.count>0?m.count:'';
+                container.appendChild(bar);
+
+                var lbl = document.createElement('div');
+                lbl.className = 'chart-label';
+                lbl.textContent = m.label.split(' ')[0];
+                labels.appendChild(lbl);
+            });
+        }
+
+        fetch('/api/dashboard')
+            .then(function(r){ if(!r.ok) throw new Error('Network response was not ok'); return r.json(); })
+            .then(function(data){
+                el('assessmentsCount').innerText = data.assessmentsCount ?? '0';
+                el('maturityAnswers').innerText = data.maturityAnswers ?? '0';
+                el('catalogsCount').innerText = (data.distribution && data.distribution.length) ? data.distribution.length : '0';
+
+                // Monthly chart
+                renderMonthlyChart(data.monthlyCreatedAssessments);
+
+                // Distribution
+                var distTbody = document.querySelector('#distributionTable tbody');
+                distTbody.innerHTML = '';
+                if(data.distribution && data.distribution.length>0){
+                    data.distribution.forEach(function(d){
+                        var tr = document.createElement('tr');
+                        var nameTd = document.createElement('td');
+                        nameTd.textContent = (d.catalogName || ('Catalog #' + (d.catalogId || '')));
+                        var countTd = document.createElement('td');
+                        countTd.textContent = d.count;
+                        tr.appendChild(nameTd);
+                        tr.appendChild(countTd);
+                        distTbody.appendChild(tr);
+                    });
+                } else {
+                    var tr = document.createElement('tr');
+                    var td = document.createElement('td'); td.setAttribute('colspan','2'); td.className='muted'; td.textContent='No data';
+                    tr.appendChild(td); distTbody.appendChild(tr);
+                }
+
+                // Recent
+                var recentList = el('recentList');
+                recentList.innerHTML = '';
+                if(data.recentAssessments && data.recentAssessments.length>0){
+                    data.recentAssessments.forEach(function(a){
+                        var li = document.createElement('li'); li.className='recent-item';
+                        var aLink = document.createElement('a');
+                        aLink.href = '/assessment/' + (a.id || '');
+                        aLink.textContent = a.name || ('Assessment #' + (a.id||''));
+                        var meta = document.createElement('div'); meta.className='muted';
+                        meta.textContent = (a.creationDate ? a.creationDate + ' • ' : '') + (a.catalogName || '') + (a.status ? ' • ' + a.status : '');
+                        li.appendChild(aLink); li.appendChild(meta);
+                        recentList.appendChild(li);
+                    });
+                } else {
+                    var li = document.createElement('li'); li.className='muted'; li.textContent='No recent assessments'; recentList.appendChild(li);
+                }
+            })
+            .catch(function(err){
+                console.error(err);
+                var nodes = document.querySelectorAll('.card .muted');
+                nodes.forEach(function(n){ n.textContent = 'Failed to load dashboard'; });
+            });
+    </script>
 </body>
 </html>
