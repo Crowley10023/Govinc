@@ -123,7 +123,7 @@ public class UserController {
         }
 
         // Prevent an ADMIN user from removing their own ADMIN role
-        if (currentUser != null && currentUser.getId().equals(id) && currentUser.getRole() == Role.ADMIN) {
+        if (currentUser != null && currentUser.getId().equals(id) && (currentUser.getRole() == Role.ADMIN)) {
             user.setRole(Role.ADMIN);
         }
         

@@ -96,18 +96,44 @@ public class AuthorizationService {
      * User roles are always fetched from the app database, NOT from the identity provider.
      */
     public Role getCurrentUserRole() {
-        User user = getCurrentUser();
-        if (user == null) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return getRoleFromAuthentication(auth);
+    }
+
+    /**
+     * Resolve Role from a provided Authentication object (does not rely on SecurityContextHolder).
+     */
+    public Role getRoleFromAuthentication(Authentication auth) {
+        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getPrincipal())) {
             return null;
         }
-        
-        Role userRole = user.getRole();
-        
-        if (user.getName().equalsIgnoreCase("admin")) {
-            return Role.ADMIN;
+
+        String username = null;
+        if (auth.getPrincipal() instanceof org.springframework.security.oauth2.core.oidc.user.OidcUser oidcUser) {
+            username = oidcUser.getPreferredUsername();
+            if (username == null) username = oidcUser.getEmail();
+            if (username == null) {
+                Object sub = oidcUser.getClaims().get("sub");
+                if (sub != null) username = sub.toString();
+            }
+        } else if (auth.getPrincipal() instanceof org.springframework.security.core.userdetails.UserDetails ud) {
+            username = ud.getUsername();
+        } else if (auth.getPrincipal() instanceof String str) {
+            username = str;
         }
 
-        return userRole;
+        if (username == null) return null;
+
+        java.util.Optional<User> userOpt = userRepository.findByName(username);
+        if (userOpt.isEmpty()) {
+            logger.fine("Authenticated principal '" + username + "' not found in DB when resolving role");
+            return null;
+        }
+        User user = userOpt.get();
+        if (user.getName() != null && user.getName().equalsIgnoreCase("admin")) {
+            return Role.ADMIN;
+        }
+        return user.getRole();
     }
     
     /**
@@ -120,26 +146,29 @@ public class AuthorizationService {
     
     /**
      * Check if user has information security manager role
+     * Note: ADMIN should be considered to have all permissions, so treat ADMIN as an ISM for checks
      */
     public boolean isInformationSecurityManager() {
         Role role = getCurrentUserRole();
-        return role == Role.INFORMATION_SECURITY_MANAGER;
+        return role == Role.ADMIN || role == Role.INFORMATION_SECURITY_MANAGER;
     }
-    
+
     /**
      * Check if user is organization team leader
+     * Admins should be treated as having all roles for authorization checks
      */
     public boolean isOrganisationTeamLeader() {
         Role role = getCurrentUserRole();
-        return role == Role.ORGANISATION_TEAM_LEADER;
+        return role == Role.ADMIN || role == Role.ORGANISATION_TEAM_LEADER;
     }
-    
+
     /**
      * Check if user is assessment delegate
+     * Admins should be treated as having all roles for authorization checks
      */
     public boolean isAssessmentDelegate() {
         Role role = getCurrentUserRole();
-        return role == Role.ASSESSMENT_DELEGATE;
+        return role == Role.ADMIN || role == Role.ASSESSMENT_DELEGATE;
     }
     
     /**

@@ -26,7 +26,9 @@
           style="color: var(--background-light); background: var(--primary-blue-dark);">User:</span>
         <span class="user-name"
           th:text="${userName != null} ? ${userName} : (${userId != null} ? ${userId} : 'no user')"
-          style="color: var(--text-main); background: var(--shine-glare);"></span>
+          style="color: var(--text-main); background: var(--shine-glare); padding: 2px 6px; border-radius: 3px;"></span>
+        <span class="nav-label" style="margin-left:0.6em; color: var(--background-light); background: var(--primary-blue-dark);">Role:</span>
+        <span class="user-role" th:text="${userRole != null} ? ${userRole} : 'No role'" style="color: var(--text-main); background: var(--shine-glare); padding: 2px 6px; border-radius: 3px;"></span>
       </div>
       <div class="version-section" style="display: flex; align-items: center; gap: 8px;padding-right: 2em;F">
         <span class="nav-label"

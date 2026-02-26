@@ -135,4 +135,19 @@ public class GlobalUserSessionAdvice {
             return false;
         }
     }
-}
+
+    /**
+     * Add current user's role (display name) to the model for templates.
+     */
+    @ModelAttribute("userRole")
+    public String addUserRoleToModel() {
+        try {
+            if (authorizationService == null) return null;
+            com.govinc.user.Role role = authorizationService.getCurrentUserRole();
+            if (role == null) return null;
+            return role.getDisplayName();
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+    }

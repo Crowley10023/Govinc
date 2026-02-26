@@ -91,6 +91,13 @@ public class SecurityConfig {
     @Autowired
     private Environment environment;
 
+    @Autowired
+    private com.govinc.authorization.AuthorizationService authorizationService;
+
+    // Filter that augments authorities in the SecurityContext using app DB roles
+    @Autowired
+    private com.govinc.configuration.GrantedAuthoritiesAugmentationFilter grantedAuthoritiesAugmentationFilter;
+
     // Load users from properties for form-based authentication
     @Value("#{${users:{:}}}")
     private Map<String, String> userProperties;
@@ -123,6 +130,8 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.ignoringRequestMatchers(CSRF_IGNORED_URLS))
             .exceptionHandling(exception -> exception
                 .accessDeniedHandler(accessDeniedHandler()))
+            // Ensure the granted-authorities augmentation filter runs early so hasRole checks see DB-driven roles
+            .addFilterBefore(grantedAuthoritiesAugmentationFilter, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(new OAuth2AuthorizationRequestLoggingFilter(), org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(new OAuth2DebugLoggingFilter(), org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
             .formLogin(form -> form
