@@ -975,18 +975,44 @@ function applyFilters() {
     });
 }
 
+// Simple debounce helper for frequent updates
+function debounce(func, wait) {
+    var timeout;
+    return function() {
+        var context = this, args = arguments;
+        clearTimeout(timeout);
+        timeout = setTimeout(function() {
+            func.apply(context, args);
+        }, wait);
+    };
+}
+
+var debouncedUpdateMaturityChart = debounce(function() {
+    try {
+        initializeMaturityRatingChart();
+    } catch (e) {
+        // ignore
+    }
+}, 250);
+
 document.addEventListener("DOMContentLoaded", function () {
     // Initialize filter bar first
     initializeFilterBar();
-    
+
+    // Initial domain completeness and chart rendering
     checkDomainCompleteness();
+    // Try to initialize maturity chart after a small delay to ensure DOM is fully rendered
+    setTimeout(function() { try { initializeMaturityRatingChart(); } catch (e) {} }, 200);
+
     document.body.addEventListener("change", function (e) {
         if (e.target.classList.contains("answer-select")) {
             checkDomainCompleteness();
             updateAnsweredCount();
+            // Update chart when answers change
+            debouncedUpdateMaturityChart();
         }
     });
-    
+
     // Collapse assessment details by default on page load
     var adBody = document.querySelector('.assessment-details-body');
     if (adBody) adBody.style.display = 'none';

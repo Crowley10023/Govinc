@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="/style.css">
     <link rel="stylesheet" href="/general.css">
     <link rel="stylesheet" href="/answering-guide.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <!-- CSRF meta tags for AJAX -->
     <meta name="_csrf" th:content="${_csrf.token}" />
     <meta name="_csrf_header" th:content="${_csrf.headerName}" />
@@ -126,26 +127,31 @@
                                         th:if="${!iterStat.last}">, </span></span></td>
                         </tr>
                     </table>
+                    
                     <h2>Summary of Answers</h2>
-                    <table class="table card summary-table">
-                        <thead>
-                            <tr>
-                                <th>Answer Category</th>
-                                <th>Count</th>
-                                <th>Percent (%)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr th:if="${answerSummary == null || answerSummary.isEmpty()}">
-                                <td colspan="3">No answers yet</td>
-                            </tr>
-                            <tr th:each="entry : ${answerSummary}">
-                                <td th:text="${entry.key}"></td>
-                                <td th:text="${entry.value.count}"></td>
-                                <td th:text="${#numbers.formatDecimal(entry.value.percent, 0, 2)}"></td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <div th:if="${answerSummary == null || answerSummary.isEmpty()}" class="no-answers-message">
+                        <p>No answers yet</p>
+                    </div>
+                    
+                    <div th:if="${answerSummary != null && !answerSummary.isEmpty()}" class="summary-answers-container">
+                        <div class="pie-chart-box">
+                            <canvas id="answerSummaryChart" width="400" height="400"></canvas>
+                        </div>
+                        <div class="summary-legend">
+                            <div th:each="entry : ${answerSummary}" class="legend-item-data" th:data-label="${entry.key}" th:data-count="${entry.value.count}" th:data-percent="${#numbers.formatDecimal(entry.value.percent, 0, 2)}"></div>
+                        </div>
+                    </div>
+
+                    <h2 style="margin-top: 40px;">Average Maturity Rating by Domain</h2>
+                    <div th:if="${securityControlDomains == null || securityControlDomains.isEmpty()}" class="no-answers-message">
+                        <p>No domains available</p>
+                    </div>
+
+                    <div th:if="${securityControlDomains != null && !securityControlDomains.isEmpty()}" class="bar-chart-container">
+                        <div class="bar-chart-box">
+                            <canvas id="maturityRatingChart" width="800" height="400"></canvas>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -248,7 +254,7 @@
                                                         th:data-control-id="${ctrl.id}"
                                                         th:disabled="${!assessment.isOpen} or (${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])})"
                                                         th:placeholder="${(T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id]))} ? 'No comment from Org Service' : 'Add comment (optional)'"
-                                                        th:text="${controlComments != null and controlComments[ctrl.id] != null ? controlComments[ctrl.id] : (orgServiceControlComments != null and orgServiceControlComments[ctrl.id] != null ? orgServiceControlComments[ctrl.id] : '')}"
+                                                        th:text="${controlComments != null && controlComments[ctrl.id] != null ? controlComments[ctrl.id] : (orgServiceControlComments != null && orgServiceControlComments[ctrl.id] != null ? orgServiceControlComments[ctrl.id] : '')}"
                                                         th:inline="text"></textarea>
                                                 </div>
                                             </div>
@@ -466,7 +472,204 @@
                     }
                 });
             }
+
+            setTimeout(initializeAnswerSummaryChart, 300);
+            // Ensure maturity chart is initialized even when there is no answer summary
+            setTimeout(initializeMaturityRatingChart, 350);
         });
+
+        var chartInstance = null;
+        var maturityChartInstance = null;
+
+        function initializeAnswerSummaryChart() {
+            var ctx = document.getElementById('answerSummaryChart');
+            if (!ctx) return;
+
+            function generateGradientColors(n) {
+                // Start = red, End = green
+                var start = { r: 255, g: 59, b: 48 };   // red-ish
+                var end = { r: 34, g: 197, b: 94 };     // green-ish
+                var cols = [];
+                for (var i = 0; i < n; i++) {
+                    var t = n === 1 ? 0 : i / (n - 1);
+                    var r = Math.round(start.r + (end.r - start.r) * t);
+                    var g = Math.round(start.g + (end.g - start.g) * t);
+                    var b = Math.round(start.b + (end.b - start.b) * t);
+                    cols.push('rgb(' + r + ',' + g + ',' + b + ')');
+                }
+                return cols;
+            }
+            var dataItems = document.querySelectorAll('.legend-item-data');
+            if (dataItems.length === 0) return;
+
+            var data = [];
+            dataItems.forEach(function(item) {
+                data.push({
+                    label: item.getAttribute('data-label'),
+                    count: parseInt(item.getAttribute('data-count')),
+                    percent: item.getAttribute('data-percent')
+                });
+            });
+
+            // Sort by label name alphabetically
+            data.sort(function(a, b) { return a.label.localeCompare(b.label); });
+
+            // Generate colors after sorting so first legend item = red, last = green
+            var colors = generateGradientColors(data.length);
+
+            // Extract for chart
+            var labels = data.map(function(d) { return d.label; });
+            var values = data.map(function(d) { return d.count; });
+            
+            chartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: colors.slice(0, labels.length),
+                        borderColor: '#fff',
+                        borderWidth: 3
+                    }]
+                },
+                options: {
+                    responsive: false,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+            
+            // Rebuild legend with sorted data and colors
+            var legendContainer = document.querySelector('.summary-legend');
+            var html = '';
+            data.forEach(function(item, idx) {
+                html += '<div class="legend-item" style="border-left-color: ' + colors[idx] + ';">' +
+                    '<div class="legend-label"><strong>' + item.label + '</strong></div>' +
+                    '<div class="legend-values">' +
+                    '<span class="legend-count">' + item.count + ' answer(s)</span>' +
+                    '<span class="legend-percent">' + item.percent + '%</span>' +
+                    '</div></div>';
+            });
+            legendContainer.innerHTML = html;
+
+            // Initialize maturity rating bar chart
+            setTimeout(initializeMaturityRatingChart, 100);
+        }
+
+        function initializeMaturityRatingChart() {
+            var ctx = document.getElementById('maturityRatingChart');
+            if (!ctx) return;
+
+            var controlsViewport = document.querySelector('.controls-viewport');
+            if (!controlsViewport) return;
+
+            var domainCollapsibles = Array.from(controlsViewport.querySelectorAll(':scope > .domain-collapsible'));
+            var domainData = [];
+
+            domainCollapsibles.forEach(function(domainSection) {
+                var domainTitle = domainSection.querySelector(':scope > .domain-header .domain-title');
+                if (!domainTitle) return;
+
+                var domainName = domainTitle.textContent.trim();
+                var controlRows = Array.from(domainSection.querySelectorAll('.controls-table tbody tr'));
+                var totalMaturity = 0;
+                var answeredCount = 0;
+
+                controlRows.forEach(function(row) {
+                    var select = row.querySelector('select.answer-select');
+                    if (select && select.value) {
+                        var selectedIndex = select.selectedIndex;
+                        if (selectedIndex > 0 && selectedIndex < select.options.length) {
+                            var selectedOption = select.options[selectedIndex];
+                            var answerText = selectedOption.textContent.trim();
+                            var maturityLevel = parseMaturityLevel(answerText);
+                            if (maturityLevel !== null) {
+                                totalMaturity += maturityLevel;
+                                answeredCount++;
+                            }
+                        }
+                    }
+                });
+
+                var avgMaturity = answeredCount > 0 ? totalMaturity / answeredCount : 0;
+                domainData.push({
+                    name: domainName,
+                    average: avgMaturity,
+                    answeredCount: answeredCount
+                });
+            });
+
+            if (domainData.length === 0) {
+                console.warn('No domain data found');
+                return;
+            }
+
+            // Sort by domain name alphabetically
+            domainData.sort(function(a, b) { return a.name.localeCompare(b.name); });
+
+            var labels = domainData.map(function(d) { return d.name; });
+            var values = domainData.map(function(d) { return parseFloat(d.average.toFixed(2)); });
+
+            if (maturityChartInstance) {
+                maturityChartInstance.destroy();
+            }
+
+            maturityChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Average Maturity Rating',
+                        data: values,
+                        backgroundColor: '#36A2EB',
+                        borderColor: '#2274A5',
+                        borderWidth: 2,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            max: 5,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function parseMaturityLevel(answerText) {
+            if (!answerText) return null;
+            var text = answerText.toLowerCase();
+
+            // 1) Try explicit "level X" patterns (e.g. "Level 3")
+            var m = text.match(/level\s*([1-5])\b/);
+            if (m && m[1]) return parseInt(m[1], 10);
+
+            // 2) Try common formats like "1 -", "1.", "1)", or digit at start
+            m = text.match(/(^|[^0-9])([1-5])(?=\s*[-\.\)]|\s|$)/);
+            if (m && m[2]) return parseInt(m[2], 10);
+
+            // 3) Fallback: first occurrence of a digit 1-5 anywhere
+            m = text.match(/([1-5])/);
+            if (m && m[1]) return parseInt(m[1], 10);
+
+            return null;
+        }
     </script>
 
     <style>
@@ -505,6 +708,105 @@
         .modal-content {
             margin: 20px 0;
             line-height: 1.6;
+        }
+
+        /* Summary Answers Container */
+        .summary-answers-container {
+            display: flex;
+            gap: 60px;
+            align-items: flex-start;
+            margin-top: 30px;
+            padding: 30px;
+            background-color: #fafafa;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .pie-chart-box {
+            flex: 0 0 auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .no-answers-message {
+            color: #999;
+            font-size: 1em;
+            text-align: center;
+            padding: 40px;
+            background-color: #fafafa;
+            border-radius: 8px;
+        }
+
+        .summary-legend {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .legend-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 18px;
+            border-left: 18px solid #2274A5;
+            background-color: #ffffff;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .legend-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.12);
+        }
+
+        .legend-label {
+            flex: 1;
+            font-weight: 600;
+            color: #333;
+            font-size: 1em;
+            margin-right: 20px;
+        }
+
+        .legend-values {
+            display: flex;
+            flex-direction: column;
+            text-align: right;
+            gap: 5px;
+            white-space: nowrap;
+        }
+
+        .legend-count {
+            font-size: 0.9em;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .legend-percent {
+            font-size: 0.95em;
+            font-weight: 700;
+            color: #2274A5;
+        }
+        
+        .legend-item-data {
+            display: none;
+        }
+
+        /* Bar Chart Container */
+        .bar-chart-container {
+            margin-top: 20px;
+            padding: 30px;
+            background-color: #fafafa;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .bar-chart-box {
+            width: 100%;
+            max-width: 1000px;
+            margin: 0 auto;
         }
     </style>
 </body>
