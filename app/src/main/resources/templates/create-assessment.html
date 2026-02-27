@@ -18,15 +18,16 @@
                 <div class="card-body">
                     <!-- Assessment Name -->
                     <div class="card-section">
-                        <label for="name">Assessment Name (Optional)</label>
-                        <input type="text" id="name" name="name" class="form-control-input" placeholder="Enter assessment name">
+                        <label for="name">Assessment Name</label>
+                        <input type="text" id="name" name="name" required class="form-control-input" placeholder="Enter assessment name">
+                        <span id="nameError" class="form-error" style="color:#b00020;display:none;margin-top:6px;">Please enter an assessment name.</span>
                     </div>
 
                     <!-- Catalog Selection -->
                     <div class="card-section">
                         <label for="catalog">Security Catalog</label>
                         <select id="catalog" name="catalogId" required class="form-control-select">
-                            <option disabled selected>-- Select a Catalog --</option>
+                            <option value="" disabled selected>-- Select a Catalog --</option>
                             <option th:each="catalog: ${catalogs}" 
                                     th:value="${catalog.id}" 
                                     th:text="${catalog.name}"></option>
@@ -175,41 +176,59 @@
             var form = document.getElementById('createAssessmentForm');
             if(!form) return;
 
+            var nameInput = document.getElementById('name');
             var catalog = document.getElementById('catalog');
             var orgUnitId = document.getElementById('orgUnitId');
+            var nameError = document.getElementById('nameError');
             var catalogError = document.getElementById('catalogError');
             var orgUnitError = document.getElementById('orgUnitError');
 
             function clearErrors(){
+                if(nameError){ nameError.style.display = 'none'; }
                 if(catalogError){ catalogError.style.display = 'none'; }
                 if(orgUnitError){ orgUnitError.style.display = 'none'; }
-                catalog.classList.remove('input-error');
-                document.getElementById('selectedOrgUnitName').classList.remove('input-error');
+                if(catalog) catalog.classList.remove('input-error');
+                if(nameInput) nameInput.classList.remove('input-error');
+                var selected = document.getElementById('selectedOrgUnitName');
+                if(selected) selected.classList.remove('input-error');
             }
 
             form.addEventListener('submit', function(e){
                 clearErrors();
                 var valid = true;
 
+                // Name must be provided
+                if(!nameInput || !nameInput.value || nameInput.value.trim() === ''){
+                    if(nameError) nameError.style.display = 'block';
+                    if(nameInput) nameInput.classList.add('input-error');
+                    valid = false;
+                }
+
                 // Catalog must be selected (first option is placeholder)
-                if(!catalog || !catalog.value){
+                if(!catalog || !catalog.value || catalog.selectedIndex === 0){
                     if(catalogError){ catalogError.style.display = 'block'; }
-                    catalog.classList.add('input-error');
+                    if(catalog) catalog.classList.add('input-error');
                     valid = false;
                 }
 
                 // Org unit must be selected
                 if(!orgUnitId || !orgUnitId.value || orgUnitId.value.trim() === ''){
                     if(orgUnitError){ orgUnitError.style.display = 'block'; }
-                    document.getElementById('selectedOrgUnitName').classList.add('input-error');
+                    var selected = document.getElementById('selectedOrgUnitName');
+                    if(selected) selected.classList.add('input-error');
                     valid = false;
                 }
 
                 if(!valid){
                     e.preventDefault();
-                    // focus first invalid field
-                    if(!catalog.value){ catalog.focus(); }
-                    else { document.getElementById('openOrgUnitModal').focus(); }
+                    // focus first invalid field: name -> catalog -> orgUnit
+                    if(!nameInput.value || nameInput.value.trim() === ''){
+                        nameInput.focus();
+                    } else if(!catalog.value){
+                        catalog.focus();
+                    } else {
+                        document.getElementById('openOrgUnitModal').focus();
+                    }
                 }
             });
         })();

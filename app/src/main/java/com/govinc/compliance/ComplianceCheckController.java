@@ -14,6 +14,7 @@ import java.util.*;
 @Controller
 @RequestMapping("/compliance")
 public class ComplianceCheckController {
+
     @Autowired
     private ComplianceService complianceService;
     @Autowired
@@ -44,6 +45,7 @@ public class ComplianceCheckController {
                 result = complianceService.calculateCompliance(selectedCheck, selectedOrg);
                 // All children and parent coverage & compliance
                 SecurityCatalog catalog = selectedCheck.getSecurityCatalog();
+                System.out.println("ComplianceCheckController: selectedCheck=" + selectedCheck.getId() + ", catalog=" + (catalog != null ? catalog.getId() : null));
                 resultsForChildren = complianceService.evaluateComplianceForOrgAndChildren(selectedOrg, selectedCheck, catalog);
                 // Bulletproof: ensure map!
                 if (result != null && !(result.getThresholdsDetails() instanceof Map)) {
@@ -60,6 +62,7 @@ public class ComplianceCheckController {
         if (resultsForChildren != null) {
             model.addAttribute("totalCoveragePercent", complianceService.getLatestTotalCoveragePercent());
             model.addAttribute("totalAveragePercent", complianceService.getLatestTotalAveragePercent());
+            model.addAttribute("totalAssessmentsCount", complianceService.getLatestTotalAssessmentsCount());
         }
         return "compliance-view";
     }

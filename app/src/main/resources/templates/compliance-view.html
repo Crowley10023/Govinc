@@ -6,6 +6,355 @@
     <meta charset="UTF-8">
     <title>Compliance View</title>
     <link rel="stylesheet" href="/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        #popup-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 9998;
+        }
+
+        #calc-popup {
+            display: none;
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            background: #fff;
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            z-index: 9999;
+            max-width: 700px;
+            max-height: 85vh;
+            overflow-y: auto;
+            padding: 0;
+        }
+
+        #calc-popup .popup-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        #calc-popup .popup-header h3 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        #calc-popup .popup-content {
+            padding: 20px;
+        }
+
+        #calc-popup .details-section {
+            margin-bottom: 24px;
+        }
+
+        #calc-popup .details-section:last-child {
+            margin-bottom: 0;
+        }
+
+        #calc-popup .details-section h4 {
+            color: #667eea;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin: 0 0 12px 0;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 8px;
+        }
+
+        #calc-popup .summary {
+            background: #f5f7fa;
+            padding: 12px;
+            border-left: 4px solid #667eea;
+            border-radius: 4px;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        #calc-popup .chart-container {
+            max-width: 350px;
+            margin: 0 auto;
+            padding: 16px 0;
+        }
+
+        #calc-popup .details-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        #calc-popup .details-table thead {
+            background: #f5f7fa;
+        }
+
+        #calc-popup .details-table tr {
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        #calc-popup .details-table tr:hover {
+            background: #fafbfc;
+        }
+
+        #calc-popup .details-table th {
+            font-weight: 700;
+            color: #333;
+            padding: 10px 8px;
+            text-align: left;
+        }
+
+        #calc-popup .details-table td {
+            padding: 10px 8px;
+            color: #555;
+        }
+
+        #calc-popup .details-table td:first-child {
+            font-weight: 600;
+            color: #333;
+        }
+
+        #calc-popup .score-cell {
+            text-align: center;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        #calc-popup .popup-footer {
+            padding: 12px 20px;
+            border-top: 1px solid #e0e0e0;
+            text-align: right;
+            background: #f5f7fa;
+            border-radius: 0 0 8px 8px;
+        }
+
+        #calc-popup .close-btn {
+            background: transparent;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 28px;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        #calc-popup .close-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        #calc-popup .popup-footer button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        #calc-popup .popup-footer button:hover {
+            background: #764ba2;
+        }
+
+        #calc-popup .no-data {
+            color: #999;
+            font-style: italic;
+            padding: 12px;
+            text-align: center;
+        }
+    </style>
+    <script>
+        var currentChart = null;
+        var detailsDataCache = {};
+
+        function showPopup(content) {
+            var overlay = document.getElementById('popup-overlay');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.id = 'popup-overlay';
+                document.body.appendChild(overlay);
+            }
+
+            var popup = document.getElementById('calc-popup');
+            if (!popup) {
+                popup = document.createElement('div');
+                popup.id = 'calc-popup';
+                document.body.appendChild(popup);
+            }
+
+            popup.innerHTML = content +
+                '<div class="popup-footer"><button onclick="closePopup()">Close</button></div>';
+
+            popup.style.display = 'block';
+            overlay.style.display = 'block';
+        }
+
+        function closePopup() {
+            var popup = document.getElementById('calc-popup');
+            var overlay = document.getElementById('popup-overlay');
+            if (popup) popup.style.display = 'none';
+            if (overlay) overlay.style.display = 'none';
+            if (currentChart) {
+                currentChart.destroy();
+                currentChart = null;
+            }
+        }
+
+        function createMaturityChart(maturityDist) {
+            var chartContainer = document.getElementById('maturityChart');
+            if (!chartContainer) return;
+
+            if (currentChart) {
+                currentChart.destroy();
+            }
+
+            var labels = [];
+            var data = [];
+            var colors = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#fee140', '#30cfd0'];
+
+            for (var answer in maturityDist) {
+                if (maturityDist.hasOwnProperty(answer)) {
+                    labels.push(answer);
+                    data.push(maturityDist[answer]);
+                }
+            }
+
+            if (data.length === 0) return;
+
+            currentChart = new Chart(chartContainer, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: colors.slice(0, labels.length),
+                        borderColor: '#fff',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: { size: 12 },
+                                padding: 15,
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    var total = context.dataset.data.reduce(function(a, b) { return a + b; }, 0);
+                                    var percentage = ((context.parsed / total) * 100).toFixed(1);
+                                    return context.label + ': ' + context.parsed + ' (' + percentage + '%)';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function formatAssessmentDetails(answers) {
+            if (!answers || answers.length === 0) {
+                return '<div class="no-data">No assessment details available</div>';
+            }
+
+            var html = '<table class="details-table"><thead><tr><th>Control</th><th>Answer</th><th class="score-cell">Score</th></tr></thead><tbody>';
+
+            for (var i = 0; i < answers.length; i++) {
+                var ans = answers[i];
+                var score = ans.score ? ans.score + '%' : '—';
+                html += '<tr><td>' + (ans.controlName || 'Unknown') + '</td>';
+                html += '<td>' + (ans.answerText || 'Not answered') + '</td>';
+                html += '<td class="score-cell">' + score + '</td></tr>';
+            }
+            html += '</tbody></table>';
+            return html;
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.calc-popup').forEach(function(el) {
+                el.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    var id = el.getAttribute('data-id');
+                    
+                    // Get details from cache
+                    var detailsObj = detailsDataCache[id] || {};
+
+                    var content = '<div class="popup-header"><h3>Compliance Details</h3><button class="close-btn" onclick="closePopup()">×</button></div>';
+                    content += '<div class="popup-content">';
+
+                    // Maturity Distribution Chart
+                    if (detailsObj.maturityDistribution && Object.keys(detailsObj.maturityDistribution).length > 0) {
+                        content += '<div class="details-section"><h4>Maturity Level Distribution</h4>';
+                        content += '<div class="chart-container"><canvas id="maturityChart"></canvas></div></div>';
+                    }
+
+                    // Latest Assessment Details
+                    if (detailsObj.latestAssessmentAnswers && Array.isArray(detailsObj.latestAssessmentAnswers) && detailsObj.latestAssessmentAnswers.length > 0) {
+                        content += '<div class="details-section"><h4>Latest Assessment - Control Answers</h4>' + formatAssessmentDetails(detailsObj.latestAssessmentAnswers) + '</div>';
+                    }
+
+                    content += '</div>';
+
+                    showPopup(content);
+
+                    // Create chart after popup is shown
+                    if (detailsObj.maturityDistribution && Object.keys(detailsObj.maturityDistribution).length > 0) {
+                        setTimeout(function() {
+                            createMaturityChart(detailsObj.maturityDistribution);
+                        }, 100);
+                    }
+                });
+            });
+
+            document.addEventListener('click', function(e) {
+                if (e.target.id === 'popup-overlay') {
+                    closePopup();
+                }
+            });
+        });
+
+        function escapeHtml(text) {
+            var map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+        }
+
+        function storeDetailsData(id, data) {
+            detailsDataCache[id] = data;
+        }
+    </script>
 </head>
 
 <body>
@@ -80,6 +429,7 @@
                 <tr>
                     <th>Org Unit</th>
                     <th>Status</th>
+                    <th>Assessments</th>
                     <th>Coverage (%)</th>
                     <th>Average Score (%)</th>
                 </tr>
@@ -89,12 +439,27 @@
                         <span th:if="${entry.value.compliant}" style="color:green;font-weight:bold;">COMPLIANT</span>
                         <span th:if="${!entry.value.compliant}" style="color:red;font-weight:bold;">NOT COMPLIANT</span>
                     </td>
-                    <td th:text="${entry.value.coveragePercent} + ' %'"></td>
+                    <td th:text="${entry.value.checkedAssessments}"></td>
+                    <td>
+                        <span th:text="${entry.value.coveragePercent} + ' %'"></span>
+                        <a href="#" class="calc-popup" th:attr="data-id=${entry.key.id}, data-summary=${entry.value.calculationSummary}">details</a>
+                        <script th:attr="data-org-id=${entry.key.id}" style="display:none;" type="text/javascript" th:inline="javascript">
+                            (function() {
+                                var data = {
+                                    maturityDistribution: [[${entry.value.calculationDetails}]].maturityDistribution || {},
+                                    latestAssessmentAnswers: [[${entry.value.calculationDetails}]].latestAssessmentAnswers || []
+                                };
+                                var orgId = document.currentScript.getAttribute('data-org-id');
+                                storeDetailsData(orgId, data);
+                            })();
+                        </script>
+                    </td>
                     <td th:text="${entry.value.averagePercent} + ' %'"></td>
                 </tr>
                 <tr style="font-weight:bold;background:#eef;">
                     <td>Total</td>
                     <td></td>
+                    <td th:text="${totalAssessmentsCount}"></td>
                     <td th:text="${totalCoveragePercent} + ' %'"></td>
                     <td th:text="${totalAveragePercent} + ' %'"></td>
                 </tr>

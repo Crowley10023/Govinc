@@ -16,13 +16,39 @@ import com.govinc.maturity.MaturityAnswer;
 public class AssessmentDetailsService {
     @Autowired
     private AssessmentDetailsRepository repository;
+    
+    @Autowired
+    private AssessmentRepository assessmentRepository;
 
     public List<AssessmentDetails> findAll() {
         return repository.findAll();
     }
 
+    /**
+     * Find AssessmentDetails by ID
+     * Works with both AssessmentDetails ID and Assessment ID (for backward compatibility)
+     */
     public Optional<AssessmentDetails> findById(Long id) {
-        return repository.findById(id);
+        // First try to find by AssessmentDetails ID
+        Optional<AssessmentDetails> byDetailsId = repository.findById(id);
+        if (byDetailsId.isPresent()) {
+            return byDetailsId;
+        }
+        
+        // If not found, try to find by Assessment ID
+        // (for compatibility with how AssessmentController uses this method)
+        Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
+        if (assessmentOpt.isPresent()) {
+            Assessment assessment = assessmentOpt.get();
+            // Find the first (should be only one) AssessmentDetails linked to this assessment
+            for (AssessmentDetails details : repository.findAll()) {
+                if (details.getAssessments() != null && details.getAssessments().contains(assessment)) {
+                    return Optional.of(details);
+                }
+            }
+        }
+        
+        return Optional.empty();
     }
 
     /**
