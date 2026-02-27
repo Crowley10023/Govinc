@@ -31,6 +31,8 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     implementation("org.json:json:20240303") // For JSON processing in OpenAIUtil
     implementation("org.webjars:jquery:3.6.0") // jQuery as WebJars dependency
+    // Provide Chart.js as a WebJar so installations without external CDN access still work
+    implementation("org.webjars.npm:chart.js:3.9.1")
 
     // docx4j for manipulating Word documents (used by AssessmentReporterWord)
     implementation("org.docx4j:docx4j-JAXB-ReferenceImpl:11.5.9")
