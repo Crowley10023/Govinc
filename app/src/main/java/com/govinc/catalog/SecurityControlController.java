@@ -27,10 +27,111 @@ public class SecurityControlController {
     @Autowired
     private SecurityCatalogService securityCatalogService;
 
+    @Autowired
+    private com.govinc.organization.OrgServiceAssessmentService orgServiceAssessmentService;
+
     @GetMapping("/list")
     public String listSecurityControls(Model model) {
         model.addAttribute("controls", service.findAll());
         return "security-controls";
+    }
+
+    @GetMapping("/orgservice-mapping")
+    public String orgServiceMapping(Model model) {
+        List<SecurityControl> allControls = service.findAll();
+        
+        // Get mapping data: control -> service that has applicable assessment
+        java.util.Map<Long, Long> controlServiceMap = new java.util.HashMap<>();
+        
+        // Check all assessments to build the current mappings
+        List<com.govinc.organization.OrgServiceAssessment> allAssessments = 
+            orgServiceAssessmentService.getAllAssessments();
+        
+        for (com.govinc.organization.OrgServiceAssessment assessment : allAssessments) {
+            for (com.govinc.organization.OrgServiceAssessmentControl control : assessment.getControls()) {
+                // If a control is applicable in an assessment, it's mapped to that service
+                if (control.isApplicable()) {
+                    controlServiceMap.put(control.getSecurityControl().getId(), assessment.getOrgService().getId());
+                }
+            }
+        }
+        
+        model.addAttribute("controls", allControls);
+        model.addAttribute("controlServiceMap", controlServiceMap);
+        return "security-controls-orgservice-mapping";
+    }
+
+    @PostMapping("/map-service")
+    @ResponseBody
+    public Map<String, Object> mapServiceToControl(@RequestParam Long controlId, @RequestParam(required = false) String serviceId) {
+        Map<String, Object> response = new java.util.HashMap<>();
+        try {
+            if (serviceId == null || serviceId.isEmpty()) {
+                // Clearing selection - find and clear applicable status
+                List<com.govinc.organization.OrgServiceAssessment> allAssessments =
+                    orgServiceAssessmentService.getAllAssessments();
+
+                for (com.govinc.organization.OrgServiceAssessment assessment : allAssessments) {
+                    boolean changed = false;
+                    for (com.govinc.organization.OrgServiceAssessmentControl control : assessment.getControls()) {
+                        if (control.getSecurityControl().getId().equals(controlId) && control.isApplicable()) {
+                            control.setApplicable(false);
+                            control.setPercent(0);
+                            changed = true;
+                        }
+                    }
+                    if (changed) {
+                        orgServiceAssessmentService.saveAssessmentWithoutValidation(assessment);
+                    }
+                }
+
+                response.put("success", true);
+                response.put("message", "Service selection cleared");
+            } else {
+                Long parsedServiceId = Long.parseLong(serviceId);
+
+                // First, clear this control from all other assessments, then set for the target service
+                List<com.govinc.organization.OrgServiceAssessment> allAssessments =
+                    orgServiceAssessmentService.getAllAssessments();
+
+                for (com.govinc.organization.OrgServiceAssessment assessment : allAssessments) {
+                    boolean changed = false;
+                    for (com.govinc.organization.OrgServiceAssessmentControl control : assessment.getControls()) {
+                        if (control.getSecurityControl().getId().equals(controlId)) {
+                            if (assessment.getOrgService().getId().equals(parsedServiceId)) {
+                                // Set as applicable for target service
+                                if (!control.isApplicable()) {
+                                    control.setApplicable(true);
+                                    if (control.getPercent() == 0) {
+                                        control.setPercent(50); // Default percent when setting as applicable
+                                    }
+                                    changed = true;
+                                }
+                            } else if (control.isApplicable()) {
+                                // Clear from other services
+                                control.setApplicable(false);
+                                control.setPercent(0);
+                                changed = true;
+                            }
+                        }
+                    }
+                    if (changed) {
+                        orgServiceAssessmentService.saveAssessmentWithoutValidation(assessment);
+                    }
+                }
+
+                response.put("success", true);
+                response.put("message", "Control mapped to service");
+                response.put("controlId", controlId);
+                response.put("serviceId", parsedServiceId);
+            }
+        } catch (Exception ex) {
+            System.err.println("Error in mapServiceToControl: " + ex.getMessage());
+            ex.printStackTrace();
+            response.put("success", false);
+            response.put("message", ex.getMessage());
+        }
+        return response;
     }
 
     @GetMapping("/edit")

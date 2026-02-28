@@ -7,9 +7,9 @@
     <div class="nav-row">
       <div class="landing-image">
         <img th:if="${layoutConfig != null and layoutConfig.imageData != null and layoutConfig.imageData.length > 0}" src="/config/image-upload/preview"
-          alt="Compliance Incubator Logo" class="ci-logo-img-visible" style="min-width: 7em; max-width: 7em" />
+          alt="Compliance Incubator Logo" style="min-width: 7em; max-width: 7em" />
         <img th:unless="${layoutConfig != null and layoutConfig.imageData != null and layoutConfig.imageData.length > 0}" src="/title.png"
-          alt="Default Compliance Incubator Logo" class="ci-logo-img-visible" />
+          alt="Default Compliance Incubator Logo" />
       </div>
       <div class="org-details">
         <span class="org-name"
@@ -60,6 +60,7 @@
         <div class="dropdown-content">
           <a href="/orgunits/list"><button type="button" class="dropdown-menu-btn">Org Units</button></a>
           <a href="/orgservices/list"><button type="button" class="dropdown-menu-btn">Org Services</button></a>
+          <a href="/security-control/orgservice-mapping"><button type="button" class="dropdown-menu-btn">Map Org Services</button></a>
         </div>
       </div>
       <div class="nav-entry">

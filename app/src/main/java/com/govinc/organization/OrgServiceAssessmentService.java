@@ -110,16 +110,29 @@ public class OrgServiceAssessmentService {
         return assessmentRepository.findById(assessmentId);
     }
 
+    public List<OrgServiceAssessment> getAllAssessments() {
+        return assessmentRepository.findAll();
+    }
+
     @Transactional
     public void saveAssessment(OrgServiceAssessment assessment) {
+        saveAssessmentInternal(assessment, true);
+    }
+
+    @Transactional
+    public void saveAssessmentWithoutValidation(OrgServiceAssessment assessment) {
+        saveAssessmentInternal(assessment, false);
+    }
+
+    private void saveAssessmentInternal(OrgServiceAssessment assessment, boolean validateConstraints) {
         // Ensure each control correctly references its parent assessment
-        // And ensure no duplicate maturity answer for a control per org service
+        // And ensure no duplicate maturity answer for a control per org service (only if validating)
         if (assessment.getOrgService() != null) {
             Long orgServiceId = assessment.getOrgService().getId();
             List<OrgServiceAssessment> allAssessments = assessmentRepository.findAll();
             for (OrgServiceAssessmentControl control : assessment.getControls()) {
                 control.setOrgServiceAssessment(assessment);
-                if (control.isApplicable()) {
+                if (validateConstraints && control.isApplicable()) {
                     // Check if any assessment *in any service* already answered this control
                     for (OrgServiceAssessment otherA : allAssessments) {
                         if (assessment.getId() != null && assessment.getId().equals(otherA.getId())) continue;
