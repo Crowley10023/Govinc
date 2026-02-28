@@ -239,6 +239,23 @@
                                                                 th:attrappend="data-rating=${ans.rating}"
                                                                 th:text="${ans.answer}"></option>
                                                         </select>
+                                                        <script th:inline="javascript">
+                                                            /*<![CDATA[*/
+                                                            (function(){
+                                                                var selectEl = document.currentScript.previousElementSibling;
+                                                                try {
+                                                                    var takenOver = /*[[${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])}]]*/ false;
+                                                                    var selectedAnswerText = /*[[${controlAnswers != null and controlAnswers[ctrl.id] != null ? controlAnswers[ctrl.id] : ''}]]*/ '';
+                                                                    if (takenOver && selectEl) {
+                                                                        var found = Array.prototype.find.call(selectEl.options, function(o){ return (o.textContent||'').trim() === (selectedAnswerText||'').trim(); });
+                                                                        if (found) {
+                                                                            selectEl.value = found.value;
+                                                                        }
+                                                                    }
+                                                                } catch(e) {}
+                                                            })();
+                                                            /*]]>*/
+                                                        </script>
                                                     </div>
                                                 </div>
 
@@ -375,6 +392,20 @@
                         </div>
                     </form>
                     <div id="users-modal-error" class="modal-error"></div>
+                </div>
+            </div>
+
+            <!-- Org Service Selection Modal -->
+            <div class="modal-bg" id="orgservice-modal">
+                <div class="modal-popup">
+                    <h3>Choose Org Services</h3>
+                    <form id="orgservice-form">
+                        <div id="orgservice-list" class="orgservice-list"></div>
+                        <div class="modal-btn-row">
+                            <button type="submit" id="orgservice-modal-save">Save</button>
+                            <button type="button" id="orgservice-modal-cancel">Cancel</button>
+                        </div>
+                    </form>
                 </div>
             </div>
 
@@ -613,6 +644,7 @@
                 domainData.push({ name: domainNames[did] || ('Domain ' + did), average: avg, answeredCount: cnt });
             });
 
+            // Determine rating scale dynamically from available ratings; default to 1..5
             var detectedMaxRating = ratingsList.length > 0 ? Math.max.apply(null, ratingsList) : 5;
 
             if (domainData.length === 0) {
@@ -667,9 +699,9 @@
                 maturityChartInstance.destroy();
             }
 
-            // Choose axis max: if answers are on a 1..5 scale keep 5; if 0..100, use 100
-            var xMax = detectedMaxRating > 5 ? 5 : 5;
-            var step = 1;
+            // Choose axis max dynamically based on detected rating scale
+            var xMax = detectedMaxRating > 5 ? 100 : 5;
+            var step = detectedMaxRating > 5 ? 10 : 1;
 
             maturityChartInstance = new Chart(ctx, {
                 type: 'bar',
