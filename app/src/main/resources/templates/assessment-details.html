@@ -135,14 +135,14 @@
                     
                     <div th:if="${answerSummary != null && !answerSummary.isEmpty()}" class="summary-answers-container">
                         <div class="pie-chart-box">
-                            <canvas id="answerSummaryChart" width="400" height="400"></canvas>
+                            <canvas id="answerSummaryChart" width="120" height="120"></canvas>
                         </div>
                         <div class="summary-legend">
                             <div th:each="entry : ${answerSummary}" class="legend-item-data" th:data-label="${entry.key}" th:data-count="${entry.value.count}" th:data-percent="${#numbers.formatDecimal(entry.value.percent, 0, 2)}"></div>
                         </div>
                     </div>
 
-                    <h2 style="margin-top: 40px;">Average Maturity Rating by Domain</h2>
+                    <h2>Average Maturity Rating by Domain</h2>
                     <div th:if="${securityControlDomains == null || securityControlDomains.isEmpty()}" class="no-answers-message">
                         <p>No domains available</p>
                     </div>
@@ -165,7 +165,7 @@
 
                     <div th:if="${securityControlDomains != null && !securityControlDomains.isEmpty()}" class="bar-chart-container">
                         <div class="bar-chart-box">
-                            <canvas id="maturityRatingChart" width="800" height="400"></canvas>
+                            <canvas id="maturityRatingChart" width="400" height="200"></canvas>
                         </div>
                     </div>
                 </div>
@@ -800,10 +800,8 @@
         /* Summary Answers Container */
         .summary-answers-container {
             display: flex;
-            gap: 60px;
+            gap: 10px;
             align-items: flex-start;
-            margin-top: 30px;
-            padding: 30px;
             background-color: #fafafa;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
@@ -883,8 +881,6 @@
 
         /* Bar Chart Container */
         .bar-chart-container {
-            margin-top: 20px;
-            padding: 30px;
             background-color: #fafafa;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);

@@ -344,7 +344,7 @@
                     <ul class="assessment-list" th:if="${latestAssessments != null and !#lists.isEmpty(latestAssessments)}">
                         <li th:each="assessment : ${latestAssessments}"
                             class="assessment-item"
-                            th:attr="data-creation-date=${assessment.creationDate}, data-status=${assessment.status}, data-security=${assessment.securityCatalog != null ? assessment.securityCatalog.name : ''}, data-users=${assessment.createdBy != null ? assessment.createdBy.name : ''}">
+                            th:attr="data-creation-date=${assessment.creationDate != null ? #temporals.format(assessment.creationDate,'yyyy-MM-dd') : ''}, data-status=${assessment.status}, data-security=${assessment.securityCatalog != null ? assessment.securityCatalog.name : ''}, data-users=${assessment.createdBy != null ? assessment.createdBy.name : ''}">
 
                             <a th:href="@{/assessment/{id}(id=${assessment.id})}" class="assessment-link">
                                 <span th:text="${assessment.name}" class="assessment-title"></span>
@@ -419,17 +419,17 @@
                                             if(!isNaN(d.getTime()) && d < threshold) visible = false;
                                         }
 
-                                        var s = (li.getAttribute('data-status') || '').toString();
+                                        var s = (li.getAttribute('data-status') || '').toString().trim();
                                         if(status && s !== status) visible = false;
 
-                                        var usersAttr = (li.getAttribute('data-users') || '').toString();
+                                        var usersAttr = (li.getAttribute('data-users') || '').toString().trim();
                                         var extraUsers = $all('div.involved-users span', li).map(function(sp){ return sp.textContent.trim(); }).filter(Boolean);
                                         var allUsers = usersAttr ? [usersAttr].concat(extraUsers) : extraUsers;
                                         if(user){
                                             if(!allUsers.some(function(u){ return u === user; })) visible = false;
                                         }
 
-                                        var sec = (li.getAttribute('data-security') || '').toString();
+                                        var sec = (li.getAttribute('data-security') || '').toString().trim();
                                         if(catalog && sec !== catalog) visible = false;
 
                                         li.style.display = visible ? '' : 'none';
