@@ -32,7 +32,7 @@ public class LandingController {
     @GetMapping("/")
     public String home(Model model) {
         try {
-            // Fetch assessments and filter by access rights, then sort by date desc and take up to 10
+            // Fetch assessments and filter by access rights, then sort by creationDate descending
             List<Assessment> all = assessmentRepository.findAll();
             List<Assessment> filtered = new ArrayList<>();
             for (Assessment a : all) {
@@ -46,8 +46,9 @@ public class LandingController {
             }
             // Sort by creationDate (new field) descending, with nulls last
             filtered.sort(Comparator.comparing(Assessment::getCreationDate, Comparator.nullsLast(Comparator.reverseOrder())));
-            List<Assessment> latest = filtered.size() > 10 ? filtered.subList(0, 10) : filtered;
-            model.addAttribute("latestAssessments", latest);
+
+            // Show all assessments that fit access rights and sorting criteria
+            model.addAttribute("latestAssessments", filtered);
 
             // Populate users and catalogs for filter dropdowns
             model.addAttribute("filterUsers", userRepository.findAll());

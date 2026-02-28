@@ -586,7 +586,8 @@ public class AssessmentController {
     // Save/update answer for a single control (AJAX POST from UI)
     @PostMapping("/{id}/answer")
     @ResponseBody
-    public String saveAnswer(@PathVariable Long id, @RequestParam Long controlId, @RequestParam Long answerId) {
+    public String saveAnswer(@PathVariable Long id, @RequestParam Long controlId, @RequestParam Long answerId,
+                             @RequestParam(required = false) Boolean isOverride) {
         // Authorization check
         if (!authorizationService.canModifyAssessment(id)) {
             return "forbidden";
@@ -623,10 +624,18 @@ public class AssessmentController {
 
         if (found == null) {
             found = new AssessmentControlAnswer(control, maturityAnswer);
+            // If an explicit isOverride flag was provided, honor it
+            if (Boolean.TRUE.equals(isOverride)) {
+                found.setIsOverride(true);
+            }
             found = assessmentControlAnswerRepository.save(found);
             answers.add(found);
         } else {
             found.setMaturityAnswer(maturityAnswer);
+            // Only update override flag if caller provided it, otherwise keep existing
+            if (isOverride != null) {
+                found.setIsOverride(Boolean.TRUE.equals(isOverride));
+            }
             found = assessmentControlAnswerRepository.save(found);
         }
         // Only update the modified/new answer, do NOT replace the set with only one

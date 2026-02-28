@@ -15,7 +15,8 @@ function toggleOverride(checkbox) {
     var controlId = checkbox.getAttribute('data-control-id');
     var assessmentId = checkbox.getAttribute('data-assessment-id');
     var isChecked = checkbox.checked;
-    
+    console.debug('[toggleOverride] controlId=', controlId, 'assessmentId=', assessmentId, 'checked=', isChecked);
+
     if (isChecked) {
         // Enable override - apply first available answer
         var $dropdown = $('select[data-control-id="' + controlId + '"]');
@@ -27,35 +28,41 @@ function toggleOverride(checkbox) {
                 options.push({ id: val, text: text });
             }
         });
-        
+
         if (options.length === 0) {
             checkbox.checked = false;
             return;
         }
-        
+
         var answerId = options[0].id;
-        
+        console.debug('[toggleOverride] sending override POST', { controlId: controlId, answerId: answerId });
+
         $.ajax({
             url: '/assessment/' + assessmentId + '/answer-override',
             type: 'POST',
             data: { controlId: controlId, answerId: answerId },
-            success: function() {
+            success: function(resp) {
+                console.debug('[toggleOverride] success', resp);
                 updateControlAfterOverride(controlId, answerId);
             },
-            error: function() {
+            error: function(xhr) {
+                console.error('[toggleOverride] error', xhr);
                 alert('Could not override answer. Please try again.');
                 checkbox.checked = false;
             }
         });
     } else {
         // Disable override - revert to org service answer
+        console.debug('[toggleOverride] sending remove-override POST', { controlId: controlId });
         $.ajax({
             url: '/assessment/' + assessmentId + '/control/' + controlId + '/remove-override',
             type: 'POST',
-            success: function() {
+            success: function(resp) {
+                console.debug('[toggleOverride] remove-override success', resp);
                 updateControlAfterRemoveOverride(controlId, assessmentId);
             },
-            error: function() {
+            error: function(xhr) {
+                console.error('[toggleOverride] remove-override error', xhr);
                 alert('Could not revert to org service answer. Please try again.');
                 checkbox.checked = true;
             }
@@ -395,37 +402,102 @@ $(document).ready(function () {
         });
     });
 
-    // Save answer on dropdown change
-    $('.answer-select').on('change', function () {
-        var select = $(this);
-        var controlId = select.data('control-id');
-        var answerId = select.val();
-        var feedbackIcon = select.closest('span').find('.answer-feedback');
-        select.css('background', '');
-        feedbackIcon.empty();
-        if (!answerId) {
-            feedbackIcon.empty();
-            return;
-        }
-        let assessmentId = window.assessmentId || 0;
-        if (assessmentId && controlId) {
-            $.ajax({
-                url: '/assessment/' + assessmentId + '/answer',
-                type: 'POST',
-                data: { controlId: controlId, answerId: answerId },
-                success: function () {
-                    select.css('background', '#d8ffd8');
-                    feedbackIcon.html('<span class="answer-success" title="Saved"><svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="#d8ffd8" stroke="#33aa33" stroke-width="2"/><path d="M5 9l3 3 5-5" fill="none" stroke="#33aa33" stroke-width="2"/></svg></span>');
-                    setTimeout(function () {
-                        feedbackIcon.empty();
-                        select.css('background', '');
-                    }, 1500);
-                },
-                error: function () {
-                    select.css('background', '#ffd8d8');
-                    feedbackIcon.html('<span class="answer-error" title="Error saving"><svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="#ffd8d8" stroke="#cc2222" stroke-width="2"/><path d="M6 6l6 6M12 6l-6 6" fill="none" stroke="#cc2222" stroke-width="2"/></svg></span>');
+    // Save answer on dropdown change (delegated handler to support dynamic elements)
+    $(document).on('change', '.answer-select', function () {
+        try {
+            var select = $(this);
+            var controlId = select.data('control-id');
+            var answerId = select.val();
+
+            // Debug: ensure handler runs
+            console.debug('[answer-select change] controlId=', controlId, 'answerId=', answerId);
+
+            // Find or create feedback icon nearby (robust across templates)
+            var $dropdownRow = select.closest('.dropdown-row');
+            var $feedbackIcon = $dropdownRow.find('.answer-feedback');
+            if ($feedbackIcon.length === 0) {
+                // Insert a feedback span right after the select to ensure UI feedback works
+                $feedbackIcon = $('<span class="answer-feedback"></span>');
+                select.after($feedbackIcon);
+            }
+            $feedbackIcon.empty();
+            select.css('background', '');
+
+            if (!answerId) {
+                $feedbackIcon.empty();
+                return;
+            }
+            let assessmentId = window.assessmentId || 0;
+            if (assessmentId && controlId) {
+                // Include override flag if present for this control row
+                var $row = select.closest('tr');
+                var isOverride = false;
+                if ($row.length > 0) {
+                    var $ov = $row.find('.override-slider-checkbox[data-control-id="' + controlId + '"]');
+                    if ($ov.length > 0) {
+                        isOverride = !!$ov.prop('checked');
+                    }
                 }
-            });
+
+                console.debug('[answer-select change] assessmentId=', assessmentId, 'isOverride=', isOverride);
+
+                // Send AJAX (jQuery will URL-encode boolean to 'true'/'false')
+                console.debug('[answer-save] sending POST', { url: '/assessment/' + assessmentId + '/answer', controlId: controlId, answerId: answerId, isOverride: isOverride });
+                $.ajax({
+                    url: '/assessment/' + assessmentId + '/answer',
+                    type: 'POST',
+                    traditional: true,
+                    contentType: 'application/x-www-form-urlencoded; charset=UTF-8',
+                    data: { controlId: controlId, answerId: answerId, isOverride: isOverride },
+                    success: function (data, textStatus, jqXHR) {
+                        console.debug('[answer-save success]', {data: data, textStatus: textStatus});
+
+                        // Update UI
+                        select.css('background', '#d8ffd8');
+                        $feedbackIcon.html('<span class="answer-success" title="Saved"><svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="#d8ffd8" stroke="#33aa33" stroke-width="2"/><path d="M5 9l3 3 5-5" fill="none" stroke="#33aa33" stroke-width="2"/></svg></span>');
+                        setTimeout(function () {
+                            $feedbackIcon.empty();
+                            select.css('background', '');
+                        }, 1500);
+
+                        // Update the row's data-selected-answer attribute (used by charts & filters)
+                        try {
+                            var selectedText = (select.find('option:selected').text() || '').trim();
+                            var $tr = select.closest('tr');
+                            if ($tr.length > 0) {
+                                $tr.attr('data-selected-answer', selectedText);
+                            }
+
+                            // If override flag was sent, ensure checkbox state reflects it
+                            if (isOverride) {
+                                var $ovcb = $tr.find('.override-slider-checkbox[data-control-id="' + controlId + '"]');
+                                if ($ovcb.length > 0 && !$ovcb.prop('checked')) {
+                                    $ovcb.prop('checked', true);
+                                }
+                            }
+
+                            // Recompute completion and charts
+                            updateAnsweredCount();
+                            debouncedUpdateMaturityChart();
+                            checkDomainCompleteness();
+                        } catch (e) {
+                            console.debug('Could not update local DOM state after save', e);
+                        }
+                    },
+                    error: function (jqXHR, textStatus, errorThrown) {
+                        console.error('[answer-save error]', {jqXHR: jqXHR, textStatus: textStatus, errorThrown: errorThrown});
+                        select.css('background', '#ffd8d8');
+                        var msg = 'Error saving answer.';
+                        try {
+                            if (jqXHR && jqXHR.responseText) msg = jqXHR.responseText;
+                        } catch (e) {}
+                        $feedbackIcon.html('<span class="answer-error" title="Error saving">' + $('<span/>').text(msg).html() + '</span>');
+                    }
+                });
+            }
+        } catch (e) {
+            // Prevent any unexpected errors from breaking other UI behavior
+            console.error('Error in answer-select change handler', e);
         }
     });
 

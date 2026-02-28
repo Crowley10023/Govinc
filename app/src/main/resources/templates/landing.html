@@ -341,7 +341,7 @@
                         <p>No assessments found yet. Start creating assessments to see them here.</p>
                     </div>
 
-                    <ul class="assessment-list" th:if="${latestAssessments != null and !#lists.isEmpty(latestAssessments)}">
+                    <ul class="assessment-list" th:if="${latestAssessments != null and !#lists.isEmpty(latestAssessments)}" style="max-height: 400px; overflow-y: auto; padding-right: 4px;">
                         <li th:each="assessment : ${latestAssessments}"
                             class="assessment-item"
                             th:attr="data-creation-date=${assessment.creationDate != null ? #temporals.format(assessment.creationDate,'yyyy-MM-dd') : ''}, data-status=${assessment.status}, data-security=${assessment.securityCatalog != null ? assessment.securityCatalog.name : ''}, data-users=${assessment.createdBy != null ? assessment.createdBy.name : ''}">
@@ -442,8 +442,17 @@
 
                                 $('#filter-apply').addEventListener('click', function(e){ e.preventDefault(); applyFilters(true); });
                                 $('#filter-clear').addEventListener('click', function(e){
-                                    e.preventDefault(); $('#filter-range').value=''; $('#filter-status').value=''; $('#filter-user').value=''; $('#filter-catalog').value='';
-                                    try{ localStorage.removeItem('landing_assessment_filters'); }catch(e){}
+                                    e.preventDefault();
+                                    // Reset all filter controls to their default (no filter) state
+                                    $('#filter-range').value = '';
+                                    $('#filter-status').value = '';
+                                    $('#filter-user').value = '';
+                                    $('#filter-catalog').value = '';
+
+                                    // Remove any previously saved filters so a reload starts clean
+                                    try { localStorage.removeItem('landing_assessment_filters'); } catch (e) {}
+
+                                    // Re-apply filters with a fully cleared state
                                     applyFilters(false);
                                 });
 
