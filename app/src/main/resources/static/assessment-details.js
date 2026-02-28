@@ -993,7 +993,7 @@ var debouncedUpdateMaturityChart = debounce(function() {
     } catch (e) {
         // ignore
     }
-}, 250);
+}, 300);
 
 document.addEventListener("DOMContentLoaded", function () {
     // Initialize filter bar first
@@ -1002,13 +1002,17 @@ document.addEventListener("DOMContentLoaded", function () {
     // Initial domain completeness and chart rendering
     checkDomainCompleteness();
     // Try to initialize maturity chart after a small delay to ensure DOM is fully rendered
-    setTimeout(function() { try { initializeMaturityRatingChart(); } catch (e) {} }, 200);
+    setTimeout(function() {
+        try {
+            initializeMaturityRatingChart();
+        } catch (e) {}
+    }, 250);
 
     document.body.addEventListener("change", function (e) {
         if (e.target.classList.contains("answer-select")) {
             checkDomainCompleteness();
             updateAnsweredCount();
-            // Update chart when answers change
+            // Update chart when answers change (including taken-over ones via data-selected-answer)
             debouncedUpdateMaturityChart();
         }
     });
