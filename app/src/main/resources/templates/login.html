@@ -144,7 +144,7 @@
 <body>
     <div class="login-container">
         <div class="landing-image">
-            <img th:if="${layoutConfig != null and layoutConfig.imageData != null and layoutConfig.imageData.length > 0}" src="/config/image-upload/preview"
+            <img style="max-width: 20em;" th:if="${layoutConfig != null and layoutConfig.imageData != null and layoutConfig.imageData.length > 0}" src="/config/image-upload/preview"
                 alt="Compliance Incubator Logo" class="ci-logo-img-visible" />
             <img th:unless="${layoutConfig != null and layoutConfig.imageData != null and layoutConfig.imageData.length > 0}" src="/title.png"
                 alt="Default Compliance Incubator Logo" class="ci-logo-img-visible" />
