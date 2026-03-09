@@ -51,16 +51,23 @@ public class OrgUnitController {
 
     // New method to enable the create org unit button (HTML form)
     @GetMapping("/create")
-    public String createOrgUnitForm(Model model) {
+    public String createOrgUnitForm(
+            @RequestParam(value = "embed", required = false, defaultValue = "false") boolean embed,
+            @RequestParam(value = "parentId", required = false) Long parentId,
+            Model model) {
         // Authorization check: only ADMIN and ISM can create org units
         if (!authorizationService.canAccessOrganization()) {
             throw new UnauthorizedException("You do not have permission to create organization units.");
         }
         OrgUnit orgUnit = new OrgUnit();
+        if (parentId != null) {
+            orgUnitService.getOrgUnit(parentId).ifPresent(orgUnit::setParent);
+        }
         List<OrgUnit> allOrgUnits = orgUnitService.getAllOrgUnits();
         model.addAttribute("orgUnit", orgUnit);
         model.addAttribute("allOrgUnits", allOrgUnits);
         model.addAttribute("allUsers", userRepository.findAll());
+        model.addAttribute("embed", embed);
         return "orgunit-edit";
     }
 

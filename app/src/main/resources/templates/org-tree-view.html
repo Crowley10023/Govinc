@@ -189,18 +189,123 @@
             color: #21435a;
         }
 
+        .edit-modal-body {
+            padding: 12px;
+            overflow: auto;
+            height: 100%;
+            background: #f7fafd;
+        }
+
+        .edit-modal-body .form-container {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(34, 116, 165, 0.08);
+            padding: 2em;
+            margin: 0;
+            border: 1px solid rgba(34, 116, 165, 0.1);
+        }
+
+        .edit-modal-body .form-header {
+            background: linear-gradient(135deg, #2274a5 0%, rgba(34, 116, 165, 0.9) 100%);
+            padding: 1.2em;
+            margin: -2em -2em 1.6em -2em;
+            border-radius: 12px 12px 0 0;
+            color: #fff;
+        }
+
+        .edit-modal-body .form-header h1 {
+            margin: 0;
+            font-size: 1.4em;
+        }
+
+        .edit-modal-body .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.2em;
+            margin-bottom: 1.2em;
+        }
+
+        .edit-modal-body .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.45em;
+            margin-bottom: 1.1em;
+        }
+
+        .edit-modal-body .form-group label {
+            font-weight: 600;
+            color: #1e4d73;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .edit-modal-body .form-group input,
+        .edit-modal-body .form-group select,
+        .edit-modal-body .form-group textarea {
+            padding: 0.75em;
+            border: 1.5px solid rgba(34, 116, 165, 0.25);
+            border-radius: 6px;
+            font-size: 0.95em;
+            background: #fff;
+            color: #253746;
+        }
+
+        .edit-modal-body .form-actions {
+            display: flex;
+            gap: 0.8em;
+            margin-top: 1.6em;
+            padding-top: 1.2em;
+            border-top: 1px solid #edf2f7;
+        }
+
+        .edit-modal-body .btn-primary,
+        .edit-modal-body .btn-secondary {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.75em 1.5em;
+            border-radius: 6px;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            border: 1px solid transparent;
+        }
+
+        .edit-modal-body .btn-primary {
+            background: linear-gradient(135deg, #2274a5 0%, #0056b3 100%);
+            color: #fff;
+            border: none;
+        }
+
+        .edit-modal-body .btn-secondary {
+            background: #f2f4f7;
+            color: #2f3d4a;
+            border-color: #d9e0e8;
+        }
+
+        .edit-modal-loading,
+        .edit-modal-error {
+            background: #ffffff;
+            border: 1px solid #d6dfeb;
+            border-radius: 10px;
+            padding: 18px;
+            color: #27445b;
+            font-weight: 600;
+        }
+
+        .edit-modal-error {
+            color: #8a2432;
+            border-color: #e8c7cf;
+            background: #fff8fa;
+        }
+
         .edit-modal-close {
             border: 1px solid #c5d4e4;
             background: #ffffff;
             border-radius: 8px;
             padding: 5px 10px;
             cursor: pointer;
-        }
-
-        .edit-frame {
-            border: 0;
-            width: 100%;
-            height: 100%;
         }
 
         @media (max-width: 900px) {
@@ -252,7 +357,7 @@
                 <span id="editModalTitle">Edit Organization Unit</span>
                 <button id="closeEditModal" class="edit-modal-close" type="button">Close</button>
             </div>
-            <iframe id="editFrame" class="edit-frame" src="about:blank" title="Edit Organization Unit"></iframe>
+            <div id="editModalBody" class="edit-modal-body"></div>
         </div>
     </div>
 
@@ -265,10 +370,12 @@
 
         const NODE_W = 280;
         const NODE_H = 152;
-        const NODE_GAP = 56;
-        const LEVEL_GAP = 230;
+        const NODE_GAP = 5;
+        const LEVEL_GAP = 220;
         const TOP_PAD_Y = 110;
         const PAD_X = 160;
+        const EXTRA_SIBLING_UNITS = 0;
+        const CONNECTOR_LANE_OFFSET = 38;
 
         const state = {
             rootId: null,
@@ -393,29 +500,47 @@
                 ? (focusNodeData.children || [])
                 : [focusNodeData];
 
-            const totalLeaves = Math.max(1, renderRoots.reduce((sum, root) => sum + countLeaves(root), 0));
-            const treeWidth = Math.max(1900, PAD_X * 2 + totalLeaves * (NODE_W + NODE_GAP));
+            const subtreeUnits = new Map();
+            renderRoots.forEach(root => computeSubtreeUnits(root, subtreeUnits));
+            const totalUnits = Math.max(
+                1,
+                renderRoots.reduce((sum, root, idx) => {
+                    const rootUnits = subtreeUnits.get(root.id) || 1;
+                    return sum + rootUnits + (idx > 0 ? EXTRA_SIBLING_UNITS * 2 : 0);
+                }, 0)
+            );
+            const unitPx = NODE_W + NODE_GAP;
+            const treeWidth = Math.max(1600, PAD_X * 2 + totalUnits * unitPx);
 
             const maxDepth = renderRoots.length === 0
                 ? 0
                 : Math.max(...renderRoots.map(getDepth));
-            const treeHeight = Math.max(500, TOP_PAD_Y + (maxDepth + 1) * LEVEL_GAP + NODE_H + 80);
 
             svg.setAttribute('width', String(treeWidth));
-            svg.setAttribute('height', String(treeHeight));
 
             const positions = new Map();
-            let nextLeaf = 0;
+            let currentLeftUnits = 0;
             renderRoots.forEach(root => {
-                nextLeaf = layoutSubtree(root, 0, nextLeaf, positions);
+                const consumed = layoutSubtree(root, 0, currentLeftUnits, positions, subtreeUnits, unitPx);
+                currentLeftUnits += consumed + EXTRA_SIBLING_UNITS * 2;
             });
 
-            positions.forEach(({ node, x, y }) => {
+            const maxY = positions.size > 0
+                ? Math.max(...Array.from(positions.values()).map(pos => pos.y))
+                : TOP_PAD_Y;
+            const treeHeight = Math.max(
+                520,
+                maxY + NODE_H + 80,
+                TOP_PAD_Y + (maxDepth + 1) * LEVEL_GAP + NODE_H + 80
+            );
+            svg.setAttribute('height', String(treeHeight));
+
+            positions.forEach(({ node, x, y, depth }) => {
                 const children = node.children || [];
                 children.forEach(child => {
                     const childPos = positions.get(child.id);
                     if (childPos) {
-                        drawRectangularLink(treeGroup, x, y + NODE_H, childPos.x, childPos.y);
+                        drawRectangularLink(treeGroup, x, y + NODE_H, childPos.x, childPos.y, depth);
                     }
                 });
             });
@@ -448,24 +573,60 @@
             return 1 + Math.max(...children.map(getDepth));
         }
 
-        // Returns the next free leaf index after this subtree.
-        function layoutSubtree(node, depth, leafStart, positions) {
-            const leaves = countLeaves(node);
-            const x = PAD_X + leafStart * (NODE_W + NODE_GAP) + (leaves * (NODE_W + NODE_GAP)) / 2;
+        // Calculates subtree width in abstract units where one leaf consumes one unit.
+        // This guarantees sibling subtrees get separate, non-overlapping horizontal space.
+        function computeSubtreeUnits(node, cache) {
+            if (!node || node.id === null || node.id === undefined) {
+                return 1;
+            }
+            if (cache.has(node.id)) {
+                return cache.get(node.id);
+            }
+
+            const children = Array.isArray(node.children) ? node.children : [];
+            if (children.length === 0) {
+                cache.set(node.id, 1);
+                return 1;
+            }
+
+            let total = 0;
+            children.forEach((child, idx) => {
+                total += computeSubtreeUnits(child, cache);
+                if (idx > 0) {
+                    total += EXTRA_SIBLING_UNITS;
+                }
+            });
+
+            const units = Math.max(1, total);
+            cache.set(node.id, units);
+            return units;
+        }
+
+        // Returns the number of abstract units consumed by this subtree.
+        function layoutSubtree(node, depth, leftUnits, positions, unitCache, unitPx) {
+            const widthUnits = unitCache.get(node.id) || 1;
+            const centerUnits = leftUnits + widthUnits / 2;
+            const x = PAD_X + centerUnits * unitPx;
             const y = TOP_PAD_Y + depth * LEVEL_GAP;
             positions.set(node.id, { node, x, y, depth });
 
-            let cursor = leafStart;
+            let cursor = leftUnits;
             const children = node.children || [];
-            children.forEach(child => {
-                cursor = layoutSubtree(child, depth + 1, cursor, positions);
+            children.forEach((child, idx) => {
+                const childUnits = unitCache.get(child.id) || 1;
+                layoutSubtree(child, depth + 1, cursor, positions, unitCache, unitPx);
+                cursor += childUnits;
+                if (idx < children.length - 1) {
+                    cursor += EXTRA_SIBLING_UNITS;
+                }
             });
 
-            return leafStart + leaves;
+            return widthUnits;
         }
 
-        function drawRectangularLink(parent, x1, y1, x2, y2) {
-            const midY = y1 + (y2 - y1) / 2;
+        function drawRectangularLink(parent, x1, y1, x2, y2, depth) {
+            const laneY = TOP_PAD_Y + depth * LEVEL_GAP + NODE_H + CONNECTOR_LANE_OFFSET;
+            const midY = Math.min(laneY, y2 - 14);
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             path.setAttribute('d', `M ${x1} ${y1} V ${midY} H ${x2} V ${y2}`);
             path.classList.add('org-link');
@@ -569,6 +730,37 @@
                 openEditModal(node);
             });
 
+            const addChildBtn = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            addChildBtn.setAttribute('x', String(NODE_W - 30));
+            addChildBtn.setAttribute('y', '8');
+            addChildBtn.setAttribute('width', '20');
+            addChildBtn.setAttribute('height', '20');
+            addChildBtn.setAttribute('rx', '5');
+            addChildBtn.setAttribute('ry', '5');
+            addChildBtn.setAttribute('fill', '#ffffff');
+            addChildBtn.setAttribute('stroke', '#d0deec');
+            addChildBtn.setAttribute('stroke-width', '1.2');
+            addChildBtn.style.cursor = 'pointer';
+            addChildBtn.classList.add('node-interactive');
+            addChildBtn.addEventListener('click', function (event) {
+                event.stopPropagation();
+                openCreateChildModal(node);
+            });
+            g.appendChild(addChildBtn);
+
+            const addChildLabel = addText(g, '+', NODE_W - 20, 23, {
+                fill: '#1f5a85',
+                fontSize: '16',
+                fontWeight: '700',
+                textAnchor: 'middle',
+                cursor: 'pointer'
+            });
+            addChildLabel.classList.add('node-interactive');
+            addChildLabel.addEventListener('click', function (event) {
+                event.stopPropagation();
+                openCreateChildModal(node);
+            });
+
             g.style.cursor = 'pointer';
             g.classList.add('node-interactive');
             g.addEventListener('click', function () {
@@ -656,20 +848,132 @@
 
         function openEditModal(node) {
             const editModal = document.getElementById('editModal');
-            const editFrame = document.getElementById('editFrame');
             const editModalTitle = document.getElementById('editModalTitle');
+            const editModalBody = document.getElementById('editModalBody');
             editModalTitle.textContent = `Edit Organization Unit: ${node.name}`;
-            editFrame.src = `/orgunits/edit/${node.id}?embed=true`;
             editModal.classList.add('open');
             editModal.setAttribute('aria-hidden', 'false');
+
+            editModalBody.innerHTML = '<div class="edit-modal-loading">Loading organization unit form...</div>';
+            fetch(`/orgunits/edit/${node.id}?embed=true`, { credentials: 'same-origin' })
+                .then(response => response.text())
+                .then(html => {
+                    renderEmbeddedEditForm(html);
+                })
+                .catch(() => {
+                    editModalBody.innerHTML = '<div class="edit-modal-error">Could not load edit form.</div>';
+                });
+        }
+
+        function openCreateChildModal(parentNode) {
+            const editModal = document.getElementById('editModal');
+            const editModalTitle = document.getElementById('editModalTitle');
+            const editModalBody = document.getElementById('editModalBody');
+            editModalTitle.textContent = `Create Child Org Unit for: ${parentNode.name}`;
+            editModal.classList.add('open');
+            editModal.setAttribute('aria-hidden', 'false');
+
+            editModalBody.innerHTML = '<div class="edit-modal-loading">Loading create form...</div>';
+            fetch(`/orgunits/create?embed=true&parentId=${parentNode.id}`, { credentials: 'same-origin' })
+                .then(response => response.text())
+                .then(html => {
+                    renderEmbeddedEditForm(html);
+                    const form = editModalBody.querySelector('form');
+                    if (form) {
+                        const nameInput = form.querySelector('input[name="name"]');
+                        if (nameInput) {
+                            nameInput.focus();
+                        }
+                    }
+                })
+                .catch(() => {
+                    editModalBody.innerHTML = '<div class="edit-modal-error">Could not load create form.</div>';
+                });
         }
 
         function closeEditModal() {
             const editModal = document.getElementById('editModal');
-            const editFrame = document.getElementById('editFrame');
-            editFrame.src = 'about:blank';
+            const editModalBody = document.getElementById('editModalBody');
+            editModalBody.innerHTML = '';
             editModal.classList.remove('open');
             editModal.setAttribute('aria-hidden', 'true');
+        }
+
+        function renderEmbeddedEditForm(html) {
+            const editModalBody = document.getElementById('editModalBody');
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const formContainer = doc.querySelector('.form-container');
+
+            if (!formContainer) {
+                editModalBody.innerHTML = '<div class="edit-modal-error">Could not render edit form.</div>';
+                return;
+            }
+
+            editModalBody.innerHTML = '';
+            editModalBody.appendChild(formContainer.cloneNode(true));
+
+            const form = editModalBody.querySelector('form');
+            if (form) {
+                if (!form.querySelector('input[name="embed"]')) {
+                    const embedInput = document.createElement('input');
+                    embedInput.type = 'hidden';
+                    embedInput.name = 'embed';
+                    embedInput.value = 'true';
+                    form.appendChild(embedInput);
+                }
+                form.addEventListener('submit', onEmbeddedFormSubmit);
+            }
+
+            const cancelLink = editModalBody.querySelector('#cancelOrgUnitEdit') || editModalBody.querySelector('.btn-secondary');
+            if (cancelLink) {
+                cancelLink.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    closeEditModal();
+                });
+            }
+        }
+
+        function onEmbeddedFormSubmit(event) {
+            event.preventDefault();
+            const form = event.currentTarget;
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+            }
+
+            const action = form.getAttribute('action') || '/orgunits/save';
+            const formData = new FormData(form);
+            if (!formData.has('embed')) {
+                formData.append('embed', 'true');
+            }
+
+            fetch(action, {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.text())
+            .then(html => {
+                if (html.includes('orgunitSaved')) {
+                    closeEditModal();
+                    loadTreeFromBackend();
+                    return;
+                }
+                renderEmbeddedEditForm(html);
+            })
+            .catch(() => {
+                const editModalBody = document.getElementById('editModalBody');
+                editModalBody.innerHTML = '<div class="edit-modal-error">Save failed. Please retry.</div>';
+            })
+            .finally(() => {
+                if (submitBtn && document.body.contains(submitBtn)) {
+                    submitBtn.disabled = false;
+                }
+            });
         }
 
         function initPanZoomControls() {

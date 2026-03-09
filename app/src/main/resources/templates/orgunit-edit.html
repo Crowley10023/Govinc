@@ -236,6 +236,7 @@
             <form th:action="@{'/orgunits/save'}" method="post">
                 <input type="hidden" name="id" th:value="${orgUnit.id}"/>
                 <input type="hidden" name="embed" th:value="${((embed != null and embed) or (param.embed != null and #strings.equalsIgnoreCase(param.embed[0], 'true'))) ? 'true' : 'false'}"/>
+                <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 
                 <div class="form-group">
                     <label for="name">Name <span style="color: #cc2222;">*</span></label>
