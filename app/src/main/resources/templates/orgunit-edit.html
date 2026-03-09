@@ -261,15 +261,14 @@
                         <label for="leaderId">Team Leader</label>
                         <select id="leaderId" name="leaderId" onchange="updateLeaderWarning()">
                             <option value="" selected>(none)</option>
-                            <option th:each="user : ${allUsers}" 
-                                th:if="${user.role == T(com.govinc.user.Role).ORGANISATION_TEAM_LEADER or user.role == T(com.govinc.user.Role).ADMIN}"
-                                th:value="${user.id}" 
+                            <option th:each="user : ${allUsers}"
+                                th:value="${user.id}"
                                 th:text="${user.name}"
                                 th:selected="${orgUnit.leader != null and user.id == orgUnit.leader.id}"
                                 th:attr="data-current-org=${orgUnit.id}">
                             </option>
                         </select>
-                        <span class="help-text">Assign a team leader for this organization unit. Only users with the Team Leader role are available. A single person may lead multiple organization units.</span>
+                        <span class="help-text">Assign a team leader for this organization unit. Any user can be assigned. A single person may lead multiple organization units.</span>
                         <div id="leaderWarning" class="warning-box">
                             <strong>⚠️ Warning:</strong> <span id="leaderWarningText"></span>
                         </div>

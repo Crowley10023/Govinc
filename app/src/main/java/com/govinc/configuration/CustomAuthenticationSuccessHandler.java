@@ -95,15 +95,28 @@ public class CustomAuthenticationSuccessHandler implements AuthenticationSuccess
             email = username + "@local";
         }
 
-        // Only insert if not present
+        // Only insert if not present. If a user with the same email exists, do NOT create a new user.
         logger.info("[OAUTH2-FLOW] Resolved username: {} | email: {}", username, email);
         if (username != null) {
-            Optional<User> existing = userRepository.findByName(username);
-            logger.info("[OAUTH2-FLOW] User exists in db? {}", existing.isPresent());
-            if (existing.isEmpty()) {
-                logger.info("[OAUTH2-FLOW] Creating new user in DB: {} / {}", username, email);
-                User user = new User(username, email);
-                userRepository.save(user);
+            Optional<com.govinc.user.User> existingByName = userRepository.findByName(username);
+            logger.info("[OAUTH2-FLOW] User exists in db by name? {}", existingByName.isPresent());
+            if (existingByName.isEmpty()) {
+                Optional<com.govinc.user.User> existingByEmail = Optional.empty();
+                if (email != null) {
+                    existingByEmail = userRepository.findByEmail(email);
+                }
+
+                if (existingByEmail.isPresent()) {
+                    // Do not create a new user if an account with the same email already exists.
+                    User found = existingByEmail.get();
+                    logger.info("[OAUTH2-FLOW] User with same email already exists in DB (will not create new user): {} / {}", found.getName(), found.getEmail());
+                    // Optionally, you could update the existing user's name here to match the identity provider's username
+                    // if (!found.getName().equals(username)) { found.setName(username); userRepository.save(found); }
+                } else {
+                    logger.info("[OAUTH2-FLOW] Creating new user in DB: {} / {}", username, email);
+                    User user = new User(username, email);
+                    userRepository.save(user);
+                }
             } else {
                 logger.info("[OAUTH2-FLOW] User already exists: {}", username);
             }
