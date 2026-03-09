@@ -85,6 +85,99 @@
         .btn-table-delete:hover {
             background-color: #c82333;
         }
+
+        .delete-modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 16px;
+        }
+
+        .delete-modal {
+            width: 100%;
+            max-width: 560px;
+            background: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+            padding: 18px;
+        }
+
+        .delete-modal h3 {
+            margin: 0 0 12px 0;
+            color: #212529;
+            font-size: 18px;
+        }
+
+        .delete-modal p {
+            margin: 0 0 10px 0;
+            color: #495057;
+        }
+
+        .delete-list-wrap {
+            max-height: 220px;
+            overflow: auto;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 12px;
+        }
+
+        .delete-list {
+            margin: 0;
+            padding-left: 18px;
+        }
+
+        .delete-list li {
+            margin-bottom: 6px;
+        }
+
+        .delete-block-notice {
+            display: none;
+            background: #fff5f5;
+            border: 1px solid #f5c2c7;
+            color: #842029;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 12px;
+            font-size: 13px;
+        }
+
+        .delete-modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .btn-modal-cancel,
+        .btn-modal-confirm {
+            border: none;
+            border-radius: 4px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .btn-modal-cancel {
+            background-color: #6c757d;
+            color: #fff;
+        }
+
+        .btn-modal-cancel:hover {
+            background-color: #5a6268;
+        }
+
+        .btn-modal-confirm {
+            background-color: #dc3545;
+            color: #fff;
+        }
+
+        .btn-modal-confirm:hover {
+            background-color: #c82333;
+        }
     </style>
 </head>
 <body>
@@ -120,7 +213,10 @@
                     <td>
                         <div class="table-actions">
                             <a th:href="@{'/users/edit/' + ${user.id}}" class="btn-table-action btn-table-edit">Edit</a>
-                            <a th:href="@{'/users/delete/' + ${user.id}}" class="btn-table-action btn-table-delete" onclick="return confirm('Are you sure?')">Delete</a>
+                            <a th:href="@{'/users/delete/' + ${user.id}}"
+                               class="btn-table-action btn-table-delete"
+                               th:attr="data-user-id=${user.id},data-user-name=${user.name}"
+                               onclick="return openDeleteModal(event)">Delete</a>
                         </div>
                     </td>
                 </tr>
@@ -128,5 +224,113 @@
         </table>
     </div>
 </div>
+
+<div id="deleteModalBackdrop" class="delete-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle">
+    <div class="delete-modal">
+        <h3 id="deleteModalTitle">Delete User</h3>
+        <p id="deleteModalSummary"></p>
+
+        <div class="delete-list-wrap">
+            <strong>Assessments where this user is in the "user" field:</strong>
+            <ul id="userAssessmentList" class="delete-list"></ul>
+        </div>
+
+        <div id="createdByBlockNotice" class="delete-block-notice"></div>
+
+        <p id="deleteConfirmText">Do you want to continue and delete this user?</p>
+
+        <div class="delete-modal-actions">
+            <button type="button" class="btn-modal-cancel" onclick="closeDeleteModal()">Cancel</button>
+            <button type="button" id="confirmDeleteBtn" class="btn-modal-confirm" onclick="confirmDelete()">Delete User</button>
+        </div>
+    </div>
+</div>
+
+<script th:inline="javascript">
+    const userAssessmentsMap = /*[[${userAssessmentsMap}]]*/ {};
+    const createdByAssessmentsMap = /*[[${createdByAssessmentsMap}]]*/ {};
+
+    let pendingDeleteUrl = null;
+
+    function openDeleteModal(event) {
+        event.preventDefault();
+        const target = event.currentTarget;
+        const userId = target.getAttribute('data-user-id');
+        const userName = target.getAttribute('data-user-name') || 'this user';
+
+        pendingDeleteUrl = target.getAttribute('href');
+
+        const assignedAssessments = userAssessmentsMap[userId] || [];
+        const createdByAssessments = createdByAssessmentsMap[userId] || [];
+
+        document.getElementById('deleteModalSummary').textContent = `You are about to delete ${userName}.`;
+        renderAssessmentList('userAssessmentList', assignedAssessments);
+
+        const createdByBlockNotice = document.getElementById('createdByBlockNotice');
+        const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+        const deleteConfirmText = document.getElementById('deleteConfirmText');
+
+        if (createdByAssessments.length > 0) {
+            createdByBlockNotice.style.display = 'block';
+            createdByBlockNotice.innerHTML =
+                'This user cannot be deleted because they are in the "created by" field of the following assessment(s):<br>' +
+                buildAssessmentLinks(createdByAssessments);
+            confirmDeleteBtn.style.display = 'none';
+            deleteConfirmText.style.display = 'none';
+        } else {
+            createdByBlockNotice.style.display = 'none';
+            createdByBlockNotice.innerHTML = '';
+            confirmDeleteBtn.style.display = 'inline-block';
+            deleteConfirmText.style.display = 'block';
+        }
+
+        document.getElementById('deleteModalBackdrop').style.display = 'flex';
+        return false;
+    }
+
+    function renderAssessmentList(listId, assessments) {
+        const listElement = document.getElementById(listId);
+        listElement.innerHTML = '';
+
+        if (!assessments || assessments.length === 0) {
+            const item = document.createElement('li');
+            item.textContent = 'No linked assessments found.';
+            listElement.appendChild(item);
+            return;
+        }
+
+        assessments.forEach(assessment => {
+            const item = document.createElement('li');
+            const link = document.createElement('a');
+            link.href = `/assessment/${assessment.id}`;
+            link.textContent = `${assessment.name} (#${assessment.id})`;
+            item.appendChild(link);
+            listElement.appendChild(item);
+        });
+    }
+
+    function buildAssessmentLinks(assessments) {
+        return assessments
+            .map(assessment => `<a href="/assessment/${assessment.id}">${assessment.name} (#${assessment.id})</a>`)
+            .join('<br>');
+    }
+
+    function closeDeleteModal() {
+        document.getElementById('deleteModalBackdrop').style.display = 'none';
+        pendingDeleteUrl = null;
+    }
+
+    function confirmDelete() {
+        if (pendingDeleteUrl) {
+            window.location.href = pendingDeleteUrl;
+        }
+    }
+
+    document.getElementById('deleteModalBackdrop').addEventListener('click', function (event) {
+        if (event.target.id === 'deleteModalBackdrop') {
+            closeDeleteModal();
+        }
+    });
+</script>
 </body>
 </html>

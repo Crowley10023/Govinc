@@ -3,6 +3,8 @@ package com.govinc.user;
 import com.govinc.session.UserSession;
 import com.govinc.authorization.AuthorizationService;
 import com.govinc.authorization.UnauthorizedException;
+import com.govinc.assessment.Assessment;
+import com.govinc.assessment.AssessmentRepository;
 import com.govinc.organization.OrgUnit;
 import com.govinc.organization.OrgUnitService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,6 +13,9 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.Optional;
 
 @Controller
@@ -28,6 +33,9 @@ public class UserController {
     @Autowired
     private OrgUnitService orgUnitService;
 
+    @Autowired
+    private AssessmentRepository assessmentRepository;
+
     @GetMapping
     public String listUsers(Model model) {
         // Authorization check: only ADMIN can view users
@@ -36,6 +44,41 @@ public class UserController {
         }
         List<User> users = userRepository.findAll();
         model.addAttribute("users", users);
+
+        List<Assessment> assessments = assessmentRepository.findAll();
+        Map<Long, List<Map<String, Object>>> userAssessmentsMap = new HashMap<>();
+        Map<Long, List<Map<String, Object>>> createdByAssessmentsMap = new HashMap<>();
+
+        for (Assessment assessment : assessments) {
+            String assessmentName = assessment.getName();
+            if (assessmentName == null || assessmentName.trim().isEmpty()) {
+                assessmentName = "Assessment " + assessment.getId();
+            }
+
+            Map<String, Object> assessmentSummary = new HashMap<>();
+            assessmentSummary.put("id", assessment.getId());
+            assessmentSummary.put("name", assessmentName);
+
+            if (assessment.getUsers() != null) {
+                for (User assignedUser : assessment.getUsers()) {
+                    if (assignedUser != null && assignedUser.getId() != null) {
+                        userAssessmentsMap
+                                .computeIfAbsent(assignedUser.getId(), k -> new ArrayList<>())
+                                .add(assessmentSummary);
+                    }
+                }
+            }
+
+            if (assessment.getCreatedBy() != null && assessment.getCreatedBy().getId() != null) {
+                createdByAssessmentsMap
+                        .computeIfAbsent(assessment.getCreatedBy().getId(), k -> new ArrayList<>())
+                        .add(assessmentSummary);
+            }
+        }
+
+        model.addAttribute("userAssessmentsMap", userAssessmentsMap);
+        model.addAttribute("createdByAssessmentsMap", createdByAssessmentsMap);
+
         // Add org units list for display purposes
         List<OrgUnit> orgUnits = orgUnitService.getAllOrgUnits();
         model.addAttribute("orgUnits", orgUnits);
@@ -176,6 +219,26 @@ public class UserController {
         // Prevent ADMIN users from deleting themselves
         if (currentUser != null && currentUser.getId().equals(id)) {
             throw new UnauthorizedException("You cannot delete your own user account.");
+        }
+
+        // A user cannot be deleted when referenced as createdBy in assessments.
+        List<Assessment> createdByAssessments = assessmentRepository.findByCreatedById(id);
+        if (!createdByAssessments.isEmpty()) {
+            throw new UnauthorizedException("You cannot delete this user because they are the creator of one or more assessments.");
+        }
+
+        // Remove user from the assessment users relation before deletion.
+        List<Assessment> assignedAssessments = assessmentRepository.findByUsersId(id);
+        if (!assignedAssessments.isEmpty()) {
+            Optional<User> userToDeleteOpt = userRepository.findById(id);
+            if (userToDeleteOpt.isPresent()) {
+                User userToDelete = userToDeleteOpt.get();
+                for (Assessment assessment : assignedAssessments) {
+                    if (assessment.getUsers() != null && assessment.getUsers().remove(userToDelete)) {
+                        assessmentRepository.save(assessment);
+                    }
+                }
+            }
         }
 
         // Remove user from any org units they lead

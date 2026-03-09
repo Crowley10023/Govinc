@@ -183,12 +183,29 @@ public class OrgUnitController {
     // REST API to delete org unit (returning nothing)
     @ResponseBody
     @DeleteMapping(value = "/{id:\\d+}", produces = MediaType.APPLICATION_JSON_VALUE)
-    public void deleteOrgUnit(@PathVariable Long id) {
-        // Authorization check: only ADMIN and ISM can delete org units
+    public ResponseEntity<?> deleteOrgUnit(@PathVariable Long id) {
+        // Security architecture: only ADMIN and INFORMATION_SECURITY_MANAGER are allowed to delete.
         if (!authorizationService.canAccessOrganization()) {
             throw new UnauthorizedException("You do not have permission to delete organization units.");
         }
-        orgUnitService.deleteOrgUnit(id);
+
+        try {
+            orgUnitService.deleteOrgUnit(id);
+            Map<String, Object> body = new HashMap<>();
+            body.put("status", "ok");
+            body.put("message", "Organization unit deleted.");
+            return ResponseEntity.ok(body);
+        } catch (IllegalArgumentException ex) {
+            Map<String, Object> body = new HashMap<>();
+            body.put("status", "error");
+            body.put("message", ex.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+        } catch (IllegalStateException ex) {
+            Map<String, Object> body = new HashMap<>();
+            body.put("status", "error");
+            body.put("message", ex.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+        }
     }
 
     @ResponseBody

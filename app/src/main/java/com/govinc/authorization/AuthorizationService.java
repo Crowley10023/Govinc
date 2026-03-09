@@ -247,8 +247,8 @@ public class AuthorizationService {
         
         // Organisation Team Leaders: check if assessment is in any of their org units or children
         if (role == Role.ORGANISATION_TEAM_LEADER) {
-            Set<OrgUnit> userLeadingOrgs = user.getLeadsOrgUnits();
-            if (userLeadingOrgs == null || userLeadingOrgs.isEmpty()) {
+            Set<Long> accessibleOrgUnitIds = getAccessibleOrgUnitIdsForUser(user);
+            if (accessibleOrgUnitIds.isEmpty()) {
                 logger.warning("Organisation Team Leader user " + user.getId() + " (" + user.getName() + ") is not leading any organisation units. Cannot access assessments.");
                 return false;
             }
@@ -258,13 +258,10 @@ public class AuthorizationService {
                 logger.warning("Assessment " + assessmentId + " has no organisation unit assigned. Team leader " + user.getName() + " cannot access it.");
                 return false;
             }
-            
-            // Check if assessment org is in any of the user's leading org units or their children
-            for (OrgUnit userOrg : userLeadingOrgs) {
-                if (isOrgUnitInTree(assessmentOrg, userOrg)) {
-                    logger.fine("Team leader " + user.getName() + " (org: " + userOrg.getName() + ") can access assessment " + assessmentId + " (org: " + assessmentOrg.getName() + ")");
-                    return true;
-                }
+
+            if (assessmentOrg.getId() != null && accessibleOrgUnitIds.contains(assessmentOrg.getId())) {
+                logger.fine("Team leader " + user.getName() + " can access assessment " + assessmentId + " (org: " + assessmentOrg.getName() + ")");
+                return true;
             }
             
             logger.fine("Team leader " + user.getName() + " cannot access assessment " + assessmentId + " (not in any of their org units)");
@@ -352,9 +349,13 @@ public class AuthorizationService {
             Set<OrgUnit> userLeadingOrgs = user.getLeadsOrgUnits();
             if (userLeadingOrgs != null && !userLeadingOrgs.isEmpty()) {
                 for (OrgUnit userOrg : userLeadingOrgs) {
-                    accessible.add(userOrg);
-                    // Add all children recursively for each org unit
-                    addChildrenToSet(userOrg, accessible);
+                    if (userOrg == null || userOrg.getId() == null) {
+                        continue;
+                    }
+                    // Resolve from repository recursively to avoid partial hierarchy loading.
+                    OrgUnit root = orgUnitService.getOrgUnitWithChildrenRecursive(userOrg.getId()).orElse(userOrg);
+                    accessible.add(root);
+                    addChildrenToSet(root, accessible);
                 }
             }
         }
@@ -417,6 +418,43 @@ public class AuthorizationService {
                     addChildrenToSet(child, set);
                 }
             }
+        }
+    }
+
+    /**
+     * Returns all org-unit IDs a team leader can access: led units and all descendants.
+     */
+    private Set<Long> getAccessibleOrgUnitIdsForUser(User user) {
+        Set<Long> ids = new HashSet<>();
+        if (user == null) {
+            return ids;
+        }
+
+        Set<OrgUnit> userLeadingOrgs = user.getLeadsOrgUnits();
+        if (userLeadingOrgs == null || userLeadingOrgs.isEmpty()) {
+            return ids;
+        }
+
+        for (OrgUnit userOrg : userLeadingOrgs) {
+            if (userOrg == null || userOrg.getId() == null) {
+                continue;
+            }
+            OrgUnit root = orgUnitService.getOrgUnitWithChildrenRecursive(userOrg.getId()).orElse(userOrg);
+            addOrgUnitIdsRecursively(root, ids);
+        }
+
+        return ids;
+    }
+
+    private void addOrgUnitIdsRecursively(OrgUnit orgUnit, Set<Long> ids) {
+        if (orgUnit == null || orgUnit.getId() == null || !ids.add(orgUnit.getId())) {
+            return;
+        }
+        if (orgUnit.getChildren() == null) {
+            return;
+        }
+        for (OrgUnit child : orgUnit.getChildren()) {
+            addOrgUnitIdsRecursively(child, ids);
         }
     }
     

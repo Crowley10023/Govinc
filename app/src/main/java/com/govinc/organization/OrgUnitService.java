@@ -1,5 +1,6 @@
 package com.govinc.organization;
 
+import com.govinc.assessment.AssessmentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -9,6 +10,9 @@ import java.util.*;
 public class OrgUnitService {
     @Autowired
     private OrgUnitRepository orgUnitRepository;
+
+    @Autowired
+    private AssessmentRepository assessmentRepository;
 
     public List<OrgUnit> getAllOrgUnits() {
         return orgUnitRepository.findAll();
@@ -23,7 +27,19 @@ public class OrgUnitService {
     }
 
     public void deleteOrgUnit(Long id) {
-        orgUnitRepository.deleteById(id);
+        OrgUnit orgUnit = orgUnitRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Organization unit not found."));
+
+        if (orgUnit.getChildren() != null && !orgUnit.getChildren().isEmpty()) {
+            throw new IllegalStateException("Cannot delete organization unit that still has children.");
+        }
+
+        long assignedAssessments = assessmentRepository.countByOrgUnitId(id);
+        if (assignedAssessments > 0) {
+            throw new IllegalStateException("Cannot delete organization unit with assigned assessments (" + assignedAssessments + ").");
+        }
+
+        orgUnitRepository.delete(orgUnit);
     }
 
     /**

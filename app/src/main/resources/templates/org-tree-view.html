@@ -5,6 +5,8 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>Organization Tree View</title>
     <link rel="stylesheet" href="/style.css">
+    <meta th:if="${_csrf != null}" name="_csrf" th:content="${_csrf.token}">
+    <meta th:if="${_csrf != null}" name="_csrf_header" th:content="${_csrf.headerName}">
     <style>
         :root {
             --tree-bg-a: #f5faf6;
@@ -149,6 +151,16 @@
             color: #29465d;
             font-weight: 600;
             padding: 0 6px;
+        }
+
+        .top-level-select {
+            border: 1px solid #cdd8e5;
+            border-radius: 8px;
+            background: #fff;
+            color: #1d3f58;
+            padding: 6px 8px;
+            font-size: 12px;
+            min-width: 180px;
         }
 
         .edit-modal {
@@ -308,6 +320,74 @@
             cursor: pointer;
         }
 
+        .dialog-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(6, 18, 31, 0.45);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2100;
+        }
+
+        .dialog-overlay.open {
+            display: flex;
+        }
+
+        .dialog-box {
+            width: min(460px, 92vw);
+            background: #ffffff;
+            border: 1px solid #d4deea;
+            border-radius: 12px;
+            box-shadow: 0 18px 36px rgba(15, 34, 54, 0.28);
+            overflow: hidden;
+        }
+
+        .dialog-title {
+            background: #f4f8fc;
+            color: #24465f;
+            font-weight: 700;
+            padding: 12px 14px;
+            border-bottom: 1px solid #e4ebf3;
+        }
+
+        .dialog-message {
+            padding: 14px;
+            color: #2a3f50;
+            line-height: 1.45;
+        }
+
+        .dialog-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            padding: 12px 14px;
+            border-top: 1px solid #edf1f6;
+            background: #fbfdff;
+        }
+
+        .dialog-btn {
+            border: 1px solid #cfd9e5;
+            border-radius: 8px;
+            background: #fff;
+            color: #2b4559;
+            font-weight: 600;
+            padding: 7px 12px;
+            cursor: pointer;
+        }
+
+        .dialog-btn.primary {
+            border-color: #1f658f;
+            background: #1f658f;
+            color: #fff;
+        }
+
+        .dialog-btn.danger {
+            border-color: #c44456;
+            background: #c44456;
+            color: #fff;
+        }
+
         @media (max-width: 900px) {
             .org-tree-page {
                 padding-left: 10px;
@@ -336,6 +416,9 @@
         <div class="org-tree-container" id="treeViewport">
             <div class="nav-controls">
                 <button id="navUpBtn" class="nav-up-btn" title="Remove current selection">Clear Selection</button>
+                <select id="topLevelSelect" class="top-level-select" title="Choose top-level organization unit">
+                    <option value="">Top-level...</option>
+                </select>
                 <span id="focusLabel" class="focus-label">Focused: -</span>
             </div>
             <svg id="orgTreeSvg" class="org-svg-tree" xmlns="http://www.w3.org/2000/svg" height="920" width="2200">
@@ -361,6 +444,14 @@
         </div>
     </div>
 
+    <div id="dialogOverlay" class="dialog-overlay" aria-hidden="true">
+        <div class="dialog-box">
+            <div id="dialogTitle" class="dialog-title">Notice</div>
+            <div id="dialogMessage" class="dialog-message"></div>
+            <div id="dialogActions" class="dialog-actions"></div>
+        </div>
+    </div>
+
     <script>
         let panX = 0, panY = 0, zoomLevel = 1;
         let isPanning = false, startX = 0, startY = 0;
@@ -383,6 +474,7 @@
             treeApiUrl: '',
             nodesById: new Map(),
             parentById: new Map(),
+            lastPositions: new Map(),
             treeLoaded: false
         };
 
@@ -450,18 +542,34 @@
 
         function initDrillNavigation() {
             const navUpBtn = document.getElementById('navUpBtn');
+            const topLevelSelect = document.getElementById('topLevelSelect');
             navUpBtn.addEventListener('click', () => {
                 if (state.rootId !== null && state.focusId !== state.rootId) {
                     focusNode(state.rootId);
                 }
             });
+
+            topLevelSelect.addEventListener('change', () => {
+                const selectedValue = topLevelSelect.value;
+                if (!selectedValue) {
+                    focusNode(state.rootId);
+                    return;
+                }
+                const targetId = Number(selectedValue);
+                if (!Number.isNaN(targetId) && state.nodesById.has(targetId)) {
+                    focusNode(targetId);
+                }
+            });
+
             updateDrillControls();
         }
 
         function updateDrillControls() {
             const navUpBtn = document.getElementById('navUpBtn');
             const focusLabel = document.getElementById('focusLabel');
+            const topLevelSelect = document.getElementById('topLevelSelect');
             const currentNode = state.nodesById.get(state.focusId);
+            const rootNode = state.nodesById.get(state.rootId);
 
             navUpBtn.disabled = state.focusId === state.rootId;
             if (!currentNode) {
@@ -471,6 +579,32 @@
             } else {
                 focusLabel.textContent = `Focused: ${currentNode.name}`;
             }
+
+            if (topLevelSelect) {
+                const rootChildren = rootNode && Array.isArray(rootNode.children) ? rootNode.children : [];
+                const hasTopLevelChoice = isVirtualRoot(rootNode) && rootChildren.length > 0;
+                topLevelSelect.style.display = hasTopLevelChoice ? 'inline-block' : 'none';
+                if (hasTopLevelChoice) {
+                    topLevelSelect.innerHTML = '';
+                    const allOption = document.createElement('option');
+                    allOption.value = '';
+                    allOption.textContent = 'All Top-level';
+                    topLevelSelect.appendChild(allOption);
+
+                    rootChildren.forEach(child => {
+                        const option = document.createElement('option');
+                        option.value = String(child.id);
+                        option.textContent = child.name || `Org ${child.id}`;
+                        topLevelSelect.appendChild(option);
+                    });
+
+                    if (state.focusId === state.rootId) {
+                        topLevelSelect.value = '';
+                    } else if (state.parentById.get(state.focusId) === state.rootId) {
+                        topLevelSelect.value = String(state.focusId);
+                    }
+                }
+            }
         }
 
         function focusNode(nodeId) {
@@ -479,6 +613,7 @@
             }
             state.focusId = nodeId;
             renderFocusedTree();
+            centerFocusedView();
             updateDrillControls();
         }
 
@@ -550,7 +685,27 @@
                 drawNodeCard(treeGroup, node, x, y, isFocus);
             });
 
+            state.lastPositions = positions;
+
             updateDrillControls();
+        }
+
+        function centerFocusedView() {
+            const viewport = document.getElementById('treeViewport');
+            const focusedPos = state.lastPositions.get(state.focusId);
+            if (!viewport || !focusedPos) {
+                return;
+            }
+
+            const targetX = focusedPos.x;
+            const targetY = focusedPos.y + NODE_H / 2;
+            panX = viewport.clientWidth / 2 - targetX * zoomLevel;
+            panY = viewport.clientHeight / 2 - targetY * zoomLevel;
+
+            const treeGroup = document.getElementById('orgTreeGroup');
+            if (treeGroup) {
+                treeGroup.setAttribute('transform', `translate(${panX}, ${panY}) scale(${zoomLevel})`);
+            }
         }
 
         function isVirtualRoot(node) {
@@ -674,14 +829,8 @@
             });
 
             const leaderName = node.leader && node.leader.name ? node.leader.name : 'Unassigned';
-            addText(g, `Leader: ${leaderName}`, 16, 92, {
+            addText(g, leaderName, 16, 92, {
                 fill: '#314e63',
-                fontSize: '12',
-                fontWeight: '500'
-            });
-
-            addText(g, `Children: ${(node.children || []).length}`, 16, 112, {
-                fill: '#446075',
                 fontSize: '12',
                 fontWeight: '500'
             });
@@ -759,6 +908,37 @@
             addChildLabel.addEventListener('click', function (event) {
                 event.stopPropagation();
                 openCreateChildModal(node);
+            });
+
+            const deleteBtn = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            deleteBtn.setAttribute('x', String(NODE_W - 142));
+            deleteBtn.setAttribute('y', '118');
+            deleteBtn.setAttribute('width', '60');
+            deleteBtn.setAttribute('height', '24');
+            deleteBtn.setAttribute('rx', '6');
+            deleteBtn.setAttribute('ry', '6');
+            deleteBtn.setAttribute('fill', '#fff3f4');
+            deleteBtn.setAttribute('stroke', '#efb8bf');
+            deleteBtn.setAttribute('stroke-width', '1.2');
+            deleteBtn.style.cursor = 'pointer';
+            deleteBtn.classList.add('node-interactive');
+            deleteBtn.addEventListener('click', function (event) {
+                event.stopPropagation();
+                requestDeleteOrgUnit(node);
+            });
+            g.appendChild(deleteBtn);
+
+            const deleteLabel = addText(g, 'Delete', NODE_W - 112, 134, {
+                fill: '#a21a2b',
+                fontSize: '12',
+                fontWeight: '700',
+                textAnchor: 'middle',
+                cursor: 'pointer'
+            });
+            deleteLabel.classList.add('node-interactive');
+            deleteLabel.addEventListener('click', function (event) {
+                event.stopPropagation();
+                requestDeleteOrgUnit(node);
             });
 
             g.style.cursor = 'pointer';
@@ -973,6 +1153,109 @@
                 if (submitBtn && document.body.contains(submitBtn)) {
                     submitBtn.disabled = false;
                 }
+            });
+        }
+
+        function requestDeleteOrgUnit(node) {
+            const hasChildren = node.children && node.children.length > 0;
+            if (hasChildren) {
+                showInfoDialog('Delete not allowed', 'This org unit cannot be deleted because it has children.');
+                return;
+            }
+
+            showConfirmDialog('Delete org unit', `Delete org unit "${node.name}"?`, {
+                confirmLabel: 'Delete',
+                danger: true
+            }).then((confirmed) => {
+                if (!confirmed) {
+                    return;
+                }
+
+                const csrfToken = document.querySelector('meta[name="_csrf"]')?.getAttribute('content');
+                const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.getAttribute('content') || 'X-CSRF-TOKEN';
+                const headers = {
+                    'Accept': 'application/json'
+                };
+                if (csrfToken) {
+                    headers[csrfHeader] = csrfToken;
+                }
+
+                fetch(`/orgunits/${node.id}`, {
+                    method: 'DELETE',
+                    credentials: 'same-origin',
+                    headers
+                })
+                    .then(async (resp) => {
+                        let payload = null;
+                        try {
+                            payload = await resp.json();
+                        } catch (e) {
+                            payload = null;
+                        }
+
+                        if (!resp.ok) {
+                            const message = payload && payload.message ? payload.message : 'Delete failed.';
+                            throw new Error(message);
+                        }
+                        return payload;
+                    })
+                    .then(() => {
+                        const fallbackFocus = state.parentById.get(node.id) || state.rootId;
+                        loadTreeFromBackend().then(() => {
+                            if (state.nodesById.has(fallbackFocus)) {
+                                focusNode(fallbackFocus);
+                            }
+                        });
+                    })
+                    .catch((err) => {
+                        showInfoDialog('Delete failed', err.message || 'Delete failed.');
+                    });
+            });
+        }
+
+        function showInfoDialog(title, message) {
+            return showDialog(title, message, [
+                { label: 'OK', value: true, className: 'primary' }
+            ]);
+        }
+
+        function showConfirmDialog(title, message, options) {
+            const confirmLabel = options && options.confirmLabel ? options.confirmLabel : 'Confirm';
+            const confirmClass = options && options.danger ? 'danger' : 'primary';
+            return showDialog(title, message, [
+                { label: 'Cancel', value: false, className: '' },
+                { label: confirmLabel, value: true, className: confirmClass }
+            ]);
+        }
+
+        function showDialog(title, message, actions) {
+            return new Promise((resolve) => {
+                const overlay = document.getElementById('dialogOverlay');
+                const dialogTitle = document.getElementById('dialogTitle');
+                const dialogMessage = document.getElementById('dialogMessage');
+                const dialogActions = document.getElementById('dialogActions');
+
+                dialogTitle.textContent = title;
+                dialogMessage.textContent = message;
+                dialogActions.innerHTML = '';
+
+                const close = (value) => {
+                    overlay.classList.remove('open');
+                    overlay.setAttribute('aria-hidden', 'true');
+                    resolve(value);
+                };
+
+                actions.forEach(action => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = `dialog-btn${action.className ? ' ' + action.className : ''}`;
+                    btn.textContent = action.label;
+                    btn.addEventListener('click', () => close(action.value));
+                    dialogActions.appendChild(btn);
+                });
+
+                overlay.classList.add('open');
+                overlay.setAttribute('aria-hidden', 'false');
             });
         }
 
