@@ -67,8 +67,9 @@ public class AssessmentRestController {
     // This bypasses the /orgservices/** security restriction to allow team leaders and delegates to see org services
     @GetMapping("/all-orgservices")
     public List<OrgService> getAllOrgServices() {
-        // This endpoint is accessible to all authenticated users
-        // Authorization for modifying an assessment's org services is checked in updateOrgServices()
+        if (authorizationService.isAssessor()) {
+            throw new UnauthorizedException("Assessors are not allowed to manage org services.");
+        }
         return orgServiceService.getAllOrgServices();
     }
 }

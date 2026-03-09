@@ -26,6 +26,7 @@ import java.util.logging.Logger;
  * - INFORMATION_SECURITY_MANAGER: Full access except configuration (no config tab access)
  * - ORGANISATION_TEAM_LEADER: Access only to assessments in their organization(s) or children, plus their org units
  * - ASSESSMENT_DELEGATE: Only access to assessments where they are assigned users
+ * - ASSESSOR: Only access to assessments where they are assigned and only for answering/commenting
  * 
  * Exception: assessment-direct endpoints are publicly accessible without authentication
  */
@@ -170,6 +171,14 @@ public class AuthorizationService {
         Role role = getCurrentUserRole();
         return role == Role.ADMIN || role == Role.ASSESSMENT_DELEGATE;
     }
+
+    /**
+     * Check if user is assessor.
+     */
+    public boolean isAssessor() {
+        Role role = getCurrentUserRole();
+        return role == Role.ASSESSOR;
+    }
     
     /**
      * Check if user can access configuration pages.
@@ -211,12 +220,13 @@ public class AuthorizationService {
      * Check if user can view list of all assessments.
      * ADMIN and INFORMATION_SECURITY_MANAGER can view all.
      * ORGANISATION_TEAM_LEADER can view assessments in their org and children.
-     * ASSESSMENT_DELEGATE can view only their assigned assessments (but this is filtered elsewhere).
+     * ASSESSMENT_DELEGATE and ASSESSOR can view only their assigned assessments (filtered elsewhere).
      */
     public boolean canViewAssessmentList() {
         Role role = getCurrentUserRole();
         return role == Role.ADMIN || role == Role.INFORMATION_SECURITY_MANAGER 
-            || role == Role.ORGANISATION_TEAM_LEADER || role == Role.ASSESSMENT_DELEGATE;
+            || role == Role.ORGANISATION_TEAM_LEADER || role == Role.ASSESSMENT_DELEGATE
+            || role == Role.ASSESSOR;
     }
     
     /**
@@ -268,8 +278,8 @@ public class AuthorizationService {
             return false;
         }
         
-        // Assessment Delegates: check if they are assigned to this assessment
-        if (role == Role.ASSESSMENT_DELEGATE) {
+        // Assessment Delegates and Assessors: check if they are assigned to this assessment
+        if (role == Role.ASSESSMENT_DELEGATE || role == Role.ASSESSOR) {
             Set<User> assignedUsers = assessment.getUsers();
             if (assignedUsers == null) {
                 return false;
@@ -301,7 +311,31 @@ public class AuthorizationService {
         }
         
         // Organisation Team Leaders and Assessment Delegates can modify if they can access
-        return canAccessAssessment(assessmentId);
+        if (role == Role.ORGANISATION_TEAM_LEADER || role == Role.ASSESSMENT_DELEGATE) {
+            return canAccessAssessment(assessmentId);
+        }
+
+        // Assessors must not be able to modify assessment structure/settings
+        return false;
+    }
+
+    /**
+     * Check if user can answer questions/write comments in an assessment.
+     */
+    public boolean canAnswerAssessment(Long assessmentId) {
+        User user = getCurrentUser();
+        if (user == null) {
+            return false;
+        }
+
+        Role role = user.getRole();
+        if (role == Role.ADMIN || role == Role.INFORMATION_SECURITY_MANAGER
+                || role == Role.ORGANISATION_TEAM_LEADER || role == Role.ASSESSMENT_DELEGATE
+                || role == Role.ASSESSOR) {
+            return canAccessAssessment(assessmentId);
+        }
+
+        return false;
     }
     
     /**

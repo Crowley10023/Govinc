@@ -291,8 +291,8 @@ public class AssessmentDetailsController {
             return new java.util.ArrayList<>(accessibleOrgUnits);
         }
 
-        // ASSESSMENT_DELEGATE: return org units from assessments they are assigned to
-        if (userRole == Role.ASSESSMENT_DELEGATE) {
+        // ASSESSMENT_DELEGATE and ASSESSOR: return org units from assessments they are assigned to
+        if (userRole == Role.ASSESSMENT_DELEGATE || userRole == Role.ASSESSOR) {
             Set<OrgUnit> orgUnitsForDelegate = new HashSet<>();
             List<Assessment> allAssessments = assessmentRepository.findAll();
             for (Assessment assessment : allAssessments) {

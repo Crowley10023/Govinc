@@ -57,7 +57,7 @@
                         <td th:text="${assessment.status}"></td>
                         <td th:text="${assessment.securityCatalog.name}"></td>
                         <td>
-                            <button class="btn btn-danger btn-sm delete-btn" type="button">Delete</button>
+                            <button th:if="${isAdminOrISM}" class="btn btn-danger btn-sm delete-btn" type="button">Delete</button>
                         </td>
                     </tr>
                 </tbody>

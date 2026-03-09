@@ -213,6 +213,11 @@ $(document).ready(function () {
     $('#choose-users-btn').click(function () {
         var $modal = $('#users-modal-bg');
         var $error = $('#users-modal-error');
+        var assessmentId = window.assessmentId || 0;
+        var addAssessorMode = !!window.assessmentAddAssessorMode;
+        var usersEndpoint = addAssessorMode
+            ? ('/assessment/' + assessmentId + '/assessors')
+            : '/users/api';
         $error.hide();
         $modal.css('display', 'flex');
 
@@ -223,22 +228,38 @@ $(document).ready(function () {
 
         // Get assigned user IDs from Thymeleaf/JS variable
         var assignedUserIds = window.assessmentAssignedUserIds || [];
-        $.getJSON('/users/api', function (users) {
+        $.getJSON(usersEndpoint, function (users) {
             $select.empty();
             if (!$.isArray(users) || users.length === 0) {
-                $select.append($('<option>').val('').text('(No users found)'));
+                $select.append($('<option>').val('').text(addAssessorMode ? '(No assessors found)' : '(No users found)'));
             } else {
-                users.forEach(function (user) {
-                    var $opt = $('<option>').val(user.id).text(user.name + ' (' + user.email + ')');
-                    if (assignedUserIds.includes(user.id) || assignedUserIds.includes(user.id.toString())) {
-                        $opt.prop('selected', true);
+                if (addAssessorMode) {
+                    var assignedSet = new Set((assignedUserIds || []).map(function (id) { return String(id); }));
+                    var usersToAdd = users.filter(function (user) {
+                        return !assignedSet.has(String(user.id));
+                    });
+
+                    if (usersToAdd.length === 0) {
+                        $select.append($('<option>').val('').text('(All assessors are already added)'));
+                    } else {
+                        usersToAdd.forEach(function (user) {
+                            var $opt = $('<option>').val(user.id).text(user.name + ' (' + user.email + ')');
+                            $select.append($opt);
+                        });
                     }
-                    $select.append($opt);
-                });
+                } else {
+                    users.forEach(function (user) {
+                        var $opt = $('<option>').val(user.id).text(user.name + ' (' + user.email + ')');
+                        if (assignedUserIds.includes(user.id) || assignedUserIds.includes(user.id.toString())) {
+                            $opt.prop('selected', true);
+                        }
+                        $select.append($opt);
+                    });
+                }
             }
             $select.prop('disabled', false);
         }).fail(function () {
-            $select.html('<option value="">(Could not load users)</option>');
+            $select.html('<option value="">' + (addAssessorMode ? '(Could not load assessors)' : '(Could not load users)') + '</option>');
         });
     });
 
@@ -256,10 +277,20 @@ $(document).ready(function () {
         var $select = $('#users-multiselect');
         var selected = $select.val() || [];
         var assessmentId = window.assessmentId || 0;
+        var addAssessorMode = !!window.assessmentAddAssessorMode;
+        var updateEndpoint = addAssessorMode
+            ? ('/assessment/' + assessmentId + '/assessors')
+            : ('/assessment/' + assessmentId + '/users');
+
+        if (addAssessorMode && selected.length === 0) {
+            $('#users-modal-error').show().text('Please select at least one user to add.');
+            return;
+        }
+
         $('#users-modal-save-btn').prop('disabled', true);
         $('#users-modal-error').hide();
         $.ajax({
-            url: '/assessment/' + assessmentId + '/users',
+            url: updateEndpoint,
             type: 'PUT',
             contentType: 'application/json',
             data: JSON.stringify(selected),
@@ -281,6 +312,8 @@ $(document).ready(function () {
                 $('#users-modal-bg').hide();
                 $('#users-modal-save-btn').prop('disabled', false);
                 $('#users-modal-error').hide();
+                // Keep assigned user ids in sync so reopening preselects correctly.
+                window.assessmentAssignedUserIds = (updatedUsers || []).map(function (u) { return u.id; });
             },
             error: function (xhr) {
                 let msg = "Could not update users.";

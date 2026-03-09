@@ -12,6 +12,7 @@ import com.govinc.organization.OrgService;
 import com.govinc.organization.OrgServiceService;
 import com.govinc.organization.OrgServiceAssessment;
 import com.govinc.organization.OrgServiceAssessmentControl;
+import com.govinc.user.Role;
 import com.govinc.user.User;
 import com.govinc.user.UserRepository;
 import com.govinc.catalog.SecurityControlDomain;
@@ -564,7 +565,12 @@ public class AssessmentController {
             model.addAttribute("details", details);
 
             // Pass authorization info for UI restrictions
-            model.addAttribute("isAdminOrISM", authorizationService.isAdmin() || authorizationService.isInformationSecurityManager());
+            Role currentRole = authorizationService.getCurrentUserRole();
+            boolean isAdminOrISM = authorizationService.isAdmin() || authorizationService.isInformationSecurityManager();
+            boolean canManageAssessors = currentRole == Role.ASSESSMENT_DELEGATE && assessment.isOpen();
+            model.addAttribute("isAdminOrISM", isAdminOrISM);
+            model.addAttribute("isAssessor", currentRole == Role.ASSESSOR);
+            model.addAttribute("canManageAssessors", canManageAssessors);
 
             return "assessment-details";
         } else {
@@ -589,7 +595,7 @@ public class AssessmentController {
     public String saveAnswer(@PathVariable Long id, @RequestParam Long controlId, @RequestParam Long answerId,
                              @RequestParam(required = false) Boolean isOverride) {
         // Authorization check
-        if (!authorizationService.canModifyAssessment(id)) {
+        if (!authorizationService.canAnswerAssessment(id)) {
             return "forbidden";
         }
         Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
@@ -649,7 +655,7 @@ public class AssessmentController {
     @ResponseBody
     public String saveComment(@PathVariable Long assessmentId, @PathVariable Long controlId, @RequestBody Map<String, String> body) {
         // Authorization check
-        if (!authorizationService.canModifyAssessment(assessmentId)) {
+        if (!authorizationService.canAnswerAssessment(assessmentId)) {
             return "forbidden";
         }
         String comment = body.get("comment");
@@ -748,6 +754,9 @@ public class AssessmentController {
     @GetMapping("/{id}/word-report-progress")
     @ResponseBody
     public Map<String, Object> getWordReportProgress(@PathVariable Long id) {
+        if (authorizationService.isAssessor()) {
+            throw new UnauthorizedException("Assessors are not allowed to generate reports.");
+        }
         ReportProgress progress = assessmentReporterWord.getProgress(id);
         Map<String, Object> response = new HashMap<>();
         response.put("percent", progress.getPercent());
@@ -758,7 +767,7 @@ public class AssessmentController {
     @GetMapping("/{id}/word-report")
     public ResponseEntity<byte[]> downloadWordReport(@PathVariable Long id) {
         // Authorization check
-        if (!authorizationService.canAccessAssessment(id)) {
+        if (!authorizationService.canAccessAssessment(id) || authorizationService.isAssessor()) {
             throw new UnauthorizedException("You do not have permission to download this assessment report.");
         }
         
@@ -813,7 +822,7 @@ public class AssessmentController {
     @GetMapping("/{id}/report")
     public ResponseEntity<byte[]> downloadReport(@PathVariable Long id) {
         // Authorization check
-        if (!authorizationService.canAccessAssessment(id)) {
+        if (!authorizationService.canAccessAssessment(id) || authorizationService.isAssessor()) {
             throw new UnauthorizedException("You do not have permission to download this assessment report.");
         }
         Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
@@ -846,7 +855,7 @@ public class AssessmentController {
     @GetMapping("/{id}/excel")
     public ResponseEntity<byte[]> downloadExcel(@PathVariable Long id) throws IOException {
         // Authorization check
-        if (!authorizationService.canAccessAssessment(id)) {
+        if (!authorizationService.canAccessAssessment(id) || authorizationService.isAssessor()) {
             throw new UnauthorizedException("You do not have permission to download this assessment data.");
         }
         Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
@@ -871,6 +880,9 @@ public class AssessmentController {
     @PostMapping("/{id}/create-url")
     @ResponseBody
     public Map<String, String> createUrl(@PathVariable Long id) {
+        if (!authorizationService.canAccessAssessmentUrls()) {
+            throw new UnauthorizedException("You do not have permission to create assessment URLs.");
+        }
         AssessmentUrls url = assessmentUrlsService.createOrReplaceUrl(id);
         String fullUrl = "/assessment-direct/" + url.getUrl();
         return Map.of("directUrl", fullUrl);
@@ -880,6 +892,9 @@ public class AssessmentController {
     @PostMapping("/{id}/set-orgunit")
     public String setOrgUnitForAssessment(@PathVariable Long id,
             @RequestParam(value = "orgUnitId", required = false) Long orgUnitId) {
+        if (!authorizationService.isInformationSecurityManager()) {
+            throw new UnauthorizedException("You do not have permission to set an organization unit for this assessment.");
+        }
         Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
         if (assessmentOpt.isPresent() && orgUnitId != null) {
             OrgUnit orgUnit = orgUnitService.getOrgUnit(orgUnitId).orElse(null);
@@ -896,6 +911,9 @@ public class AssessmentController {
     @PutMapping("/{id}/users")
     @ResponseBody
     public List<User> updateAssessmentUsers(@PathVariable Long id, @RequestBody List<Long> userIds) {
+        if (!authorizationService.canModifyAssessment(id)) {
+            throw new UnauthorizedException("You do not have permission to update assessment users.");
+        }
         Optional<Assessment> opt = assessmentRepository.findById(id);
         if (opt.isEmpty())
             throw new org.springframework.web.server.ResponseStatusException(
@@ -910,12 +928,75 @@ public class AssessmentController {
         return new ArrayList<>(users);
     }
 
+    // Delegate workflow: fetch only assessor users for assignment modal
+    @GetMapping("/{id}/assessors")
+    @ResponseBody
+    public List<User> getAssessorsForAssessment(@PathVariable Long id) {
+        if (!authorizationService.canAccessAssessment(id)) {
+            throw new UnauthorizedException("You do not have permission to access this assessment.");
+        }
+
+        Role role = authorizationService.getCurrentUserRole();
+        boolean allowed = role == Role.ASSESSMENT_DELEGATE
+                || role == Role.ADMIN
+                || role == Role.INFORMATION_SECURITY_MANAGER;
+        if (!allowed) {
+            throw new UnauthorizedException("You do not have permission to view assessors.");
+        }
+
+        return userRepository.findAll().stream()
+                .filter(u -> u.getRole() == Role.ASSESSOR)
+                .collect(Collectors.toList());
+    }
+
+    // Delegate workflow: add assessor users to an assessment without replacing existing users
+    @PutMapping("/{id}/assessors")
+    @ResponseBody
+    public List<User> addAssessmentAssessors(@PathVariable Long id, @RequestBody List<Long> assessorUserIds) {
+        if (!authorizationService.canAccessAssessment(id)) {
+            throw new UnauthorizedException("You do not have permission to access this assessment.");
+        }
+
+        Role role = authorizationService.getCurrentUserRole();
+        boolean delegateOrAdmin = role == Role.ASSESSMENT_DELEGATE
+                || role == Role.ADMIN
+                || role == Role.INFORMATION_SECURITY_MANAGER;
+        if (!delegateOrAdmin) {
+            throw new UnauthorizedException("You do not have permission to add assessors to this assessment.");
+        }
+
+        Optional<Assessment> opt = assessmentRepository.findById(id);
+        if (opt.isEmpty()) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.NOT_FOUND);
+        }
+
+        Assessment assessment = opt.get();
+        Set<User> updatedUsers = assessment.getUsers() == null
+                ? new LinkedHashSet<>()
+                : new LinkedHashSet<>(assessment.getUsers());
+
+        for (Long userId : assessorUserIds) {
+            User assessor = userRepository.findById(userId).orElse(null);
+            if (assessor == null || assessor.getRole() != Role.ASSESSOR) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.BAD_REQUEST,
+                        "Only users with the Assessor role can be added.");
+            }
+            updatedUsers.add(assessor);
+        }
+
+        assessment.setUsers(updatedUsers);
+        assessment = assessmentRepository.save(assessment);
+        return new ArrayList<>(assessment.getUsers());
+    }
+
     // Save answer with override flag for org service answers
     @PostMapping("/{id}/answer-override")
     @ResponseBody
     public String saveAnswerWithOverride(@PathVariable Long id, @RequestParam Long controlId, @RequestParam Long answerId) {
         // Authorization check
-        if (!authorizationService.canModifyAssessment(id)) {
+        if (!authorizationService.canAnswerAssessment(id)) {
             return "forbidden";
         }
         Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
@@ -967,7 +1048,7 @@ public class AssessmentController {
     @ResponseBody
     public String removeOverride(@PathVariable Long id, @PathVariable Long controlId) {
         // Authorization check
-        if (!authorizationService.canModifyAssessment(id)) {
+        if (!authorizationService.canAnswerAssessment(id)) {
             return "forbidden";
         }
         Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);

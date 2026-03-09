@@ -106,6 +106,14 @@ public class DatabaseMigrationService {
         migration_1_2.put("available", "1.1".equals(currentVersion));
         migrations.add(migration_1_2);
 
+        // Migration from 1.3 to 1.4
+        Map<String, Object> migration_1_4 = new LinkedHashMap<>();
+        migration_1_4.put("fromVersion", "1.3");
+        migration_1_4.put("toVersion", "1.4");
+        migration_1_4.put("description", "Normalize user.role column for new roles (convert ENUM to VARCHAR)");
+        migration_1_4.put("available", "1.3".equals(currentVersion));
+        migrations.add(migration_1_4);
+
         return migrations;
     }
 
@@ -261,6 +269,48 @@ public class DatabaseMigrationService {
     }
 
     /**
+     * Execute migration from 1.3 to 1.4
+     */
+    @Transactional
+    public void migrateTo_1_4() throws Exception {
+        System.out.println("[DB Migration] Starting migration to version 1.4");
+        try {
+            String sql = "SELECT DATA_TYPE, COLUMN_TYPE " +
+                    "FROM INFORMATION_SCHEMA.COLUMNS " +
+                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'user' AND COLUMN_NAME = 'role'";
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
+
+            if (rows.isEmpty()) {
+                throw new Exception("Column user.role not found");
+            }
+
+            String dataType = rows.get(0).get("DATA_TYPE") != null
+                    ? rows.get(0).get("DATA_TYPE").toString().toLowerCase(Locale.ROOT)
+                    : "";
+            String columnType = rows.get(0).get("COLUMN_TYPE") != null
+                    ? rows.get(0).get("COLUMN_TYPE").toString().toUpperCase(Locale.ROOT)
+                    : "";
+
+            if ("enum".equals(dataType) && !columnType.contains("ASSESSOR")) {
+                jdbcTemplate.execute("ALTER TABLE `user` MODIFY COLUMN role VARCHAR(64) NOT NULL");
+                System.out.println("[DB Migration] Converted user.role from ENUM to VARCHAR(64)");
+            } else {
+                System.out.println("[DB Migration] user.role already compatible, no ALTER needed");
+            }
+
+            DatabaseConfig config = getDatabaseConfig();
+            config.setCurrentVersion("1.4");
+            config.setDescription("Normalized user.role column to support new role values such as ASSESSOR");
+            databaseConfigRepository.save(config);
+            System.out.println("[DB Migration] Successfully updated database config to version 1.4");
+        } catch (Exception e) {
+            System.out.println("[DB Migration] ERROR: Migration to 1.4 failed: " + e.getMessage());
+            e.printStackTrace();
+            throw new Exception("Migration to 1.4 failed: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Execute a specific migration
      */
     @Transactional
@@ -273,6 +323,8 @@ public class DatabaseMigrationService {
             migrateTo_1_1();
         } else if ("1.2".equals(toVersion) && "1.1".equals(currentVersion)) {
             migrateTo_1_2();
+        } else if ("1.4".equals(toVersion) && "1.3".equals(currentVersion)) {
+            migrateTo_1_4();
         } else {
             throw new Exception("Invalid migration: from " + currentVersion + " to " + toVersion);
         }

@@ -286,21 +286,21 @@
 
         <section class="general-button-bar">
             <button th:if="${isAdminOrISM and assessment.isOpen}" id="choose-orgunit-btn" type="button" class="modal-launch-btn btn-nav">Choose Org Unit</button>
-            <button th:if="${isAdminOrISM and assessment.isOpen}" id="choose-users-btn" type="button" class="modal-launch-btn btn-nav">Choose Users</button>
-            <button th:if="${assessment.isOpen}" id="choose-orgservices-btn" type="button" class="modal-launch-btn btn-nav">Choose Org Services</button>
+            <button th:if="${(isAdminOrISM or canManageAssessors) and assessment.isOpen}" id="choose-users-btn" type="button" class="modal-launch-btn btn-nav" th:text="${canManageAssessors ? 'Add User' : 'Choose Users'}">Choose Users</button>
+            <button th:if="${assessment.isOpen and !isAssessor}" id="choose-orgservices-btn" type="button" class="modal-launch-btn btn-nav">Choose Org Services</button>
 
             <button th:if="${assessment.isOpen and isAdminOrISM}" id="finalize-btn" type="button" class="btn-nav">Finalize</button>
             <form th:if="${isAdminOrISM}" th:action="@{'/assessment/' + ${assessment.id} + '/delete'}" method="post">
                 <button type="submit" class="btn-nav"
                     onclick="return confirm('Are you sure you want to delete this assessment?')">Delete</button>
             </form>
-            <form th:action="@{'/assessment/' + ${assessment.id} + '/report'}" method="get">
+            <form th:if="${!isAssessor}" th:action="@{'/assessment/' + ${assessment.id} + '/report'}" method="get">
                 <button type="submit" class="btn-nav">Create Report (PDF)</button>
             </form>
-            <form id="word-report-form" th:action="@{'/assessment/' + ${assessment.id} + '/word-report'}" method="get">
+            <form th:if="${!isAssessor}" id="word-report-form" th:action="@{'/assessment/' + ${assessment.id} + '/word-report'}" method="get">
                 <button type="submit" id="word-report-btn" class="btn-nav">Create Report (Word)</button>
             </form>
-            <form th:action="@{'/assessment/' + ${assessment.id} + '/excel'}" method="get">
+            <form th:if="${!isAssessor}" th:action="@{'/assessment/' + ${assessment.id} + '/excel'}" method="get">
                 <button type="submit" class="btn-nav">Export to Excel</button>
             </form>
             <button th:if="${isAdminOrISM and assessment.isOpen}" id="create-url-btn" type="button" class="btn-nav">Create URL</button>
@@ -362,7 +362,7 @@
             <!-- User Selection Modal -->
             <div class="modal-bg" id="users-modal-bg">
                 <div class="modal-popup">
-                    <h3>Choose Users for Assessment</h3>
+                    <h3 th:text="${canManageAssessors ? 'Add Users to Assessment' : 'Choose Users for Assessment'}">Choose Users for Assessment</h3>
                     <form id="users-modal-form">
                         <select id="users-multiselect" name="userIds" multiple size="8" class="users-multiselect">
                             <option th:each="user : ${users}" th:value="${user.id}"
@@ -370,7 +370,7 @@
                                 th:text="${user.name + ' (' + user.email + ')'}"></option>
                         </select>
                         <div class="modal-btn-row">
-                            <button id="users-modal-save-btn" type="submit">Save</button>
+                            <button id="users-modal-save-btn" type="submit" th:text="${canManageAssessors ? 'Add User' : 'Save'}">Save</button>
                             <button id="users-modal-cancel-btn" type="button">Cancel</button>
                         </div>
                     </form>
@@ -448,6 +448,7 @@
         window.securityCatalogId = /*[[${assessment.securityCatalog != null ? assessment.securityCatalog.id : 0}]]*/ 0;
         window.currentOrgUnitId = /*[[${assessment.orgUnit != null ? assessment.orgUnit.id : ''}]]*/ '';
         window.assessmentAssignedUserIds = /*[[${assessment.users != null ? assessment.users.![id] : {}}]]*/[];
+        window.assessmentAddAssessorMode = /*[[${canManageAssessors}]]*/ false;
         window.currentAssessmentIdForProgress = /*[[${assessment.id}]]*/ 0;
         /*]]>*/
 

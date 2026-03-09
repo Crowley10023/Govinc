@@ -329,6 +329,7 @@
                             <option value="ADMIN" th:text="'Admin'">Admin</option>
                             <option value="INFORMATION_SECURITY_MANAGER" th:text="'Information Security Manager'">Information Security Manager</option>
                             <option value="ASSESSMENT_DELEGATE" th:text="'Assessment Delegate'">Assessment Delegate</option>
+                            <option value="ASSESSOR" th:text="'Assessor'">Assessor</option>
                         </select>
                         <p class="field-hint" id="roleHint"></p>
                         <div id="roleInfo" class="role-info"></div>
@@ -380,7 +381,8 @@
         'ADMIN': 'Full administrative access to all systems and features',
         'INFORMATION_SECURITY_MANAGER': 'Access to security frameworks and user/organization management (no configuration)',
         'ORGANISATION_TEAM_LEADER': 'Access to assessments in their assigned organization and its child units. Can lead multiple organization units. (Available at user creation only)',
-        'ASSESSMENT_DELEGATE': 'Access only to assigned assessments'
+        'ASSESSMENT_DELEGATE': 'Access only to assigned assessments',
+        'ASSESSOR': 'Can only answer assessment questions, use guide, and write comments in assigned assessments'
     };
 
     function updateRoleInfo() {
