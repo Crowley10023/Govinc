@@ -3,6 +3,7 @@ package com.govinc;
 import com.govinc.service.AuthConfigService;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -19,6 +20,7 @@ import org.slf4j.LoggerFactory;
  * - Organization and user management
  */
 @SpringBootApplication
+@EnableScheduling
 public class Theia01Application {
     private static final Logger logger = LoggerFactory.getLogger(Theia01Application.class);
 

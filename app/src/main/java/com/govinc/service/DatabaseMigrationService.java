@@ -34,6 +34,18 @@ import java.util.stream.Stream;
 public class DatabaseMigrationService {
     private static final Pattern VERSION_FROM_FILENAME_PATTERN = Pattern.compile("_v([A-Za-z0-9._-]+)_\\d{8}_\\d{6}\\.sql$");
 
+    private static final class MigrationDefinition {
+        private final String fromVersion;
+        private final String toVersion;
+        private final String description;
+
+        private MigrationDefinition(String fromVersion, String toVersion, String description) {
+            this.fromVersion = fromVersion;
+            this.toVersion = toVersion;
+            this.description = description;
+        }
+    }
+
     private final DatabaseConfigRepository databaseConfigRepository;
     private final JdbcTemplate jdbcTemplate;
     private final DataSource dataSource;
@@ -82,37 +94,14 @@ public class DatabaseMigrationService {
         List<Map<String, Object>> migrations = new ArrayList<>();
         String currentVersion = getCurrentVersion();
 
-        // Migration from 0.9 to 1.0
-        Map<String, Object> migration_1_0 = new LinkedHashMap<>();
-        migration_1_0.put("fromVersion", "0.9");
-        migration_1_0.put("toVersion", "1.0");
-        migration_1_0.put("description", "Fix AIProvider constraints - allow multiple providers of same type");
-        migration_1_0.put("available", "0.9".equals(currentVersion));
-        migrations.add(migration_1_0);
-
-        // Migration from 1.0 to 1.1
-        Map<String, Object> migration_1_1 = new LinkedHashMap<>();
-        migration_1_1.put("fromVersion", "1.0");
-        migration_1_1.put("toVersion", "1.1");
-        migration_1_1.put("description", "Allow multiple organization units per leader - remove unique constraint on leader_id");
-        migration_1_1.put("available", "1.0".equals(currentVersion));
-        migrations.add(migration_1_1);
-
-        // Migration from 1.1 to 1.2
-        Map<String, Object> migration_1_2 = new LinkedHashMap<>();
-        migration_1_2.put("fromVersion", "1.1");
-        migration_1_2.put("toVersion", "1.2");
-        migration_1_2.put("description", "Make maturity_answer_id column nullable in assessment_control_answer - allows saving comments without answers");
-        migration_1_2.put("available", "1.1".equals(currentVersion));
-        migrations.add(migration_1_2);
-
-        // Migration from 1.3 to 1.4
-        Map<String, Object> migration_1_4 = new LinkedHashMap<>();
-        migration_1_4.put("fromVersion", "1.3");
-        migration_1_4.put("toVersion", "1.4");
-        migration_1_4.put("description", "Normalize user.role column for new roles (convert ENUM to VARCHAR)");
-        migration_1_4.put("available", "1.3".equals(currentVersion));
-        migrations.add(migration_1_4);
+        for (MigrationDefinition definition : getMigrationDefinitions()) {
+            Map<String, Object> migration = new LinkedHashMap<>();
+            migration.put("fromVersion", definition.fromVersion);
+            migration.put("toVersion", definition.toVersion);
+            migration.put("description", definition.description);
+            migration.put("available", isForwardMigrationAvailable(currentVersion, definition.toVersion));
+            migrations.add(migration);
+        }
 
         return migrations;
     }
@@ -317,17 +306,114 @@ public class DatabaseMigrationService {
     public void executeMigration(String toVersion) throws Exception {
         String currentVersion = getCurrentVersion();
 
-        if ("1.0".equals(toVersion) && "0.9".equals(currentVersion)) {
+        if (Objects.equals(currentVersion, toVersion)) {
+            return;
+        }
+
+        if (compareVersions(currentVersion, toVersion) > 0) {
+            throw new Exception("Downgrade is not supported: from " + currentVersion + " to " + toVersion);
+        }
+
+        List<MigrationDefinition> chain = resolveStrictMigrationPath(currentVersion, toVersion);
+        if (!chain.isEmpty()) {
+            for (MigrationDefinition step : chain) {
+                executeSingleMigration(step.toVersion);
+            }
+            return;
+        }
+
+        // Fallback: if no strict chain exists (for example 1.2 -> 1.4), execute the target patch directly.
+        executeSingleMigration(toVersion);
+    }
+
+    private List<MigrationDefinition> getMigrationDefinitions() {
+        return List.of(
+                new MigrationDefinition("0.9", "1.0", "Fix AIProvider constraints - allow multiple providers of same type"),
+                new MigrationDefinition("1.0", "1.1", "Allow multiple organization units per leader - remove unique constraint on leader_id"),
+                new MigrationDefinition("1.1", "1.2", "Make maturity_answer_id column nullable in assessment_control_answer - allows saving comments without answers"),
+                new MigrationDefinition("1.3", "1.4", "Normalize user.role column for new roles (convert ENUM to VARCHAR)")
+        );
+    }
+
+    private boolean isForwardMigrationAvailable(String currentVersion, String targetVersion) {
+        if (compareVersions(currentVersion, targetVersion) >= 0) {
+            return false;
+        }
+
+        return !resolveStrictMigrationPath(currentVersion, targetVersion).isEmpty() || hasMigrationHandler(targetVersion);
+    }
+
+    private List<MigrationDefinition> resolveStrictMigrationPath(String fromVersion, String toVersion) {
+        if (Objects.equals(fromVersion, toVersion)) {
+            return Collections.emptyList();
+        }
+
+        Map<String, MigrationDefinition> byFrom = new HashMap<>();
+        for (MigrationDefinition definition : getMigrationDefinitions()) {
+            byFrom.put(definition.fromVersion, definition);
+        }
+
+        List<MigrationDefinition> chain = new ArrayList<>();
+        String cursor = fromVersion;
+        Set<String> visited = new HashSet<>();
+
+        while (!Objects.equals(cursor, toVersion)) {
+            if (!visited.add(cursor)) {
+                return Collections.emptyList();
+            }
+
+            MigrationDefinition next = byFrom.get(cursor);
+            if (next == null || compareVersions(next.toVersion, toVersion) > 0) {
+                return Collections.emptyList();
+            }
+
+            chain.add(next);
+            cursor = next.toVersion;
+        }
+
+        return chain;
+    }
+
+    private boolean hasMigrationHandler(String toVersion) {
+        return "1.0".equals(toVersion) || "1.1".equals(toVersion) || "1.2".equals(toVersion) || "1.4".equals(toVersion);
+    }
+
+    private void executeSingleMigration(String toVersion) throws Exception {
+        if ("1.0".equals(toVersion)) {
             migrateTo_1_0();
-        } else if ("1.1".equals(toVersion) && "1.0".equals(currentVersion)) {
+        } else if ("1.1".equals(toVersion)) {
             migrateTo_1_1();
-        } else if ("1.2".equals(toVersion) && "1.1".equals(currentVersion)) {
+        } else if ("1.2".equals(toVersion)) {
             migrateTo_1_2();
-        } else if ("1.4".equals(toVersion) && "1.3".equals(currentVersion)) {
+        } else if ("1.4".equals(toVersion)) {
             migrateTo_1_4();
         } else {
-            throw new Exception("Invalid migration: from " + currentVersion + " to " + toVersion);
+            throw new Exception("Unknown migration target version: " + toVersion);
         }
+    }
+
+    private int compareVersions(String left, String right) {
+        int[] leftParts = parseVersionParts(left);
+        int[] rightParts = parseVersionParts(right);
+        int maxLength = Math.max(leftParts.length, rightParts.length);
+
+        for (int i = 0; i < maxLength; i++) {
+            int leftValue = i < leftParts.length ? leftParts[i] : 0;
+            int rightValue = i < rightParts.length ? rightParts[i] : 0;
+            if (leftValue != rightValue) {
+                return Integer.compare(leftValue, rightValue);
+            }
+        }
+        return 0;
+    }
+
+    private int[] parseVersionParts(String version) {
+        String[] parts = version.split("\\.");
+        int[] parsed = new int[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            parsed[i] = Integer.parseInt(parts[i]);
+        }
+        return parsed;
     }
 
     /**
