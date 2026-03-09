@@ -2,6 +2,7 @@ package com.govinc.configuration;
 
 import com.govinc.user.User;
 import com.govinc.user.UserRepository;
+import com.govinc.user.Role;
 import com.govinc.session.UserSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -115,6 +116,7 @@ public class CustomAuthenticationSuccessHandler implements AuthenticationSuccess
                 } else {
                     logger.info("[OAUTH2-FLOW] Creating new user in DB: {} / {}", username, email);
                     User user = new User(username, email);
+                    user.setRole(Role.ASSESSOR);
                     userRepository.save(user);
                 }
             } else {

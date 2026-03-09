@@ -254,28 +254,10 @@ public class AuthorizationService {
             return false;
         }
         Assessment assessment = assessmentOpt.get();
-        
-        // Organisation Team Leaders: check if assessment is in any of their org units or children
-        if (role == Role.ORGANISATION_TEAM_LEADER) {
-            Set<Long> accessibleOrgUnitIds = getAccessibleOrgUnitIdsForUser(user);
-            if (accessibleOrgUnitIds.isEmpty()) {
-                logger.warning("Organisation Team Leader user " + user.getId() + " (" + user.getName() + ") is not leading any organisation units. Cannot access assessments.");
-                return false;
-            }
-            
-            OrgUnit assessmentOrg = assessment.getOrgUnit();
-            if (assessmentOrg == null) {
-                logger.warning("Assessment " + assessmentId + " has no organisation unit assigned. Team leader " + user.getName() + " cannot access it.");
-                return false;
-            }
 
-            if (assessmentOrg.getId() != null && accessibleOrgUnitIds.contains(assessmentOrg.getId())) {
-                logger.fine("Team leader " + user.getName() + " can access assessment " + assessmentId + " (org: " + assessmentOrg.getName() + ")");
-                return true;
-            }
-            
-            logger.fine("Team leader " + user.getName() + " cannot access assessment " + assessmentId + " (not in any of their org units)");
-            return false;
+        // Leadership-based access should work independently of the user's role value.
+        if (canAccessAssessmentThroughLeadership(user, assessment)) {
+            return true;
         }
         
         // Assessment Delegates and Assessors: check if they are assigned to this assessment
@@ -288,6 +270,42 @@ public class AuthorizationService {
         }
         
         return false;
+    }
+
+    /**
+     * Landing-page visibility rule: users who lead org units can see assessments
+     * in those units and all descendants, regardless of their role value.
+     */
+    public boolean canAccessAssessmentThroughLeadership(Long assessmentId) {
+        User user = getCurrentUser();
+        if (user == null) {
+            return false;
+        }
+
+        Optional<Assessment> assessmentOpt = assessmentRepository.findById(assessmentId);
+        if (assessmentOpt.isEmpty()) {
+            return false;
+        }
+
+        return canAccessAssessmentThroughLeadership(user, assessmentOpt.get());
+    }
+
+    private boolean canAccessAssessmentThroughLeadership(User user, Assessment assessment) {
+        if (user == null || assessment == null) {
+            return false;
+        }
+
+        Set<Long> accessibleOrgUnitIds = getAccessibleOrgUnitIdsForUser(user);
+        if (accessibleOrgUnitIds.isEmpty()) {
+            return false;
+        }
+
+        OrgUnit assessmentOrg = assessment.getOrgUnit();
+        if (assessmentOrg == null || assessmentOrg.getId() == null) {
+            return false;
+        }
+
+        return accessibleOrgUnitIds.contains(assessmentOrg.getId());
     }
     
     /**

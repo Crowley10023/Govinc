@@ -45,7 +45,10 @@ public class LandingController {
             List<Assessment> filtered = new ArrayList<>();
             for (Assessment a : all) {
                 try {
-                    if (a.getId() != null && authorizationService.canAccessAssessment(a.getId())) {
+                    if (a.getId() != null && (
+                            authorizationService.canAccessAssessment(a.getId())
+                                    || authorizationService.canAccessAssessmentThroughLeadership(a.getId())
+                    )) {
                         filtered.add(a);
                     }
                 } catch (Exception e) {
