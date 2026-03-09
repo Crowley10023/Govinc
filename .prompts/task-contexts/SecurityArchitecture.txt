@@ -10,7 +10,8 @@ This file denotes major corner stones of the security architecture.
     d) special assignment Team Lead: A team lead is allowed to see and edit all assessments of his organisational unit and its children, as well as where he is assigned as user.
        The team lead is typically assigned, when editing an organisational unit. team lead is not a standard role in the system and may not be assigned like the other roles. 
        a team lead may lead multiple organisational units.
-    c) A Team Lead is allowed to see all assessments of his organisation units and their children
+    e) A Team Lead is allowed to see all assessments of his organisation units and their children
+    f) ASSESSOR: an assessor is soley able to see assessments where that person is named as "user".
 5. SecurityConfig.java defines what is accessible and what not. 
 6. The system allows three different authentication providers: Keycloak, Azure and local. Local typically spots only the user named ADMIN with the  role ADMIN
 7. Users generally may have one or more roles. valid combinations are:
@@ -20,3 +21,5 @@ This file denotes major corner stones of the security architecture.
 8. in Production environments, the local ADMIN user must not be active, only in development environments (see deployment)
 9. A user may be deleted when the user is not in "created by" in an assessment. if deleting a user that is part of "users" of an assessment, the user must be deleted as user 
    in these assessments prior to deleting the user.
+10. Assessment delegates entitlements:
+    a) Assessment delegates are allowed to ADD users to the list of users of an assessment they are already allowed for. 

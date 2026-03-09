@@ -84,6 +84,66 @@
             border-bottom-color: #ff9800;
         }
 
+        .backup-section {
+            border-color: #4caf50;
+            background-color: #eef8ef;
+        }
+
+        .backup-section h3 {
+            color: #2e7d32;
+            border-bottom-color: #4caf50;
+        }
+
+        .section-header-actions {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .section-header-actions h3 {
+            margin-bottom: 0;
+            flex: 1;
+        }
+
+        .btn-success {
+            background-color: #4caf50;
+            color: #fff;
+        }
+
+        .btn-success:hover {
+            background-color: #2e7d32;
+        }
+
+        .backup-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .backup-table th,
+        .backup-table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+            font-size: 13px;
+        }
+
+        .backup-table th {
+            background: #f3f3f3;
+            font-size: 12px;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        .backup-table td.actions-cell {
+            text-align: right;
+        }
+
         .migration-item {
             background-color: #fff;
             border: 1px solid #ddd;
@@ -466,6 +526,46 @@
                 </div>
             </div>
         </div>
+
+        <!-- Backup Management Section -->
+        <div class="section-card backup-section">
+            <div class="section-header-actions">
+                <h3>💾 Database Backups</h3>
+                <button type="button" id="createBackupBtn" class="btn btn-success">Create Full Backup</button>
+            </div>
+
+            <div class="alert alert-info">
+                Full SQL dump backups are stored on the filesystem and cannot be deleted from this interface.
+            </div>
+
+            <div id="backupTableWrap">
+                <table class="backup-table">
+                    <thead>
+                        <tr>
+                            <th>File</th>
+                            <th>Version</th>
+                            <th>Created</th>
+                            <th>Size</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="backupTableBody">
+                        <tr th:if="${databaseBackups.isEmpty()}">
+                            <td colspan="5">No backups available yet.</td>
+                        </tr>
+                        <tr th:each="backup : ${databaseBackups}">
+                            <td th:text="${backup.fileName}"></td>
+                            <td th:text="${backup.version}"></td>
+                            <td th:text="${backup.createdAt}"></td>
+                            <td th:text="${backup.sizeBytes}"></td>
+                            <td class="actions-cell">
+                                <button type="button" class="btn btn-warning restore-btn" th:data-file-name="${backup.fileName}">Restore</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <!-- Migration Confirmation Modal -->
@@ -619,6 +719,141 @@
             });
         }
 
+        function formatBytes(bytes) {
+            const value = Number(bytes) || 0;
+            if (value <= 0) return '0 B';
+            const units = ['B', 'KB', 'MB', 'GB'];
+            const idx = Math.min(Math.floor(Math.log(value) / Math.log(1024)), units.length - 1);
+            const scaled = value / Math.pow(1024, idx);
+            return scaled.toFixed(idx === 0 ? 0 : 1) + ' ' + units[idx];
+        }
+
+        function escapeHtml(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function renderBackups(backups) {
+            const tbody = document.getElementById('backupTableBody');
+            if (!tbody) return;
+
+            if (!Array.isArray(backups) || backups.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5">No backups available yet.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = backups.map(backup => {
+                const fileName = String(backup.fileName || '');
+                const version = String(backup.version || 'unknown');
+                const createdAt = String(backup.createdAt || '');
+                const size = formatBytes(backup.sizeBytes);
+                return `
+                    <tr>
+                        <td>${escapeHtml(fileName)}</td>
+                        <td>${escapeHtml(version)}</td>
+                        <td>${escapeHtml(createdAt)}</td>
+                        <td>${escapeHtml(size)}</td>
+                        <td class="actions-cell">
+                            <button type="button" class="btn btn-warning restore-btn" data-file-name="${escapeHtml(fileName)}">Restore</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function loadBackups() {
+            fetch('/config/database/backups')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to load backups');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data && data.success) {
+                        renderBackups(data.backups || []);
+                    } else {
+                        throw new Error((data && data.error) ? data.error : 'Unknown error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Failed to load backups:', error);
+                    showStatus('Could not load backups: ' + error.message, 'error');
+                });
+        }
+
+        function createBackup() {
+            showStatus('Creating database backup...', 'info');
+
+            const csrf = getCsrfToken();
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            if (csrf.token) {
+                headers[csrf.header] = csrf.token;
+            }
+
+            fetch('/config/database/backup', {
+                method: 'POST',
+                headers: headers
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.success) {
+                        showStatus('Backup created successfully: ' + data.backup.fileName, 'success');
+                        loadBackups();
+                    } else {
+                        throw new Error((data && data.error) ? data.error : 'Backup failed');
+                    }
+                })
+                .catch(error => {
+                    console.error('Backup error:', error);
+                    showStatus('Backup failed: ' + error.message, 'error');
+                });
+        }
+
+        function restoreBackup(fileName) {
+            if (!fileName) return;
+
+            const ok = window.confirm('Restore backup "' + fileName + '"? This will overwrite current database content.');
+            if (!ok) return;
+
+            showStatus('Restoring database backup...', 'info');
+
+            const csrf = getCsrfToken();
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            if (csrf.token) {
+                headers[csrf.header] = csrf.token;
+            }
+
+            fetch('/config/database/restore', {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify({ fileName: fileName })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.success) {
+                        showStatus('Restore completed successfully. Reloading page...', 'success');
+                        setTimeout(() => {
+                            window.location.href = '/config/database';
+                        }, 1800);
+                    } else {
+                        throw new Error((data && data.error) ? data.error : 'Restore failed');
+                    }
+                })
+                .catch(error => {
+                    console.error('Restore error:', error);
+                    showStatus('Restore failed: ' + error.message, 'error');
+                });
+        }
+
         // Close modal when clicking outside
         window.onclick = function(event) {
             const modal = document.getElementById('migrationConfirmModal');
@@ -639,6 +874,23 @@
                     openMigrationConfirmModal(toVersion);
                 });
             });
+
+            const createBackupBtn = document.getElementById('createBackupBtn');
+            if (createBackupBtn) {
+                createBackupBtn.addEventListener('click', createBackup);
+            }
+
+            const backupTableBody = document.getElementById('backupTableBody');
+            if (backupTableBody) {
+                backupTableBody.addEventListener('click', function (event) {
+                    const btn = event.target.closest('.restore-btn');
+                    if (!btn) return;
+                    const fileName = btn.getAttribute('data-file-name');
+                    restoreBackup(fileName);
+                });
+            }
+
+            loadBackups();
         });
     </script>
 </body>

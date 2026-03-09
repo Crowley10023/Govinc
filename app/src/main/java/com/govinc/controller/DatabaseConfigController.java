@@ -32,10 +32,12 @@ public class DatabaseConfigController {
     public String getDatabaseConfigPage(Model model) {
         DatabaseConfig config = databaseMigrationService.getDatabaseConfig();
         List<Map<String, Object>> availableMigrations = databaseMigrationService.getAvailableMigrations();
+        List<Map<String, Object>> backups = databaseMigrationService.listBackups();
 
         model.addAttribute("databaseConfig", config);
         model.addAttribute("currentVersion", config.getCurrentVersion());
         model.addAttribute("availableMigrations", availableMigrations);
+        model.addAttribute("databaseBackups", backups);
 
         return "database-config";
     }
@@ -81,6 +83,65 @@ public class DatabaseConfigController {
         } catch (Exception e) {
             return ResponseEntity.status(500).body(
                 Map.of("success", false, "error", "Migration failed: " + e.getMessage())
+            );
+        }
+    }
+
+    /**
+     * List all available database backups.
+     */
+    @GetMapping(path = "/backups", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public ResponseEntity<?> listBackups() {
+        try {
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "backups", databaseMigrationService.listBackups()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(
+                    Map.of("success", false, "error", "Failed to list backups: " + e.getMessage())
+            );
+        }
+    }
+
+    /**
+     * Create a full database backup file.
+     */
+    @PostMapping(path = "/backup", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public ResponseEntity<?> createBackup() {
+        try {
+            Map<String, Object> backup = databaseMigrationService.createFullBackup();
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Database backup created successfully",
+                    "backup", backup
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(
+                    Map.of("success", false, "error", "Database backup failed: " + e.getMessage())
+            );
+        }
+    }
+
+    /**
+     * Restore database from a backup file.
+     */
+    @PostMapping(path = "/restore", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public ResponseEntity<?> restoreBackup(@RequestBody Map<String, String> body) {
+        String fileName = body != null ? body.get("fileName") : null;
+        try {
+            Map<String, Object> result = databaseMigrationService.restoreBackup(fileName);
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Database restore completed successfully",
+                    "result", result
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(
+                    Map.of("success", false, "error", "Database restore failed: " + e.getMessage())
             );
         }
     }

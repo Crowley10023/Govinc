@@ -4,23 +4,48 @@ import com.govinc.entity.DatabaseConfig;
 import com.govinc.repository.DatabaseConfigRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.init.ScriptUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.sql.DataSource;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.Statement;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /**
  * Service to manage database schema migrations and version control.
  */
 @Service
 public class DatabaseMigrationService {
+    private static final Pattern VERSION_FROM_FILENAME_PATTERN = Pattern.compile("_v([A-Za-z0-9._-]+)_\\d{8}_\\d{6}\\.sql$");
+
     private final DatabaseConfigRepository databaseConfigRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final DataSource dataSource;
+
+    @org.springframework.beans.factory.annotation.Value("${app.database.backup-dir:backups/database}")
+    private String databaseBackupDirectory;
 
     @Autowired
-    public DatabaseMigrationService(DatabaseConfigRepository databaseConfigRepository, JdbcTemplate jdbcTemplate) {
+    public DatabaseMigrationService(DatabaseConfigRepository databaseConfigRepository, JdbcTemplate jdbcTemplate, DataSource dataSource) {
         this.databaseConfigRepository = databaseConfigRepository;
         this.jdbcTemplate = jdbcTemplate;
+        this.dataSource = dataSource;
     }
 
     /**
@@ -251,5 +276,258 @@ public class DatabaseMigrationService {
         } else {
             throw new Exception("Invalid migration: from " + currentVersion + " to " + toVersion);
         }
+    }
+
+    /**
+     * Create a full SQL dump backup of the configured MariaDB database.
+     */
+    public Map<String, Object> createFullBackup() throws Exception {
+        Path backupDir = getBackupDirectoryPath();
+        Files.createDirectories(backupDir);
+
+        String version = getCurrentVersion();
+        String safeVersion = version.replaceAll("[^A-Za-z0-9._-]", "_");
+        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+        String fileName = "govinc_v" + safeVersion + "_" + timestamp + ".sql";
+        Path backupFile = backupDir.resolve(fileName).normalize();
+
+        writeFullDumpUsingJdbc(backupFile);
+
+        return createBackupInfo(backupFile);
+    }
+
+    /**
+     * List all available full dump backup files.
+     */
+    public List<Map<String, Object>> listBackups() {
+        Path backupDir = getBackupDirectoryPath();
+        if (!Files.exists(backupDir) || !Files.isDirectory(backupDir)) {
+            return new ArrayList<>();
+        }
+
+        try (Stream<Path> files = Files.list(backupDir)) {
+            return files
+                    .filter(Files::isRegularFile)
+                    .filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".sql"))
+                    .sorted(Comparator.comparing(Path::getFileName).reversed())
+                    .map(this::createBackupInfo)
+                    .toList();
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to list backup files: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Restore the database from a selected full dump backup file.
+     */
+    public Map<String, Object> restoreBackup(String fileName) throws Exception {
+        if (fileName == null || fileName.isBlank()) {
+            throw new IllegalArgumentException("Backup file name is required.");
+        }
+
+        if (fileName.contains("/") || fileName.contains("\\") || fileName.contains("..")) {
+            throw new IllegalArgumentException("Invalid backup file name.");
+        }
+
+        Path backupDir = getBackupDirectoryPath();
+        Path backupFile = backupDir.resolve(fileName).normalize();
+
+        if (!backupFile.startsWith(backupDir)) {
+            throw new IllegalArgumentException("Invalid backup file path.");
+        }
+        if (!Files.exists(backupFile) || !Files.isRegularFile(backupFile)) {
+            throw new IllegalArgumentException("Backup file not found: " + fileName);
+        }
+
+        restoreFromDumpUsingJdbc(backupFile);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("restoredFile", fileName);
+        result.put("currentVersion", getCurrentVersion());
+        return result;
+    }
+
+    private Path getBackupDirectoryPath() {
+        return Paths.get(databaseBackupDirectory).toAbsolutePath().normalize();
+    }
+
+    private void writeFullDumpUsingJdbc(Path backupFile) throws Exception {
+        if (Files.exists(backupFile)) {
+            Files.delete(backupFile);
+        }
+
+        try (Connection connection = dataSource.getConnection();
+             BufferedWriter writer = Files.newBufferedWriter(backupFile, StandardCharsets.UTF_8)) {
+
+            DatabaseMetaData metaData = connection.getMetaData();
+            String databaseName = connection.getCatalog();
+
+            writer.write("-- Govinc database backup generated at " + LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+            writer.newLine();
+            writer.write("-- Database: " + databaseName);
+            writer.newLine();
+            writer.write("SET FOREIGN_KEY_CHECKS=0;");
+            writer.newLine();
+            writer.newLine();
+
+            List<String> baseTables = new ArrayList<>();
+            List<String> views = new ArrayList<>();
+
+            try (ResultSet rs = metaData.getTables(databaseName, null, "%", new String[]{"TABLE", "VIEW"})) {
+                while (rs.next()) {
+                    String tableName = rs.getString("TABLE_NAME");
+                    String tableType = rs.getString("TABLE_TYPE");
+                    if (tableName == null || tableName.isBlank()) {
+                        continue;
+                    }
+                    if ("VIEW".equalsIgnoreCase(tableType)) {
+                        views.add(tableName);
+                    } else {
+                        baseTables.add(tableName);
+                    }
+                }
+            }
+
+            Collections.sort(baseTables);
+            Collections.sort(views);
+
+            for (String table : baseTables) {
+                writeTableDump(connection, writer, table);
+            }
+
+            for (String view : views) {
+                writeViewDump(connection, writer, view);
+            }
+
+            writer.write("SET FOREIGN_KEY_CHECKS=1;");
+            writer.newLine();
+        }
+    }
+
+    private void writeTableDump(Connection connection, BufferedWriter writer, String tableName) throws Exception {
+        writer.write("-- Table: `" + tableName + "`");
+        writer.newLine();
+        writer.write("DROP TABLE IF EXISTS `" + tableName + "`;");
+        writer.newLine();
+
+        String createSql = querySingleString(connection, "SHOW CREATE TABLE `" + tableName + "`", "Create Table");
+        writer.write(createSql + ";");
+        writer.newLine();
+
+        try (Statement statement = connection.createStatement();
+             ResultSet rs = statement.executeQuery("SELECT * FROM `" + tableName + "`")) {
+            ResultSetMetaData md = rs.getMetaData();
+            int colCount = md.getColumnCount();
+            while (rs.next()) {
+                writer.write("INSERT INTO `" + tableName + "` VALUES (");
+                for (int i = 1; i <= colCount; i++) {
+                    if (i > 1) {
+                        writer.write(", ");
+                    }
+                    writer.write(toSqlLiteral(rs.getObject(i)));
+                }
+                writer.write(");");
+                writer.newLine();
+            }
+        }
+
+        writer.newLine();
+    }
+
+    private void writeViewDump(Connection connection, BufferedWriter writer, String viewName) throws Exception {
+        writer.write("-- View: `" + viewName + "`");
+        writer.newLine();
+        writer.write("DROP VIEW IF EXISTS `" + viewName + "`;");
+        writer.newLine();
+
+        String createSql = querySingleString(connection, "SHOW CREATE VIEW `" + viewName + "`", "Create View");
+        writer.write(createSql + ";");
+        writer.newLine();
+        writer.newLine();
+    }
+
+    private String querySingleString(Connection connection, String sql, String columnName) throws Exception {
+        try (Statement statement = connection.createStatement();
+             ResultSet rs = statement.executeQuery(sql)) {
+            if (!rs.next()) {
+                throw new IllegalStateException("No result for SQL: " + sql);
+            }
+            String value = rs.getString(columnName);
+            if (value == null || value.isBlank()) {
+                throw new IllegalStateException("Missing " + columnName + " for SQL: " + sql);
+            }
+            return value;
+        }
+    }
+
+    private void restoreFromDumpUsingJdbc(Path backupFile) throws Exception {
+        try (Connection connection = dataSource.getConnection()) {
+            ScriptUtils.executeSqlScript(connection, new org.springframework.core.io.FileSystemResource(backupFile));
+        }
+    }
+
+    private String toSqlLiteral(Object value) {
+        if (value == null) {
+            return "NULL";
+        }
+        if (value instanceof Number) {
+            return String.valueOf(value);
+        }
+        if (value instanceof Boolean b) {
+            return b ? "1" : "0";
+        }
+        if (value instanceof byte[] bytes) {
+            StringBuilder hex = new StringBuilder("X'");
+            for (byte aByte : bytes) {
+                hex.append(String.format("%02x", aByte));
+            }
+            hex.append("'");
+            return hex.toString();
+        }
+
+        String text = String.valueOf(value)
+                .replace("\\", "\\\\")
+                .replace("'", "''")
+                .replace("\r", "\\r")
+                .replace("\n", "\\n");
+        return "'" + text + "'";
+    }
+
+    private Map<String, Object> createBackupInfo(Path path) {
+        Map<String, Object> info = new LinkedHashMap<>();
+        String fileName = path.getFileName().toString();
+        info.put("fileName", fileName);
+        info.put("version", extractVersionFromFileName(fileName));
+        info.put("sizeBytes", getFileSize(path));
+        info.put("createdAt", getCreatedAtIso(path));
+        return info;
+    }
+
+    private long getFileSize(Path path) {
+        try {
+            return Files.size(path);
+        } catch (IOException e) {
+            return 0L;
+        }
+    }
+
+    private String getCreatedAtIso(Path path) {
+        try {
+            LocalDateTime created = LocalDateTime.ofInstant(
+                    Files.getLastModifiedTime(path).toInstant(),
+                    ZoneId.systemDefault()
+            );
+            return created.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        } catch (IOException e) {
+            return "";
+        }
+    }
+
+    private String extractVersionFromFileName(String fileName) {
+        java.util.regex.Matcher matcher = VERSION_FROM_FILENAME_PATTERN.matcher(fileName);
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        return "unknown";
     }
 }
