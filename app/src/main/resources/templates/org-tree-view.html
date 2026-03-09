@@ -6,13 +6,56 @@
     <title>Organization Tree View</title>
     <link rel="stylesheet" href="/style.css">
     <style>
+        :root {
+            --tree-bg-a: #f5faf6;
+            --tree-bg-b: #eef4fb;
+            --panel: #ffffff;
+            --panel-border: #d7e0ea;
+            --primary: #1d6f56;
+            --primary-strong: #135342;
+            --accent: #2573a8;
+            --muted: #5d6a79;
+            --link: #1e5e89;
+            --line: #8fa7ba;
+            --focus: #e9f8f2;
+            --shadow: 0 14px 26px rgba(20, 51, 80, 0.09);
+        }
+
+        .org-tree-page {
+            max-width: none !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding-left: 20px;
+            padding-right: 20px;
+        }
+
+        .tree-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin: 14px 0 12px;
+        }
+
+        .tree-caption {
+            color: var(--muted);
+            font-size: 14px;
+            margin: 0;
+        }
+
         .org-tree-container {
             width: 100%;
-            height: 600px;
-            border: 1px solid #ccc;
-            background-color: #f9f9f9;
+            height: calc(100vh - 220px);
+            min-height: 560px;
+            border: 1px solid var(--panel-border);
+            border-radius: 16px;
+            background:
+                radial-gradient(circle at 18% 18%, rgba(37, 115, 168, 0.11), transparent 38%),
+                radial-gradient(circle at 84% 78%, rgba(29, 111, 86, 0.11), transparent 34%),
+                linear-gradient(155deg, var(--tree-bg-a), var(--tree-bg-b));
             position: relative;
             overflow: hidden;
+            box-shadow: var(--shadow);
         }
 
         .org-svg-tree {
@@ -25,161 +68,609 @@
             cursor: grabbing;
         }
 
-        .org-node {
-            fill: #ffffff;
-            stroke: #2c5aa0;
-            stroke-width: 2.5;
-            rx: 6;
-            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
-            transition: fill 0.2s ease, stroke-width 0.2s ease;
-        }
-
-        .org-node:hover {
-            fill: #e8f1f8;
-            stroke-width: 3;
-        }
-
-        .org-label {
-            font-family: 'Segoe UI', Arial, sans-serif;
-            font-size: 12px;
-            fill: #1a3d5c;
-            font-weight: 600;
-            text-anchor: middle;
-            alignment-baseline: middle;
-            pointer-events: none;
-        }
-
-        .org-label-leader {
-            font-family: 'Segoe UI', Arial, sans-serif;
-            font-size: 10px;
-            fill: #2c5aa0;
-            font-style: italic;
-            text-anchor: middle;
-            alignment-baseline: middle;
-            pointer-events: none;
-        }
-
-        .org-node-link {
-            font-family: 'Segoe UI', Arial, sans-serif;
-            font-size: 10px;
-            fill: #2c5aa0;
-            font-weight: 500;
-            text-anchor: middle;
-            alignment-baseline: middle;
-            pointer-events: auto;
-            cursor: pointer;
-            text-decoration: underline;
-        }
-
-        .org-node-link:hover {
-            fill: #1a3d5c;
-            font-weight: 600;
-        }
-
         .org-link {
-            stroke: #9ca3af;
+            stroke: var(--line);
             stroke-width: 2;
             fill: none;
-        }
-        .expand-btn {
-            cursor: pointer;
-            fill: #2c5aa0;
-            user-select: none;
-        }
-        .selected-node {
-            fill: #fff3cd !important;
-            stroke: #ff9800 !important;
-            stroke-width: 3.5 !important;
-            filter: drop-shadow(0 3px 6px rgba(255, 152, 0, 0.3)) !important;
         }
 
         .zoom-controls {
             position: absolute;
-            top: 10px;
-            right: 10px;
+            top: 12px;
+            right: 12px;
             display: flex;
-            gap: 5px;
-            background-color: white;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            padding: 5px;
+            gap: 6px;
+            align-items: center;
+            background-color: rgba(255, 255, 255, 0.95);
+            border: 1px solid var(--panel-border);
+            border-radius: 10px;
+            padding: 7px;
             z-index: 10;
         }
 
         .zoom-btn {
-            padding: 6px 10px;
-            border: 1px solid #ccc;
-            background-color: white;
+            padding: 6px 11px;
+            border: 1px solid #cfd8e2;
+            background-color: #ffffff;
+            color: #234057;
             cursor: pointer;
-            border-radius: 3px;
-            font-weight: bold;
+            border-radius: 8px;
+            font-weight: 700;
             font-size: 14px;
         }
 
         .zoom-btn:hover {
-            background-color: #e9ecef;
+            background-color: #edf4fb;
         }
 
         .zoom-display {
             padding: 6px 10px;
-            background-color: #f5f5f5;
-            border-radius: 3px;
+            background-color: #f3f8fd;
+            border-radius: 8px;
+            border: 1px solid #dfe7ef;
             font-size: 12px;
-            min-width: 40px;
+            color: #24445f;
+            min-width: 48px;
             text-align: center;
+            font-weight: 600;
+        }
+
+        .nav-controls {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid var(--panel-border);
+            border-radius: 10px;
+            padding: 6px;
+            z-index: 10;
+        }
+
+        .nav-up-btn {
+            border: 1px solid #cdd8e5;
+            background: #ffffff;
+            color: #163c57;
+            border-radius: 8px;
+            padding: 7px 10px;
+            cursor: pointer;
+            font-weight: 700;
+        }
+
+        .nav-up-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        .focus-label {
+            font-size: 13px;
+            color: #29465d;
+            font-weight: 600;
+            padding: 0 6px;
+        }
+
+        .edit-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(4, 16, 30, 0.45);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            backdrop-filter: blur(2px);
+        }
+
+        .edit-modal.open {
+            display: flex;
+        }
+
+        .edit-modal-content {
+            width: min(1100px, 94vw);
+            height: min(88vh, 880px);
+            background: #ffffff;
+            border-radius: 12px;
+            border: 1px solid #d6dfeb;
+            box-shadow: 0 24px 44px rgba(7, 25, 44, 0.28);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .edit-modal-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 14px;
+            border-bottom: 1px solid #e3eaf2;
+            background: #f5f9fd;
+            font-weight: 600;
+            color: #21435a;
+        }
+
+        .edit-modal-close {
+            border: 1px solid #c5d4e4;
+            background: #ffffff;
+            border-radius: 8px;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+
+        .edit-frame {
+            border: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        @media (max-width: 900px) {
+            .org-tree-page {
+                padding-left: 10px;
+                padding-right: 10px;
+            }
+
+            .org-tree-container {
+                height: calc(100vh - 190px);
+                min-height: 500px;
+            }
         }
     </style>
 </head>
 
 <body>
 <div th:replace="~{navigation :: mainNav}"></div>
-<div class="container">
-    <h1>Org Unit Tree View</h1>
-    <div th:if="${orgUnit == null}">
+<div class="container org-tree-page">
+    <div class="tree-header">
+        <h1>Org Unit Tree View</h1>
+        <p class="tree-caption">Click an org unit to drill into its direct children. Use the up arrow to navigate one level up.</p>
+    </div>
+    <div th:if="${treeApiUrl == null}">
         <p>No organization unit found for this ID.</p>
     </div>
-    <div th:if="${orgUnit != null}">
+    <div th:if="${treeApiUrl != null}">
         <div class="org-tree-container" id="treeViewport">
-            <svg id="orgTreeSvg" class="org-svg-tree" xmlns="http://www.w3.org/2000/svg" height="800" width="1600">
+            <div class="nav-controls">
+                <button id="navUpBtn" class="nav-up-btn" title="Remove current selection">Clear Selection</button>
+                <span id="focusLabel" class="focus-label">Focused: -</span>
+            </div>
+            <svg id="orgTreeSvg" class="org-svg-tree" xmlns="http://www.w3.org/2000/svg" height="920" width="2200">
                 <g id="orgTreeGroup"></g>
             </svg>
             <div class="zoom-controls">
                 <button class="zoom-btn" id="zoomInBtn" title="Zoom In">+</button>
                 <div class="zoom-display" id="zoomLevel">100%</div>
-                <button class="zoom-btn" id="zoomOutBtn" title="Zoom Out">−</button>
+                <button class="zoom-btn" id="zoomOutBtn" title="Zoom Out">-</button>
                 <button class="zoom-btn" id="resetZoomBtn" title="Reset View">Reset</button>
             </div>
         </div>
         <a th:href="@{'/orgunits/list'}">&larr; Back to Org Units List</a>
     </div>
 
+    <div id="editModal" class="edit-modal" aria-hidden="true">
+        <div class="edit-modal-content">
+            <div class="edit-modal-bar">
+                <span id="editModalTitle">Edit Organization Unit</span>
+                <button id="closeEditModal" class="edit-modal-close" type="button">Close</button>
+            </div>
+            <iframe id="editFrame" class="edit-frame" src="about:blank" title="Edit Organization Unit"></iframe>
+        </div>
+    </div>
+
     <script>
-        // Pan and zoom state
         let panX = 0, panY = 0, zoomLevel = 1;
         let isPanning = false, startX = 0, startY = 0;
         const MIN_ZOOM = 0.5;
         const MAX_ZOOM = 3;
         const ZOOM_STEP = 0.1;
 
-        // Fetch full org tree at once, then render the whole tree immediately.
+        const NODE_W = 280;
+        const NODE_H = 152;
+        const NODE_GAP = 56;
+        const LEVEL_GAP = 230;
+        const TOP_PAD_Y = 110;
+        const PAD_X = 160;
+
+        const state = {
+            rootId: null,
+            focusId: null,
+            treeApiUrl: '',
+            nodesById: new Map(),
+            parentById: new Map(),
+            treeLoaded: false
+        };
+
         document.addEventListener('DOMContentLoaded', function () {
-            const rootId = "[[${orgUnit != null ? orgUnit.id : ''}]]";
-            if (!rootId) return;
-            // This endpoint needs to return the 'full' node, including parent if available
-            fetch(`/orgunits/tree/${rootId}/fulltree`)
-                .then(resp => resp.json())
-                .then(tree => {
-                    // If the node has a parent, use the parent as virtual root
-                    if (tree.parent && tree.parent.children) {
-                        drawOrgTreeWithSiblings(tree.parent, rootId, 800, 40, 0, 1600);
-                    } else {
-                        // Fallback to normal rendering
-                        drawOrgTreeFull(tree, 800, 40, 0, 1600);
-                    }
-                    // Initialize pan and zoom controls after tree is drawn
+            const treeApiUrl = "[[${treeApiUrl != null ? treeApiUrl : ''}]]";
+            if (!treeApiUrl) {
+                return;
+            }
+            state.treeApiUrl = treeApiUrl;
+
+            loadTreeFromBackend()
+                .then(() => {
                     initPanZoomControls();
+                    initDrillNavigation();
+                    initEditModal();
                 });
         });
+
+        function loadTreeFromBackend() {
+            if (!state.treeApiUrl) {
+                return Promise.resolve();
+            }
+
+            return fetch(state.treeApiUrl)
+                .then(resp => resp.json())
+                .then(tree => {
+                    state.nodesById.clear();
+                    state.parentById.clear();
+                    indexTree(tree, null);
+                    state.rootId = tree.id;
+                    state.focusId = tree.id;
+                    state.treeLoaded = true;
+                    renderFocusedTree();
+                })
+                .catch(() => {
+                    const label = document.getElementById('focusLabel');
+                    if (label) {
+                        label.textContent = 'Could not load org tree data.';
+                    }
+                });
+        }
+
+        function indexTree(node, parentId) {
+            if (!node || node.id === null || node.id === undefined) {
+                return;
+            }
+
+            if (!Array.isArray(node.children)) {
+                node.children = [];
+            }
+
+            node.children.sort((a, b) => {
+                const aName = (a && a.name ? a.name : '').toLowerCase();
+                const bName = (b && b.name ? b.name : '').toLowerCase();
+                return aName.localeCompare(bName);
+            });
+
+            state.nodesById.set(node.id, node);
+            if (parentId !== null) {
+                state.parentById.set(node.id, parentId);
+            }
+
+            node.children.forEach(child => indexTree(child, node.id));
+        }
+
+        function initDrillNavigation() {
+            const navUpBtn = document.getElementById('navUpBtn');
+            navUpBtn.addEventListener('click', () => {
+                if (state.rootId !== null && state.focusId !== state.rootId) {
+                    focusNode(state.rootId);
+                }
+            });
+            updateDrillControls();
+        }
+
+        function updateDrillControls() {
+            const navUpBtn = document.getElementById('navUpBtn');
+            const focusLabel = document.getElementById('focusLabel');
+            const currentNode = state.nodesById.get(state.focusId);
+
+            navUpBtn.disabled = state.focusId === state.rootId;
+            if (!currentNode) {
+                focusLabel.textContent = 'Focused: -';
+            } else if (isVirtualRoot(currentNode)) {
+                focusLabel.textContent = 'Focused: Top-level Organisation Chart';
+            } else {
+                focusLabel.textContent = `Focused: ${currentNode.name}`;
+            }
+        }
+
+        function focusNode(nodeId) {
+            if (!state.nodesById.has(nodeId)) {
+                return;
+            }
+            state.focusId = nodeId;
+            renderFocusedTree();
+            updateDrillControls();
+        }
+
+        function renderFocusedTree() {
+            if (!state.treeLoaded) {
+                return;
+            }
+
+            const treeGroup = document.getElementById('orgTreeGroup');
+            const svg = document.getElementById('orgTreeSvg');
+            const focusNodeData = state.nodesById.get(state.focusId);
+            if (!focusNodeData) {
+                return;
+            }
+
+            treeGroup.innerHTML = '';
+
+            const renderRoots = isVirtualRoot(focusNodeData)
+                ? (focusNodeData.children || [])
+                : [focusNodeData];
+
+            const totalLeaves = Math.max(1, renderRoots.reduce((sum, root) => sum + countLeaves(root), 0));
+            const treeWidth = Math.max(1900, PAD_X * 2 + totalLeaves * (NODE_W + NODE_GAP));
+
+            const maxDepth = renderRoots.length === 0
+                ? 0
+                : Math.max(...renderRoots.map(getDepth));
+            const treeHeight = Math.max(500, TOP_PAD_Y + (maxDepth + 1) * LEVEL_GAP + NODE_H + 80);
+
+            svg.setAttribute('width', String(treeWidth));
+            svg.setAttribute('height', String(treeHeight));
+
+            const positions = new Map();
+            let nextLeaf = 0;
+            renderRoots.forEach(root => {
+                nextLeaf = layoutSubtree(root, 0, nextLeaf, positions);
+            });
+
+            positions.forEach(({ node, x, y }) => {
+                const children = node.children || [];
+                children.forEach(child => {
+                    const childPos = positions.get(child.id);
+                    if (childPos) {
+                        drawRectangularLink(treeGroup, x, y + NODE_H, childPos.x, childPos.y);
+                    }
+                });
+            });
+
+            positions.forEach(({ node, x, y }) => {
+                const isFocus = !isVirtualRoot(focusNodeData) && node.id === focusNodeData.id;
+                drawNodeCard(treeGroup, node, x, y, isFocus);
+            });
+
+            updateDrillControls();
+        }
+
+        function isVirtualRoot(node) {
+            return node && Number(node.id) === 0;
+        }
+
+        function countLeaves(node) {
+            const children = node && Array.isArray(node.children) ? node.children : [];
+            if (children.length === 0) {
+                return 1;
+            }
+            return children.reduce((sum, child) => sum + countLeaves(child), 0);
+        }
+
+        function getDepth(node) {
+            const children = node && Array.isArray(node.children) ? node.children : [];
+            if (children.length === 0) {
+                return 0;
+            }
+            return 1 + Math.max(...children.map(getDepth));
+        }
+
+        // Returns the next free leaf index after this subtree.
+        function layoutSubtree(node, depth, leafStart, positions) {
+            const leaves = countLeaves(node);
+            const x = PAD_X + leafStart * (NODE_W + NODE_GAP) + (leaves * (NODE_W + NODE_GAP)) / 2;
+            const y = TOP_PAD_Y + depth * LEVEL_GAP;
+            positions.set(node.id, { node, x, y, depth });
+
+            let cursor = leafStart;
+            const children = node.children || [];
+            children.forEach(child => {
+                cursor = layoutSubtree(child, depth + 1, cursor, positions);
+            });
+
+            return leafStart + leaves;
+        }
+
+        function drawRectangularLink(parent, x1, y1, x2, y2) {
+            const midY = y1 + (y2 - y1) / 2;
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', `M ${x1} ${y1} V ${midY} H ${x2} V ${y2}`);
+            path.classList.add('org-link');
+            parent.appendChild(path);
+        }
+
+        function drawNodeCard(parent, node, centerX, topY, isFocus) {
+            const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            g.setAttribute('transform', `translate(${centerX - NODE_W / 2}, ${topY})`);
+
+            const shell = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            shell.setAttribute('width', String(NODE_W));
+            shell.setAttribute('height', String(NODE_H));
+            shell.setAttribute('rx', '12');
+            shell.setAttribute('ry', '12');
+            shell.setAttribute('fill', isFocus ? 'var(--focus)' : 'var(--panel)');
+            shell.setAttribute('stroke', isFocus ? 'var(--primary)' : 'var(--panel-border)');
+            shell.setAttribute('stroke-width', isFocus ? '2.6' : '1.5');
+            shell.style.filter = 'drop-shadow(0 6px 10px rgba(36, 72, 100, 0.12))';
+            g.appendChild(shell);
+
+            const bar = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            bar.setAttribute('x', '0');
+            bar.setAttribute('y', '0');
+            bar.setAttribute('width', String(NODE_W));
+            bar.setAttribute('height', '34');
+            bar.setAttribute('rx', '12');
+            bar.setAttribute('ry', '12');
+            bar.setAttribute('fill', isFocus ? 'var(--primary)' : 'var(--accent)');
+            g.appendChild(bar);
+
+            addText(g, node.name || 'Unnamed Org Unit', 14, 22, {
+                fill: '#ffffff',
+                fontSize: '13',
+                fontWeight: '700'
+            });
+
+            const wrappedNameLines = wrapText(node.name || 'Unnamed Org Unit', 30);
+            wrappedNameLines.slice(0, 2).forEach((line, idx) => {
+                addText(g, line, 16, 56 + idx * 17, {
+                    fill: '#1f3647',
+                    fontSize: '13',
+                    fontWeight: idx === 0 ? '700' : '600'
+                });
+            });
+
+            const leaderName = node.leader && node.leader.name ? node.leader.name : 'Unassigned';
+            addText(g, `Leader: ${leaderName}`, 16, 92, {
+                fill: '#314e63',
+                fontSize: '12',
+                fontWeight: '500'
+            });
+
+            addText(g, `Children: ${(node.children || []).length}`, 16, 112, {
+                fill: '#446075',
+                fontSize: '12',
+                fontWeight: '500'
+            });
+
+            const assessmentLink = addText(g, 'Latest assessment', 16, 134, {
+                fill: 'var(--link)',
+                fontSize: '12',
+                fontWeight: '700',
+                textDecoration: 'underline',
+                cursor: 'pointer'
+            });
+            assessmentLink.classList.add('node-interactive');
+            assessmentLink.addEventListener('click', function (event) {
+                event.stopPropagation();
+                window.location.href = `/assessment/list?orgUnit=${node.id}`;
+            });
+
+            const editBtn = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            editBtn.setAttribute('x', String(NODE_W - 76));
+            editBtn.setAttribute('y', '118');
+            editBtn.setAttribute('width', '60');
+            editBtn.setAttribute('height', '24');
+            editBtn.setAttribute('rx', '6');
+            editBtn.setAttribute('ry', '6');
+            editBtn.setAttribute('fill', '#f0f7ff');
+            editBtn.setAttribute('stroke', '#b7d0ea');
+            editBtn.setAttribute('stroke-width', '1.3');
+            editBtn.style.cursor = 'pointer';
+            editBtn.classList.add('node-interactive');
+            editBtn.addEventListener('click', function (event) {
+                event.stopPropagation();
+                openEditModal(node);
+            });
+            g.appendChild(editBtn);
+
+            const editLabel = addText(g, 'Edit', NODE_W - 46, 134, {
+                fill: '#245277',
+                fontSize: '12',
+                fontWeight: '700',
+                textAnchor: 'middle',
+                cursor: 'pointer'
+            });
+            editLabel.classList.add('node-interactive');
+            editLabel.addEventListener('click', function (event) {
+                event.stopPropagation();
+                openEditModal(node);
+            });
+
+            g.style.cursor = 'pointer';
+            g.classList.add('node-interactive');
+            g.addEventListener('click', function () {
+                focusNode(node.id);
+            });
+
+            parent.appendChild(g);
+        }
+
+        function addText(parent, text, x, y, style) {
+            const el = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            el.setAttribute('x', String(x));
+            el.setAttribute('y', String(y));
+            el.textContent = text;
+
+            if (style.fill) el.setAttribute('fill', style.fill);
+            if (style.fontSize) el.setAttribute('font-size', style.fontSize);
+            if (style.fontWeight) el.setAttribute('font-weight', style.fontWeight);
+            if (style.textAnchor) el.setAttribute('text-anchor', style.textAnchor);
+            if (style.textDecoration) el.setAttribute('text-decoration', style.textDecoration);
+            if (style.cursor) el.style.cursor = style.cursor;
+            el.setAttribute('font-family', 'Segoe UI, Arial, sans-serif');
+
+            parent.appendChild(el);
+            return el;
+        }
+
+        function wrapText(text, maxCharsPerLine) {
+            const words = String(text || '').split(/\s+/).filter(Boolean);
+            if (words.length === 0) {
+                return [''];
+            }
+
+            const lines = [];
+            let current = '';
+            words.forEach(word => {
+                const trial = current ? `${current} ${word}` : word;
+                if (trial.length <= maxCharsPerLine) {
+                    current = trial;
+                } else {
+                    if (current) {
+                        lines.push(current);
+                    }
+                    current = word;
+                }
+            });
+            if (current) {
+                lines.push(current);
+            }
+            return lines;
+        }
+
+        function initEditModal() {
+            const editModal = document.getElementById('editModal');
+            const closeEditModalBtn = document.getElementById('closeEditModal');
+
+            closeEditModalBtn.addEventListener('click', closeEditModal);
+            editModal.addEventListener('click', function (event) {
+                if (event.target === editModal) {
+                    closeEditModal();
+                }
+            });
+
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') {
+                    closeEditModal();
+                }
+            });
+
+            window.addEventListener('message', function (event) {
+                if (event.origin !== window.location.origin) {
+                    return;
+                }
+                if (!event.data || event.data.type !== 'orgunitSaved') {
+                    if (event.data && event.data.type === 'orgunitEditCancelled') {
+                        closeEditModal();
+                    }
+                    return;
+                }
+
+                closeEditModal();
+                loadTreeFromBackend();
+            });
+        }
+
+        function openEditModal(node) {
+            const editModal = document.getElementById('editModal');
+            const editFrame = document.getElementById('editFrame');
+            const editModalTitle = document.getElementById('editModalTitle');
+            editModalTitle.textContent = `Edit Organization Unit: ${node.name}`;
+            editFrame.src = `/orgunits/edit/${node.id}?embed=true`;
+            editModal.classList.add('open');
+            editModal.setAttribute('aria-hidden', 'false');
+        }
+
+        function closeEditModal() {
+            const editModal = document.getElementById('editModal');
+            const editFrame = document.getElementById('editFrame');
+            editFrame.src = 'about:blank';
+            editModal.classList.remove('open');
+            editModal.setAttribute('aria-hidden', 'true');
+        }
 
         function initPanZoomControls() {
             const svg = document.getElementById('orgTreeSvg');
@@ -231,8 +722,13 @@
                 updateZoomDisplay();
             }, { passive: false });
 
-            // Pan with mouse drag
             svg.addEventListener('mousedown', (e) => {
+                if (e.button !== 0) {
+                    return;
+                }
+                if (e.target && e.target.closest && e.target.closest('.node-interactive')) {
+                    return;
+                }
                 isPanning = true;
                 startX = e.clientX - panX;
                 startY = e.clientY - panY;
@@ -259,284 +755,8 @@
                 zoomDisplay.textContent = Math.round(zoomLevel * 100) + '%';
             }
 
-            // Initialize transform
+            updateTransform();
             updateZoomDisplay();
-        }
-
-        // Recursive-aware draw: shows all parent's children and recursively expands them
-        function drawOrgTreeWithSiblings(parentNode, selectedNodeId, svgWidth, startY, level, svgDisplayWidth) {
-            const treeGroup = document.getElementById('orgTreeGroup');
-            treeGroup.innerHTML = '';
-            const nodeW = 160, nodeH = 50, vSpacing = 90;
-            const children = parentNode.children || [];
-            const n = children.length;
-            const spacing = svgDisplayWidth / (n + 1);
-            // Draw parent (optional, could be omitted as visual anchor)
-            /* Uncomment if you want to show parent as top node
-            const parentX = svgDisplayWidth/2, parentY = startY;
-            drawNode(treeGroup, parentNode, parentX, parentY, nodeW, nodeH);
-            let yOffset = startY + vSpacing;
-            */
-            let yOffset = startY;
-            // Recursively draw nodes and their children
-            function drawRecursively(node, x, y, spacing, vSpacing, selectedId) {
-                drawNode(treeGroup, node, x, y, nodeW, nodeH, node.id == selectedId);
-                if (node.children && node.children.length) {
-                    const childCount = node.children.length;
-                    const childSpacing = spacing / childCount;
-                    node.children.forEach((child, idx) => {
-                        const childX = x - spacing / 2 + childSpacing * (idx + 0.5);
-                        const childY = y + vSpacing;
-                        drawLink(treeGroup, x, y + nodeH, childX, childY);
-                        drawRecursively(child, childX, childY, childSpacing, vSpacing, selectedId);
-                    });
-                }
-            }
-
-            children.forEach((sib, idx) => {
-                const x = spacing * (idx + 1);
-                drawNode(treeGroup, sib, x, yOffset, nodeW, nodeH, sib.id == selectedNodeId, sib.id);
-                // If this is the selected node, expand its children below it
-                drawRecursively(sib, x, yOffset, spacing, vSpacing, selectedNodeId);
-            });
-        }
-
-        function drawNode(parent, node, x, y, w, h, highlight, nodeId) {
-            const nodeGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-            nodeGroup.setAttribute('id', 'node-' + node.id);
-            nodeGroup.style.cursor = 'pointer';
-            
-            const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-            r.setAttribute('x', x - w/2);
-            r.setAttribute('y', y);
-            r.setAttribute('width', w);
-            r.setAttribute('height', h);
-            r.classList.add('org-node');
-            if (highlight) r.classList.add('selected-node');
-            nodeGroup.appendChild(r);
-            
-            const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            t.setAttribute('x', x);
-            t.setAttribute('y', y + 17);
-            t.classList.add('org-label');
-            
-            // Build array of text lines: org name + optional leader
-            let lines = [];
-            
-            // Split long names into multiple lines
-            if (node.name && node.name.length > 16) {
-                const words = node.name.split(' ');
-                let line1 = '', line2 = '';
-                let currentLine = '';
-                
-                for (let word of words) {
-                    if ((currentLine + (currentLine ? ' ' : '') + word).length <= 10) {
-                        currentLine += (currentLine ? ' ' : '') + word;
-                    } else {
-                        if (!line1) line1 = currentLine;
-                        else {
-                            line2 = currentLine;
-                            break;
-                        }
-                        currentLine = word;
-                    }
-                }
-                if (!line1) line1 = currentLine;
-                else if (!line2) line2 = currentLine;
-                
-                lines.push(line1);
-                if (line2) lines.push(line2);
-            } else {
-                lines.push(node.name);
-            }
-            
-            // Add leader name if present
-            if (node.leader && node.leader.name) {
-                lines.push(node.leader.name);
-            }
-            
-            // Create tspan elements for each line
-            lines.forEach((line, idx) => {
-                const tspan = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
-                tspan.setAttribute('x', x);
-                if (idx === 0) {
-                    tspan.setAttribute('dy', '0');
-                } else {
-                    tspan.setAttribute('dy', '1.1em');
-                }
-                
-                // Add CSS class for styling
-                if (idx > 0 && node.leader && idx === lines.length - 1) {
-                    // This is the leader line
-                    tspan.classList.add('org-label-leader');
-                } else {
-                    tspan.classList.add('org-label');
-                }
-                
-                tspan.textContent = line;
-                t.appendChild(tspan);
-            });
-            
-            nodeGroup.appendChild(t);
-            
-            // Add assessments link
-            const link = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            link.setAttribute('x', x);
-            link.setAttribute('y', y + h - 8);
-            link.classList.add('org-node-link');
-            link.textContent = 'assessments';
-            link.addEventListener('click', (e) => {
-                e.stopPropagation();
-                window.location.href = `/assessment/list?orgUnit=${nodeId}`;
-            });
-            nodeGroup.appendChild(link);
-            
-            parent.appendChild(nodeGroup);
-        }
-
-        function drawLink(parent, x1, y1, x2, y2) {
-            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            line.setAttribute('x1', x1);
-            line.setAttribute('y1', y1);
-            line.setAttribute('x2', x2);
-            line.setAttribute('y2', y2);
-            line.classList.add('org-link');
-            parent.appendChild(line);
-        }
-
-        // fallback if parent is not present (original code)
-        function drawOrgTreeFull(root, svgWidth, startY, level, svgDisplayWidth) {
-            const treeGroup = document.getElementById('orgTreeGroup');
-            treeGroup.innerHTML = '';
-            const nodeW = 160, nodeH = 50, hSpacing = 160, vSpacing = 90;
-            function computeSubtreeWidth(node) {
-                if (!node.children || node.children.length === 0) return 1;
-                return node.children.map(computeSubtreeWidth).reduce((a,b)=>a+b,0);
-            }
-            let positions = [];
-            function layout(node, depth, left, width) {
-                const sw = computeSubtreeWidth(node);
-                const nodeX = left + width/2;
-                const nodeY = startY + depth*vSpacing;
-                positions.push({ node, x: nodeX, y: nodeY, subtreeWidth: sw });
-                if (node.children && node.children.length) {
-                    let total = node.children.map(computeSubtreeWidth).reduce((a,b)=>a+b,0);
-                    let curX = left;
-                    node.children.forEach(child => {
-                        const w = width * computeSubtreeWidth(child) / total;
-                        layout(child, depth+1, curX, w);
-                        curX += w;
-                    });
-                }
-            }
-            layout(root, level, 0, svgDisplayWidth);
-            positions.forEach(pos => {
-                if (pos.node.children && pos.node.children.length) {
-                    pos.node.children.forEach(child => {
-                        const target = positions.find(p=>p.node.id===child.id);
-                        if (target) {
-                            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                            line.setAttribute('x1', pos.x);
-                            line.setAttribute('y1', pos.y+nodeH);
-                            line.setAttribute('x2', target.x);
-                            line.setAttribute('y2', target.y);
-                            line.classList.add('org-link');
-                            treeGroup.appendChild(line);
-                        }
-                    });
-                }
-            });
-            positions.forEach(pos => {
-                const nodeGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-                nodeGroup.setAttribute('id', 'node-'+pos.node.id);
-                nodeGroup.style.cursor = 'pointer';
-                
-                const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-                r.setAttribute('x', pos.x-nodeW/2);
-                r.setAttribute('y', pos.y);
-                r.setAttribute('width', nodeW);
-                r.setAttribute('height', nodeH);
-                r.classList.add('org-node');
-                nodeGroup.appendChild(r);
-                
-                const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                t.setAttribute('x', pos.x);
-                t.setAttribute('y', pos.y + 17);
-                t.classList.add('org-label');
-                
-                // Build array of text lines: org name + optional leader
-                let lines = [];
-                
-                // Split long names into multiple lines
-                if (pos.node.name && pos.node.name.length > 16) {
-                    const words = pos.node.name.split(' ');
-                    let line1 = '', line2 = '';
-                    let currentLine = '';
-                    
-                    for (let word of words) {
-                        if ((currentLine + (currentLine ? ' ' : '') + word).length <= 10) {
-                            currentLine += (currentLine ? ' ' : '') + word;
-                        } else {
-                            if (!line1) line1 = currentLine;
-                            else {
-                                line2 = currentLine;
-                                break;
-                            }
-                            currentLine = word;
-                        }
-                    }
-                    if (!line1) line1 = currentLine;
-                    else if (!line2) line2 = currentLine;
-                    
-                    lines.push(line1);
-                    if (line2) lines.push(line2);
-                } else {
-                    lines.push(pos.node.name);
-                }
-                
-                // Add leader name if present
-                if (pos.node.leader && pos.node.leader.name) {
-                    lines.push('Lead: ' + pos.node.leader.name);
-                }
-                
-                // Create tspan elements for each line
-                lines.forEach((line, idx) => {
-                    const tspan = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
-                    tspan.setAttribute('x', pos.x);
-                    if (idx === 0) {
-                        tspan.setAttribute('dy', '0');
-                    } else {
-                        tspan.setAttribute('dy', '1.1em');
-                    }
-                    
-                    // Add CSS class for styling
-                    if (idx > 0 && pos.node.leader && idx === lines.length - 1) {
-                        // This is the leader line
-                        tspan.classList.add('org-label-leader');
-                    } else {
-                        tspan.classList.add('org-label');
-                    }
-                    
-                    tspan.textContent = line;
-                    t.appendChild(tspan);
-                });
-                
-                nodeGroup.appendChild(t);
-                
-                // Add assessments link
-                const link = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                link.setAttribute('x', pos.x);
-                link.setAttribute('y', pos.y + nodeH - 8);
-                link.classList.add('org-node-link');
-                link.textContent = 'assessments';
-                link.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    window.location.href = `/assessment/list?orgUnit=${pos.node.id}`;
-                });
-                nodeGroup.appendChild(link);
-                
-                treeGroup.appendChild(nodeGroup);
-            });
         }
     </script>
 </div>

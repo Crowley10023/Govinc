@@ -16,8 +16,10 @@ import com.govinc.user.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Controller
@@ -64,7 +66,9 @@ public class OrgUnitController {
 
     // Edit Org Unit form (by id)
     @GetMapping("/edit/{id}")
-    public String editOrgUnitForm(@PathVariable Long id, Model model) {
+    public String editOrgUnitForm(@PathVariable Long id,
+                                  @RequestParam(value = "embed", required = false, defaultValue = "false") boolean embed,
+                                  Model model) {
         // Authorization check: only ADMIN and ISM can edit org units
         if (!authorizationService.canAccessOrganization()) {
             throw new UnauthorizedException("You do not have permission to edit organization units.");
@@ -80,6 +84,7 @@ public class OrgUnitController {
         model.addAttribute("orgUnit", orgUnit);
         model.addAttribute("allOrgUnits", allOrgUnits);
         model.addAttribute("allUsers", userRepository.findAll());
+        model.addAttribute("embed", embed);
         return "orgunit-edit";
     }
 
@@ -88,7 +93,9 @@ public class OrgUnitController {
     public String saveOrgUnit(@ModelAttribute OrgUnit orgUnit,
             @RequestParam(value = "parentId", required = false) Long parentId,
             @RequestParam(value = "leaderId", required = false) Long leaderId,
-            @RequestParam(value = "childrenIds", required = false) List<Long> childrenIds) {
+            @RequestParam(value = "childrenIds", required = false) List<Long> childrenIds,
+            @RequestParam(value = "embed", required = false, defaultValue = "false") boolean embed,
+            Model model) {
         // Authorization check: only ADMIN and ISM can save org units
         if (!authorizationService.canAccessOrganization()) {
             throw new UnauthorizedException("You do not have permission to save organization units.");
@@ -113,7 +120,11 @@ public class OrgUnitController {
         } else {
             orgUnit.setChildren(null);
         }
-        orgUnitService.addOrgUnit(orgUnit);
+        OrgUnit saved = orgUnitService.addOrgUnit(orgUnit);
+        if (embed) {
+            model.addAttribute("savedOrgUnitId", saved.getId());
+            return "orgunit-edit-embedded-saved";
+        }
         return "redirect:/orgunits/list";
     }
 
@@ -121,6 +132,9 @@ public class OrgUnitController {
     @ResponseBody
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     public List<OrgUnit> getAllOrgUnits() {
+        if (!authorizationService.canViewOrgUnits()) {
+            throw new UnauthorizedException("You do not have permission to view organization units.");
+        }
         return orgUnitService.getAllOrgUnits();
     }
 
@@ -128,6 +142,9 @@ public class OrgUnitController {
     @ResponseBody
     @GetMapping(value = "/{id:\\d+}", produces = MediaType.APPLICATION_JSON_VALUE)
     public Optional<OrgUnit> getOrgUnit(@PathVariable Long id) {
+        if (!authorizationService.canViewOrgUnits()) {
+            throw new UnauthorizedException("You do not have permission to view organization units.");
+        }
         return orgUnitService.getOrgUnit(id);
     }
 
@@ -135,6 +152,9 @@ public class OrgUnitController {
     @ResponseBody
     @GetMapping(value = "/children/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
     public List<OrgUnit> getChildrenOfOrgUnit(@PathVariable Long id) {
+        if (!authorizationService.canViewOrgUnits()) {
+            throw new UnauthorizedException("You do not have permission to view organization units.");
+        }
         List<OrgUnit> children = orgUnitService.getChildrenOfOrgUnit(id);
         System.out.println("Children for OrgUnit ID " + id + ":");
         for (OrgUnit child : children) {
@@ -147,6 +167,9 @@ public class OrgUnitController {
     @ResponseBody
     @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE, consumes = MediaType.APPLICATION_JSON_VALUE)
     public OrgUnit addOrgUnit(@RequestBody OrgUnit orgUnit) {
+        if (!authorizationService.canAccessOrganization()) {
+            throw new UnauthorizedException("You do not have permission to create organization units.");
+        }
         return orgUnitService.addOrgUnit(orgUnit);
     }
 
@@ -164,6 +187,9 @@ public class OrgUnitController {
     @ResponseBody
     @GetMapping(value = "/tree/{id}/fulltree", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> getOrgUnitFullTree(@PathVariable Long id) {
+        if (!authorizationService.canViewOrgUnits()) {
+            throw new UnauthorizedException("You do not have permission to view organization units.");
+        }
         Optional<OrgUnit> orgUnitOpt = orgUnitService.getOrgUnitWithChildrenRecursive(id);
         if (orgUnitOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -174,6 +200,22 @@ public class OrgUnitController {
         printOrgUnitTree(root, 0);
     
         return ResponseEntity.ok(root);
+    }
+
+    @ResponseBody
+    @GetMapping(value = "/tree/top/fulltree", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> getTopLevelOrgTree() {
+        if (!authorizationService.canViewOrgUnits()) {
+            throw new UnauthorizedException("You do not have permission to view organization units.");
+        }
+
+        List<OrgUnit> roots = orgUnitService.getTopLevelOrgUnitsWithChildrenRecursive();
+        Map<String, Object> virtualRoot = new HashMap<>();
+        virtualRoot.put("id", 0L);
+        virtualRoot.put("name", "Organisation Chart");
+        virtualRoot.put("leader", null);
+        virtualRoot.put("children", roots);
+        return ResponseEntity.ok(virtualRoot);
     }
     
     // Helper method to print the OrgUnit tree recursively
@@ -191,12 +233,27 @@ public class OrgUnitController {
     // Handle tree view rendering for selected org unit as root and all its children
     @GetMapping("/tree-view/{id}")
     public String orgTreeView(@PathVariable Long id, Model model) {
+        if (!authorizationService.canViewOrgUnits()) {
+            throw new UnauthorizedException("You do not have permission to view organization units.");
+        }
         Optional<OrgUnit> orgUnitOpt = orgUnitService.getOrgUnitWithChildrenRecursive(id);
         OrgUnit orgUnit = orgUnitOpt.orElse(null);
         // checkthat
         printOrgTree(orgUnit);
 
         model.addAttribute("orgUnit", orgUnit);
+        model.addAttribute("treeApiUrl", "/orgunits/tree/" + id + "/fulltree");
+        return "org-tree-view";
+    }
+
+    @GetMapping("/tree-view")
+    public String orgTreeTopLevelView(Model model) {
+        if (!authorizationService.canViewOrgUnits()) {
+            throw new UnauthorizedException("You do not have permission to view organization units.");
+        }
+
+        model.addAttribute("orgUnit", new OrgUnit());
+        model.addAttribute("treeApiUrl", "/orgunits/tree/top/fulltree");
         return "org-tree-view";
     }
 

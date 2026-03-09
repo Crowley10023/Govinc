@@ -81,4 +81,17 @@ public class OrgUnitService {
     public List<OrgUnit> getChildrenOfOrgUnit(Long parentId) {
         return orgUnitRepository.findByParentId(parentId);
     }
+
+    /**
+     * Returns all top-level org units (without parent), each fully loaded with descendants.
+     */
+    public List<OrgUnit> getTopLevelOrgUnitsWithChildrenRecursive() {
+        List<OrgUnit> roots = orgUnitRepository.findByParentIsNullOrderByNameAsc();
+        List<OrgUnit> loadedRoots = new ArrayList<>();
+        for (OrgUnit root : roots) {
+            Optional<OrgUnit> loaded = getOrgUnitWithChildrenRecursive(root.getId());
+            loaded.ifPresent(loadedRoots::add);
+        }
+        return loadedRoots;
+    }
 }

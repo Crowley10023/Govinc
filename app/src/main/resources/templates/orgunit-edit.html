@@ -214,10 +214,18 @@
                 width: 100%;
             }
         }
+
+        body.embed-mode .main-scroll-container {
+            padding-top: 0;
+        }
+
+        body.embed-mode .container {
+            padding-top: 1em;
+        }
     </style>
 </head>
-<body>
-<div th:replace="~{navigation :: mainNav}"></div>
+<body th:classappend="${(embed != null and embed) or (param.embed != null and #strings.equalsIgnoreCase(param.embed[0], 'true'))} ? 'embed-mode' : ''">
+<div th:unless="${(embed != null and embed) or (param.embed != null and #strings.equalsIgnoreCase(param.embed[0], 'true'))}" th:replace="~{navigation :: mainNav}"></div>
 <div class="main-scroll-container">
     <div class="container">
         <div class="form-container">
@@ -227,6 +235,7 @@
 
             <form th:action="@{'/orgunits/save'}" method="post">
                 <input type="hidden" name="id" th:value="${orgUnit.id}"/>
+                <input type="hidden" name="embed" th:value="${((embed != null and embed) or (param.embed != null and #strings.equalsIgnoreCase(param.embed[0], 'true'))) ? 'true' : 'false'}"/>
 
                 <div class="form-group">
                     <label for="name">Name <span style="color: #cc2222;">*</span></label>
@@ -283,7 +292,7 @@
 
                 <div class="form-actions">
                     <button type="submit" class="btn-primary">Save Organization Unit</button>
-                    <a href="#" th:href="@{'/orgunits/list'}" class="btn-secondary">Cancel</a>
+                    <a id="cancelOrgUnitEdit" href="#" th:href="@{'/orgunits/list'}" class="btn-secondary">Cancel</a>
                 </div>
             </form>
         </div>
@@ -291,6 +300,17 @@
 </div>
 
 <script>
+    (function enforceEmbedMode() {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('embed') === 'true') {
+            document.body.classList.add('embed-mode');
+            const nav = document.querySelector('.main-navigation');
+            if (nav) {
+                nav.remove();
+            }
+        }
+    })();
+
     function updateLeaderWarning() {
         const leaderSelect = document.getElementById('leaderId');
         const selectedOption = leaderSelect.options[leaderSelect.selectedIndex];
@@ -304,6 +324,19 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
+        const params = new URLSearchParams(window.location.search);
+        const isEmbed = params.get('embed') === 'true';
+        const cancelLink = document.getElementById('cancelOrgUnitEdit');
+
+        if (isEmbed && cancelLink) {
+            cancelLink.addEventListener('click', function (event) {
+                event.preventDefault();
+                if (window.parent && window.parent !== window) {
+                    window.parent.postMessage({ type: 'orgunitEditCancelled' }, window.location.origin);
+                }
+            });
+        }
+
         updateLeaderWarning(); // Initial check
     });
 </script>

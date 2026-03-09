@@ -17,4 +17,7 @@ public interface OrgUnitRepository extends JpaRepository<OrgUnit, Long> {
 
     // Get all direct children for a given parent org unit ID
     List<OrgUnit> findByParentId(Long parentId);
+
+    // Top-level org units (no parent) are the roots for the organization chart.
+    List<OrgUnit> findByParentIsNullOrderByNameAsc();
 }

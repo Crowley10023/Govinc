@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Organization Unit Saved</title>
+</head>
+<body>
+<script th:inline="javascript">
+    (function () {
+        const payload = {
+            type: 'orgunitSaved',
+            orgUnitId: [[${savedOrgUnitId}]]
+        };
+
+        if (window.parent && window.parent !== window) {
+            window.parent.postMessage(payload, window.location.origin);
+        }
+    })();
+</script>
+<p>Organization unit saved. You can close this window.</p>
+</body>
+</html>

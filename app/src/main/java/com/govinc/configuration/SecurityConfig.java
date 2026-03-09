@@ -126,6 +126,8 @@ public class SecurityConfig {
                 ).hasAnyRole("ADMIN", "INFORMATION_SECURITY_MANAGER")
                 // All other requests require authentication; fine-grained checks are performed in controllers
                 .anyRequest().authenticated())
+            // Required for same-origin modal iframe usage (e.g., org unit edit popup).
+            .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
             // Enable CSRF but ignore assessment-direct anonymous write endpoints only
             .csrf(csrf -> csrf.ignoringRequestMatchers(CSRF_IGNORED_URLS))
             .exceptionHandling(exception -> exception
