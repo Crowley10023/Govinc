@@ -90,6 +90,27 @@ public class SecurityControlController {
             } else {
                 Long parsedServiceId = Long.parseLong(serviceId);
 
+                // Ensure target service has an assessment and a row for this control
+                com.govinc.organization.OrgServiceAssessment targetAssessment =
+                    orgServiceAssessmentService.findOrCreateAssessment(parsedServiceId);
+
+                boolean targetHasControl = targetAssessment.getControls().stream()
+                    .anyMatch(c -> c.getSecurityControl().getId().equals(controlId));
+
+                if (!targetHasControl) {
+                    SecurityControl securityControl = service.findById(controlId)
+                        .orElseThrow(() -> new IllegalArgumentException("Invalid controlId: " + controlId));
+
+                    com.govinc.organization.OrgServiceAssessmentControl newControl =
+                        new com.govinc.organization.OrgServiceAssessmentControl();
+                    newControl.setOrgServiceAssessment(targetAssessment);
+                    newControl.setSecurityControl(securityControl);
+                    newControl.setApplicable(false);
+                    newControl.setPercent(0);
+                    targetAssessment.getControls().add(newControl);
+                    orgServiceAssessmentService.saveAssessmentWithoutValidation(targetAssessment);
+                }
+
                 // First, clear this control from all other assessments, then set for the target service
                 List<com.govinc.organization.OrgServiceAssessment> allAssessments =
                     orgServiceAssessmentService.getAllAssessments();
