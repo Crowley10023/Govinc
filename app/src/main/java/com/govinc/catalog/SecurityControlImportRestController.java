@@ -3,6 +3,8 @@ package com.govinc.catalog;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -20,7 +22,22 @@ public class SecurityControlImportRestController {
     private com.govinc.authorization.AuthorizationService authorizationService;
 
     private boolean isAuthorized() {
-        // Only ADMIN and Information Security Manager may perform import analyses
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return false;
+        }
+
+        // Prefer authorities from the active security context.
+        // This aligns with route-level role checks and avoids provider-specific username lookup issues.
+        boolean hasRequiredAuthority = authentication.getAuthorities().stream()
+                .map(a -> a.getAuthority())
+                .anyMatch(a -> "ROLE_ADMIN".equals(a) || "ROLE_INFORMATION_SECURITY_MANAGER".equals(a));
+
+        if (hasRequiredAuthority) {
+            return true;
+        }
+
+        // Fallback to centralized DB-backed authorization rules.
         return authorizationService != null && authorizationService.canAccessSecurityFramework();
     }
     

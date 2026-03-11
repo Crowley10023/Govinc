@@ -2275,15 +2275,28 @@ network segmentation","SC-7","Network"</div>
             analysisInProgress[control.rowNumber] = true;
             
             (function(ctrl) {
+                const headers = {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                };
+                const csrfToken = getCsrfToken();
+                const csrfHeaderName = getCsrfHeaderName();
+                if (csrfToken && csrfHeaderName) {
+                    headers[csrfHeaderName] = csrfToken;
+                }
+
                 fetch('/api/security-control/import/analyze-single', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify(controlDTO)
+                    headers: headers,
+                    body: JSON.stringify(controlDTO),
+                    credentials: 'same-origin'
                 })
-                    .then(response => response.json())
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('HTTP ' + response.status);
+                        }
+                        return response.json();
+                    })
                     .then(result => {
                         analysisResults[ctrl.rowNumber] = result;
                         completedCount++;

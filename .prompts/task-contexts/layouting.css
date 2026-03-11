@@ -1,0 +1,24 @@
+The layout, ui and ux must follow these rules::after
+1.  All style elements must be located in central style.css
+2.  All color definitions must be located in theme-css.html
+3.  Standards for tables, table headers, cells, flow layouts, div, button, popups, every other style elements must be set in style.css
+4.  Standards for fonts, font sizes, font colors must be set in theme-css.html
+5.  Standards for spacing must be set in theme-css.html
+6.  main navigation elements must be located in navigation.html
+7.  the following colors are the bare minimum:
+    a) Main Font color
+    b) Main Background color
+    c) Main Accent color 
+    d) Main Accent color 2
+    e) Main active element color (buttons, etc)
+    f) Main active element accent color 
+    g) Main table header color 
+    h) Navigation active element color 
+    i) navigation active element accent color 
+    j) navigation background color
+    k) navigation font color
+    l) popup background color
+    m) popup font color
+    n) popup accent color
+8. all template html files and javascript code must adhere to the layouting  
+. 
