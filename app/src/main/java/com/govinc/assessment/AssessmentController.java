@@ -548,8 +548,13 @@ public class AssessmentController {
             model.addAttribute("controlAnswerIsOverridden", controlAnswerIsOverridden);
             model.addAttribute("orgServiceControlComments", orgServiceControlComments);
 
-            // Summary table by answer type
-            model.addAttribute("answerSummary", assessmentDetailsService.computeAnswerSummary(details));
+                // Summary table by answer type (catalog-scoped)
+                Set<Long> catalogMaturityAnswerIds = maturityAnswers.stream()
+                    .map(MaturityAnswer::getId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+                model.addAttribute("answerSummary",
+                    assessmentDetailsService.computeAnswerSummary(details, catalogMaturityAnswerIds));
 
             // --- Pass securityControlDomains: all unique domains of controls in this
             // catalog ---
