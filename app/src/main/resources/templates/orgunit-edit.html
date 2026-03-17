@@ -3,6 +3,7 @@
 <head>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title th:text="${orgUnit.id != null} ? 'Edit Organization Unit' : 'Create Organization Unit'"></title>
+    <th:block th:replace="~{navigation :: navHead}"></th:block>
 </head>
 <body th:classappend="${(embed != null and embed) or (param.embed != null and #strings.equalsIgnoreCase(param.embed[0], 'true'))} ? 'embed-mode' : ''">
 <div th:unless="${(embed != null and embed) or (param.embed != null and #strings.equalsIgnoreCase(param.embed[0], 'true'))}" th:replace="~{navigation :: mainNav}"></div>

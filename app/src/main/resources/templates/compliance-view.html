@@ -1,7 +1,8 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 
 <head>
+    <th:block th:replace="~{navigation :: navHead}"></th:block>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <meta charset="UTF-8">
     <title>Compliance View</title>    <script src="/webjars/chart.js/3.9.1/dist/chart.min.js"></script>
@@ -109,7 +110,7 @@
 
             for (var i = 0; i < answers.length; i++) {
                 var ans = answers[i];
-                var score = ans.score ? ans.score + '%' : '—';
+                var score = ans.score ? ans.score + '%' : '�';
                 html += '<tr><td>' + (ans.controlName || 'Unknown') + '</td>';
                 html += '<td>' + (ans.answerText || 'Not answered') + '</td>';
                 html += '<td class="score-cell">' + score + '</td></tr>';
@@ -127,7 +128,7 @@
                     // Get details from cache
                     var detailsObj = detailsDataCache[id] || {};
 
-                    var content = '<div class="popup-header"><h3>Compliance Details</h3><button class="close-btn" onclick="closePopup()">×</button></div>';
+                    var content = '<div class="popup-header"><h3>Compliance Details</h3><button class="close-btn" onclick="closePopup()">�</button></div>';
                     content += '<div class="popup-content">';
 
                     // Maturity Distribution Chart

@@ -7,6 +7,7 @@
     <meta th:name="${_csrf.headerName}" th:content="${_csrf.token}">
     <meta name="_csrf" th:content="${_csrf.token}">
     <meta name="_csrf_header" th:content="${_csrf.headerName}">
+    <th:block th:replace="~{navigation :: navHead}"></th:block>
 </head>
 
 <body>

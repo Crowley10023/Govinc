@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 
 <head>
@@ -7,6 +7,7 @@
     <meta th:name="${_csrf.headerName}" th:content="${_csrf.token}">
     <meta name="_csrf" th:content="${_csrf.token}">
     <meta name="_csrf_header" th:content="${_csrf.headerName}">
+    <th:block th:replace="~{navigation :: navHead}"></th:block>
 </head>
 
 <body>
@@ -20,7 +21,7 @@
 
         <!-- Database Status Section -->
         <div class="section-card db-status-section">
-            <h3>📊 Database Status</h3>
+            <h3>?? Database Status</h3>
 
             <div class="status-info">
                 <div class="status-item">
@@ -34,16 +35,16 @@
             </div>
 
             <div th:if="${availableMigrations.isEmpty()}" class="alert alert-info">
-                ✓ Database is up to date. No migrations available.
+                ? Database is up to date. No migrations available.
             </div>
         </div>
 
         <!-- Available Migrations Section -->
         <div th:unless="${availableMigrations.isEmpty()}" class="section-card migrations-section">
-            <h3>🔄 Available Migrations</h3>
+            <h3>?? Available Migrations</h3>
 
             <div class="alert alert-warning">
-                ⚠ The following database updates are available. Please review and apply them carefully.
+                ? The following database updates are available. Please review and apply them carefully.
             </div>
 
             <div id="migrationsContainer">
@@ -55,7 +56,7 @@
                     <div class="migration-info">
                         <h4>Update to Version <span th:text="${migration.toVersion}"></span></h4>
                         <div class="version-range">
-                            <span th:text="${migration.fromVersion}"></span> → <span th:text="${migration.toVersion}"></span>
+                            <span th:text="${migration.fromVersion}"></span> ? <span th:text="${migration.toVersion}"></span>
                         </div>
                         <p th:text="${migration.description}"></p>
                     </div>
@@ -74,7 +75,7 @@
         <!-- Backup Management Section -->
         <div class="section-card backup-section">
             <div class="section-header-actions">
-                <h3>💾 Database Backups</h3>
+                <h3>?? Database Backups</h3>
                 <button type="button" id="createBackupBtn" class="btn-submit">Create Full Backup</button>
             </div>
 
@@ -117,12 +118,12 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Confirm Database Migration</h2>
-                <button type="button" class="modal-close" onclick="closeMigrationConfirmModal()">×</button>
+                <button type="button" class="modal-close" onclick="closeMigrationConfirmModal()">�</button>
             </div>
             <div class="modal-body">
                 <p id="migrationMessage" class="text-14 my-15"></p>
                 <div class="alert alert-warning">
-                    ⚠ <strong>Important:</strong> Please ensure you have a backup of your database before proceeding.
+                    ? <strong>Important:</strong> Please ensure you have a backup of your database before proceeding.
                 </div>
             </div>
             <div class="modal-footer">
@@ -149,9 +150,9 @@
             statusEl.classList.remove('success', 'error', 'info', 'hide');
             statusEl.classList.add(type);
             
-            let icon = 'ℹ️';
-            if (type === 'success') icon = '✔';
-            if (type === 'error') icon = '✕';
+            let icon = '??';
+            if (type === 'success') icon = '?';
+            if (type === 'error') icon = '?';
             
             statusEl.innerHTML = `<span class="status-icon">${icon}</span> ${message}`;
             statusEl.classList.add('show');

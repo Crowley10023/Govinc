@@ -6,7 +6,8 @@
     <meta charset="UTF-8">
     <meta name="_csrf" th:content="${_csrf.token}">
     <meta name="_csrf_header" th:content="${_csrf.headerName}">
-    <title>Assessment List</title></head>
+    <title>Assessment List</title>
+    <th:block th:replace="~{navigation :: navHead}"></th:block></head>
 
 <body>
     <div th:replace="~{navigation :: mainNav}"></div>

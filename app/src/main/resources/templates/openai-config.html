@@ -1,9 +1,10 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 
 <head>
     <title>AI Configuration</title>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <th:block th:replace="~{navigation :: navHead}"></th:block>
 </head>
 
 <body>
@@ -17,10 +18,10 @@
 
         <!-- Success/Error Messages -->
         <div th:if="${saved}" class="alert alert-success">
-            ✔ Configuration saved successfully!
+            ? Configuration saved successfully!
         </div>
         <div th:if="${error}" class="alert alert-error">
-            ⚠ <span th:text="${error}"></span>
+            ? <span th:text="${error}"></span>
         </div>
 
         <!-- SECTION 1: Provider Configuration -->
@@ -28,7 +29,7 @@
             <!-- Provider Selection & Settings Card -->
             <div class="section-card provider-section">
                 <h3>
-                    📡 AI Providers
+                    ?? AI Providers
                     <button class="btn-action btn-sm" onclick="openCreateProviderModal()">+ Add Provider</button>
                 </h3>
 
@@ -46,7 +47,7 @@
                             onclick="selectProvider(this, this.getAttribute('data-provider-id'))">
                             <strong th:text="${provider.displayName}"></strong>
                             <small th:text="${provider.description}"></small>
-                            <small th:if="${provider.active}" class="provider-active-indicator">✓ Active</small>
+                            <small th:if="${provider.active}" class="provider-active-indicator">? Active</small>
                             <div class="provider-actions" onclick="event.stopPropagation();">
                                 <button type="button" class="btn-action" th:data-provider-id="${provider.id}" onclick="makeProviderActive(event, this.getAttribute('data-provider-id'));">Make Active</button>
                                 <button type="button" class="btn-edit" th:data-provider-id="${provider.id}" onclick="openEditProviderModal(event, this.getAttribute('data-provider-id'));">Edit</button>
@@ -59,7 +60,7 @@
 
             <!-- General Settings Card -->
             <div class="section-card general-section">
-                <h3>⚙️ General AI Settings</h3>
+                <h3>?? General AI Settings</h3>
 
                 <form id="generalSettingsForm" method="post">
                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
@@ -90,7 +91,7 @@
 
         <!-- SECTION 2: Test AI Connection -->
         <div class="section-card test-section full-width">
-            <h3>🧪 Test AI Connection</h3>
+            <h3>?? Test AI Connection</h3>
 
             <form id="testForm" th:action="@{/config/openai/test}" method="post">
                 <div class="form-group">
@@ -125,7 +126,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Create New AI Provider</h2>
-                <button type="button" class="modal-close" onclick="closeCreateProviderModal()">×</button>
+                <button type="button" class="modal-close" onclick="closeCreateProviderModal()">�</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
@@ -149,7 +150,7 @@
                 </div>
                 <!-- OpenAI Specific Settings -->
                 <div id="createOpenAISettings" class="provider-details-section d-none">
-                    <h5>🔑 OpenAI Settings</h5>
+                    <h5>?? OpenAI Settings</h5>
                     <div class="form-group">
                         <label for="createOpenAIKey">API Key:</label>
                         <input type="password" id="createOpenAIKey" placeholder="Enter your API key" />
@@ -168,7 +169,7 @@
                 </div>
                 <!-- Ollama Specific Settings -->
                 <div id="createOllamaSettings" class="provider-details-section d-none">
-                    <h5>🦙 Ollama Settings</h5>
+                    <h5>?? Ollama Settings</h5>
                     <div class="form-group">
                         <label for="createOllamaModel">Model:</label>
                         <input type="text" id="createOllamaModel" placeholder="e.g., llama2, mistral" />
@@ -182,7 +183,7 @@
                 </div>
                 <!-- Anthropic Specific Settings -->
                 <div id="createAnthropicSettings" class="provider-details-section d-none">
-                    <h5>🧠 Anthropic Settings</h5>
+                    <h5>?? Anthropic Settings</h5>
                     <div class="form-group">
                         <label for="createAnthropicKey">API Key:</label>
                         <input type="password" id="createAnthropicKey" placeholder="sk-ant-..." />
@@ -206,7 +207,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Edit AI Provider</h2>
-                <button type="button" class="modal-close" onclick="closeEditProviderModal()">×</button>
+                <button type="button" class="modal-close" onclick="closeEditProviderModal()">�</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
@@ -224,7 +225,7 @@
                 </div>
                 <!-- OpenAI Specific Settings -->
                 <div id="editOpenAISettings" class="provider-details-section d-none">
-                    <h5>🔑 OpenAI Settings</h5>
+                    <h5>?? OpenAI Settings</h5>
                     <div class="form-group">
                         <label for="editOpenAIKey">API Key:</label>
                         <input type="password" id="editOpenAIKey" placeholder="Enter your API key" />
@@ -243,7 +244,7 @@
                 </div>
                 <!-- Ollama Specific Settings -->
                 <div id="editOllamaSettings" class="provider-details-section d-none">
-                    <h5>🦙 Ollama Settings</h5>
+                    <h5>?? Ollama Settings</h5>
                     <div class="form-group">
                         <label for="editOllamaModel">Model:</label>
                         <input type="text" id="editOllamaModel" placeholder="e.g., llama2, mistral" />
@@ -257,7 +258,7 @@
                 </div>
                 <!-- Anthropic Specific Settings -->
                 <div id="editAnthropicSettings" class="provider-details-section d-none">
-                    <h5>🧠 Anthropic Settings</h5>
+                    <h5>?? Anthropic Settings</h5>
                     <div class="form-group">
                         <label for="editAnthropicKey">API Key:</label>
                         <input type="password" id="editAnthropicKey" placeholder="sk-ant-..." />
@@ -287,11 +288,11 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Delete Provider</h2>
-                <button type="button" class="modal-close" onclick="closeDeleteProviderModal()">×</button>
+                <button type="button" class="modal-close" onclick="closeDeleteProviderModal()">�</button>
             </div>
             <div class="modal-body">
                 <p id="deleteConfirmMessage" class="text-16 my-20"></p>
-                <p class="text-warning-strong">⚠️ This action cannot be undone!</p>
+                <p class="text-warning-strong">?? This action cannot be undone!</p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn-cancel" onclick="closeDeleteProviderModal()">Cancel</button>
@@ -323,9 +324,9 @@
             statusEl.classList.add(type);
             
             // Set icon based on type
-            let icon = 'ℹ️';
-            if (type === 'success') icon = '✔';
-            if (type === 'error') icon = '✕';
+            let icon = '??';
+            if (type === 'success') icon = '?';
+            if (type === 'error') icon = '?';
             
             // Set message content
             statusEl.innerHTML = `<span class="status-icon">${icon}</span> ${message}`;

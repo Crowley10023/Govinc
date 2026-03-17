@@ -4,6 +4,7 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title th:text="${securityControl.id == null ? 'Create Security Control' : 'Edit Security Control'}">Security Control</title>
     <meta charset="UTF-8">    <th:block th:replace="~{fragments/theme-css :: themeCss}" />
+    <th:block th:replace="~{navigation :: navHead}"></th:block>
 </head>
 <body>
     <div th:replace="~{navigation :: mainNav}"></div>

@@ -75,48 +75,6 @@
     width: 100%;
 }
 
-/* Modal Styles */
-.modal-bg {
-    display: none;
-    position: fixed;
-    z-index: 105;
-    left: 0;
-    top: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(0, 0, 0, 0.25);
-    justify-content: center;
-    align-items: center;
-}
-
-.modal-popup {
-    background: var(--modal-beige1);
-    border-radius: 10px;
-    box-shadow: 0 1.5px 14px rgba(0, 0, 0, 0.15);
-    padding: 2em 2em 1.2em 2em;
-    min-width: 400px;
-    min-height: 350px;
-    max-width: 95vw;
-    text-align: center;
-    position: relative;
-}
-
-.modal-popup h3 {
-    margin-top: 0;
-}
-
-.modal-popup select {
-    width: 90%;
-    margin-bottom: 1em;
-}
-
-.modal-btn-row {
-    display: flex;
-    gap: 1.5em;
-    justify-content: center;
-    margin-top: 1em;
-}
-
 .taken-over {
     background: var(--taken-over-bg) !important;
     color: var(--gray-888) !important;
@@ -332,19 +290,6 @@
 
 .domain-checkmark svg {
     vertical-align: middle;
-}
-
-/* Base colors */
-:root {
-    --primary-blue: var(--primary-blue);
-    --primary-blue-dark: var(--primary-blue-dark);
-    --accent-orange: var(--accent-orange);
-    --background-light: var(--background-light);
-    --text-main: var(--text-main);
-    --border: var(--border);
-    --nav-violet: var(--nav-violet);
-    --shine-glare: var(--shine-glare);
-    --shine-highlight: var(--shine-highlight);
 }
 
 body {

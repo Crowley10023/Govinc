@@ -1,8 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <title th:text="${#strings.isEmpty(check.id) ? 'Create' : 'Edit'} + ' Compliance Check'"></title>
+    <th:block th:replace="~{navigation :: navHead}"></th:block>
 </head>
 <body>
 <div th:replace="~{navigation :: mainNav}"></div>

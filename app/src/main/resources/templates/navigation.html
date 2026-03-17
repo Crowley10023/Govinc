@@ -1,6 +1,8 @@
-<div th:fragment="mainNav">
+<th:block th:fragment="navHead">
   <link rel="stylesheet" href="/style.css">
   <th:block th:replace="~{fragments/theme-css :: themeCss}" />
+</th:block>
+<div th:fragment="mainNav">
   <nav class="main-navigation fancy-shine">
 
     <div class="nav-row">
