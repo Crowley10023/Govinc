@@ -7,6 +7,9 @@ import com.govinc.user.UserRepository;
 import com.govinc.catalog.SecurityCatalogRepository;
 import com.govinc.assessment.AssessmentDetailsService;
 import com.govinc.assessment.AssessmentDetails;
+import com.govinc.organization.OrgServiceAssessment;
+import com.govinc.organization.OrgServiceAssessmentControl;
+import com.govinc.organization.OrgServiceAssessmentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -15,9 +18,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 @Controller
 public class LandingController {
@@ -36,6 +41,9 @@ public class LandingController {
 
     @Autowired
     private AssessmentDetailsService assessmentDetailsService;
+
+    @Autowired
+    private OrgServiceAssessmentRepository orgServiceAssessmentRepository;
 
     @GetMapping("/")
     public String home(Model model) {
@@ -72,17 +80,37 @@ public class LandingController {
                 }
                 int answered = 0;
                 try {
+                    // Collect directly-answered control IDs from assessment details
+                    Set<Long> answeredIds = new HashSet<>();
                     Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(a.getId());
                     if (detailsOpt.isPresent() && detailsOpt.get().getControlAnswers() != null) {
-                        // Count unique control ids only (ignore null securityControl entries)
-                        java.util.Set<Long> answeredIds = new java.util.HashSet<>();
                         for (com.govinc.assessment.AssessmentControlAnswer aca : detailsOpt.get().getControlAnswers()) {
                             if (aca != null && aca.getSecurityControl() != null && aca.getSecurityControl().getId() != null) {
                                 answeredIds.add(aca.getSecurityControl().getId());
                             }
                         }
-                        answered = answeredIds.size();
                     }
+                    // Also count controls that are "taken over" by org services (applicable=true)
+                    // even if the detail page hasn't been visited yet and they aren't persisted yet.
+                    if (a.getOrgServices() != null && !a.getOrgServices().isEmpty()) {
+                        for (com.govinc.organization.OrgService orgService : a.getOrgServices()) {
+                            List<OrgServiceAssessment> osaList = orgServiceAssessmentRepository
+                                    .findByOrgServiceId(orgService.getId());
+                            if (osaList != null) {
+                                for (OrgServiceAssessment osa : osaList) {
+                                    if (osa.getControls() != null) {
+                                        for (OrgServiceAssessmentControl osac : osa.getControls()) {
+                                            if (osac.isApplicable() && osac.getSecurityControl() != null
+                                                    && osac.getSecurityControl().getId() != null) {
+                                                answeredIds.add(osac.getSecurityControl().getId());
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    answered = answeredIds.size();
                 } catch (Exception e) {
                     // swallow any errors retrieving details
                 }

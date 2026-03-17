@@ -435,14 +435,8 @@
                                 <!-- Questions section -->
                                 <div id="answering-guide-questions" class="guide-questions"></div>
 
-                                <!-- Proposed answer section -->
-                                <div id="answering-guide-proposed-answer" class="guide-proposed-answer">
-                                    <div class="guide-suggestion-notice">
-                                        <span class="guide-suggestion-icon">✓</span>
-                                        <span>AI suggests: <strong id="guide-proposed-answer-text"></strong> — click it on the right to apply.</span>
-                                    </div>
-                                    <a href="#" class="guide-try-again-link" onclick="discardProposedAnswer(); return false;">↩ Try again</a>
-                                </div>
+                                <!-- Proposed answer section (hidden, used for state only) -->
+                                <div id="answering-guide-proposed-answer" class="guide-proposed-answer" style="display:none;"></div>
 
                                 <!-- Loading state on submit -->
                                 <div id="answering-guide-generating" class="guide-loading guide-loading-submit">

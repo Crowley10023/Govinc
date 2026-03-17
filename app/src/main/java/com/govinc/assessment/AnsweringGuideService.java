@@ -146,9 +146,15 @@ public class AnsweringGuideService {
         String prompt = "You are a security maturity assessment expert. Based on the following yes/no Q&A responses, determine which maturity level best fits the control's current state.\n\n" +
                 "Q&A Responses:\n" +
                 qandAMatrix.toString() + "\n" +
-                "Available Maturity Answers for this control:\n" +
+                "Yes percentage: " + yesPercentage + "% (" + yesCount + " of " + totalCount + " answered Yes)\n\n" +
+                "Available Maturity Answers for this control (ordered from lowest to highest maturity):\n" +
                 maturityAnswersStr.toString() + "\n" +
-                "Based on the Q&A responses, select the most appropriate maturity answer and return it EXACTLY as written in the list above. Return ONLY the answer text, nothing else.";
+                "Selection rules:\n" +
+                "- If ALL answers are 'Yes' (100%), you MUST select the HIGHEST-rated maturity answer.\n" +
+                "- If NO answers are 'Yes' (0%), you MUST select the LOWEST-rated maturity answer.\n" +
+                "- Otherwise, select the maturity answer whose rating percentage is closest to the yes percentage (" + yesPercentage + "%).\n" +
+                "- When in doubt between two answers, prefer the higher-rated one.\n\n" +
+                "Based on the rules above, select the most appropriate maturity answer and return it EXACTLY as written in the list above. Return ONLY the answer text, nothing else.";
         
         String aiResponse = openAIUtil.askAI(prompt).trim();
         

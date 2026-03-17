@@ -22,16 +22,17 @@
       <a href="javascript:void(0)" class="btn-nav shiny" onclick="document.getElementById('logoutForm').submit()">Logout</a>
       <form id="logoutForm" th:action="@{/logout}" method="post" style="display:none;"></form>
       <div class="user-section">
-        <span class="nav-label">User:</span>
-        <span class="user-name"
-          th:text="${userName != null} ? ${userName} : (${userId != null} ? ${userId} : 'no user')"></span>
-        <span class="nav-label ml-sm">Role:</span>
-        <span class="user-role" th:text="${userRole != null} ? ${userRole} : 'No role'"></span>
+        <div class="user-info-card">
+          <span class="nav-label">&#128100;</span>
+          <span class="user-name"
+            th:text="${userName != null} ? ${userName} : (${userId != null} ? ${userId} : 'no user')"></span>
+          <span class="user-role-sep"></span>
+          <span class="nav-label">&#127991;</span>
+          <span class="user-role" th:text="${userRole != null} ? ${userRole} : 'No role'"></span>
+        </div>
       </div>
       <div class="version-section">
-        <span class="nav-label">v</span>
-        <span class="app-version"
-          th:text="${appVersion != null} ? ${appVersion} : 'unknown'"></span>
+        <span class="app-version">v<span th:text="${appVersion != null} ? ${appVersion} : 'unknown'"></span></span>
       </div>
     </div>
     <div class="nav-row">

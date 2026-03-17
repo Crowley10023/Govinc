@@ -7,12 +7,13 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Scheduled component that periodically checks for and removes stale assessment URLs.
- * A URL is considered stale if the current time exceeds its creation time plus lifetime (in days).
+ * Scheduled component that runs once per day at midnight.
+ * Decrements the remaining lifetime of each assessment URL by 1 day.
+ * URLs whose lifetime reaches 0 or below are automatically deleted.
  */
 @Component
 public class StaleAssessmentUrlsCleanupScheduler {
@@ -22,46 +23,42 @@ public class StaleAssessmentUrlsCleanupScheduler {
     @Autowired
     private AssessmentUrlsRepository urlsRepository;
 
+    @Autowired
+    private AssessmentUrlsService assessmentUrlsService;
+
     /**
-     * Runs every hour to check for and delete stale assessment URLs.
-     * Can be configured via application.properties or application.yml
+     * Runs every day at midnight (00:00:00) to decrement lifetime counters and
+     * remove expired assessment URLs.
      */
-    @Scheduled(fixedRate = 3600000) // 1 hour in milliseconds
+    @Scheduled(cron = "0 0 0 * * *")
     @Transactional
     public void cleanupStaleUrls() {
-        logger.debug("Starting cleanup of stale assessment URLs");
+        logger.info("Daily assessment URL cleanup starting");
 
         List<AssessmentUrls> allUrls = urlsRepository.findAll();
-        LocalDateTime now = LocalDateTime.now();
+        List<Long> toDelete = new ArrayList<>();
 
         for (AssessmentUrls url : allUrls) {
-            // If createdAt is missing (null), set it to now and persist it so stale logic has a baseline.
-            if (url.getCreatedAt() == null) {
-                logger.info("Assessment URL id {} has null createdAt; setting to now", url.getId());
-                urlsRepository.updateCreatedAtById(url.getId(), now);
-                // update in-memory value so subsequent checks use the new timestamp
-                url.setCreatedAt(now);
+            int remaining = url.getLifetime() - 1;
+            if (remaining <= 0) {
+                toDelete.add(url.getId());
+            } else {
+                url.setLifetime(remaining);
+                urlsRepository.save(url);
+                logger.debug("Assessment URL id={} decremented to {} remaining day(s)", url.getId(), remaining);
             }
+        }
 
-            if (isStale(url, now)) {
-                logger.info("Removing stale assessment URL with id: {} (created at: {}, lifetime: {})",
-                        url.getId(), url.getCreatedAt(), url.getLifetime());
-                urlsRepository.deleteById(url.getId());
-                }
+        for (Long id : toDelete) {
+            try {
+                assessmentUrlsService.deleteUrl(id);
+                logger.info("Deleted expired assessment URL id={}", id);
+            } catch (Exception e) {
+                logger.warn("Failed to delete assessment URL id={}: {}", id, e.getMessage());
             }
+        }
 
-        logger.debug("Cleanup of stale assessment URLs completed");
-    }
-
-    /**
-     * Checks if an assessment URL has expired based on its creation time and lifetime.
-     *
-     * @param url the AssessmentUrls entity to check
-     * @param now the current time
-     * @return true if the URL is stale (expired), false otherwise
-     */
-    private boolean isStale(AssessmentUrls url, LocalDateTime now) {
-        LocalDateTime expirationTime = url.getCreatedAt().plusDays(url.getLifetime());
-        return now.isAfter(expirationTime);
+        logger.info("Daily assessment URL cleanup completed: {} deleted, {} updated",
+                toDelete.size(), allUrls.size() - toDelete.size());
     }
 }

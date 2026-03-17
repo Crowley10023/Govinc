@@ -665,7 +665,9 @@ function submitAnsweringGuideAnswers() {
             if (val && text !== '-- select an answer --') {
                 maturityModelAnswers.push({
                     id: val,
-                    answer: text
+                    answer: text,
+                    rating: $(this).attr('data-rating') !== undefined ? Number($(this).attr('data-rating')) : null,
+                    description: $(this).attr('data-description') || ''
                 });
             }
         });
@@ -698,9 +700,7 @@ function submitAnsweringGuideAnswers() {
             $('#answering-guide-generating').hide();
             if (response && response.proposedAnswer) {
                 currentAnsweringGuideState.proposedAnswer = response.proposedAnswer;
-                $('#guide-proposed-answer-text').text(response.proposedAnswer);
-                $('#answering-guide-questions').hide();
-                $('#answering-guide-proposed-answer').show();
+                $('#answering-guide-questions').show();
                 highlightSuggestedAnswer(response.proposedAnswer);
             } else {
                 alert('Error generating answer. Please try again.');

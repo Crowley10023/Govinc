@@ -2156,9 +2156,28 @@ body::before {
     display: flex;
     align-items: center;
     margin-left: auto;
-    margin-right: 2em;
-    gap: 0.23em;
+    margin-right: 1em;
+    gap: 0;
     min-height: 28px;
+}
+
+.user-info-card {
+    display: flex;
+    align-items: center;
+    gap: 0.25em;
+    background: rgba(255, 255, 255, 0.10);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 20px;
+    padding: 2px 10px 2px 6px;
+}
+
+.user-role-sep {
+    display: inline-block;
+    width: 1px;
+    height: 16px;
+    background: rgba(255, 255, 255, 0.30);
+    margin: 0 6px;
+    vertical-align: middle;
 }
 
 .nav-label {
@@ -2170,16 +2189,6 @@ body::before {
     letter-spacing: 0.05em;
     margin-right: 4px;
     font-weight: 500;
-}
-
-.user-name {
-    color: #fff;
-    background: rgba(255, 255, 255, 0.13);
-    padding: 1.5px 6px 1.5px 5px;
-    border-radius: 0 7px 7px 8px;
-    font-weight: 500;
-    letter-spacing: 0.01em;
-    max-height: 26px;
 }
 
 .logout-form {
@@ -3393,31 +3402,44 @@ body::before {
     max-width: 7em;
 }
 
-/* User/role value chips - use theme variables */
-.user-name,
+/* User value chip */
+.user-name {
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.93em;
+    padding: 1px 2px;
+    letter-spacing: 0.01em;
+}
+
+/* Role badge - accent styled */
 .user-role {
-    color: var(--text-main);
-    background: var(--shine-glare);
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-weight: 500;
+    color: var(--primary-blue-dark);
+    background: var(--accent-orange);
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 0.82em;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
 }
 
 /* Version section layout */
 .version-section {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding-right: 2em;
+    padding: 0 1.4em 0 0.6em;
 }
 
 /* App version chip */
 .app-version {
-    color: var(--text-main);
-    background: var(--shine-glare);
-    font-size: 0.9em;
-    padding: 2px 6px;
-    border-radius: 3px;
+    color: rgba(255,255,255,0.75);
+    background: rgba(255,255,255,0.10);
+    border: 1px solid rgba(255,255,255,0.20);
+    font-size: 0.82em;
+    font-family: 'Courier New', monospace;
+    padding: 2px 8px;
+    border-radius: 10px;
+    letter-spacing: 0.04em;
 }
 
 /* =========================================================
@@ -3425,12 +3447,13 @@ body::before {
    ========================================================= */
 .landing-container {
     max-width: 100%;
-    margin: 2em auto;
-    padding: 1em;
-    display: flex;
-    flex-direction: row;
-    width: 90%;
-    align-content: center;
+    margin: 1.5em auto;
+    padding: 0 1.5em 1.5em;
+    display: grid;
+    grid-template-columns: 3fr 1fr;
+    gap: 1.5em;
+    width: 96%;
+    box-sizing: border-box;
 }
 
 .landing-header {
@@ -3470,7 +3493,7 @@ body::before {
     display: flex;
     flex-direction: column;
     height: 100%;
-    min-width: 53%;
+    min-width: 0;
 }
 
 .card-icon-row {
@@ -3655,6 +3678,11 @@ body::before {
 }
 
 @media (max-width: 1024px) {
+    .landing-container {
+        grid-template-columns: 2fr 1fr;
+        gap: 1.2em;
+    }
+
     .landing-grid {
         grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
         gap: 1.2em;
@@ -3668,7 +3696,10 @@ body::before {
 
 @media (max-width: 768px) {
     .landing-container {
-        padding: 1.5em 1em;
+        grid-template-columns: 1fr;
+        padding: 1em;
+        gap: 1em;
+        width: 100%;
     }
 
     .landing-header {
@@ -6264,7 +6295,8 @@ body::before {
     background: var(--modal-beige1);
 }
 
-.file-input {
+/* Hide the raw file input inside the drag-drop upload area (image upload) */
+.upload-area .file-input {
     display: none;
 }
 
@@ -9413,13 +9445,16 @@ body {
     text-align: center;
 }
 
-.file-input {
-    margin: 10px 0;
+/* File input shown inline in the CSV import wizard */
+.upload-section .file-input {
+    display: block;
+    margin: 10px auto;
     padding: 8px;
     border: 1px solid #ddd;
     border-radius: 4px;
     width: 100%;
     max-width: 400px;
+    cursor: pointer;
 }
 
 .catalog-options {
