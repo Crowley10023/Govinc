@@ -2,10 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <title>Org Service List</title>
-    <link rel="stylesheet" href="/style.css">
-    <link rel="stylesheet" href="/general.css">
-    <meta name="_csrf" th:content="${_csrf.token}"/>
+    <title>Org Service List</title>    <meta name="_csrf" th:content="${_csrf.token}"/>
     <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
     <script>
       function getCsrfHeader() {
@@ -14,7 +11,7 @@
         return header && token ? {[header.content]: token.content} : {};
       }
       function confirmDeleteOrgService(orgServiceId, orgServiceName) {
-          document.getElementById('modal-bg').style.display = 'flex';
+          document.getElementById('deleteModal').style.display = 'flex';
           document.getElementById('modal-delete-msg').innerText = 'Delete Org Service "' + orgServiceName + '" and all its assessments?';
           var confirmBtn = document.getElementById('modal-confirm-delete');
           confirmBtn.disabled = false;
@@ -35,7 +32,7 @@
           };
       }
       function closeModal() {
-        document.getElementById('modal-bg').style.display = 'none';
+        document.getElementById('deleteModal').style.display = 'none';
       }
     </script>
 </head>
@@ -44,61 +41,54 @@
 <div class="container">
     <div class="orgservice-header">
         <h1>Org Services</h1>
-        <a th:href="@{'/orgservices/create'}" class="btn-create-primary">+ Create New Org Service</a>
+        <a th:href="@{'/orgservices/create'}" class="btn-action">+ Create New Org Service</a>
     </div>
 
-    <div class="orgservice-grid">
-        <div th:each="orgService : ${orgServices}" class="orgservice-card">
-            <div class="card-header">
-                <h2 th:text="${orgService.name}"></h2>
-                <button type="button"
-                        class="btn-delete-card"
-                        title="Delete"
-                        th:attr="data-orgservice-id=${orgService.id},data-orgservice-name=${orgService.name}"
-                        onclick="confirmDeleteOrgService(this.getAttribute('data-orgservice-id'), this.getAttribute('data-orgservice-name'))">
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5.5 5.5L14.5 14.5M5.5 14.5L14.5 5.5" stroke="#cc2222" stroke-width="2" stroke-linecap="round"/></svg>
-                </button>
-            </div>
-
-            <div class="card-body">
-                <div class="card-section">
-                    <label>Description</label>
-                    <p th:text="${orgService.description != null} ? ${orgService.description} : 'No description'"></p>
-                </div>
-
-                <div class="card-section">
-                    <label>Organization Units</label>
-                    <div class="org-units-list">
-                        <span th:each="unit : ${orgService.orgUnits}" class="unit-tag" th:text="${unit.name}"></span>
-                        <span th:if="${orgService.orgUnits.isEmpty()}" class="unit-tag-empty">No units assigned</span>
-                    </div>
-                </div>
-
-                <div class="card-meta">
-                    <span class="meta-id">ID: <strong th:text="${orgService.id}"></strong></span>
-                </div>
-            </div>
-
-            <div class="card-actions">
-                <a th:href="@{'/orgservices/edit/' + ${orgService.id}}" class="btn-action btn-edit">Edit</a>
-                <a th:href="@{|/orgservice-assessment/edit/${orgService.id}|}" class="btn-action btn-assess">Assess</a>
-            </div>
-        </div>
-    </div>
+    <table class="table card">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Org Units</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="orgService : ${orgServices}">
+                <td th:text="${orgService.name}"></td>
+                <td th:text="${orgService.description != null} ? ${orgService.description} : ''"></td>
+                <td>
+                    <span th:each="unit, s : ${orgService.orgUnits}">
+                        <span th:text="${unit.name}"></span><span th:unless="${s.last}">, </span>
+                    </span>
+                    <span th:if="${orgService.orgUnits.isEmpty()}" class="text-muted">—</span>
+                </td>
+                <td>
+                    <a th:href="@{'/orgservices/edit/' + ${orgService.id}}" class="btn-edit">Edit</a>
+                    <a th:href="@{|/orgservice-assessment/edit/${orgService.id}|}" class="btn-action">Assess</a>
+                    <button type="button" class="btn-danger"
+                            th:attr="data-orgservice-id=${orgService.id},data-orgservice-name=${orgService.name}"
+                            onclick="confirmDeleteOrgService(this.getAttribute('data-orgservice-id'), this.getAttribute('data-orgservice-name'))">
+                        Delete
+                    </button>
+                </td>
+            </tr>
+        </tbody>
+    </table>
 
     <!-- Empty state message -->
-    <div th:if="${orgServices.isEmpty()}" class="empty-state">
+    <div th:if="${orgServices.isEmpty()}" class="no-results-found">
         <p>No org services found. <a th:href="@{'/orgservices/create'}">Create one now</a></p>
     </div>
 
-    <!-- Modal Popup -->
-    <div id="modal-bg" class="modal-bg">
-      <div class="modal-popup">
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" class="modal-bg">
+      <div class="modal-popup-confirmation">
         <h3>Confirm Delete</h3>
         <p id="modal-delete-msg">Are you sure?</p>
         <div class="modal-btn-row">
-            <button id="modal-confirm-delete" class="btn-modal-confirm">Yes, delete</button>
-            <button type="button" class="btn-modal-cancel" onclick="closeModal()">Cancel</button>
+            <button id="modal-confirm-delete" class="btn-danger">Yes, delete</button>
+            <button type="button" class="btn-cancel" onclick="closeModal()">Cancel</button>
         </div>
       </div>
     </div>

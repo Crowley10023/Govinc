@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -109,13 +110,28 @@ public class AssessmentDetailsService {
      * Returns a map of MaturityAnswer.answer to a summary containing count and percentage for each answer in AssessmentDetails.
      */
     public Map<String, Map<String, Object>> computeAnswerSummary(AssessmentDetails details) {
+        return computeAnswerSummary(details, null);
+    }
+
+    /**
+     * Returns answer summary filtered to a specific set of allowed maturity answer IDs.
+     * If allowedMaturityAnswerIds is null/empty, all answers are included.
+     */
+    public Map<String, Map<String, Object>> computeAnswerSummary(AssessmentDetails details, Set<Long> allowedMaturityAnswerIds) {
         Map<String, Integer> counts = new HashMap<>();
         int total = 0;
+        Set<Long> allowed = (allowedMaturityAnswerIds == null || allowedMaturityAnswerIds.isEmpty())
+            ? null
+            : allowedMaturityAnswerIds.stream().filter(id -> id != null).collect(Collectors.toSet());
+
         if (details != null && details.getControlAnswers() != null) {
             System.out.println(details);
             for (AssessmentControlAnswer ans : details.getControlAnswers()) {                
                 MaturityAnswer ma = ans.getMaturityAnswer();
                 if (ma != null && ma.getAnswer() != null) {
+                    if (allowed != null && (ma.getId() == null || !allowed.contains(ma.getId()))) {
+                        continue;
+                    }
                     counts.put(ma.getAnswer(), counts.getOrDefault(ma.getAnswer(), 0) + 1);
                     total++;
                 }

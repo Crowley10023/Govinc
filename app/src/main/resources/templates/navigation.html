@@ -1,13 +1,12 @@
 <div th:fragment="mainNav">
-  <link rel="stylesheet" href="/general.css">
+  <link rel="stylesheet" href="/style.css">
   <th:block th:replace="~{fragments/theme-css :: themeCss}" />
-  <nav class="main-navigation fancy-shine"
-    style="font-family: var(--nav-font-family); font-size: var(--font-size-nav);">
+  <nav class="main-navigation fancy-shine">
 
     <div class="nav-row">
       <div class="landing-image">
         <img th:if="${layoutConfig != null and layoutConfig.imageData != null and layoutConfig.imageData.length > 0}" src="/config/image-upload/preview"
-          alt="Compliance Incubator Logo" style="min-width: 7em; max-width: 7em" />
+          alt="Compliance Incubator Logo" class="logo-uploaded" />
         <img th:unless="${layoutConfig != null and layoutConfig.imageData != null and layoutConfig.imageData.length > 0}" src="/title.png"
           alt="Default Compliance Incubator Logo" />
       </div>
@@ -17,25 +16,20 @@
         <span class="tool-name"
           th:text="${organisationDetails != null and organisationDetails.toolName != null ? organisationDetails.toolName : ''}"></span>
       </div>
-      <a href="/"><button type="button" class="btn-nav shiny">Home</button></a>
-      <form th:action="@{/logout}" method="post" class="logout-form">
-        <button type="submit" class="btn-nav nav-btn shiny">Logout</button>
-      </form>
+      <a href="/" class="btn-nav shiny">Home</a>
+      <a href="javascript:void(0)" class="btn-nav shiny" onclick="document.getElementById('logoutForm').submit()">Logout</a>
+      <form id="logoutForm" th:action="@{/logout}" method="post" style="display:none;"></form>
       <div class="user-section">
-        <span class="nav-label"
-          style="color: var(--background-light); background: var(--primary-blue-dark);">User:</span>
+        <span class="nav-label">User:</span>
         <span class="user-name"
-          th:text="${userName != null} ? ${userName} : (${userId != null} ? ${userId} : 'no user')"
-          style="color: var(--text-main); background: var(--shine-glare); padding: 2px 6px; border-radius: 3px;"></span>
-        <span class="nav-label" style="margin-left:0.6em; color: var(--background-light); background: var(--primary-blue-dark);">Role:</span>
-        <span class="user-role" th:text="${userRole != null} ? ${userRole} : 'No role'" style="color: var(--text-main); background: var(--shine-glare); padding: 2px 6px; border-radius: 3px;"></span>
+          th:text="${userName != null} ? ${userName} : (${userId != null} ? ${userId} : 'no user')"></span>
+        <span class="nav-label ml-sm">Role:</span>
+        <span class="user-role" th:text="${userRole != null} ? ${userRole} : 'No role'"></span>
       </div>
-      <div class="version-section" style="display: flex; align-items: center; gap: 8px;padding-right: 2em;F">
-        <span class="nav-label"
-          style="color: var(--background-light); background: var(--primary-blue-dark); font-size: 0.85em;">v</span>
+      <div class="version-section">
+        <span class="nav-label">v</span>
         <span class="app-version"
-          th:text="${appVersion != null} ? ${appVersion} : 'unknown'"
-          style="color: var(--text-main); background: var(--shine-glare); font-size: 0.9em; padding: 2px 6px; border-radius: 3px;"></span>
+          th:text="${appVersion != null} ? ${appVersion} : 'unknown'"></span>
       </div>
     </div>
     <div class="nav-row">
@@ -43,67 +37,60 @@
       <div class="nav-entry dropdown" th:if="${canAccessSecurityFramework}">
         <button type="button" class="dropdown-button btn-nav shiny entry-link">Security Framework</button>
         <div class="dropdown-content">
-          <a href="/security-control/list"><button type="button" class="dropdown-menu-btn">Security
-              Controls</button></a>
-          <a href="/security-catalog/list"><button type="button" class="dropdown-menu-btn">Security
-              Catalogs</button></a>
-          <a href="/security-control-domain/list"><button type="button" class="dropdown-menu-btn">Security Control
-              Domains</button></a>
-          <a href="/maturitymodel/list"><button type="button" class="dropdown-menu-btn">Maturity Models</button></a>
-          <a href="/maturityanswer/list"><button type="button" class="dropdown-menu-btn">Maturity Model
-              Answers</button></a>
+          <a href="/security-control/list" class="dropdown-menu-btn">Security Controls</a>
+          <a href="/security-catalog/list" class="dropdown-menu-btn">Security Catalogs</a>
+          <a href="/security-control-domain/list" class="dropdown-menu-btn">Security Control Domains</a>
+          <a href="/maturitymodel/list" class="dropdown-menu-btn">Maturity Models</a>
+          <a href="/maturityanswer/list" class="dropdown-menu-btn">Maturity Model Answers</a>
         </div>
       </div>
       <!-- Organization: Only visible to ADMIN and ISM -->
       <div class="nav-entry dropdown" th:if="${canAccessOrganization}">
         <button type="button" class="dropdown-button btn-nav shiny">Organization</button>
         <div class="dropdown-content">
-          <a href="/orgunits/list"><button type="button" class="dropdown-menu-btn">Org Units</button></a>
-          <a href="/orgunits/tree-view"><button type="button" class="dropdown-menu-btn">Organisation Chart</button></a>
-          <a href="/orgservices/list"><button type="button" class="dropdown-menu-btn">Org Services</button></a>
-          <a href="/security-control/orgservice-mapping"><button type="button" class="dropdown-menu-btn">Map Org Services</button></a>
+          <a href="/orgunits/list" class="dropdown-menu-btn">Org Units</a>
+          <a href="/orgunits/tree-view" class="dropdown-menu-btn">Organisation Chart</a>
+          <a href="/orgservices/list" class="dropdown-menu-btn">Org Services</a>
+          <a href="/security-control/orgservice-mapping" class="dropdown-menu-btn">Map Org Services</a>
         </div>
       </div>
-      <div class="nav-entry">
-        <!-- Assessment URLs: Only visible to ADMIN and ISM -->
-        <div class="nav-entry" th:if="${canAccessAssessmentUrls}">
-          <a href="/assessment-urls-list"><button type="button" class="btn-nav shiny">Assessment URLs</button></a>
+      <!-- Assessment URLs: Only visible to ADMIN and ISM -->
+      <div class="nav-entry" th:if="${canAccessAssessmentUrls}">
+        <a href="/assessment-urls-list" class="entry-link btn-nav shiny">Assessment URLs</a>
+      </div>
+      <!-- Create Assessment: Visible to ADMIN and ISM -->
+      <div class="nav-entry" th:if="${canCreateAssessment}">
+        <a href="/assessment/create" class="entry-link btn-nav shiny">Create Assessment</a>
+      </div>
+      <!-- Assessments: Visible to all roles -->
+      <div class="nav-entry" th:if="${canViewAssessmentList}">
+        <a href="/assessment/list" class="entry-link btn-nav shiny">Assessments</a>
+      </div>
+      <!-- Compliance Check: Only visible to ADMIN and ISM -->
+      <div class="nav-entry dropdown" th:if="${canAccessCompliance}">
+        <button type="button" class="dropdown-button btn-nav shiny">Compliance Check</button>
+        <div class="dropdown-content">
+          <a href="/compliance/view" class="dropdown-menu-btn">Compliance Check</a>
+          <a href="/compliance/checks" class="dropdown-menu-btn">Compliance Check List</a>
         </div>
-        <!-- Create Assessment: Visible to ADMIN and ISM -->
-        <div class="nav-entry" th:if="${canCreateAssessment}">
-          <form action="/assessment/create" method="get" class="entry-form">
-            <button type="submit" class="btn-nav shiny">Create Assessment</button>
-          </form>
-        </div>
-        <!-- Assessments: Visible to all roles -->
-        <div class="nav-entry" th:if="${canViewAssessmentList}">
-          <a href="/assessment/list" class="entry-link"><button type="button"
-              class="btn-nav shiny">Assessments</button></a>
-        </div>
-        <!-- Compliance Check: Only visible to ADMIN and ISM -->
-        <div class="nav-entry" th:if="${canAccessCompliance}">
-          <a href="/compliance/view" class="entry-link"><button type="button" class="btn-nav shiny">Compliance
-              Check</button></a>
-        </div>
-        <!-- Statistics: Only visible to ADMIN and ISM -->
-        <div class="nav-entry" th:if="${canAccessStatistics}">
-          <a href="/statistics" class="entry-link"><button type="button" class="btn-nav shiny">Statistics</button></a>
-        </div>
+      </div>
+      <!-- Statistics: Only visible to ADMIN and ISM -->
+      <div class="nav-entry" th:if="${canAccessStatistics}">
+        <a href="/statistics" class="entry-link btn-nav shiny">Statistics</a>
+      </div>
 
-        <!-- Config: Only visible to ADMIN -->
-        <div class="nav-entry dropdown" th:if="${canAccessConfig}">
-          <button type="button" class="dropdown-button btn-nav shiny">Config</button>
-          <div class="dropdown-content">
-            <a href="/config/openai"><button type="button" class="dropdown-menu-btn">Open AI</button></a>
-            <a href="/config/ai-cache"><button type="button" class="dropdown-menu-btn">AI Cache</button></a>
-            <a href="/config/layout"><button type="button" class="dropdown-menu-btn">Layout & Theme</button></a>
-            <a href="/config/image-upload"><button type="button" class="dropdown-menu-btn">Logo Upload</button></a>
-            <a href="/config/organisation-details"><button type="button" class="dropdown-menu-btn">Organisation
-                Details</button></a>
-            <a href="/admin/auth-config"><button type="button" class="dropdown-menu-btn">Authentication</button></a>
-            <a href="/config/database"><button type="button" class="dropdown-menu-btn">Database & Backup</button></a>
-            <a href="/users"><button type="button" class="dropdown-menu-btn">Users</button></a>
-          </div>
+      <!-- Config: Only visible to ADMIN -->
+      <div class="nav-entry dropdown" th:if="${canAccessConfig}">
+        <button type="button" class="dropdown-button btn-nav shiny">Config</button>
+        <div class="dropdown-content">
+          <a href="/config/openai" class="dropdown-menu-btn">Open AI</a>
+          <a href="/config/ai-cache" class="dropdown-menu-btn">AI Cache</a>
+          <a href="/config/layout" class="dropdown-menu-btn">Layout & Theme</a>
+          <a href="/config/image-upload" class="dropdown-menu-btn">Logo Upload</a>
+          <a href="/config/organisation-details" class="dropdown-menu-btn">Organisation Details</a>
+          <a href="/admin/auth-config" class="dropdown-menu-btn">Authentication</a>
+          <a href="/config/database" class="dropdown-menu-btn">Database & Backup</a>
+          <a href="/users" class="dropdown-menu-btn">Users</a>
         </div>
       </div>
 

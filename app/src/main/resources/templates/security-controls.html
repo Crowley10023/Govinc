@@ -3,885 +3,16 @@
 <head>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>Security Controls List</title>
-    <meta charset="UTF-8">
-    <link rel="stylesheet" href="/style.css">
-    <!-- CSRF Token Meta Tags for JS Access -->
+    <meta charset="UTF-8">    <!-- CSRF Token Meta Tags for JS Access -->
     <meta name="_csrf" th:content="${_csrf.token}" />
     <meta name="_csrf_header" th:content="${_csrf.headerName}" />
-    <style>
-        /* Popup Modal Styles */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 7em;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(2px);
-        }
-
-        .modalLevel2 {
-            display: none;
-            position: fixed;
-            z-index: 2000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(2px);
-        }        
-        
-        .modal-content {
-            background-color: #fefefe;
-            margin: 2% auto;
-            padding: 30px;
-            border: 1px solid #888;
-            border-radius: 10px;
-            width: 90%;
-            max-width: 1200px;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-            animation: modalFadeIn 0.3s ease-out;
-        }
-        
-        @keyframes modalFadeIn {
-            from { opacity: 0; transform: translateY(-50px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .close {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        
-        .close:hover,
-        .close:focus {
-            color: #000;
-        }
-        
-        .csv-instructions {
-            background-color: #f9f9f9;
-            border-left: 4px solid #2196F3;
-            padding: 15px;
-            margin: 15px 0;
-            border-radius: 4px;
-        }
-        
-        .csv-instructions h4 {
-            margin-top: 0;
-            color: #2196F3;
-        }
-        
-        .column-list {
-            background-color: #ffffff;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            padding: 15px;
-            margin: 10px 0;
-        }
-        
-        .column-list ul {
-            margin: 5px 0;
-            padding-left: 20px;
-        }
-        
-        .column-list li {
-            margin: 5px 0;
-            font-family: monospace;
-            background-color: #f5f5f5;
-            padding: 3px 6px;
-            border-radius: 3px;
-            display: inline-block;
-        }
-        
-        .example-section {
-            background-color: #fff3cd;
-            border: 1px solid #ffeaa7;
-            border-radius: 4px;
-            padding: 15px;
-            margin: 10px 0;
-        }
-        
-        .example-section h5 {
-            margin-top: 0;
-            color: #856404;
-        }
-        
-        .example-csv {
-            font-family: monospace;
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            padding: 10px;
-            overflow-x: auto;
-            white-space: pre;
-            font-size: 12px;
-        }
-        
-        .import-button {
-            background-color: #28a745;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            margin-top: 15px;
-            margin-right: 10px;
-            display: inline-block;
-            text-decoration: none;
-        }
-        
-        .import-button:hover {
-            background-color: #218838;
-        }
-        
-        .import-button:disabled {
-            background-color: #6c757d;
-            cursor: not-allowed;
-        }
-
-        .import-button.primary {
-            background-color: #007bff;
-        }
-
-        .import-button.primary:hover {
-            background-color: #0056b3;
-        }
-        
-        .upload-section {
-            margin: 20px 0;
-            padding: 15px;
-            border: 2px dashed #ccc;
-            border-radius: 8px;
-            text-align: center;
-        }
-        
-        .file-input {
-            margin: 10px 0;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            width: 100%;
-            max-width: 400px;
-        }
-        
-        .catalog-options {
-            background-color: #e8f5e8;
-            border: 1px solid #c3e6c3;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 20px 0;
-        }
-        
-        .catalog-options h4 {
-            margin-top: 0;
-            color: #2d5a2d;
-        }
-        
-        .radio-group {
-            margin: 10px 0;
-        }
-        
-        .radio-option {
-            margin: 8px 0;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            background-color: #f9f9f9;
-        }
-        
-        .radio-option:hover {
-            background-color: #f0f0f0;
-        }
-        
-        .radio-option input[type="radio"] {
-            margin-right: 10px;
-        }
-        
-        .new-catalog-fields {
-            display: none;
-            margin-top: 15px;
-            padding: 15px;
-            background-color: #f5f5f5;
-            border-radius: 5px;
-            border: 1px solid #ddd;
-        }
-        
-        .new-catalog-fields input, .new-catalog-fields textarea {
-            width: 100%;
-            padding: 8px;
-            margin: 5px 0;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        
-        .existing-catalog-select {
-            display: none;
-            margin-top: 15px;
-            padding: 15px;
-            background-color: #f5f5f5;
-            border-radius: 5px;
-            border: 1px solid #ddd;
-        }
-        
-        .existing-catalog-select select {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        
-        .preview-section {
-            display: none;
-            margin: 20px 0;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            background-color: #f9f9f9;
-        }
-        
-        .preview-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 10px 0;
-            font-size: 11px;
-        }
-        
-        .preview-table th, .preview-table td {
-            border: 1px solid #ddd;
-            padding: 6px;
-            text-align: left;
-        }
-        
-        .preview-table th {
-            background-color: #e9ecef;
-            font-weight: bold;
-        }
-        
-        .preview-table tr:nth-child(even) {
-            background-color: #f8f9fa;
-        }
-        
-        .preview-table td {
-            max-width: 150px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        
-        .preview-stats {
-            background-color: #d4edda;
-            border: 1px solid #c3e6cb;
-            border-radius: 4px;
-            padding: 10px;
-            margin: 10px 0;
-        }
-        
-        .error-box {
-            background-color: #f8d7da;
-            border: 1px solid #f5c6cb;
-            border-radius: 4px;
-            padding: 15px;
-            margin: 10px 0;
-            color: #721c24;
-        }
-        
-        .step-container {
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            margin: 15px 0;
-            overflow: hidden;
-            display: none;
-        }
-        
-        .step-container.active {
-            display: block;
-        }
-        
-        .step-header {
-            background-color: #e9ecef;
-            padding: 15px;
-            font-weight: bold;
-            color: #495057;
-        }
-        
-        .step-content {
-            padding: 20px;
-        }
-        
-        .step-number {
-            background-color: #007bff;
-            color: white;
-            border-radius: 50%;
-            width: 25px;
-            height: 25px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 10px;
-            font-size: 14px;
-        }
-        
-        .warning-box {
-            background-color: #fff3cd;
-            border: 1px solid #ffeaa7;
-            border-radius: 4px;
-            padding: 15px;
-            margin: 10px 0;
-            color: #856404;
-        }
-        
-        .error-row {
-            background-color: #f8d7da !important;
-            color: #721c24;
-        }
-        
-        .valid-row {
-            background-color: #d1eddd;
-            color: #155724;
-        }
-        
-        .match-high {
-            background-color: #fff3cd;
-        }
-        
-        .match-medium {
-            background-color: #d1ecf1;
-        }
-        
-        .match-low {
-            background-color: #f0f0f0;
-        }
-        
-        .match-none {
-            background-color: #ffffff;
-        }
-        
-        .analysis-progress {
-            margin: 15px 0;
-            padding: 10px;
-            background-color: #d1ecf1;
-            border: 1px solid #bee5eb;
-            border-radius: 4px;
-            display: none;
-        }
-        
-        .progress-bar-container {
-            width: 100%;
-            height: 20px;
-            background-color: #e9ecef;
-            border-radius: 10px;
-            overflow: hidden;
-            margin: 10px 0;
-        }
-        
-        .progress-bar {
-            height: 100%;
-            background-color: #007bff;
-            width: 0%;
-            transition: width 0.3s;
-        }
-        
-        .match-badge-high {
-            background-color: #ffc107;
-            color: #333;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 11px;
-            font-weight: bold;
-            cursor: pointer;
-            text-decoration: underline;
-        }
-        
-        .match-badge-high:hover {
-            background-color: #ffb300;
-        }
-        
-        .match-badge-medium {
-            background-color: #17a2b8;
-            color: #fff;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 11px;
-            font-weight: bold;
-            cursor: pointer;
-            text-decoration: underline;
-        }
-        
-        .match-badge-medium:hover {
-            background-color: #138496;
-        }
-        
-        .match-badge-low {
-            background-color: #6c757d;
-            color: #fff;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 11px;
-            font-weight: bold;
-            cursor: pointer;
-            text-decoration: underline;
-        }
-        
-        .match-badge-low:hover {
-            background-color: #5a6268;
-        }
-        
-        .match-badge-none {
-            background-color: #28a745;
-            color: #fff;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 11px;
-            font-weight: bold;
-        }
-        
-        .action-select {
-            padding: 4px;
-            border: 1px solid #ddd;
-            border-radius: 3px;
-            font-size: 11px;
-        }
-        
-        .tooltip {
-            position: relative;
-            display: inline-block;
-            cursor: help;
-            border-bottom: 1px dotted #333;
-        }
-        
-        .tooltip-content {
-            visibility: hidden;
-            width: 350px;
-            background-color: #333;
-            color: #fff;
-            text-align: left;
-            border-radius: 6px;
-            padding: 12px;
-            position: absolute;
-            z-index: 1001;
-            bottom: 125%;
-            left: 50%;
-            margin-left: -175px;
-            opacity: 0;
-            transition: opacity 0.3s;
-            font-size: 12px;
-            font-weight: normal;
-            white-space: normal;
-            word-wrap: break-word;
-            max-height: 300px;
-            overflow-y: auto;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        }
-        
-        .tooltip:hover .tooltip-content {
-            visibility: visible;
-            opacity: 1;
-        }
-
-        .match-tooltip {
-            display: inline-block;
-            cursor: help;
-            position: relative;
-        }
-        
-        .match-tooltip .tooltip-content {
-            position: fixed !important;
-            z-index: 2000 !important;
-        }
-        
-        .match-info {
-            background-color: #2c3e50;
-            border-left: 3px solid #3498db;
-            padding: 10px;
-            margin: 5px 0;
-            border-radius: 3px;
-        }
-        
-        .match-info-label {
-            font-weight: bold;
-            color: #ecf0f1;
-            margin-bottom: 3px;
-        }
-        
-        .match-info-value {
-            color: #bdc3c7;
-            font-size: 11px;
-            word-break: break-word;
-        }
-
-        .empty-message {
-            text-align: center;
-            padding: 40px 20px;
-            color: #6c757d;
-            font-size: 14px;
-        }
-        
-        .row-analyzing {
-            opacity: 0.6;
-        }
-        
-        .translation-section {
-            background-color: #f0f8ff;
-            border: 1px solid #bee5eb;
-            border-radius: 4px;
-            padding: 15px;
-            margin: 15px 0;
-        }
-        
-        .translation-section h5 {
-            margin-top: 0;
-            color: #004085;
-        }
-        
-        .translation-checkbox {
-            display: flex;
-            align-items: center;
-            margin: 8px 0;
-        }
-        
-        .translation-checkbox input[type="checkbox"] {
-            margin-right: 10px;
-            width: 16px;
-            height: 16px;
-            cursor: pointer;
-        }
-        
-        .translation-checkbox label {
-            margin: 0;
-            cursor: pointer;
-        }
-        
-        .button-group {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-            flex-wrap: wrap;
-        }
-        
-        .button-secondary {
-            background-color: #6c757d;
-        }
-        
-        .button-secondary:hover {
-            background-color: #5a6268;
-        }
-
-        /* Delete Confirmation Modal */
-        .delete-modal {
-            display: none;
-            position: fixed;
-            z-index: 2000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(3px);
-            animation: fadeIn 0.2s ease-out;
-        }
-
-        .delete-modal-content {
-            background-color: #fefefe;
-            margin: 15% auto;
-            padding: 30px;
-            border: 1px solid #dc3545;
-            border-radius: 10px;
-            width: 90%;
-            max-width: 500px;
-            box-shadow: 0 8px 32px rgba(220, 53, 69, 0.3);
-            animation: slideIn 0.3s ease-out;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        @keyframes slideIn {
-            from { transform: translateY(-50px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-
-        .delete-modal-header {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #dc3545;
-        }
-
-        .delete-modal-header .icon {
-            font-size: 32px;
-            color: #dc3545;
-        }
-
-        .delete-modal-header h3 {
-            margin: 0;
-            color: #dc3545;
-            flex: 1;
-        }
-
-        .delete-modal-body {
-            margin: 20px 0;
-            line-height: 1.6;
-            color: #333;
-        }
-
-        .delete-modal-body .control-name {
-            font-weight: bold;
-            color: #495057;
-            background-color: #f8f9fa;
-            padding: 10px;
-            border-radius: 5px;
-            margin: 10px 0;
-            word-break: break-word;
-        }
-
-        .delete-modal-body .error-message {
-            background-color: #f8d7da;
-            border: 1px solid #f5c6cb;
-            border-radius: 5px;
-            color: #721c24;
-            padding: 15px;
-            margin: 15px 0;
-            display: none;
-        }
-
-        .delete-modal-body .error-message.show {
-            display: block;
-            animation: slideDown 0.3s ease-out;
-        }
-
-        @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .delete-modal-body .error-icon {
-            font-size: 20px;
-            margin-right: 10px;
-            vertical-align: middle;
-        }
-
-        .delete-modal-footer {
-            display: flex;
-            gap: 10px;
-            justify-content: flex-end;
-            margin-top: 25px;
-            padding-top: 15px;
-            border-top: 1px solid #dee2e6;
-        }
-
-        .delete-modal-footer button {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: all 0.2s;
-        }
-
-        .delete-modal-footer .btn-cancel {
-            background-color: #6c757d;
-            color: white;
-        }
-
-        .delete-modal-footer .btn-cancel:hover {
-            background-color: #5a6268;
-        }
-
-        .delete-modal-footer .btn-confirm {
-            background-color: #dc3545;
-            color: white;
-        }
-
-        .delete-modal-footer .btn-confirm:hover:not(:disabled) {
-            background-color: #c82333;
-            transform: scale(1.02);
-        }
-
-        .delete-modal-footer .btn-confirm:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-            opacity: 0.7;
-        }
-
-        .delete-modal-footer .btn-confirm .spinner {
-            display: inline-block;
-            width: 14px;
-            height: 14px;
-            border: 2px solid #ffffff;
-            border-top: 2px solid transparent;
-            border-radius: 50%;
-            animation: spin 0.6s linear infinite;
-            margin-right: 8px;
-            vertical-align: middle;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        /* Action Buttons Styling */
-        .action-buttons {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-
-        .btn {
-            padding: 6px 12px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 13px;
-            text-decoration: none;
-            transition: all 0.2s;
-            display: inline-block;
-        }
-
-        .btn-primary {
-            background-color: #007bff;
-            color: white;
-            min-width: 7em;
-        }
-
-        .btn-primary:hover {
-            background-color: #0056b3;
-        }
-
-        .btn-danger {
-            background-color: #dc3545;
-            color: white;
-        }
-
-        .btn-danger:hover {
-            background-color: #c82333;
-        }
-
-        /* Success/Error Messages */
-        .alert {
-            padding: 15px;
-            margin: 20px 0;
-            border: 1px solid transparent;
-            border-radius: 5px;
-            animation: slideDown 0.3s ease-out;
-        }
-
-        .alert-success {
-            background-color: #d4edda;
-            border-color: #c3e6cb;
-            color: #155724;
-        }
-
-        .alert-error {
-            background-color: #f8d7da;
-            border-color: #f5c6cb;
-            color: #721c24;
-        }
-
-        .alert-close {
-            float: right;
-            cursor: pointer;
-            font-size: 18px;
-            font-weight: bold;
-            color: inherit;
-            opacity: 0.7;
-        }
-
-        .alert-close:hover {
-            opacity: 1;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-        }
-
-        table th {
-            background-color: #f8f9fa;
-            padding: 12px;
-            text-align: left;
-            font-weight: 600;
-            border-bottom: 2px solid #dee2e6;
-        }
-
-        table td {
-            padding: 12px;
-            border-bottom: 1px solid #dee2e6;
-        }
-
-        table tr:hover {
-            background-color: #f8f9fa;
-        }
-
-        table tr.hidden {
-            display: none;
-        }
-
-        /* Filter Bar Styles */
-        .filter-bar {
-            margin: 20px 0;
-            padding: 15px;
-            background-color: #f9f9f9;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-        }
-
-        .filter-bar h3 {
-            margin-top: 0;
-            color: #333;
-            font-size: 14px;
-        }
-
-        .filter-inputs {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
-            gap: 15px;
-        }
-
-        .filter-inputs label {
-            display: block;
-            font-weight: bold;
-            margin-bottom: 5px;
-            font-size: 12px;
-            color: #555;
-        }
-
-        .filter-inputs input,
-        .filter-inputs select {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 12px;
-        }
-
-        @media (max-width: 768px) {
-            .filter-inputs {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
 </head>
 <body>
 <div th:replace="~{navigation :: mainNav}"></div>
 <div class="container">
     
     <h1>Security Controls</h1>
-    <div style="margin: 20px 0;">
+    <div class="my-20">
         <button id="importBtn" class="import-button">Import Security Controls from CSV</button>
         <a href="/security-control/create" class="import-button primary">Create New Security Control</a>
     </div>
@@ -922,11 +53,11 @@
         <div class="modal-content">
             <span class="close" onclick="closeMatchDetailModal()">&times;</span>
             <h2>Matched Security Control Details</h2>
-            <div id="matchDetailContent" style="padding: 20px; background-color: #f9f9f9; border-radius: 8px;">
+            <div id="matchDetailContent" class="panel-gray-20">
                 <!-- Match details will be populated here -->
             </div>
-            <div style="margin-top: 20px; padding: 20px; border-top: 1px solid #ddd; text-align: right;">
-                <p style="font-size: 12px; color: #666; margin: 0 0 10px 0; text-align: left;">
+            <div class="topborder-actions-20">
+                <p class="text-12-muted mb-10 text-left">
                     💡 <strong>This is the suggested control to merge with your imported control.</strong> 
                     You can confirm this action in the import wizard.
                 </p>
@@ -972,9 +103,9 @@ and access rights","AC-2","Access Control"
 network segmentation","SC-7","Network"</div>
                         </div>
                         
-                        <div style="background-color: #d1ecf1; border: 1px solid #bee5eb; border-radius: 4px; padding: 10px; margin: 10px 0;">
+                        <div class="info-box-blue">
                             <strong>💡 Important Notes:</strong>
-                            <ul style="margin: 8px 0; padding-left: 20px;">
+                            <ul class="my-8 pl-20">
                                 <li>The first row must contain the column headers exactly as shown</li>
                                 <li>Use double quotes around values that contain commas or newlines</li>
                                 <li>You CAN include newlines (line breaks) within quoted fields</li>
@@ -1006,15 +137,15 @@ network segmentation","SC-7","Network"</div>
                 <div class="step-content">
                     <div class="translation-section">
                         <h5>🌐 Detect Language & Offer Translation</h5>
-                        <div id="languageDetectionResult" style="background-color: #f0f8ff; padding: 15px; border-radius: 4px; margin: 10px 0;">
-                            <p><strong>Detected CSV Language:</strong> <span id="detectedLanguage" style="font-weight: bold; color: #0066cc;">Detecting...</span></p>
-                            <p id="confidenceText" style="font-size: 12px; color: #666; margin: 5px 0;"></p>
+                        <div id="languageDetectionResult" class="info-box-light">
+                            <p><strong>Detected CSV Language:</strong> <span id="detectedLanguage" class="detected-language-label">Detecting...</span></p>
+                            <p id="confidenceText" class="text-12-muted my-5"></p>
                         </div>
                         
-                        <div style="margin: 20px 0;">
+                        <div class="my-20">
                             <p><strong>Would you like to translate the content to other languages?</strong></p>
-                            <p style="font-size: 12px; color: #666; margin: 5px 0;">Select languages to translate to. If none are selected, content will be used as-is.</p>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+                            <p class="text-12-muted my-5">Select languages to translate to. If none are selected, content will be used as-is.</p>
+                            <div class="grid-2 gap-sm mt-10">
                                 <div class="translation-checkbox">
                                     <input type="checkbox" id="translateDE" name="languages" value="de" />
                                     <label for="translateDE">German (Deutsch)</label>
@@ -1026,12 +157,12 @@ network segmentation","SC-7","Network"</div>
                             </div>
                         </div>
                         
-                        <div id="translationProgress" style="display: none; margin: 15px 0; padding: 10px; background-color: #e3f2fd; border: 1px solid #90caf9; border-radius: 4px;">
-                            <p style="margin: 0; font-size: 12px;"><strong>🔄 Translating content with AI...</strong></p>
-                            <div class="progress-bar-container" style="margin-top: 5px;">
-                                <div id="translationProgressBar" class="progress-bar" style="width: 0%;"></div>
+                        <div id="translationProgress" class="translation-progress-box d-none">
+                            <p class="m-0 text-12"><strong>🔄 Translating content with AI...</strong></p>
+                            <div class="progress-bar-container mt-5">
+                                <div id="translationProgressBar" class="progress-bar w-0"></div>
                             </div>
-                            <p style="margin: 5px 0; font-size: 11px; color: #666;"><span id="translationProgressText">0/0</span> items translated...</p>
+                            <p class="my-5 text-11 text-muted"><span id="translationProgressText">0/0</span> items translated...</p>
                         </div>
                     </div>
                     
@@ -1048,23 +179,23 @@ network segmentation","SC-7","Network"</div>
                     <span class="step-number">3</span>Review Data with Applied Translation
                 </div>
                 <div class="step-content">
-                    <div style="margin-bottom: 15px;">
+                    <div class="mb-15">
                         <div class="preview-stats" id="previewStats"></div>
                     </div>
-                    <div class="error-box" id="previewError" style="display: none;"></div>
-                    <div class="warning-box" id="previewWarnings" style="display: none;"></div>
+                    <div id="previewError" class="error-box d-none"></div>
+                    <div id="previewWarnings" class="warning-box d-none"></div>
                     
                     <!-- Preview Table (shown initially, hidden during analysis) -->
-                    <div id="previewTableSection" style="max-height: 600px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px;">
+                    <div id="previewTableSection" class="scroll-box-600">
                         <table class="preview-table" id="previewTable">
                             <thead>
                                 <tr>
-                                    <th style="width: 30px;">Row</th>
-                                    <th style="width: 150px;">Name</th>
-                                    <th style="width: 150px;">Detail</th>
-                                    <th style="width: 80px;">Reference</th>
-                                    <th style="width: 80px;">Domain</th>
-                                    <th style="width: 70px;">Status</th>
+                                    <th class="w-30">Row</th>
+                                    <th class="w-150">Name</th>
+                                    <th class="w-150">Detail</th>
+                                    <th class="w-80">Reference</th>
+                                    <th class="w-80">Domain</th>
+                                    <th class="w-70">Status</th>
                                 </tr>
                             </thead>
                             <tbody id="previewTableBody">
@@ -1074,7 +205,7 @@ network segmentation","SC-7","Network"</div>
                     
                     <!-- Buttons for initial preview state -->
                     <div id="previewButtonGroup" class="button-group">
-                        <button type="button" id="step3AnalysisBtn" class="import-button" style="background-color: #007bff;">🤖 Perform AI Similarity Check</button>
+                        <button type="button" id="step3AnalysisBtn" class="import-button import-btn-primary">🤖 Perform AI Similarity Check</button>
                         <button type="button" id="step3SkipBtn" class="import-button button-secondary">Skip Similarity Check</button>
                         <button type="button" id="step3BackBtn" class="import-button button-secondary">Back</button>
                     </div>
@@ -1085,24 +216,24 @@ network segmentation","SC-7","Network"</div>
                         <div class="progress-bar-container">
                             <div id="progressBar" class="progress-bar"></div>
                         </div>
-                        <p style="font-size: 12px; color: #666;"><span id="progressText">0/0</span> controls analyzed...</p>
+                        <p class="text-12-muted"><span id="progressText">0/0</span> controls analyzed...</p>
                     </div>
                     
                     <!-- Analysis Results Table (only shown after analysis complete) -->
-                    <div id="analysisResultsSection" style="display: none; margin-top: 20px;">
+                    <div id="analysisResultsSection" class="d-none mt-20">
                         <h5>Analysis Results with Merge/New Options</h5>
-                        <div style="max-height: 600px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px;">
+                        <div class="scroll-box-600">
                             <table class="preview-table" id="analysisResultsTable">
                                 <thead>
                                     <tr>
-                                        <th style="width: 30px;">Row</th>
-                                        <th style="width: 150px;">Name</th>
-                                        <th style="width: 150px;">Detail</th>
-                                        <th style="width: 80px;">Reference</th>
-                                        <th style="width: 80px;">Domain</th>
-                                        <th style="width: 100px;">Match <span class="tooltip">? <span class="tooltip-content">Similarity level to existing controls. Click on match badges to see details. High: Very similar, Medium: Somewhat similar, Low: Slightly similar, None: No match found</span></span></th>
-                                        <th style="width: 110px;">Action <span class="tooltip">? <span class="tooltip-content">Choose: Merge (combine with existing), New (create new control). Default is Merge when any match is found (high, medium, or low), New when no match is found.</span></span></th>
-                                        <th style="width: 70px;">Status</th>
+                                        <th class="w-30">Row</th>
+                                        <th class="w-150">Name</th>
+                                        <th class="w-150">Detail</th>
+                                        <th class="w-80">Reference</th>
+                                        <th class="w-80">Domain</th>
+                                        <th class="w-100">Match <span class="tooltip">? <span class="tooltip-content">Similarity level to existing controls. Click on match badges to see details. High: Very similar, Medium: Somewhat similar, Low: Slightly similar, None: No match found</span></span></th>
+                                        <th class="w-110">Action <span class="tooltip">? <span class="tooltip-content">Choose: Merge (combine with existing), New (create new control). Default is Merge when any match is found (high, medium, or low), New when no match is found.</span></span></th>
+                                        <th class="w-70">Status</th>
                                     </tr>
                                 </thead>
                                 <tbody id="analysisResultsTableBody">
@@ -1112,7 +243,7 @@ network segmentation","SC-7","Network"</div>
                         
                         <!-- Buttons after analysis completes -->
                         <div id="analysisButtonGroup" class="button-group">
-                            <button type="button" id="step3ContinueBtn" class="import-button" style="background-color: #007bff;">Next: Catalog & Approve</button>
+                            <button type="button" id="step3ContinueBtn" class="import-button import-btn-primary">Next: Catalog & Approve</button>
                             <button type="button" id="step3BackFromAnalysisBtn" class="import-button button-secondary">Back</button>
                         </div>
                     </div>
@@ -1128,7 +259,7 @@ network segmentation","SC-7","Network"</div>
                     <h5>📋 Final Import Summary</h5>
                     <div id="step4Summary"></div>
 
-                    <h4 style="margin-top: 30px;">🔗 Link Security Controls to Catalog</h4>
+                    <h4 class="mt-30">🔗 Link Security Controls to Catalog</h4>
                     <p>Choose how you want to organize the imported security controls:</p>
                     
                     <div class="radio-group">
@@ -1191,7 +322,7 @@ network segmentation","SC-7","Network"</div>
                     <h5>✓ Ready to Import</h5>
                     <div id="step5Summary"></div>
                     <div class="button-group">
-                        <button type="button" id="submitImportBtn" class="import-button" style="background-color: #28a745;">✓ Confirm & Import</button>
+                        <button type="button" id="submitImportBtn" class="import-button import-btn-success">✓ Confirm & Import</button>
                         <button type="button" id="step5BackBtn" class="import-button button-secondary">Back</button>
                     </div>
                 </div>
@@ -1208,7 +339,7 @@ network segmentation","SC-7","Network"</div>
     </div>
 
     <!-- Delete Confirmation Modal -->
-    <div id="deleteModal" class="delete-modal">
+    <div id="deleteModal" class="modal-bg">
         <div class="delete-modal-content">
             <div class="delete-modal-header">
                 <span class="icon">🗑️</span>
@@ -1217,7 +348,7 @@ network segmentation","SC-7","Network"</div>
             <div class="delete-modal-body">
                 <p>Are you sure you want to delete this security control?</p>
                 <div class="control-name" id="controlName"></div>
-                <p style="color: #6c757d; font-size: 14px; margin: 15px 0 0 0;">This action cannot be undone.</p>
+                <p class="text-gray-6c text-14 mt-15">This action cannot be undone.</p>
                 <div class="error-message" id="deleteError"></div>
             </div>
             <div class="delete-modal-footer">
@@ -1231,26 +362,26 @@ network segmentation","SC-7","Network"</div>
 
     <!-- Edit Modal -->
     <div id="editControlModal" class="modal">
-        <div class="modal-content" style="max-width: 900px; width: 95%; max-height: 90vh; display: flex; flex-direction: column; padding: 0;">
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 20px 30px; border-bottom: 1px solid #e0e0e0; flex-shrink: 0;">
-                <h2 style="margin: 0; color: #333; font-size: 24px;">Edit Security Control</h2>
-                <span class="close" onclick="closeEditModal()" style="margin: 0; float: none;">&times;</span>
+        <div class="modal-content modal-content-wide">
+            <div class="modal-header-row">
+                <h2 class="m-0 text-24 text-main">Edit Security Control</h2>
+                <span class="close m-0 no-float" onclick="closeEditModal()">&times;</span>
             </div>
-            <div id="editFormContainer" style="flex: 1 1 auto; overflow-y: auto; padding: 30px;">
+            <div id="editFormContainer" class="flex-auto scroll-y p-30">
                 <!-- Form will be loaded via AJAX -->
             </div>
         </div>
     </div>
 
-    <table id="controlsTable">
+    <table id="controlsTable" class="table card">
         <thead>
             <tr>
-                <th>ID</th>
-                <th>Name</th>
-                <th>Detail</th>
-                <th>Reference</th>
-                <th>Tag</th>
-                <th>Domain</th>
+                <th class="sortable-th" data-col="0">ID<span class="sort-arrow"></span></th>
+                <th class="sortable-th" data-col="1">Name<span class="sort-arrow"></span></th>
+                <th class="sortable-th" data-col="2">Detail<span class="sort-arrow"></span></th>
+                <th class="sortable-th" data-col="3">Reference<span class="sort-arrow"></span></th>
+                <th class="sortable-th" data-col="4">Tag<span class="sort-arrow"></span></th>
+                <th class="sortable-th" data-col="5">Domain<span class="sort-arrow"></span></th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -1264,14 +395,14 @@ network segmentation","SC-7","Network"</div>
                 <td th:text="${control.securityControlDomain != null ? control.securityControlDomain.name : ''}"></td>
                 <td>
                     <div class="action-buttons">
-                        <button class="btn btn-primary" type="button" th:data-id="${control.id}" onclick="openEditModal(this)">Edit</button>
-                        <button class="btn btn-primary" type="button" th:data-id="${control.id}" th:data-name="${control.name}" onclick="openDeleteModalFromBtn(this)">Delete</button>
+                        <button class="btn-edit" type="button" style="min-width:72px;" th:data-id="${control.id}" onclick="openEditModal(this)">Edit</button>
+                        <button class="btn-danger" type="button" style="min-width:72px;" th:data-id="${control.id}" th:data-name="${control.name}" onclick="openDeleteModalFromBtn(this)">Delete</button>
                     </div>
                 </td>
             </tr>
         </tbody>
     </table>
-    <a href="/">Back to main</a>
+    <a href="/" class="back-link">Back to main</a>
 </div>
 
 <script>
@@ -1305,7 +436,7 @@ network segmentation","SC-7","Network"</div>
         document.getElementById('deleteError').classList.remove('show');
         document.getElementById('confirmDeleteBtn').disabled = false;
         document.getElementById('confirmDeleteBtn').innerHTML = '<span id="btnText">Delete</span>';
-        document.getElementById('deleteModal').style.display = 'block';
+        document.getElementById('deleteModal').style.display = 'flex';
     }
 
     function closeDeleteModal() {
@@ -1344,11 +475,11 @@ network segmentation","SC-7","Network"</div>
                     const safeMsgHtml = tempDiv.innerHTML;
                     let errorHtml = '<span class="error-icon">⚠️</span><strong>Cannot Delete This Security Control</strong><p>' + safeMsgHtml + '</p>';
                     if (data.errorType === 'IN_USE') {
-                        errorHtml += '<p style="margin-top: 10px; font-size: 13px; font-style: italic; color: #555;">💡 <strong>Tip:</strong> Remove this control from all assessments before attempting to delete.</p>';
+                        errorHtml += '<p class="mt-10 text-13 italic text-555">💡 <strong>Tip:</strong> Remove this control from all assessments before attempting to delete.</p>';
                     } else if (data.errorType === 'CONSTRAINT_VIOLATION') {
-                        errorHtml += '<p style="margin-top: 10px; font-size: 13px; font-style: italic; color: #555;">💡 <strong>Tip:</strong> Unlink this control from all catalogs, then try deleting again.</p>';
+                        errorHtml += '<p class="mt-10 text-13 italic text-555">💡 <strong>Tip:</strong> Unlink this control from all catalogs, then try deleting again.</p>';
                     } else if (data.errorType === 'GENERAL_ERROR') {
-                        errorHtml += '<p style="margin-top: 10px; font-size: 13px; font-style: italic; color: #555;">💡 <strong>Tip:</strong> Please try again or contact system administrator if the issue persists.</p>';
+                        errorHtml += '<p class="mt-10 text-13 italic text-555">💡 <strong>Tip:</strong> Please try again or contact system administrator if the issue persists.</p>';
                     }
                     errorDiv.innerHTML = errorHtml;
                     errorDiv.classList.add('show');
@@ -1360,7 +491,7 @@ network segmentation","SC-7","Network"</div>
                 console.error('Error:', error);
                 const errorDiv = document.getElementById('deleteError');
                 let errorHtml = '<span class="error-icon">⚠️</span><strong>Unexpected Error</strong><p>An unexpected error occurred while deleting the security control. Please try again.</p>';
-                errorHtml += '<p style="margin-top: 10px; font-size: 13px; font-style: italic; color: #555;">If the problem persists, please contact your system administrator.</p>';
+                errorHtml += '<p class="mt-10 text-13 italic text-555">If the problem persists, please contact your system administrator.</p>';
                 errorDiv.innerHTML = errorHtml;
                 errorDiv.classList.add('show');
                 btn.disabled = false;
@@ -1675,7 +806,7 @@ network segmentation","SC-7","Network"</div>
             const importModal = document.getElementById('csvImportModal');
             const matchModal = document.getElementById('matchDetailModal');
             
-            if (deleteModal.style.display === 'block') {
+            if (deleteModal.style.display === 'flex') {
                 closeDeleteModal();
             }
             if (editModal.style.display === 'block') {
@@ -2095,7 +1226,7 @@ network segmentation","SC-7","Network"</div>
                 console.error('Language detection error:', error);
                 document.getElementById('detectedLanguage').textContent = 'Unable to detect';
                 document.getElementById('confidenceText').innerHTML = 
-                    '<span style="color: #dc3545;">Error: Could not detect language</span>';
+                    '<span class="text-danger">Error: Could not detect language</span>';
             });
     }
 
@@ -2113,8 +1244,8 @@ network segmentation","SC-7","Network"</div>
         previewStats.innerHTML = `
             <strong>📊 Import Summary:</strong><br>
             Total rows: ${csvData.length} | 
-            Valid rows: <span style="color: #28a745;">${validRows}</span> | 
-            Invalid rows: <span style="color: #dc3545;">${invalidRows}</span> | 
+            Valid rows: <span class="text-success">${validRows}</span> | 
+            Invalid rows: <span class="text-danger">${invalidRows}</span> | 
             Unique domains: ${uniqueDomains}
         `;
         
@@ -2138,8 +1269,8 @@ network segmentation","SC-7","Network"</div>
             if (!row.valid) tr.className = 'error-row';
             
             let statusHtml = !row.valid ? 
-                '<span style="color: #dc3545;">✗ ' + row.errors.join(', ') + '</span>' :
-                '<span style="color: #28a745;">✓ Valid</span>';
+                '<span class="text-danger">✗ ' + row.errors.join(', ') + '</span>' :
+                '<span class="text-success">✓ Valid</span>';
             
             const displayName = row.translatedName || row.name;
             const displayDetail = row.translatedDetail || row.detail;
@@ -2382,9 +1513,9 @@ network segmentation","SC-7","Network"</div>
             
             let statusHtml;
             if (analysisInProgress[row.rowNumber]) {
-                statusHtml = '<span style="color: #007bff;">⏳ Analyzing...</span>';
+                statusHtml = '<span class="text-primary">⏳ Analyzing...</span>';
             } else {
-                statusHtml = '<span style="color: #28a745;">✓ Valid</span>';
+                statusHtml = '<span class="text-success">✓ Valid</span>';
             }
             
             let matchBadge = '';
@@ -2392,12 +1523,12 @@ network segmentation","SC-7","Network"</div>
             else if (row.matchingRate === 'medium') matchBadge = '<span class="match-badge-medium">Medium</span>';
             else if (row.matchingRate === 'low') matchBadge = '<span class="match-badge-low">Low</span>';
             else if (row.analyzed) matchBadge = '<span class="match-badge-none">None</span>';
-            else matchBadge = '<span style="color: #999; font-size: 11px;">Pending...</span>';
+            else matchBadge = '<span class="text-11 text-light-muted">Pending...</span>';
             
             let matchCell = '';
             if (row.suggestedMatch && row.matchingRate !== 'none') {
                 const rowNum = row.rowNumber;
-                matchCell = '<span style="cursor: pointer;" onclick="openMatchDetailModal(' + rowNum + ')">' + matchBadge + '</span>';
+                matchCell = '<span class="cursor-pointer" onclick="openMatchDetailModal(' + rowNum + ')">' + matchBadge + '</span>';
             } else {
                 matchCell = matchBadge;
             }
@@ -2472,25 +1603,25 @@ network segmentation","SC-7","Network"</div>
         const match = rowData.suggestedMatch;
         const analysisResult = analysisResults[rowNumber];
         
-        let detailHtml = '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;\">';
+        let detailHtml = '<div class="grid-2 gap-20">';
         
         detailHtml += '<div>';
-        detailHtml += '<h4 style="color: #007bff; border-bottom: 2px solid #007bff; padding-bottom: 10px; margin-bottom: 15px;">📥 Imported Control</h4>';
-        detailHtml += '<div class="match-info" style="margin: 10px 0;">';
+        detailHtml += '<h4 class="heading-blue-underlined">📥 Imported Control</h4>';
+        detailHtml += '<div class="match-info my-10">';
         detailHtml += '<div class="match-info-label">Name:</div>';
         const importedName = rowData.translatedName || rowData.name;
-        detailHtml += '<div class="match-info-value" style="font-weight: 500; color: #ecf0f1;">' + escapeHtml(importedName) + '</div>';
+        detailHtml += '<div class="match-info-value text-medium text-light">' + escapeHtml(importedName) + '</div>';
         detailHtml += '</div>';
         
         if (rowData.translatedDetail || rowData.detail) {
-            detailHtml += '<div class="match-info" style="margin: 10px 0;">';
+            detailHtml += '<div class="match-info my-10">';
             detailHtml += '<div class="match-info-label">Detail:</div>';
             const importedDetail = rowData.translatedDetail || rowData.detail;
-            detailHtml += '<div class="match-info-value" style="word-break: break-word;">' + escapeHtml(importedDetail) + '</div>';
+            detailHtml += '<div class="match-info-value word-break">' + escapeHtml(importedDetail) + '</div>';
             detailHtml += '</div>';
         }
         
-        detailHtml += '<div class="match-info" style="margin: 10px 0;">';
+        detailHtml += '<div class="match-info my-10">';
         detailHtml += '<div class="match-info-label">Domain:</div>';
         const importedDomain = rowData.translatedDomain || rowData.domain;
         detailHtml += '<div class="match-info-value">' + escapeHtml(importedDomain) + '</div>';
@@ -2498,26 +1629,26 @@ network segmentation","SC-7","Network"</div>
         detailHtml += '</div>';
         
         detailHtml += '<div>';
-        detailHtml += '<h4 style="color: #28a745; border-bottom: 2px solid #28a745; padding-bottom: 10px; margin-bottom: 15px;">🎯 Matched Existing Control</h4>';
-        detailHtml += '<div class="match-info" style="margin: 10px 0;">';
+        detailHtml += '<h4 class="heading-green-underlined">🎯 Matched Existing Control</h4>';
+        detailHtml += '<div class="match-info my-10">';
         detailHtml += '<div class="match-info-label">Name:</div>';
-        detailHtml += '<div class="match-info-value" style="font-weight: 500; color: #ecf0f1;">' + escapeHtml(match.existingControlName) + '</div>';
+        detailHtml += '<div class="match-info-value text-medium text-light">' + escapeHtml(match.existingControlName) + '</div>';
         detailHtml += '</div>';
         
         if (match.existingControlDetail) {
-            detailHtml += '<div class="match-info" style="margin: 10px 0;">';
+            detailHtml += '<div class="match-info my-10">';
             detailHtml += '<div class="match-info-label">Detail:</div>';
-            detailHtml += '<div class="match-info-value" style="word-break: break-word;">' + escapeHtml(match.existingControlDetail) + '</div>';
+            detailHtml += '<div class="match-info-value word-break">' + escapeHtml(match.existingControlDetail) + '</div>';
             detailHtml += '</div>';
         }
         
-        detailHtml += '<div class="match-info" style="margin: 10px 0;">';
+        detailHtml += '<div class="match-info my-10">';
         detailHtml += '<div class="match-info-label">Control ID:</div>';
         detailHtml += '<div class="match-info-value">#' + match.existingControlId + '</div>';
         detailHtml += '</div>';
         
         if (analysisResult && analysisResult.matchingRate) {
-            detailHtml += '<div class="match-info" style="margin: 10px 0;">';
+            detailHtml += '<div class="match-info my-10">';
             detailHtml += '<div class="match-info-label">Match Level:</div>';
             let matchBadgeClass = 'match-badge-' + analysisResult.matchingRate;
             detailHtml += '<div class="match-info-value"><span class="' + matchBadgeClass + '">' + analysisResult.matchingRate.toUpperCase() + '</span></div>';
@@ -2528,9 +1659,9 @@ network segmentation","SC-7","Network"</div>
         detailHtml += '</div>';
         
         if (analysisResult && analysisResult.aiAnalysis) {
-            detailHtml += '<div style="margin-top: 20px; padding: 15px; background-color: #e3f2fd; border-left: 4px solid #2196F3; border-radius: 4px;">';
-            detailHtml += '<h4 style="color: #1976d2; margin-top: 0;">🤖 AI Analysis</h4>';
-            detailHtml += '<div style="color: #333; white-space: pre-wrap; font-size: 12px;">' + escapeHtml(analysisResult.aiAnalysis) + '</div>';
+            detailHtml += '<div class="panel-ai">';
+            detailHtml += '<h4 class="text-blue-1976 mt-0">🤖 AI Analysis</h4>';
+            detailHtml += '<div class="text-main pre-wrap text-12">' + escapeHtml(analysisResult.aiAnalysis) + '</div>';
             detailHtml += '</div>';
         }
         
@@ -2561,11 +1692,11 @@ network segmentation","SC-7","Network"</div>
         let newCount = totalImport - mergeCount;
         
         let summaryText = `
-            <div style="background-color: #e8f5e9; border: 1px solid #c3e6c3; border-radius: 4px; padding: 15px; margin: 10px 0;">
+            <div class="success-box">
             <p><strong>Controls to Import:</strong> ${totalImport}</p>
-            <ul style="margin: 5px 0; padding-left: 20px;">
-            <li><span style="color: #28a745;">📝 New Controls:</span> ${newCount}</li>
-            <li><span style="color: #007bff;">🔗 Merge with Existing:</span> ${mergeCount}</li>
+            <ul class="my-5 pl-20">
+            <li><span class="text-success">📝 New Controls:</span> ${newCount}</li>
+            <li><span class="text-primary">🔗 Merge with Existing:</span> ${mergeCount}</li>
             </ul>
             </div>
         `;
@@ -2593,12 +1724,12 @@ network segmentation","SC-7","Network"</div>
         let newCount = totalImport - mergeCount;
         
         let summaryText = `
-            <div style="background-color: #e8f5e9; border: 1px solid #c3e6c3; border-radius: 4px; padding: 15px; margin: 10px 0;">
+            <div class="success-box">
             <p><strong>📋 Import Plan:</strong></p>
-            <ul style="margin: 5px 0; padding-left: 20px;">
+            <ul class="my-5 pl-20">
             <li><strong>Total Controls:</strong> ${totalImport}</li>
-            <li><span style="color: #28a745;">📝 New Controls:</span> ${newCount}</li>
-            <li><span style="color: #007bff;">🔗 Merge with Existing:</span> ${mergeCount}</li>
+            <li><span class="text-success">📝 New Controls:</span> ${newCount}</li>
+            <li><span class="text-primary">🔗 Merge with Existing:</span> ${mergeCount}</li>
         `;
         
         if (catalogOption === 'existing') {
@@ -2781,6 +1912,37 @@ network segmentation","SC-7","Network"</div>
             matchModal.style.display = 'none';
         }
     }
+
+    // Sortable column headers for controlsTable
+    (function() {
+        var sortState = { col: -1, dir: 0 };
+        var ths = document.querySelectorAll('#controlsTable thead .sortable-th');
+        ths.forEach(function(th) {
+            th.addEventListener('click', function() {
+                var col = parseInt(this.getAttribute('data-col'));
+                if (sortState.col === col) {
+                    sortState.dir = sortState.dir === 1 ? -1 : (sortState.dir === -1 ? 0 : 1);
+                } else {
+                    sortState.col = col;
+                    sortState.dir = 1;
+                }
+                ths.forEach(function(h) { h.classList.remove('sort-asc', 'sort-desc'); });
+                if (sortState.dir === 1) this.classList.add('sort-asc');
+                else if (sortState.dir === -1) this.classList.add('sort-desc');
+                if (sortState.dir !== 0) {
+                    var tbody = document.getElementById('controlsTableBody');
+                    var rows = Array.from(tbody.querySelectorAll('tr'));
+                    var dir = sortState.dir;
+                    rows.sort(function(a, b) {
+                        var av = a.children[col].textContent.trim().toLowerCase();
+                        var bv = b.children[col].textContent.trim().toLowerCase();
+                        return av.localeCompare(bv) * dir;
+                    });
+                    rows.forEach(function(r) { tbody.appendChild(r); });
+                }
+            });
+        });
+    })();
 </script>
 </body>
 </html>

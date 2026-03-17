@@ -35,12 +35,20 @@ public class StaleAssessmentUrlsCleanupScheduler {
         LocalDateTime now = LocalDateTime.now();
 
         for (AssessmentUrls url : allUrls) {
+            // If createdAt is missing (null), set it to now and persist it so stale logic has a baseline.
+            if (url.getCreatedAt() == null) {
+                logger.info("Assessment URL id {} has null createdAt; setting to now", url.getId());
+                urlsRepository.updateCreatedAtById(url.getId(), now);
+                // update in-memory value so subsequent checks use the new timestamp
+                url.setCreatedAt(now);
+            }
+
             if (isStale(url, now)) {
-                logger.info("Removing stale assessment URL with id: {} (created at: {}, lifetime: {} days)",
+                logger.info("Removing stale assessment URL with id: {} (created at: {}, lifetime: {})",
                         url.getId(), url.getCreatedAt(), url.getLifetime());
                 urlsRepository.deleteById(url.getId());
+                }
             }
-        }
 
         logger.debug("Cleanup of stale assessment URLs completed");
     }

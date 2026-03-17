@@ -4,25 +4,6 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <meta charset="UTF-8">
     <title>Dashboard</title>
-    <link rel="stylesheet" href="/style.css">
-    <style>
-        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 1rem; margin-bottom: 1rem; }
-        .card { background: #fff; border-radius: 6px; padding: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
-        .card h3 { margin: 0 0 .5rem 0; font-size: 1rem; color: #333; }
-        .metric { font-size: 2rem; font-weight: 600; }
-        .small { color: #666; font-size: .9rem; }
-        .table { width: 100%; border-collapse: collapse; }
-        .table th, .table td { text-align: left; padding: .5rem; border-bottom: 1px solid #eee; }
-        .recent-list { list-style: none; padding: 0; margin: 0; }
-        .recent-item { padding: .5rem 0; border-bottom: 1px dashed #eee; }
-        .muted { color: #777; font-size: .9rem; }
-        /* simple bar chart */
-        .chart { display: flex; align-items: flex-end; gap: .5rem; padding: 1rem 0; height: 220px; }
-        .chart-bar { background: #4a90e2; border-radius: 4px 4px 0 0; width: 36px; display:flex; align-items:flex-end; justify-content:center; color:#fff; font-size:0.8rem; }
-        .chart-labels { display:flex; gap:.5rem; margin-top:.5rem; }
-        .chart-label { width:36px; text-align:center; font-size:.75rem; color:#333; }
-        .chart-wrap { overflow-x:auto; }
-    </style>
 </head>
 <body>
     <div th:replace="~{navigation :: mainNav}"></div>
@@ -59,9 +40,9 @@
             </div>
         </div>
 
-        <div class="card" style="margin-top:1rem">
+            <div class="card mt-1rem">
             <h2>Distribution of Assessments by Security Catalog</h2>
-            <table class="table" id="distributionTable">
+            <table class="table card" id="distributionTable">
                 <thead>
                     <tr><th>Catalog</th><th>Assessments</th></tr>
                 </thead>
@@ -71,7 +52,7 @@
             </table>
         </div>
 
-        <div class="card" style="margin-top:1rem">
+            <div class="card mt-1rem">
             <h2>Recent Assessments</h2>
             <ul class="recent-list" id="recentList">
                 <li class="muted">Loading…</li>

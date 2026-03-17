@@ -5,312 +5,6 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>Landing Page</title>
     <meta charset="UTF-8">
-    <link rel="stylesheet" href="/general.css">
-    <link rel="stylesheet" href="/style.css">
-    <style>
-        /* Dashboard Landing Page Styles */
-        .landing-container {
-            max-width: 100%;
-            margin: 0 auto;
-            padding: 1em;
-            display: flex;
-            flex-direction: row;
-            width: 90%;
-            margin: 2em;
-            align-content: center;
-        }
-
-
-        .landing-header {
-            margin-bottom: 1.5em;
-            padding-bottom: 1em;
-            border-bottom: 2px solid rgba(34, 116, 165, 0.15);
-        }
-
-        .landing-header h1 {
-            margin: 0 0 0.5em 0;
-            font-size: 2.2em;
-            color: var(--primary-blue-dark);
-            text-shadow: 0 2px 8px rgba(34, 116, 165, 0.10);
-        }
-
-        .landing-header p {
-            margin: 0;
-            color: #666;
-            font-size: 1.05em;
-        }
-
-        .landing-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
-            gap: 1.5em;
-            margin-bottom: 1.5em;
-            flex: 1;
-        }
-
-        .landing-card {
-            background: #fff;
-            border: 2px solid rgba(34, 116, 165, 0.12);
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 2px 12px rgba(34, 116, 165, 0.08);
-            transition: all 0.3s ease;
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-            min-width: 53%;
-        }
-
-        .card-header {
-            background: linear-gradient(135deg, rgba(34, 116, 165, 0.08) 0%, rgba(255, 149, 5, 0.04) 100%);
-            padding: 1.3em 1.3em 0.9em 1.3em;
-            border-bottom: 1px solid rgba(34, 116, 165, 0.1);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.8em;
-        }
-
-        .card-header h2 {
-            margin: 0;
-            color: var(--primary-blue-dark);
-            font-size: 1.25em;
-            font-weight: 600;
-            flex: 1;
-        }
-
-        .card-icon {
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, var(--primary-blue) 0%, rgba(34, 116, 165, 0.7) 100%);
-            border-radius: 8px;
-            color: #fff;
-            font-size: 1.5em;
-            flex-shrink: 0;
-        }
-
-        .card-body {
-            padding: 1.2em;
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 0.8em;
-            min-height: 48em;
-        }
-
-        .assessment-list {
-            list-style: none;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            gap: 0.8em;
-        }
-
-        .assessment-item {
-            padding: 0.9em 1em;
-            background: linear-gradient(135deg, #f8fbfd 0%, #f3f9fd 100%);
-            border: 1px solid rgba(34, 116, 165, 0.1);
-            border-radius: 8px;
-            transition: all 0.25s ease;
-            display: flex;
-            flex-direction: row;
-            align-items: center;
-            gap: 0.6em;
-        }
-
-        .assessment-item:hover {
-            background: linear-gradient(135deg, #f0f7fc 0%, #e8f4fc 100%);
-            border-color: rgba(34, 116, 165, 0.25);
-            box-shadow: 0 2px 8px rgba(34, 116, 165, 0.08);
-            transform: translateX(4px);
-        }
-
-        .assessment-link {
-            display: block;
-            width: 100%;
-            color: var(--primary-blue-dark);
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 1.05em;
-            transition: color 0.2s;
-        }
-
-        .assessment-link:hover {
-            color: var(--accent-orange);
-            text-shadow: 0 0 8px var(--shine-highlight);
-        }
-
-        .assessment-meta {
-            display: flex;
-            gap: 1.2em;
-            flex-wrap: wrap;
-            font-size: 0.9em;
-        }
-
-        .assessment-org {
-            display: flex;
-            align-items: center;
-            gap: 0.5em;
-            color: var(--primary-blue);
-            font-weight: 500;
-        }
-
-        .assessment-org::before {
-            content: '🏢';
-        }
-
-        .assessment-date {
-            display: flex;
-            align-items: center;
-            gap: 0.5em;
-            color: #999;
-        }
-
-        .assessment-date::before {
-            content: '📅';
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 2.5em 2em;
-            background: linear-gradient(135deg, rgba(34, 116, 165, 0.02) 0%, rgba(255, 149, 5, 0.01) 100%);
-            border: 2px dashed rgba(34, 116, 165, 0.15);
-            border-radius: 10px;
-            color: #999;
-            font-size: 1em;
-        }
-
-        .coming-soon {
-            text-align: center;
-            padding: 2.5em 2em;
-            color: #999;
-            font-style: italic;
-            margin: 0;
-        }
-
-        .stats-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1.2em;
-            margin-bottom: 1.5em;
-        }
-
-        .stat-card {
-            background: linear-gradient(135deg, #fff 0%, #f8fbfd 100%);
-            border: 1px solid rgba(34, 116, 165, 0.1);
-            border-radius: 10px;
-            padding: 1.2em 1em;
-            text-align: center;
-            box-shadow: 0 2px 8px rgba(34, 116, 165, 0.06);
-            transition: all 0.3s ease;
-        }
-
-        .stat-card:hover {
-            border-color: rgba(34, 116, 165, 0.3);
-            box-shadow: 0 4px 16px rgba(34, 116, 165, 0.1);
-            transform: translateY(-2px);
-        }
-
-        .stat-value {
-            font-size: 2em;
-            font-weight: 700;
-            color: var(--primary-blue-dark);
-            margin: 0 0 0.3em 0;
-        }
-
-        .stat-label {
-            font-size: 0.9em;
-            color: #666;
-            margin: 0;
-            font-weight: 500;
-        }
-
-        @media (max-width: 1024px) {
-            .landing-grid {
-                grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-                gap: 1.2em;
-            }
-
-            .stats-row {
-                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-                gap: 1em;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .landing-container {
-                padding: 1.5em 1em;
-            }
-
-            .landing-header {
-                margin-bottom: 2em;
-            }
-
-            .landing-header h1 {
-                font-size: 1.8em;
-            }
-
-            .landing-header p {
-                font-size: 0.95em;
-            }
-
-            .card-header h2 {
-                font-size: 1.2em;
-            }
-
-            .card-header {
-                padding: 1.2em 1.2em 0.8em 1.2em;
-            }
-
-            .card-body {
-                padding: 1em;
-                gap: 0.7em;
-            }
-
-            .assessment-item {
-                padding: 0.9em;
-            }
-
-            .assessment-link {
-                font-size: 0.98em;
-            }
-
-            .assessment-meta {
-                gap: 0.8em;
-                font-size: 0.85em;
-            }
-
-            .stats-row {
-                grid-template-columns: 1fr;
-                gap: 1em;
-            }
-
-            .stat-value {
-                font-size: 2em;
-            }
-        }
-
-        .completion-bar-container {
-            background: #e9f4fb;
-            border-radius: 6px;
-            height: 10px;
-            width: 10em;
-            max-width: 100%;
-            border: 1px solid #000;
-        }
-
-        .completion-bar-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #ff6b6b 0%, #ffd166 50%, #22b573 100%);
-            border-radius: 6px;
-            width: 0%;
-            transition: width 0.35s ease;
-        }
-    </style>
 </head>
 
 <body>
@@ -322,15 +16,14 @@
         <!-- Latest Assessments Card -->
         <div class="landing-card">
             <div class="card-header">
-                <div style="display: flex; align-items: center; gap: 0.8em; flex: 1;">
+                <div class="card-icon-row">
                     <div class="card-icon">📋</div>
                     <h2>Latest Assessments</h2>
                 </div>
             </div>
             <div class="card-body">
                 <!-- Small filter bar (client-side, remembers choices in localStorage) -->
-                <div class="filter-bar"
-                    style="display:flex; gap:0.5em; align-items:center; margin-bottom:0.6em; flex-wrap:wrap;">
+                <div class="filter-bar">
                     <select id="filter-range" class="tiny" title="Date range">
                         <option value="">All time</option>
                         <option value="1">Last month</option>
@@ -354,16 +47,15 @@
                         <option th:each="c : ${filterCatalogs}" th:value="${c.name}" th:text="${c.name}"></option>
                     </select>
 
-                    <button id="filter-apply" class="tiny">Apply</button>
-                    <button id="filter-clear" class="tiny">Clear</button>
+                    <button id="filter-apply" class="btn-action btn-sm">Apply</button>
+                    <button id="filter-clear" class="btn-cancel btn-sm">Clear</button>
                 </div>
 
                 <div th:if="${latestAssessments != null and #lists.isEmpty(latestAssessments)}" class="empty-state">
                     <p>No assessments found yet. Start creating assessments to see them here.</p>
                 </div>
 
-                <ul class="assessment-list" th:if="${latestAssessments != null and !#lists.isEmpty(latestAssessments)}"
-                    style="max-height: 400px; overflow-y: auto; padding-right: 4px;">
+                <ul class="assessment-list" th:if="${latestAssessments != null and !#lists.isEmpty(latestAssessments)}">
                     <li th:each="assessment : ${latestAssessments}" class="assessment-item"
                         th:attr="data-creation-date=${assessment.creationDate != null ? #temporals.format(assessment.creationDate,'yyyy-MM-dd') : ''}, data-status=${assessment.status}, data-security=${assessment.securityCatalog != null ? assessment.securityCatalog.name : ''}, data-users=${assessment.createdBy != null ? assessment.createdBy.name : ''}">
 
@@ -378,18 +70,16 @@
                             </div>
 
                             <!-- Hidden: render other involved users (if any) for client-side collection -->
-                            <div style="display:none;" class="involved-users">
+                            <div class="involved-users d-none">
                                 <span th:each="u : ${assessment.users}" th:text="${u.name}"></span>
                             </div>
                         </a>
 
                         <!-- Right side: completion bar and leader -->
-                        <div class="assessment-side"
-                            style="display:flow-root; align-items:center; gap:0.8em; margin-left:12px;">
+                        <div class="assessment-side">
                             <div class="team-leader"
-                                th:text="${assessmentTeamLeaders[assessment.id] != null ? assessmentTeamLeaders[assessment.id] : ''}"
-                                style="white-space:nowrap; color:#000000; font-size:1.1em;"></div>
-                            <div class="completion-bar-wrapper" title="Completion" style="width:10em;">
+                                th:text="${assessmentTeamLeaders[assessment.id] != null ? assessmentTeamLeaders[assessment.id] : ''}"></div>
+                            <div class="completion-bar-wrapper" title="Completion">
                                 <div class="completion-bar-container">
                                     <div class="completion-bar-fill"
                                         th:style="'width:' + (${assessmentCompletionPercent[assessment.id] != null ? (assessmentCompletionPercent[assessment.id] > 100 ? 100 : assessmentCompletionPercent[assessment.id]) : 0}) + '%'">
@@ -501,28 +191,13 @@
                     });
                 })();
             </script>
-
-            <style>
-                /* tiny inputs for compact filter bar */
-                .tiny {
-                    padding: 4px 6px;
-                    font-size: 0.9em;
-                    border-radius: 6px;
-                    border: 1px solid rgba(0, 0, 0, 0.08);
-                }
-
-                .filter-bar .tiny {
-                    height: 34px;
-                }
-            </style>
-
-        </div>
+</div>
 
 
         <!-- Tasks Card -->
         <div class="landing-card">
             <div class="card-header">
-                <div style="display: flex; align-items: center; gap: 0.8em; flex: 1;">
+                <div class="card-icon-row">
                     <div class="card-icon">✓</div>
                     <h2>Tasks</h2>
                 </div>

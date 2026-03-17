@@ -119,23 +119,15 @@ public class LayoutConfiguration {
     @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#e2e6ea'")
     private String dropdownBgHover;
 
-    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#f8f9fa'")
-    private String secondaryNavBg;
+    // Standard spacing and typography (NEW)
+    @Column(nullable = true, columnDefinition = "VARCHAR(10) DEFAULT '0.95em'")
+    private String fontSizeBody;
 
-    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#dee2e6'")
-    private String secondaryNavBorder;
+    @Column(nullable = true, columnDefinition = "VARCHAR(10) DEFAULT '0.85em'")
+    private String fontSizeBtn;
 
-    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#adb5bd'")
-    private String logoBorder;
-
-    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#0d6efd'")
-    private String dropdownHoverBlue;
-
-    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#495057'")
-    private String mainNavBorder;
-
-    @Column(nullable = true, columnDefinition = "VARCHAR(7) DEFAULT '#e3f2fd'")
-    private String faintBlue1;
+    @Column(nullable = true, columnDefinition = "VARCHAR(10) DEFAULT '1rem'")
+    private String spacingBase;
 
     @Column(nullable = true, columnDefinition = "VARCHAR(100) DEFAULT 'Arial, sans-serif'")
     private String fontFamily;
@@ -199,12 +191,9 @@ public class LayoutConfiguration {
         if (this.alertColor == null) this.alertColor = "#155724";
         if (this.takenOverBg == null) this.takenOverBg = "#fff3cd";
         if (this.dropdownBgHover == null) this.dropdownBgHover = "#e2e6ea";
-        if (this.secondaryNavBg == null) this.secondaryNavBg = "#f8f9fa";
-        if (this.secondaryNavBorder == null) this.secondaryNavBorder = "#dee2e6";
-        if (this.logoBorder == null) this.logoBorder = "#adb5bd";
-        if (this.dropdownHoverBlue == null) this.dropdownHoverBlue = "#0d6efd";
-        if (this.mainNavBorder == null) this.mainNavBorder = "#495057";
-        if (this.faintBlue1 == null) this.faintBlue1 = "#e3f2fd";
+        if (this.fontSizeBody == null) this.fontSizeBody = "0.95em";
+        if (this.fontSizeBtn == null) this.fontSizeBtn = "0.85em";
+        if (this.spacingBase == null) this.spacingBase = "1rem";
         if (this.fontFamily == null) this.fontFamily = "Arial, sans-serif";
         if (this.fontSizeNav == null) this.fontSizeNav = "14px";
         if (this.fontSizeHeadline == null) this.fontSizeHeadline = "24px";
@@ -323,23 +312,14 @@ public class LayoutConfiguration {
     public String getDropdownBgHover() { return dropdownBgHover; }
     public void setDropdownBgHover(String v) { this.dropdownBgHover = v; }
 
-    public String getSecondaryNavBg() { return secondaryNavBg; }
-    public void setSecondaryNavBg(String v) { this.secondaryNavBg = v; }
+    public String getFontSizeBody() { return fontSizeBody; }
+    public void setFontSizeBody(String v) { this.fontSizeBody = v; }
 
-    public String getSecondaryNavBorder() { return secondaryNavBorder; }
-    public void setSecondaryNavBorder(String v) { this.secondaryNavBorder = v; }
+    public String getFontSizeBtn() { return fontSizeBtn; }
+    public void setFontSizeBtn(String v) { this.fontSizeBtn = v; }
 
-    public String getLogoBorder() { return logoBorder; }
-    public void setLogoBorder(String v) { this.logoBorder = v; }
-
-    public String getDropdownHoverBlue() { return dropdownHoverBlue; }
-    public void setDropdownHoverBlue(String v) { this.dropdownHoverBlue = v; }
-
-    public String getMainNavBorder() { return mainNavBorder; }
-    public void setMainNavBorder(String v) { this.mainNavBorder = v; }
-
-    public String getFaintBlue1() { return faintBlue1; }
-    public void setFaintBlue1(String v) { this.faintBlue1 = v; }
+    public String getSpacingBase() { return spacingBase; }
+    public void setSpacingBase(String v) { this.spacingBase = v; }
 
     public String getFontFamily() { return fontFamily; }
     public void setFontFamily(String fontFamily) { this.fontFamily = fontFamily; }

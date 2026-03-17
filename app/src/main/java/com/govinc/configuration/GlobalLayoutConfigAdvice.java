@@ -57,12 +57,9 @@ public class GlobalLayoutConfigAdvice {
             if (resu.getAlertColor() == null) resu.setAlertColor("#155724");
             if (resu.getTakenOverBg() == null) resu.setTakenOverBg("#fff3cd");
             if (resu.getDropdownBgHover() == null) resu.setDropdownBgHover("#e2e6ea");
-            if (resu.getSecondaryNavBg() == null) resu.setSecondaryNavBg("#f8f9fa");
-            if (resu.getSecondaryNavBorder() == null) resu.setSecondaryNavBorder("#dee2e6");
-            if (resu.getLogoBorder() == null) resu.setLogoBorder("#adb5bd");
-            if (resu.getDropdownHoverBlue() == null) resu.setDropdownHoverBlue("#0d6efd");
-            if (resu.getMainNavBorder() == null) resu.setMainNavBorder("#495057");
-            if (resu.getFaintBlue1() == null) resu.setFaintBlue1("#e3f2fd");
+            if (resu.getFontSizeBody() == null) resu.setFontSizeBody("0.95em");
+            if (resu.getFontSizeBtn() == null) resu.setFontSizeBtn("0.85em");
+            if (resu.getSpacingBase() == null) resu.setSpacingBase("1rem");
             if (resu.getOrgNameColor() == null) resu.setOrgNameColor("#212529");
             if (resu.getOrgNameFontSize() == null) resu.setOrgNameFontSize("16px");
             if (resu.getToolNameColor() == null) resu.setToolNameColor("#6c757d");

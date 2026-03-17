@@ -3,16 +3,14 @@
 <head>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>Maturity Model List</title>
-    <meta charset="UTF-8">
-    <link rel="stylesheet" href="/style.css">
-</head>
+    <meta charset="UTF-8"></head>
 <body>
     <div th:replace="~{navigation :: mainNav}"></div>
     <div class="container">
         <h1>Maturity Models</h1>
-        <a href="/maturitymodel/edit">Create New Maturity Model</a>
-        <div class="entity-edit-frame maturity-model-table-frame" style="max-width:1000px;margin:2rem auto 2rem auto;">
-            <table class="table">
+        <a href="/maturitymodel/edit" class="btn-action">Create New Maturity Model</a>
+        <div style="margin-top:1.5em;">
+            <table class="table card">
                 <thead>
                     <tr>
                         <th>Name</th>
@@ -27,13 +25,45 @@
                     <td th:text="${model.name}"></td>
                     <td th:text="${model.description}"></td>
                     <td th:text="${model.securityCatalog != null ? model.securityCatalog.name : '-'}"></td>
-                    <td><a th:href="@{'/maturitymodel/edit/' + ${model.id}}">Edit</a></td>
-                    <td><a th:href="@{'/maturitymodel/delete/' + ${model.id}}" onclick="return confirm('Are you sure?')">Delete</a></td>
+                    <td><a th:href="@{'/maturitymodel/edit/' + ${model.id}}" class="btn-edit">Edit</a></td>
+                    <td>
+                        <button type="button" class="btn-danger"
+                            th:data-id="${model.id}"
+                            th:data-name="${model.name}"
+                            onclick="openDeleteModal(this)">Delete</button>
+                    </td>
                 </tr>
                 </tbody>
             </table>
         </div>
-        <a href="/">Back to Landing Page</a>
     </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="maturityDeleteModal" class="modal-bg" style="display:none;">
+        <div class="modal-popup-confirmation">
+            <h3>Delete Maturity Model?</h3>
+            <p>Are you sure you want to delete <strong id="maturityDeleteName"></strong>?</p>
+            <p>This action cannot be undone.</p>
+            <div class="modal-btn-row">
+                <button type="button" class="btn-cancel" onclick="closeDeleteModal()">Cancel</button>
+                <form id="maturityDeleteForm" method="post" style="display:inline;">
+                    <button type="submit" class="btn-danger">Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openDeleteModal(btn) {
+            var id = btn.getAttribute('data-id');
+            var name = btn.getAttribute('data-name');
+            document.getElementById('maturityDeleteName').textContent = name;
+            document.getElementById('maturityDeleteForm').action = '/maturitymodel/delete/' + id;
+            document.getElementById('maturityDeleteModal').style.display = 'flex';
+        }
+        function closeDeleteModal() {
+            document.getElementById('maturityDeleteModal').style.display = 'none';
+        }
+    </script>
 </body>
 </html>

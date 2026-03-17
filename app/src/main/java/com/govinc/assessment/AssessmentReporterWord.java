@@ -157,7 +157,7 @@ public class AssessmentReporterWord {
 
             // Step 4: Generate content via AI
             updateProgress(assessmentId, 35, "Generating report content from AI...");
-            String aiResult = openAIUtil.askAI(prompt);
+            String aiResult = openAIUtil.askAI(prompt, false);
 
             // Validate AI response
             if (aiResult == null || aiResult.isBlank()) {
@@ -654,7 +654,7 @@ public class AssessmentReporterWord {
 
         String aiResp = null;
         try {
-            aiResp = openAIUtil.askAI(p.toString());
+            aiResp = openAIUtil.askAI(p.toString(), false);
             if (aiResp != null) aiResp = aiResp.trim();
         } catch (Exception e) {
             System.err.println("[AssessmentReporterWord] AI style matching failed: " + e.getMessage());

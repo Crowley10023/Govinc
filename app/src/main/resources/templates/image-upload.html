@@ -1,134 +1,16 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
-    <title>Navigation Logo Upload</title>
+    <title>Logo Upload</title>
+    <meta charset="UTF-8">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <link rel="stylesheet" href="/style.css">
-    <style>
-        .upload-container {
-            max-width: 800px;
-            margin: 2rem auto;
-            padding: 2rem;
-            background: var(--background-light);
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        
-        .upload-area {
-            border: 3px dashed var(--border);
-            border-radius: 8px;
-            padding: 2rem;
-            text-align: center;
-            background: var(--shine-glare);
-            margin: 1rem 0;
-            transition: all 0.3s ease;
-        }
-        
-        .upload-area:hover {
-            border-color: var(--primary-blue);
-            background: var(--nav-violet);
-        }
-        
-        .upload-area.drag-over {
-            border-color: var(--accent-orange);
-            background: var(--modal-beige1);
-        }
-        
-        .file-input {
-            display: none;
-        }
-        
-        .upload-button {
-            background: var(--primary-blue);
-            color: white;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 1rem;
-            transition: background-color 0.3s ease;
-        }
-        
-        .upload-button:hover {
-            background: var(--primary-blue-dark);
-        }
-        
-        .current-image {
-            text-align: center;
-            margin: 2rem 0;
-            padding: 1rem;
-            background: white;
-            border-radius: 8px;
-            border: 1px solid var(--border);
-        }
-        
-        .preview-image {
-            max-width: 300px;
-            max-height: 150px;
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            margin: 1rem 0;
-        }
-        
-        .message {
-            padding: 1rem;
-            border-radius: 6px;
-            margin: 1rem 0;
-            font-weight: bold;
-        }
-        
-        .message.success {
-            background: var(--alert-bg1);
-            color: var(--success-green);
-            border: 1px solid var(--success-green);
-        }
-        
-        .message.error {
-            background: #fee;
-            color: var(--error-red);
-            border: 1px solid var(--error-red);
-        }
-        
-        .delete-button {
-            background: var(--error-red);
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-left: 1rem;
-        }
-        
-        .delete-button:hover {
-            background: darkred;
-        }
-        
-        .info-box {
-            background: var(--modal-beige1);
-            padding: 1rem;
-            border-radius: 6px;
-            margin: 1rem 0;
-            border-left: 4px solid var(--label-gold);
-        }
-        
-        .upload-instructions {
-            color: var(--text-main);
-            margin: 1rem 0;
-        }
-        
-        .file-requirements {
-            font-size: 0.9em;
-            color: var(--gray-777);
-            margin-top: 0.5rem;
-        }
-    </style>
 </head>
 <body>
     <div th:replace="~{navigation :: mainNav}"></div>
     
     <div class="container">
         <div class="upload-container">
-            <h2>Navigation Logo Upload</h2>
+            <h1>Navigation Logo Upload</h1>
             <p>Upload a custom logo image for the navigation bar. This image will appear in the top-left corner of all pages.</p>
             
             <!-- Success/Error Messages -->
@@ -140,10 +22,10 @@
                 <h3>Current Navigation Logo</h3>
                 <img src="/config/image-upload/preview" alt="Current Navigation Logo" class="preview-image">
                 <br>
-                <form th:action="@{/config/image-upload/delete}" method="post" style="display: inline;">
-                    <button type="submit" class="delete-button" 
-                            onclick="return confirm('Are you sure you want to delete the current logo?')">
-                        🗑️ Delete Current Logo
+                <form th:action="@{/config/image-upload/delete}" method="post" style="display:inline;">
+                    <button type="button" class="btn-danger"
+                            onclick="document.getElementById('logoDeleteModal').style.display='flex'">
+                        Delete Current Logo
                     </button>
                 </form>
             </div>
@@ -154,7 +36,7 @@
                     <div class="upload-instructions">
                         <h3>📁 Upload New Logo</h3>
                         <p>Click to select an image file or drag and drop it here</p>
-                        <button type="button" class="upload-button" onclick="document.getElementById('imageFile').click()">
+                        <button type="button" class="btn-action" onclick="document.getElementById('imageFile').click()">
                             Choose Image File
                         </button>
                         <input type="file" id="imageFile" name="imageFile" class="file-input" 
@@ -169,11 +51,11 @@
                     </div>
                 </div>
                 
-                <div id="fileInfo" style="display: none; margin: 1rem 0; text-align: center;">
+                <div id="fileInfo" class="d-none my-1rem text-center">
                     <p><strong>Selected file:</strong> <span id="fileName"></span></p>
                     <p><strong>File size:</strong> <span id="fileSize"></span></p>
-                    <button type="submit" class="upload-button">
-                        🚀 Upload Logo
+                    <button type="submit" class="btn-submit">
+                        Upload Logo
                     </button>
                 </div>
             </form>
@@ -250,5 +132,20 @@
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
     </script>
+
+    <!-- Logo Delete Confirmation Modal -->
+    <div id="logoDeleteModal" class="modal-bg" style="display:none;">
+        <div class="modal-popup-confirmation">
+            <h3>Delete Logo?</h3>
+            <p>Are you sure you want to delete the current navigation logo?</p>
+            <div class="modal-btn-row">
+                <button type="button" class="btn-cancel" onclick="document.getElementById('logoDeleteModal').style.display='none'">Cancel</button>
+                <form th:action="@{/config/image-upload/delete}" method="post" style="display:inline;">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <button type="submit" class="btn-danger">Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

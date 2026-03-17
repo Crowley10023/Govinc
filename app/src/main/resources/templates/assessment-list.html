@@ -6,94 +6,81 @@
     <meta charset="UTF-8">
     <meta name="_csrf" th:content="${_csrf.token}">
     <meta name="_csrf_header" th:content="${_csrf.headerName}">
-    <title>Assessment List</title>
-    <link rel="stylesheet" href="/general.css">
-    <link rel="stylesheet" href="/style.css">
-</head>
+    <title>Assessment List</title></head>
 
 <body>
     <div th:replace="~{navigation :: mainNav}"></div>
     <div class="container">
+        <h1>Assessments</h1>
          <section>
-            <div class="filters" style="margin-bottom: 1em; display: flex; align-items: center; gap: 1em; flex-wrap: wrap;">
-                <button id="orgUnitFilterBtn" class="btn btn-secondary" type="button" style="display: none;">Org Unit</button>
-                <span id="activeOrgUnitFilter" style="display:none; align-items: center;" class="badge">
+            <div class="filters">
+                <button id="orgUnitFilterBtn" class="btn-secondary d-none" type="button">Org Unit</button>
+                <span id="activeOrgUnitFilter" class="badge d-none align-center">
                     <span id="orgUnitFilterName"></span>
                     <svg id="clearOrgUnitFilter" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16"
-                        height="16" style="margin-left:0.5em;cursor:pointer;">
+                        height="16" class="clear-filter-icon">
                         <circle cx="8" cy="8" r="8" fill="#ccc" />
                         <path d="M5 5l6 6M11 5l-6 6" stroke="#333" stroke-width="2" stroke-linecap="round" />
                     </svg>
                 </span>
-                <div style="display: flex; align-items: center; gap: 0.5em;">
-                    <label for="sortSelect" style="font-weight: 500;">Sort by:</label>
-                    <select id="sortSelect" class="form-control" style="min-width: 150px;">
-                        <option value="date-desc">Date (Newest First)</option>
-                        <option value="date-asc">Date (Oldest First)</option>
-                        <option value="catalog">Security Catalog</option>
-                        <option value="orgunit">Org Unit</option>
-                        <option value="status">Assessment Status</option>
-                    </select>
-                </div>
             </div>
-            <table class="table card">
+            <table class="table card" id="assessmentTable">
                 <thead>
                     <tr>
-                        <th>Name</th>
-                        <th>Date</th>
-                        <th>Status</th>
-                        <th>Catalog</th>
+                        <th class="sortable-th" data-col="0">Name<span class="sort-arrow"></span></th>
+                        <th class="sortable-th" data-col="1">Date<span class="sort-arrow"></span></th>
+                        <th class="sortable-th" data-col="2">Status<span class="sort-arrow"></span></th>
+                        <th class="sortable-th" data-col="3">Catalog<span class="sort-arrow"></span></th>
                         <th>Actions</th>
+                    </tr>
+                    <tr class="filter-row">
+                        <th><input type="text" class="col-filter" data-col="0" placeholder="Filter name…" style="width:100%;box-sizing:border-box;font-weight:normal;font-size:0.82em;padding:0.2em 0.4em;"></th>
+                        <th><input type="text" class="col-filter" data-col="1" placeholder="Filter date…" style="width:100%;box-sizing:border-box;font-weight:normal;font-size:0.82em;padding:0.2em 0.4em;"></th>
+                        <th><input type="text" class="col-filter" data-col="2" placeholder="Filter status…" style="width:100%;box-sizing:border-box;font-weight:normal;font-size:0.82em;padding:0.2em 0.4em;"></th>
+                        <th><input type="text" class="col-filter" data-col="3" placeholder="Filter catalog…" style="width:100%;box-sizing:border-box;font-weight:normal;font-size:0.82em;padding:0.2em 0.4em;"></th>
+                        <th></th>
                     </tr>
                 </thead>
                 <tbody id="assessmentTbody">
                     <tr th:each="assessment : ${assessments}"
                         th:data-orgunitid="${assessment.orgUnit != null ? assessment.orgUnit.id : 0}"
                         th:data-assessment-id="${assessment.id}"
-                        style="cursor: pointer;"
                         class="assessment-row">
                         <td th:text="${assessment.name}"></td>
                         <td th:text="${assessment.creationDate != null ? #temporals.format(assessment.creationDate, 'yyyy-MM-dd') : 'N/A'}" th:attr="data-iso-date=${assessment.creationDate != null ? #temporals.format(assessment.creationDate, 'yyyy-MM-dd') : ''}"></td>
                         <td th:text="${assessment.status}"></td>
                         <td th:text="${assessment.securityCatalog.name}"></td>
                         <td>
-                            <button th:if="${isAdminOrISM}" class="btn btn-danger btn-sm delete-btn" type="button">Delete</button>
+                            <button th:if="${isAdminOrISM}" class="btn-danger btn-sm delete-btn" type="button">Delete</button>
                         </td>
                     </tr>
                 </tbody>
             </table>
             <!-- Delete Confirmation Modal -->
-            <div id="deleteConfirmModal"
-                style="display:none; position: fixed; z-index: 1002; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.25);">
-                <div
-                    style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: #fff; width: 90vw; max-width: 400px; padding: 2em; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); text-align: center;">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="48" height="48" style="margin: 0 auto 1em; color: #dc3545; fill: currentColor;">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
-                    </svg>
-                    <h3 style="margin: 0 0 0.5em 0; color: #333;">Delete Assessment?</h3>
-                    <p style="margin: 0 0 1.5em 0; color: #666; font-size: 0.95em;">This action cannot be undone. Are you sure you want to delete this assessment?</p>
-                    <div style="display: flex; gap: 1em; justify-content: center;">
-                        <button id="deleteConfirmBtn" class="btn btn-danger" type="button">Delete</button>
-                        <button id="deleteCancelBtn" class="btn btn-secondary" type="button">Cancel</button>
+            <div id="deleteConfirmModal" class="modal-bg" style="display:none">
+                <div class="modal-popup-confirmation">
+                    <h3>Delete Assessment?</h3>
+                    <p>This action cannot be undone. Are you sure you want to delete this assessment?</p>
+                    <div class="modal-btn-row">
+                        <button id="deleteCancelBtn" class="btn-cancel" type="button">Cancel</button>
+                        <button id="deleteConfirmBtn" class="btn-danger" type="button">Delete</button>
                     </div>
                 </div>
             </div>
             <!-- Org Unit Selection Modal -->
-            <div id="orgUnitModal"
-                style="display:none; position: fixed; z-index: 1001; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.25);">
-                <div
-                    style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: #fff; width: 70vw; max-width: 600px; height: 70vh; overflow: auto; padding: 1.5em; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.2);">
-                    <h2>Select Org Unit</h2>
-                    <div id="orgUnitList" style="margin-bottom: 2em;"></div>
-                    <button id="orgUnitConfirmBtn" class="btn btn-primary" type="button">Confirm</button>
-                    <button id="orgUnitCancelBtn" class="btn btn-secondary" type="button"
-                        style="margin-left:1em;">Cancel</button>
+            <div id="orgUnitModal" class="modal-bg" style="display:none">
+                <div class="modal-popup" style="max-height:70vh;display:flex;flex-direction:column;width:420px;overflow:hidden;">
+                    <h2 style="flex-shrink:0;margin-bottom:0.5em;">Select Org Unit</h2>
+                    <div id="orgUnitList" style="max-height:25vh;overflow-y:auto;min-height:25vh;margin-bottom:1em;"></div>
+                    <div class="modal-btn-row" style="flex-shrink:0;">
+                        <button id="orgUnitCancelBtn" class="btn-cancel" type="button">Cancel</button>
+                        <button id="orgUnitConfirmBtn" class="btn-action" type="button">Confirm</button>
+                    </div>
                 </div>
             </div>
             <script>
                 let orgUnitsCache = null;
                 let selectedOrgUnit = null;
-                let currentSortOption = 'date-desc';
                 let pendingDeleteId = null;
 
                 // Check for orgUnit parameter on page load and initialize filter button visibility
@@ -122,57 +109,7 @@
 
                     // Setup row click handlers
                     setupAssessmentRowHandlers();
-
-                    // Setup sort dropdown
-                    setupSortDropdown();
                 });
-
-                function setupSortDropdown() {
-                    const sortSelect = document.getElementById('sortSelect');
-                    sortSelect.addEventListener('change', function() {
-                        currentSortOption = this.value;
-                        applySorting();
-                    });
-                }
-
-                function applySorting() {
-                    const tbody = document.getElementById('assessmentTbody');
-                    const rows = Array.from(tbody.querySelectorAll('tr'));
-
-                    function parseRowDate(row) {
-                        const iso = row.children[1].getAttribute('data-iso-date');
-                        if (iso && iso.trim() !== '') {
-                            // Parse ISO date (yyyy-MM-dd)
-                            return new Date(iso);
-                        }
-                        // Fallback to displayed text if available
-                        const txt = row.children[1].textContent.trim();
-                        if (!txt || txt.toLowerCase() === 'n/a') return new Date(0);
-                        return new Date(txt);
-                    }
-
-                    rows.sort((a, b) => {
-                        switch(currentSortOption) {
-                            case 'date-desc':
-                                return parseRowDate(b) - parseRowDate(a);
-                            case 'date-asc':
-                                return parseRowDate(a) - parseRowDate(b);
-                            case 'catalog':
-                                return a.children[3].textContent.localeCompare(b.children[3].textContent);
-                            case 'orgunit':
-                                const ouA = a.getAttribute('data-orgunitid');
-                                const ouB = b.getAttribute('data-orgunitid');
-                                return parseInt(ouA) - parseInt(ouB);
-                            case 'status':
-                                return a.children[2].textContent.localeCompare(b.children[2].textContent);
-                            default:
-                                return 0;
-                        }
-                    });
-
-                    // Re-append sorted rows
-                    rows.forEach(row => tbody.appendChild(row));
-                }
 
                 function setupAssessmentRowHandlers() {
                     const assessmentRows = document.querySelectorAll('.assessment-row');
@@ -202,7 +139,7 @@
 
                 function showDeleteConfirmation(assessmentId) {
                     pendingDeleteId = assessmentId;
-                    document.getElementById('deleteConfirmModal').style.display = 'block';
+                    document.getElementById('deleteConfirmModal').style.display = 'flex';
                 }
 
                 document.getElementById('deleteConfirmBtn').addEventListener('click', function () {
@@ -241,7 +178,7 @@
                 });
 
                 document.getElementById('orgUnitFilterBtn').addEventListener('click', function () {
-                    document.getElementById('orgUnitModal').style.display = 'block';
+                    document.getElementById('orgUnitModal').style.display = 'flex';
                     if (!orgUnitsCache) {
                         fetch('/assessmentdetails/orgunits')
                             .then(res => res.json())
@@ -260,19 +197,23 @@
                     let listDiv = document.getElementById('orgUnitList');
                     listDiv.innerHTML = '';
                     if (!units || units.length === 0) {
-                        listDiv.innerHTML = '<div>No org units available.</div>';
+                        listDiv.innerHTML = '<div style="text-align:left;padding:0.5em;">No org units available.</div>';
                         return;
                     }
                     let selectedId = selectedOrgUnit ? selectedOrgUnit.id : null;
                     units.forEach(ou => {
                         let label = document.createElement('label');
-                        label.style.display = 'block';
-                        label.style.marginBottom = '0.5em';
+                        label.style.display = 'flex';
+                        label.style.alignItems = 'center';
+                        label.style.gap = '0.5em';
+                        label.style.padding = '0.3em 0.5em';
+                        label.style.cursor = 'pointer';
+                        label.style.textAlign = 'left';
+                        label.style.borderRadius = '4px';
                         let radio = document.createElement('input');
                         radio.type = 'radio';
                         radio.name = 'orgUnitChoice';
                         radio.value = ou.id;
-                        radio.style.marginRight = '0.5em';
                         if (selectedId && ou.id === selectedId) radio.checked = true;
                         label.appendChild(radio);
                         label.appendChild(document.createTextNode(ou.name));
@@ -299,32 +240,42 @@
                     applyOrgUnitFilter();
                 };
                 function applyOrgUnitFilter() {
+                    applyAllFilters();
+                }
+
+                function applyAllFilters() {
                     // Wait for DOM to be ready if called early
                     const tbody = document.getElementById('assessmentTbody');
                     if (!tbody) {
-                        setTimeout(applyOrgUnitFilter, 100);
+                        setTimeout(applyAllFilters, 100);
                         return;
                     }
-                    
+
+                    // Collect column filter values
+                    const colFilters = Array.from(document.querySelectorAll('#assessmentTable .col-filter'))
+                        .map(inp => ({ col: parseInt(inp.getAttribute('data-col')), val: inp.value.trim().toLowerCase() }));
+
                     let rows = tbody.querySelectorAll('tr');
-                    let filterActive = !!selectedOrgUnit;
                     rows.forEach(row => {
-                        if (filterActive) {
+                        // Org unit filter
+                        let ouMatch = true;
+                        if (selectedOrgUnit) {
                             let ouid = row.getAttribute('data-orgunitid');
-                            if (parseInt(ouid, 10) === selectedOrgUnit.id) {
-                                row.style.display = '';
-                            } else {
-                                row.style.display = 'none';
-                            }
-                        } else {
-                            row.style.display = '';
+                            ouMatch = parseInt(ouid, 10) === selectedOrgUnit.id;
                         }
+                        // Column filters
+                        let colMatch = colFilters.every(f => {
+                            if (!f.val) return true;
+                            let cell = row.children[f.col];
+                            return cell && cell.textContent.trim().toLowerCase().includes(f.val);
+                        });
+                        row.style.display = (ouMatch && colMatch) ? '' : 'none';
                     });
 
                     // Show/hide filter badge
                     let badge = document.getElementById('activeOrgUnitFilter');
                     let nameSpan = document.getElementById('orgUnitFilterName');
-                    if (filterActive) {
+                    if (selectedOrgUnit) {
                         badge.style.display = 'inline-flex';
                         nameSpan.textContent = selectedOrgUnit.name;
                     } else {
@@ -345,6 +296,49 @@
                         document.getElementById('deleteConfirmModal').style.display = 'none';
                     }
                 });
+
+                // Column filter inputs
+                document.querySelectorAll('#assessmentTable .col-filter').forEach(inp => {
+                    inp.addEventListener('input', applyAllFilters);
+                    // Prevent row click when clicking filter inputs
+                    inp.addEventListener('click', e => e.stopPropagation());
+                });
+
+                // Sortable column headers
+                (function() {
+                    var sortState = { col: -1, dir: 0 };
+                    var ths = document.querySelectorAll('#assessmentTable thead .sortable-th');
+                    ths.forEach(function(th) {
+                        th.addEventListener('click', function() {
+                            var col = parseInt(this.getAttribute('data-col'));
+                            if (sortState.col === col) {
+                                sortState.dir = sortState.dir === 1 ? -1 : (sortState.dir === -1 ? 0 : 1);
+                            } else {
+                                sortState.col = col;
+                                sortState.dir = 1;
+                            }
+                            ths.forEach(function(h) { h.classList.remove('sort-asc','sort-desc'); });
+                            if (sortState.dir === 1) this.classList.add('sort-asc');
+                            else if (sortState.dir === -1) this.classList.add('sort-desc');
+                            if (sortState.dir !== 0) {
+                                var tbody = document.getElementById('assessmentTbody');
+                                var rows = Array.from(tbody.querySelectorAll('tr'));
+                                var dir = sortState.dir;
+                                rows.sort(function(a, b) {
+                                    var av = a.children[col].textContent.trim().toLowerCase();
+                                    var bv = b.children[col].textContent.trim().toLowerCase();
+                                    if (col === 1) { // date column
+                                        var ad = a.children[col].getAttribute('data-iso-date') || av;
+                                        var bd = b.children[col].getAttribute('data-iso-date') || bv;
+                                        return ad.localeCompare(bd) * dir;
+                                    }
+                                    return av.localeCompare(bv) * dir;
+                                });
+                                rows.forEach(function(r) { tbody.appendChild(r); });
+                            }
+                        });
+                    });
+                })();
             </script>
         </section>
     </div>

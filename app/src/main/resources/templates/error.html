@@ -3,9 +3,7 @@
 <head>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>Error</title>
-    <meta charset="UTF-8">
-    <link rel="stylesheet" href="/style.css">
-</head>
+    <meta charset="UTF-8"></head>
 <body>
 <div th:replace="~{navigation :: mainNav}"></div>
 <div class="container">
@@ -15,7 +13,7 @@
         <h2>Error Details</h2>
         <pre th:text="${details}"></pre>
     </div>
-    <a href="/">Back to Landing Page</a>
+    <a href="/" class="back-link">Back to Landing Page</a>
 </div>
 </body>
 </html>

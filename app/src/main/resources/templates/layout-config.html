@@ -1,158 +1,341 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
-    <title>Layout & Theme Configuration</title>
+    <title>Layout &amp; Theme Configuration</title>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <link rel="stylesheet" href="/style.css">
+    <meta name="_csrf" th:content="${_csrf.token}" />
+    <meta name="_csrf_header" th:content="${_csrf.headerName}" />
 </head>
 <body>
     <div th:replace="~{navigation :: mainNav}"></div>
     <div class="container">
-        <h2>Layout & Theme Configuration</h2>
-        <p>Configure the color scheme, fonts, and visual styling for your application. For logo upload, use the <a href="/config/image-upload" style="color: var(--primary-blue); text-decoration: underline;">Logo Upload</a> page.</p>
-        
+        <h2>Layout &amp; Theme Configuration</h2>
+        <p>Configure the color scheme, fonts, and visual styling. For logo upload, use the <a href="/config/image-upload" class="link-primary-underline">Logo Upload</a> page.</p>
+
         <form id="layoutConfigForm" th:action="@{/config/layout}" method="post" th:object="${layoutConfig}">
             <input type="hidden" th:field="*{id}" />
-            
-            <h3>Primary Colors</h3>
-            <label for="primaryColor">Primary color:</label><br>
-            <input type="color" th:field="*{primaryColor}" id="primaryColor"><br>
-
-            <label for="primaryColorDark">Primary color (dark):</label><br>
-            <input type="color" th:field="*{primaryColorDark}" id="primaryColorDark"><br>
-
-            <label for="accentColor">Accent color:</label><br>
-            <input type="color" th:field="*{accentColor}" id="accentColor"><br>
-
-            <label for="backgroundColor">Background color:</label><br>
-            <input type="color" th:field="*{backgroundColor}" id="backgroundColor"><br>
-
-            <label for="borderColor">Border color:</label><br>
-            <input type="color" th:field="*{borderColor}" id="borderColor"><br>
-
-            <label for="navViolet">Nav/Violet color:</label><br>
-            <input type="color" th:field="*{navViolet}" id="navViolet"><br>
-
-            <label for="textMain">Main Text color:</label><br>
-            <input type="color" th:field="*{textMain}" id="textMain"><br>
-
-            <label for="secondaryColor">Secondary color:</label><br>
-            <input type="color" th:field="*{secondaryColor}" id="secondaryColor"><br><br>
-
-            <h3>Typography</h3>
-            <label for="fontFamily">Font Family (CSS, optional):</label><br>
-            <input type="text" th:field="*{fontFamily}" id="fontFamily" placeholder="Segoe UI, Arial, sans-serif"><br>
-
-            <label for="fontSizeNav">Navigation Font Size (CSS):</label><br>
-            <input type="text" th:field="*{fontSizeNav}" id="fontSizeNav" placeholder="1em"><br>
-
-            <label for="fontSizeHeadline">Headline Font Size (CSS):</label><br>
-            <input type="text" th:field="*{fontSizeHeadline}" id="fontSizeHeadline" placeholder="1.5em"><br><br>
-
-            <!-- Organisation and Tool name color/font config -->
-            <fieldset style="margin-top:14px; margin-bottom:16px; border:1px solid var(--border); padding:0.8em 1.2em; border-radius:7px;">
-                <legend style="font-size:1em;color:var(--primary-blue-dark);font-weight:bold;">Organisation/Tool Name Styles (Nav)</legend>
-                <div>
-                    <label for="orgNameColor">Organisation Name Color:</label>
-                    <input type="color" th:field="*{orgNameColor}" id="orgNameColor">
-                    &nbsp;&nbsp;&nbsp;
-                    <label for="orgNameFontSize">Font Size:</label>
-                    <input type="text" th:field="*{orgNameFontSize}" id="orgNameFontSize" placeholder="e.g. 1.18em">
-                </div>
-                <div style="margin-top:6px;">
-                    <label for="toolNameColor">Tool Name Color:</label>
-                    <input type="color" th:field="*{toolNameColor}" id="toolNameColor">
-                    &nbsp;&nbsp;&nbsp;
-                    <label for="toolNameFontSize">Font Size:</label>
-                    <input type="text" th:field="*{toolNameFontSize}" id="toolNameFontSize" placeholder="e.g. 1em">
-                </div>
-            </fieldset>
-
-            <h3>Visual Effects</h3>
-            <label for="shineGlare">Shine Glare (RGBA):</label>
-            <input type="text" th:field="*{shineGlare}" id="shineGlare" placeholder="rgba(255,255,255,0.60)"><br>
-
-            <label for="shineHighlight">Shine Highlight (RGBA):</label>
-            <input type="text" th:field="*{shineHighlight}" id="shineHighlight" placeholder="rgba(255,255,255,0.33)"><br><br>
-
-            <h3>Status & Alert Colors</h3>
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-            <label for="successGreen">Success Green:</label><br>
-            <input type="color" th:field="*{successGreen}" id="successGreen"><br>
-            <label for="errorRed">Error Red:</label><br>
-            <input type="color" th:field="*{errorRed}" id="errorRed"><br>
-            
-            <label for="alertBg1">Alert BG 1:</label><br>
-            <input type="color" th:field="*{alertBg1}" id="alertBg1"><br>
-            <label for="alertBg2">Alert BG 2:</label><br>
-            <input type="color" th:field="*{alertBg2}" id="alertBg2"><br>
-            <label for="alertColor">Alert Text Color:</label><br>
-            <input type="color" th:field="*{alertColor}" id="alertColor"><br><br>
 
-            <h3>Modal & Dialog Colors</h3>
-            <label for="modalBeige1">Modal Beige 1:</label><br>
-            <input type="color" th:field="*{modalBeige1}" id="modalBeige1"><br>
-            <label for="modalBeige2">Modal Beige 2:</label><br>
-            <input type="color" th:field="*{modalBeige2}" id="modalBeige2"><br>
-            <label for="modalBeige3">Modal Beige 3:</label><br>
-            <input type="color" th:field="*{modalBeige3}" id="modalBeige3"><br>
-            <label for="modalBeige4">Modal Beige 4:</label><br>
-            <input type="color" th:field="*{modalBeige4}" id="modalBeige4"><br><br>
+            <!-- Primary Colors -->
+            <div class="entity-edit-frame entity-edit-frame-wide" style="margin-bottom:1.5em;">
+                <h3 style="margin-top:0">Primary Colors</h3>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1em;">
+                    <div class="form-group">
+                        <label for="primaryColor">Primary Color</label>
+                        <input type="color" th:field="*{primaryColor}" id="primaryColor">
+                    </div>
+                    <div class="form-group">
+                        <label for="primaryColorDark">Primary Color (dark)</label>
+                        <input type="color" th:field="*{primaryColorDark}" id="primaryColorDark">
+                    </div>
+                    <div class="form-group">
+                        <label for="accentColor">Accent Color</label>
+                        <input type="color" th:field="*{accentColor}" id="accentColor">
+                    </div>
+                    <div class="form-group">
+                        <label for="backgroundColor">Background Color</label>
+                        <input type="color" th:field="*{backgroundColor}" id="backgroundColor">
+                    </div>
+                    <div class="form-group">
+                        <label for="borderColor">Border Color</label>
+                        <input type="color" th:field="*{borderColor}" id="borderColor">
+                    </div>
+                    <div class="form-group">
+                        <label for="navViolet">Nav / Violet Color</label>
+                        <input type="color" th:field="*{navViolet}" id="navViolet">
+                    </div>
+                    <div class="form-group">
+                        <label for="textMain">Main Text Color</label>
+                        <input type="color" th:field="*{textMain}" id="textMain">
+                    </div>
+                    <div class="form-group">
+                        <label for="secondaryColor">Secondary Color</label>
+                        <input type="color" th:field="*{secondaryColor}" id="secondaryColor">
+                    </div>
+                </div>
+            </div>
 
-            <h3>Table & Data Colors</h3>
-            <label for="tableBg1">Table BG 1:</label><br>
-            <input type="color" th:field="*{tableBg1}" id="tableBg1"><br>
-            <label for="tableBg2">Table BG 2:</label><br>
-            <input type="color" th:field="*{tableBg2}" id="tableBg2"><br>
-            <label for="tableBg3">Table BG 3:</label><br>
-            <input type="color" th:field="*{tableBg3}" id="tableBg3"><br>
-            <label for="tableBg4">Table BG 4:</label><br>
-            <input type="color" th:field="*{tableBg4}" id="tableBg4"><br>
-            <label for="tableBg5">Table BG 5:</label><br>
-            <input type="color" th:field="*{tableBg5}" id="tableBg5"><br>
-            <label for="tableHover1">Table Hover 1:</label><br>
-            <input type="color" th:field="*{tableHover1}" id="tableHover1"><br>
-            <label for="tableHover2">Table Hover 2:</label><br>
-            <input type="color" th:field="*{tableHover2}" id="tableHover2"><br><br>
+            <!-- Typography -->
+            <div class="entity-edit-frame entity-edit-frame-wide" style="margin-bottom:1.5em;">
+                <h3 style="margin-top:0">Typography</h3>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1em;">
+                    <div class="form-group">
+                        <label for="fontFamily">Font Family (CSS)</label>
+                        <input type="text" th:field="*{fontFamily}" id="fontFamily" placeholder="Segoe UI, Arial, sans-serif">
+                    </div>
+                    <div class="form-group">
+                        <label for="fontSizeNav">Nav Font Size</label>
+                        <input type="text" th:field="*{fontSizeNav}" id="fontSizeNav" placeholder="1em">
+                    </div>
+                    <div class="form-group">
+                        <label for="fontSizeHeadline">Headline Font Size</label>
+                        <input type="text" th:field="*{fontSizeHeadline}" id="fontSizeHeadline" placeholder="1.5em">
+                    </div>
+                    <div class="form-group">
+                        <label for="fontSizeBody">Body Font Size</label>
+                        <input type="text" th:field="*{fontSizeBody}" id="fontSizeBody" placeholder="0.95em">
+                    </div>
+                    <div class="form-group">
+                        <label for="fontSizeBtn">Button Font Size</label>
+                        <input type="text" th:field="*{fontSizeBtn}" id="fontSizeBtn" placeholder="0.85em">
+                    </div>
+                    <div class="form-group">
+                        <label for="spacingBase">Base Spacing Unit</label>
+                        <input type="text" th:field="*{spacingBase}" id="spacingBase" placeholder="1rem">
+                    </div>
+                </div>
 
-            <h3>Navigation & UI Colors</h3>
-            <label for="secondaryNavBg">Secondary Nav BG:</label><br>
-            <input type="color" th:field="*{secondaryNavBg}" id="secondaryNavBg"><br>
-            <label for="secondaryNavBorder">Secondary Nav Border:</label><br>
-            <input type="color" th:field="*{secondaryNavBorder}" id="secondaryNavBorder"><br>
-            <label for="mainNavBorder">Main Nav Border:</label><br>
-            <input type="color" th:field="*{mainNavBorder}" id="mainNavBorder"><br>
-            <label for="logoBorder">Logo Border:</label><br>
-            <input type="color" th:field="*{logoBorder}" id="logoBorder"><br>
-            <label for="dropdownBgHover">Dropdown BG Hover:</label><br>
-            <input type="color" th:field="*{dropdownBgHover}" id="dropdownBgHover"><br>
-            <label for="dropdownHoverBlue">Dropdown Hover Blue:</label><br>
-            <input type="color" th:field="*{dropdownHoverBlue}" id="dropdownHoverBlue"><br><br>
+                <fieldset class="config-fieldset" style="margin-top:1em;">
+                    <legend class="text-primary-dark-bold">Organisation / Tool Name Styles (Nav)</legend>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1em;margin-top:0.5em;">
+                        <div class="form-group">
+                            <label for="orgNameColor">Org Name Color</label>
+                            <input type="color" th:field="*{orgNameColor}" id="orgNameColor">
+                        </div>
+                        <div class="form-group">
+                            <label for="orgNameFontSize">Org Name Font Size</label>
+                            <input type="text" th:field="*{orgNameFontSize}" id="orgNameFontSize" placeholder="1.18em">
+                        </div>
+                        <div class="form-group">
+                            <label for="toolNameColor">Tool Name Color</label>
+                            <input type="color" th:field="*{toolNameColor}" id="toolNameColor">
+                        </div>
+                        <div class="form-group">
+                            <label for="toolNameFontSize">Tool Name Font Size</label>
+                            <input type="text" th:field="*{toolNameFontSize}" id="toolNameFontSize" placeholder="1em">
+                        </div>
+                    </div>
+                </fieldset>
+            </div>
 
-            <h3>Utility Colors</h3>
-            <label for="labelGold">Label Gold:</label><br>
-            <input type="color" th:field="*{labelGold}" id="labelGold"><br>
-            <label for="gray777">Gray 777:</label><br>
-            <input type="color" th:field="*{gray777}" id="gray777"><br>
-            <label for="gray888">Gray 888:</label><br>
-            <input type="color" th:field="*{gray888}" id="gray888"><br>
-            <label for="headerGradHighlight">Header Highlight:</label><br>
-            <input type="color" th:field="*{headerGradHighlight}" id="headerGradHighlight"><br>
-            <label for="yellowHighlight">Yellow Highlight:</label><br>
-            <input type="color" th:field="*{yellowHighlight}" id="yellowHighlight"><br>
-            <label for="takenOverBg">Taken Over BG:</label><br>
-            <input type="color" th:field="*{takenOverBg}" id="takenOverBg"><br>
-            <label for="faintBlue1">Faint Blue 1:</label><br>
-            <input type="color" th:field="*{faintBlue1}" id="faintBlue1"><br><br>
+            <!-- Visual Effects -->
+            <div class="entity-edit-frame entity-edit-frame-wide" style="margin-bottom:1.5em;">
+                <h3 style="margin-top:0">Visual Effects</h3>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1em;">
+                    <div class="form-group">
+                        <label for="shineGlare">Shine Glare (RGBA)</label>
+                        <input type="text" th:field="*{shineGlare}" id="shineGlare" placeholder="rgba(255,255,255,0.60)">
+                    </div>
+                    <div class="form-group">
+                        <label for="shineHighlight">Shine Highlight (RGBA)</label>
+                        <input type="text" th:field="*{shineHighlight}" id="shineHighlight" placeholder="rgba(255,255,255,0.33)">
+                    </div>
+                </div>
+            </div>
 
-            <button type="submit" style="background: var(--primary-blue); color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer;">Save Theme Configuration</button>
-            <span th:if="${saved}" style="color: var(--success-green); font-weight: bold; margin-left: 1rem;">✔ Saved!</span>
+            <!-- Status & Alert Colors -->
+            <div class="entity-edit-frame entity-edit-frame-wide" style="margin-bottom:1.5em;">
+                <h3 style="margin-top:0">Status &amp; Alert Colors</h3>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1em;">
+                    <div class="form-group">
+                        <label for="successGreen">Success Green</label>
+                        <input type="color" th:field="*{successGreen}" id="successGreen">
+                    </div>
+                    <div class="form-group">
+                        <label for="errorRed">Error Red</label>
+                        <input type="color" th:field="*{errorRed}" id="errorRed">
+                    </div>
+                    <div class="form-group">
+                        <label for="alertBg1">Alert BG 1</label>
+                        <input type="color" th:field="*{alertBg1}" id="alertBg1">
+                    </div>
+                    <div class="form-group">
+                        <label for="alertBg2">Alert BG 2</label>
+                        <input type="color" th:field="*{alertBg2}" id="alertBg2">
+                    </div>
+                    <div class="form-group">
+                        <label for="alertColor">Alert Text Color</label>
+                        <input type="color" th:field="*{alertColor}" id="alertColor">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal & Dialog Colors -->
+            <div class="entity-edit-frame entity-edit-frame-wide" style="margin-bottom:1.5em;">
+                <h3 style="margin-top:0">Modal &amp; Dialog Colors</h3>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1em;">
+                    <div class="form-group">
+                        <label for="modalBeige1">Modal Beige 1</label>
+                        <input type="color" th:field="*{modalBeige1}" id="modalBeige1">
+                    </div>
+                    <div class="form-group">
+                        <label for="modalBeige2">Modal Beige 2</label>
+                        <input type="color" th:field="*{modalBeige2}" id="modalBeige2">
+                    </div>
+                    <div class="form-group">
+                        <label for="modalBeige3">Modal Beige 3</label>
+                        <input type="color" th:field="*{modalBeige3}" id="modalBeige3">
+                    </div>
+                    <div class="form-group">
+                        <label for="modalBeige4">Modal Beige 4</label>
+                        <input type="color" th:field="*{modalBeige4}" id="modalBeige4">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table & Data Colors -->
+            <div class="entity-edit-frame entity-edit-frame-wide" style="margin-bottom:1.5em;">
+                <h3 style="margin-top:0">Table &amp; Data Colors</h3>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1em;">
+                    <div class="form-group">
+                        <label for="tableBg1">Table BG 1</label>
+                        <input type="color" th:field="*{tableBg1}" id="tableBg1">
+                    </div>
+                    <div class="form-group">
+                        <label for="tableBg2">Table BG 2</label>
+                        <input type="color" th:field="*{tableBg2}" id="tableBg2">
+                    </div>
+                    <div class="form-group">
+                        <label for="tableBg3">Table BG 3</label>
+                        <input type="color" th:field="*{tableBg3}" id="tableBg3">
+                    </div>
+                    <div class="form-group">
+                        <label for="tableBg4">Table BG 4</label>
+                        <input type="color" th:field="*{tableBg4}" id="tableBg4">
+                    </div>
+                    <div class="form-group">
+                        <label for="tableBg5">Table BG 5</label>
+                        <input type="color" th:field="*{tableBg5}" id="tableBg5">
+                    </div>
+                    <div class="form-group">
+                        <label for="tableHover1">Table Hover 1</label>
+                        <input type="color" th:field="*{tableHover1}" id="tableHover1">
+                    </div>
+                    <div class="form-group">
+                        <label for="tableHover2">Table Hover 2</label>
+                        <input type="color" th:field="*{tableHover2}" id="tableHover2">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navigation & Utility Colors -->
+            <div class="entity-edit-frame entity-edit-frame-wide" style="margin-bottom:1.5em;">
+                <h3 style="margin-top:0">Navigation &amp; Utility Colors</h3>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1em;">
+                    <div class="form-group">
+                        <label for="dropdownBgHover">Dropdown BG Hover</label>
+                        <input type="color" th:field="*{dropdownBgHover}" id="dropdownBgHover">
+                    </div>
+                    <div class="form-group">
+                        <label for="labelGold">Label Gold</label>
+                        <input type="color" th:field="*{labelGold}" id="labelGold">
+                    </div>
+                    <div class="form-group">
+                        <label for="gray777">Gray 777</label>
+                        <input type="color" th:field="*{gray777}" id="gray777">
+                    </div>
+                    <div class="form-group">
+                        <label for="gray888">Gray 888</label>
+                        <input type="color" th:field="*{gray888}" id="gray888">
+                    </div>
+                    <div class="form-group">
+                        <label for="headerGradHighlight">Header Highlight</label>
+                        <input type="color" th:field="*{headerGradHighlight}" id="headerGradHighlight">
+                    </div>
+                    <div class="form-group">
+                        <label for="yellowHighlight">Yellow Highlight</label>
+                        <input type="color" th:field="*{yellowHighlight}" id="yellowHighlight">
+                    </div>
+                    <div class="form-group">
+                        <label for="takenOverBg">Taken Over BG</label>
+                        <input type="color" th:field="*{takenOverBg}" id="takenOverBg">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn-submit">Save Theme Configuration</button>
+                <span th:if="${saved}" class="text-success text-bold ml-1rem">&#10004; Saved!</span>
+            </div>
         </form>
-        
-        <div style="margin-top: 2rem; padding: 1rem; background: var(--modal-beige1); border-radius: 8px; border-left: 4px solid var(--primary-blue);">
-            <h4>🎨 AI Theme Suggestions</h4>
-            <p>Want AI to suggest colors based on your logo? Use the <strong>Suggest</strong> button on the <a href="/config/image-upload" style="color: var(--primary-blue);">Logo Upload</a> page after uploading an image.</p>
+
+        <div class="info-panel-theme">
+            <h4>&#127912; Propose Layout by AI</h4>
+            <p class="text-sm" style="color:#555;margin-top:0">AI will suggest a matching color theme. If a logo is already uploaded it will be used automatically; you can also upload a different image to base the suggestion on.</p>
+            <div id="ai-theme-upload-area" style="margin-top:0.8em;display:flex;align-items:center;gap:0.8em;flex-wrap:wrap;">
+                <label for="ai-theme-image-input" class="btn-action" style="cursor:pointer;display:inline-block;">&#128196; Use Different Image (optional)</label>
+                <input type="file" id="ai-theme-image-input" accept="image/*" style="display:none">
+                <span id="ai-theme-file-name" style="font-size:0.9em;color:#555;"></span>
+            </div>
+            <div style="margin-top:0.8em;">
+                <button type="button" id="ai-theme-propose-btn" class="btn-action">&#10024; Propose Theme</button>
+            </div>
+            <div id="ai-theme-status" style="margin-top:0.8em;font-size:0.9em;"></div>
         </div>
     </div>
+
+    <script>
+        (function() {
+            var fileInput = document.getElementById('ai-theme-image-input');
+            var fileNameSpan = document.getElementById('ai-theme-file-name');
+            var proposeBtn = document.getElementById('ai-theme-propose-btn');
+            var statusDiv = document.getElementById('ai-theme-status');
+
+            fileInput.addEventListener('change', function() {
+                fileNameSpan.textContent = (fileInput.files && fileInput.files[0]) ? fileInput.files[0].name : '';
+                statusDiv.textContent = '';
+            });
+
+            proposeBtn.addEventListener('click', function() {
+                var csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+                var csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+
+                proposeBtn.disabled = true;
+                statusDiv.innerHTML = '<span style="color:#555;">&#9889; Analyzing and generating theme\u2026 this may take a moment.</span>';
+
+                // If the user picked a new file, use it directly
+                if (fileInput.files && fileInput.files[0]) {
+                    var formData = new FormData();
+                    formData.append('imageFile', fileInput.files[0]);
+                    postTheme('/config/openai/suggest-theme', csrfHeader, csrfToken, formData);
+                    return;
+                }
+
+                // Try to use the existing uploaded logo
+                fetch('/config/image-upload/preview')
+                    .then(function(resp) {
+                        if (resp.ok) {
+                            return resp.blob().then(function(blob) {
+                                var formData = new FormData();
+                                formData.append('imageFile', blob, 'logo.png');
+                                postTheme('/config/openai/suggest-theme', csrfHeader, csrfToken, formData);
+                            });
+                        }
+                        // No image available — use text-only suggestion
+                        postTheme('/config/openai/suggest-theme-noimage', csrfHeader, csrfToken, null);
+                    })
+                    .catch(function() {
+                        postTheme('/config/openai/suggest-theme-noimage', csrfHeader, csrfToken, null);
+                    });
+            });
+
+            function postTheme(url, csrfHeader, csrfToken, body) {
+                var opts = {
+                    method: 'POST',
+                    headers: { [csrfHeader]: csrfToken }
+                };
+                if (body) opts.body = body;
+
+                fetch(url, opts)
+                    .then(function(resp) {
+                        proposeBtn.disabled = false;
+                        if (resp.ok) return resp.json();
+                        return resp.json().then(function(e) { throw new Error(e.error || 'Unknown error'); });
+                    })
+                    .then(function(data) {
+                        if (data.error) {
+                            statusDiv.innerHTML = '<span style="color:#c22;">&#10007; Error: ' + data.error + '</span>';
+                        } else {
+                            statusDiv.innerHTML = '<span style="color:#22a060;">&#10003; Theme applied! </span>' +
+                                '<a href="/config/layout" class="text-primary-link" style="margin-left:0.5em;">Reload page to see changes</a>';
+                        }
+                    })
+                    .catch(function(err) {
+                        proposeBtn.disabled = false;
+                        statusDiv.innerHTML = '<span style="color:#c22;">&#10007; Error: ' + err.message + '</span>';
+                    });
+            }
+        })();
+    </script>
 </body>
 </html>

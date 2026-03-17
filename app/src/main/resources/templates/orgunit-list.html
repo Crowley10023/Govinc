@@ -3,97 +3,12 @@
 <head>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>Org Unit List</title>
-    <link rel="stylesheet" href="/style.css">
-    <link rel="stylesheet" href="/general.css">
-    <style>
-        .orgunit-table {
-            width: 100%;
-            border-collapse: collapse;
-            background-color: #fff;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            border-radius: 8px;
-            overflow: hidden;
-        }
-        
-        .orgunit-table thead {
-            background-color: #f8f9fa;
-            border-bottom: 2px solid #dee2e6;
-        }
-        
-        .orgunit-table th {
-            padding: 16px;
-            text-align: left;
-            font-weight: 600;
-            color: #495057;
-            font-size: 14px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .orgunit-table tbody tr {
-            border-bottom: 1px solid #dee2e6;
-            transition: background-color 0.2s ease;
-        }
-        
-        .orgunit-table tbody tr:hover {
-            background-color: #f8f9fa;
-        }
-        
-        .orgunit-table td {
-            padding: 16px;
-            color: #212529;
-            font-size: 14px;
-        }
-        
-        .orgunit-table td:first-child {
-            font-weight: 600;
-            color: #0066cc;
-        }
-        
-        .table-actions {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        
-        .btn-table-action {
-            padding: 8px 12px;
-            border: none;
-            border-radius: 4px;
-            font-size: 13px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            text-decoration: none;
-            display: inline-block;
-            text-align: center;
-        }
-        
-        .btn-table-edit {
-            background-color: #0066cc;
-            color: white;
-        }
-        
-        .btn-table-edit:hover {
-            background-color: #0052a3;
-        }
-        
-        .btn-table-tree {
-            background-color: #6c757d;
-            color: white;
-        }
-        
-        .btn-table-tree:hover {
-            background-color: #5a6268;
-        }
-    </style>
 </head>
 <body>
 <div th:replace="~{navigation :: mainNav}"></div>
 <div class="container">
-    <div class="orgservice-header">
-        <h1>Organization Units</h1>
-        <a th:href="@{'/orgunits/create'}" class="btn-create-primary">Create New Org Unit</a>
-    </div>
+    <h1>Organization Units</h1>
+    <a th:href="@{'/orgunits/create'}" class="btn-action">Create New Org Unit</a>
     
     <div th:if="${#lists.isEmpty(orgUnits)}" class="empty-state">
         <p>No organization units found.</p>
@@ -101,7 +16,7 @@
     </div>
     
     <div th:if="${not #lists.isEmpty(orgUnits)}">
-        <table class="orgunit-table">
+        <table class="table card">
             <thead>
                 <tr>
                     <th>Name</th>
@@ -116,10 +31,8 @@
                     <td th:text="${orgUnit.id}"></td>
                     <td th:text="${orgUnit.leader != null ? orgUnit.leader.name : '—'}"></td>
                     <td>
-                        <div class="table-actions">
-                            <a th:href="@{'/orgunits/edit/' + ${orgUnit.id}}" class="btn-table-action btn-table-edit">Edit</a>
-                            <a th:href="@{'/orgunits/tree-view/' + ${orgUnit.id}}" class="btn-table-action btn-table-tree">Tree View</a>
-                        </div>
+                        <a th:href="@{'/orgunits/edit/' + ${orgUnit.id}}" class="btn-edit">Edit</a>
+                        <a th:href="@{'/orgunits/tree-view/' + ${orgUnit.id}}" class="btn-action">Tree View</a>
                     </td>
                 </tr>
             </tbody>

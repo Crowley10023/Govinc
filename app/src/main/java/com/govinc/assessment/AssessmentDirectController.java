@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.Comparator;
 import java.util.Objects;
 import java.time.LocalDate;
+import java.util.stream.Collectors;
 
 import com.govinc.maturity.MaturityAnswer;
 import com.govinc.maturity.MaturityAnswerRepository;
@@ -126,8 +127,12 @@ public class AssessmentDirectController {
             out.put("controlAnswers", controlAnswers);
             out.put("controlComments", controlComments);
 
-            // answerSummary (as in old model)
-            Object summary = detailsService.computeAnswerSummary(details);
+            // answerSummary filtered to maturity answers of this assessment's catalog model
+            Set<Long> catalogMaturityAnswerIds = maturityAnswers.stream()
+                .map(MaturityAnswer::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+            Object summary = detailsService.computeAnswerSummary(details, catalogMaturityAnswerIds);
             out.put("answerSummary", summary);
 
             // Assessment is open only if status is OPEN

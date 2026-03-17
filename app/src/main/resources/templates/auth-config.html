@@ -2,231 +2,11 @@
 <html xmlns:th="http://www.thymeleaf.org">
 
 <head>
-    <title>Authentication Configuration - Govinc</title>
-    <link rel="stylesheet" type="text/css" href="/style.css">
-    <link rel="stylesheet" href="/general.css">
-    <th:block th:replace="~{fragments/theme-css :: themeCss}" />
+    <title>Authentication Configuration - Govinc</title>    <th:block th:replace="~{fragments/theme-css :: themeCss}" />
     <!-- CSRF Token Meta Tags -->
     <meta th:name="${_csrf.headerName}" th:content="${_csrf.token}">
     <meta name="_csrf" th:content="${_csrf.token}">
     <meta name="_csrf_header" th:content="${_csrf.headerName}">
-    <style>
-        .auth-config-container {
-            max-width: 1000px;
-            margin: 20px auto;
-            padding: 20px;
-        }
-
-        .provider-card {
-            background: #fff;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            margin-bottom: 20px;
-            padding: 20px;
-        }
-
-        .provider-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-
-        .provider-title {
-            font-size: 1.2em;
-            font-weight: bold;
-        }
-
-        .status-indicator {
-            padding: 4px 12px;
-            border-radius: 4px;
-            font-size: 0.9em;
-            font-weight: bold;
-        }
-
-        .status-healthy {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .status-unhealthy {
-            background: #f8d7da;
-            color: #721c24;
-        }
-
-        .status-unconfigured {
-            background: #fff3cd;
-            color: #856404;
-        }
-
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-
-        .form-group input[type=text],
-        .form-group input[type=password] {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            box-sizing: border-box;
-        }
-
-        .btn {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.9em;
-            margin-right: 10px;
-        }
-
-        .btn-primary {
-            background: #007bff;
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: #0056b3;
-        }
-
-        .btn-secondary {
-            background: #6c757d;
-            color: white;
-        }
-
-        .btn-secondary:hover {
-            background: #545b62;
-        }
-
-        .btn-danger {
-            background: #dc3545;
-            color: white;
-        }
-
-        .btn-danger:hover {
-            background: #c82333;
-        }
-
-        .alert {
-            padding: 12px;
-            border-radius: 4px;
-            margin-bottom: 20px;
-        }
-
-        .alert-success {
-            background: #d4edda;
-            border: 1px solid #c3e6cb;
-            color: #155724;
-        }
-
-        .alert-danger {
-            background: #f8d7da;
-            border: 1px solid #f5c6cb;
-            color: #721c24;
-        }
-
-        .alert-warning {
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            color: #856404;
-        }
-
-        .alert-info {
-            background: #d1ecf1;
-            border: 1px solid #bee5eb;
-            color: #0c5460;
-        }
-
-        .hidden {
-            display: none;
-        }
-
-        .provider-form {
-            border-top: 1px solid #eee;
-            padding-top: 15px;
-            margin-top: 15px;
-        }
-
-        .health-details {
-            background: #f8f9fa;
-            border-radius: 4px;
-            padding: 12px;
-            margin-top: 10px;
-            font-size: 0.9em;
-        }
-
-        .health-details h4 {
-            margin: 0 0 8px 0;
-            font-size: 1em;
-        }
-
-        .health-error {
-            background: #ffe6e6;
-            border: 1px solid #ffcccc;
-        }
-
-        .health-success {
-            background: #e6ffe6;
-            border: 1px solid #ccffcc;
-        }
-
-        .expandable {
-            cursor: pointer;
-        }
-
-        .expandable:hover {
-            background: #f0f0f0;
-        }
-
-        .form-row {
-            display: flex;
-            gap: 15px;
-        }
-
-        .form-row .form-group {
-            flex: 1;
-        }
-
-        .redirect-uri-section {
-            border-top: 1px solid #eee;
-            padding-top: 15px;
-            margin-top: 15px;
-        }
-
-        .health-check-btn {
-            background: #28a745;
-            color: white;
-        }
-
-        .health-check-btn:hover {
-            background: #218838;
-        }
-
-        .health-check-btn:disabled {
-            background: #6c757d;
-            cursor: not-allowed;
-        }
-
-        .status-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-top: 10px;
-        }
-
-        .auto-refresh-indicator {
-            font-size: 0.8em;
-            color: #6c757d;
-            margin-top: 10px;
-        }
-    </style>
 </head>
 
 <body>
@@ -243,14 +23,14 @@
                 <div class="provider-header">
                     <div class="provider-title">Authentication Status Overview</div>
                     <div>
-                        <button class="btn btn-secondary" onclick="refreshStatus()">Refresh Status</button>
-                        <button class="btn health-check-btn" onclick="performHealthCheck()">Test All Connections</button>
+                        <button class="btn-cancel" onclick="refreshStatus()">Refresh Status</button>
+                        <button class="btn-action health-check-btn" onclick="performHealthCheck()">Test All Connections</button>
                     </div>
                 </div>
                 <div id="status-overview">
                     <p>Loading status...</p>
                 </div>
-                <div class="alert alert-info" style="margin-top: 15px; font-size: 0.9em;">
+                <div class="alert alert-info mt-15 text-sm">
                     <strong>Note:</strong> Changes to authentication providers may require an application restart for full integration. 
                     Form authentication is always available as a fallback option.
                 </div>
@@ -287,10 +67,10 @@
                             <input type="text" id="keycloak-redirect-uri" name="redirectUri"
                                 placeholder="http://your-app-server:8080/login/oauth2/code/keycloak">
                         </div>
-                        <button type="submit" class="btn btn-primary">Configure Keycloak</button>
-                        <button type="button" class="btn btn-secondary health-check-btn"
+                        <button type="submit" class="btn-submit">Configure Keycloak</button>
+                        <button type="button" class="btn-cancel health-check-btn"
                             onclick="performProviderHealthCheck('keycloak')">Test Connection</button>
-                        <button type="button" class="btn btn-danger"
+                        <button type="button" class="btn-danger"
                             onclick="removeProvider('keycloak')">Remove</button>
                     </form>
                 </div>
@@ -323,10 +103,10 @@
                             <input type="text" id="azure-redirect-uri" name="redirectUri"
                                 placeholder="{baseUrl}/login/oauth2/code/{registrationId}">
                         </div>
-                        <button type="submit" class="btn btn-primary">Configure Azure</button>
-                        <button type="button" class="btn btn-secondary health-check-btn"
+                        <button type="submit" class="btn-submit">Configure Azure</button>
+                        <button type="button" class="btn-cancel health-check-btn"
                             onclick="performProviderHealthCheck('azure')">Test Connection</button>
-                        <button type="button" class="btn btn-danger" onclick="removeProvider('azure')">Remove</button>
+                        <button type="button" class="btn-danger" onclick="removeProvider('azure')">Remove</button>
                     </form>
                 </div>
             </div>
@@ -448,7 +228,7 @@
             }
             
             overview.innerHTML = `
-                <div class="alert alert-${statusClass}" style="margin-bottom: 15px;">
+                <div class="alert alert-${statusClass} mb-15">
                     <strong>System Status:</strong> ${statusMessage}
                 </div>
                 <div class="status-grid">

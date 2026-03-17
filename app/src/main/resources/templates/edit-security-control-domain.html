@@ -3,9 +3,7 @@
 <head>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>Edit Security Control Domain</title>
-    <meta charset="UTF-8">
-    <link rel="stylesheet" href="/style.css">
-</head>
+    <meta charset="UTF-8"></head>
 <body>
 <div th:replace="~{navigation :: mainNav}"></div>
 <div class="container">
@@ -13,16 +11,18 @@
     <div class="entity-edit-frame">
         <form th:action="@{/security-control-domain/edit}" th:object="${domain}" method="post">
             <input type="hidden" th:field="*{id}" />
-            <div>
-                <label for="name">Name:</label>
+            <div class="form-group">
+                <label for="name">Name</label>
                 <input type="text" th:field="*{name}" id="name" required />
             </div>
-            <div>
-                <label for="description">Description:</label>
+            <div class="form-group">
+                <label for="description">Description</label>
                 <textarea th:field="*{description}" id="description"></textarea>
             </div>
-            <button type="submit">Save</button>
-            <a th:href="@{/security-control-domain/list}" class="button">Cancel</a>
+            <div class="form-actions">
+                <button type="submit" class="btn-submit">Save</button>
+                <a th:href="@{/security-control-domain/list}" class="btn-cancel">Cancel</a>
+            </div>
         </form>
     </div>
 </div>

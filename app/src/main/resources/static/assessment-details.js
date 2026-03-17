@@ -190,21 +190,29 @@ function updateControlAfterRemoveOverride(controlId, assessmentId) {
 $(document).ready(function () {
     // Org Unit modal logic
     $('#choose-orgunit-btn').click(function () {
-        const $select = $('#orgunit-select');
-        $select.prop('disabled', true);
-        $select.html('<option>Loading...</option>');
         var currentOrgUnitId = window.currentOrgUnitId || '';
+        var $list = $('#orgunit-list');
+        var $hidden = $('#orgunit-hidden');
+        var $search = $('#orgunit-search');
+        $list.html('<div style="padding:0.5em;">Loading\u2026</div>');
+        $hidden.val(currentOrgUnitId || '');
         $.getJSON('/assessmentdetails/orgunits', function (units) {
-            $select.empty();
-            $select.append($('<option>').val('').text('-- Please choose an organization unit --'));
+            $list.empty();
             units.forEach(function (unit) {
-                let $opt = $('<option>').val(unit.id).text(unit.name);
-                if (currentOrgUnitId && String(unit.id) === String(currentOrgUnitId)) {
-                    $opt.prop('selected', true);
-                }
-                $select.append($opt);
+                var isSelected = currentOrgUnitId && String(unit.id) === String(currentOrgUnitId);
+                var $label = $('<label>').css({display:'flex', alignItems:'center', gap:'0.5em', padding:'0.3em 0.5em', cursor:'pointer', borderRadius:'4px'});
+                var $radio = $('<input>').attr({type:'radio', name:'orgUnitChoice', value: unit.id}).css('cursor','pointer');
+                if (isSelected) { $radio.prop('checked', true); }
+                $radio.on('change', function () { $hidden.val(this.value); });
+                $label.append($radio).append($('<span>').text(unit.name));
+                $list.append($label);
             });
-            $select.prop('disabled', false);
+            $search.val('').off('input').on('input', function () {
+                var val = $(this).val().trim().toLowerCase();
+                $list.children('label').each(function () {
+                    $(this).toggle($(this).find('span').text().toLowerCase().indexOf(val) !== -1);
+                });
+            });
         });
         $('#orgunit-modal-bg').css('display', 'flex');
     });
@@ -537,9 +545,10 @@ $(document).ready(function () {
     // Word Report Progress Handler with real-time polling
     $('#word-report-btn').click(function (e) {
         e.preventDefault();
+        var href = $(this).attr('href');
         showWordReportProgress();
         setTimeout(function () {
-            $('#word-report-form').submit();
+            window.location.href = href;
         }, 100);
     });
 });
@@ -566,6 +575,9 @@ function openAnsweringGuideModal(controlId, controlName, controlDetail, security
     $('#answering-guide-generating').hide();
     $('#answering-guide-loading').show();
     $('#answering-guide-modal-bg').css('display', 'flex');
+
+    // Populate right panel with maturity answers
+    populateGuideMaturityAnswers(controlId);
 
     // Fetch questions from backend
     $.ajax({
@@ -602,28 +614,35 @@ function displayAnsweringGuideQuestions(questions) {
     var html = '<div class="questions-container">';
     questions.forEach(function(q, index) {
         html += '<div class="question-item">';
-        html += '<label class="question-label">' + (index + 1) + '. ' + $('<span/>').text(q).html() + '</label>';
+        html += '<div class="question-label">' + (index + 1) + '. ' + $('<span/>').text(q).html() + '</div>';
         html += '<div class="question-answer-options">';
-        html += '<label class="option-label"><input type="radio" name="question_' + index + '" value="Yes" class="question-answer-input" data-question-index="' + index + '"> Yes</label>';
-        html += '<label class="option-label"><input type="radio" name="question_' + index + '" value="No" class="question-answer-input" data-question-index="' + index + '"> No</label>';
+        html += '<button type="button" class="question-pill" data-question-index="' + index + '" data-value="Yes">Yes</button>';
+        html += '<button type="button" class="question-pill" data-question-index="' + index + '" data-value="No">No</button>';
         html += '</div>';
         html += '</div>';
     });
     html += '<button type="button" class="guide-submit-answers-btn" onclick="submitAnsweringGuideAnswers()">Submit Answers</button>';
     html += '</div>';
-    $('#answering-guide-questions').html(html).css('display', 'flex');
+    var $container = $('#answering-guide-questions');
+    $container.html(html).css('display', 'flex');
+    // Pill toggle handler
+    $container.find('.question-pill').on('click', function() {
+        var idx = $(this).data('question-index');
+        $container.find('.question-pill[data-question-index="' + idx + '"]').removeClass('question-pill-selected');
+        $(this).addClass('question-pill-selected');
+    });
 }
 
 function submitAnsweringGuideAnswers() {
     var answers = [];
     var allAnswered = true;
     for (var i = 0; i < currentAnsweringGuideState.questions.length; i++) {
-        var selectedValue = $('input[name="question_' + i + '"]:checked').val();
-        if (!selectedValue) {
+        var $selected = $('#answering-guide-questions .question-pill[data-question-index="' + i + '"].question-pill-selected');
+        if ($selected.length === 0) {
             allAnswered = false;
             break;
         }
-        answers.push(selectedValue);
+        answers.push($selected.data('value'));
     }
     
     if (!allAnswered) {
@@ -682,6 +701,7 @@ function submitAnsweringGuideAnswers() {
                 $('#guide-proposed-answer-text').text(response.proposedAnswer);
                 $('#answering-guide-questions').hide();
                 $('#answering-guide-proposed-answer').show();
+                highlightSuggestedAnswer(response.proposedAnswer);
             } else {
                 alert('Error generating answer. Please try again.');
                 $('#answering-guide-generating').hide();
@@ -718,8 +738,7 @@ function takeoverProposedAnswer() {
         }).first();
 
         if (matchedOption.length > 0) {
-            selectElement.val(matchedOption.val()).change();
-            closeAnsweringGuideModal();
+            applyAnswerFromGuide(matchedOption.val(), proposedAnswer);
         } else {
             alert('Proposed answer does not match available options. Please select manually.');
         }
@@ -729,13 +748,17 @@ function takeoverProposedAnswer() {
 }
 
 function discardProposedAnswer() {
-    // Reset the modal to show questions again for reuse
+    // Reset highlighted suggestion
+    $('.maturity-answer-card').removeClass('maturity-answer-suggested');
+
+    // Go back to questions so user can try again
     $('#answering-guide-questions').show();
     $('#answering-guide-proposed-answer').hide();
     $('#answering-guide-generating').hide();
-    
+
     // Reset answer selections
     $('input[type="radio"][name^="question_"]').prop('checked', false);
+    currentAnsweringGuideState.proposedAnswer = null;
 }
 
 function closeAnsweringGuideModal() {
@@ -746,6 +769,7 @@ function closeAnsweringGuideModal() {
     $('#answering-guide-questions').empty();
     $('#answering-guide-proposed-answer').hide();
     $('#answering-guide-generating').hide();
+    $('#guide-maturity-answers-list').empty();
     
     currentAnsweringGuideState = {
         controlId: null,
@@ -754,6 +778,80 @@ function closeAnsweringGuideModal() {
         answers: {},
         proposedAnswer: null
     };
+}
+
+// Populate the right panel with maturity answers from the control's dropdown
+function populateGuideMaturityAnswers(controlId) {
+    var $selectElement = $('select[data-control-id="' + controlId + '"]');
+    var $list = $('#guide-maturity-answers-list');
+    $list.empty();
+
+    if ($selectElement.length === 0) {
+        $list.html('<p style="color:#888;font-size:0.9em;">No maturity answers available.</p>');
+        return;
+    }
+
+    var items = [];
+    $selectElement.find('option').each(function() {
+        var val = $(this).val();
+        var text = $(this).text().trim();
+        var desc = $(this).attr('data-description') || '';
+        if (!val || text === '-- select an answer --') return;
+        items.push({ id: val, text: text, desc: desc });
+    });
+
+    if (items.length === 0) {
+        $list.html('<p style="color:#888;font-size:0.9em;">No maturity answers found.</p>');
+        return;
+    }
+
+    items.forEach(function(item) {
+        var $card = $('<div class="maturity-answer-card"></div>')
+            .attr('data-answer-id', item.id)
+            .attr('data-answer-text', item.text);
+        var $name = $('<div class="maturity-answer-name"></div>').text(item.text);
+        $card.append($name);
+        if (item.desc) {
+            var $desc = $('<div class="maturity-answer-desc"></div>').text(item.desc);
+            $card.append($desc);
+        }
+        $card.on('click', function() {
+            applyAnswerFromGuide(item.id, item.text);
+        });
+        $list.append($card);
+    });
+}
+
+// Highlight the card matching the suggested answer on the right panel
+function highlightSuggestedAnswer(proposedAnswerText) {
+    $('.maturity-answer-card').removeClass('maturity-answer-suggested');
+    var $matched = null;
+    $('.maturity-answer-card').each(function() {
+        var cardText = $(this).attr('data-answer-text') || '';
+        if (cardText.trim() === proposedAnswerText.trim()) {
+            $(this).addClass('maturity-answer-suggested');
+            $matched = $(this);
+        }
+    });
+    // Scroll matched card into view
+    if ($matched) {
+        var $list = $('#guide-maturity-answers-list');
+        var itemTop = $matched.position() ? $matched.position().top : 0;
+        $list.scrollTop($list.scrollTop() + itemTop - 30);
+    }
+}
+
+// Apply a maturity answer from the right panel or proposed answer section
+function applyAnswerFromGuide(answerId, answerText) {
+    var controlId = currentAnsweringGuideState.controlId;
+    if (!controlId) return;
+    var $select = $('select[data-control-id="' + controlId + '"]');
+    if ($select.length > 0) {
+        $select.val(answerId).change();
+        closeAnsweringGuideModal();
+    } else {
+        alert('Could not find answer dropdown for this control.');
+    }
 }
 
 function closeOrgUnitModal() {

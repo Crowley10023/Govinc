@@ -3,16 +3,13 @@
 
 <head>
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
-  <title th:text="${orgService.id != null} ? 'Edit Org Service' : 'Create Org Service'">Edit Org Service</title>
-  <link rel="stylesheet" href="/style.css">
-  <link rel="stylesheet" href="/general.css">
-</head>
+  <title th:text="${orgService.id != null} ? 'Edit Org Service' : 'Create Org Service'">Edit Org Service</title></head>
 
 <body>
   <div th:replace="~{navigation :: mainNav}"></div>
   <div class="main-scroll-container">
     <div class="container">
-      <div class="entity-edit-frame" style="margin-top: 2em; margin-bottom: 3em;">
+      <div class="entity-edit-frame mt-2em mb-3em">
         
         <!-- Header Section -->
         <div class="orgservice-header">
@@ -85,11 +82,11 @@
 
           <!-- Action Buttons -->
           <div class="form-actions">
-            <button type="submit" class="btn-create-primary">
+            <button type="submit" class="btn-submit">
               <span th:text="${orgService.id != null} ? 'Update Service' : 'Create Service'"></span>
             </button>
-            <a th:href="@{'/orgservices/list'}" class="btn-secondary">
-              Back to Services
+            <a th:href="@{'/orgservices/list'}" class="btn-cancel">
+              Cancel
             </a>
           </div>
 
@@ -98,208 +95,6 @@
       </div>
     </div>
   </div>
-
-  <style>
-    /* ========== EDIT FORM STYLES ========== */
-    
-    .form-card {
-      background: #fff;
-      border-radius: 12px;
-      box-shadow: 0 2px 12px rgba(34, 116, 165, 0.1);
-      padding: 2.5em;
-      border: 1px solid rgba(34, 116, 165, 0.08);
-    }
-
-    .form-fields-container {
-      display: flex;
-      flex-direction: column;
-      gap: 2em;
-      margin-bottom: 2.5em;
-    }
-
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 0.6em;
-    }
-
-    .form-label {
-      display: flex;
-      align-items: center;
-      gap: 0.3em;
-      font-weight: 600;
-      color: var(--primary-blue);
-      font-size: 0.95em;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .label-text {
-      color: var(--primary-blue);
-    }
-
-    .label-required {
-      color: #cc2222;
-      font-weight: 700;
-    }
-
-    .form-input,
-    .form-textarea,
-    .form-select {
-      padding: 0.85em 1em;
-      border: 2px solid rgba(34, 116, 165, 0.15);
-      border-radius: 8px;
-      font-size: 1em;
-      font-family: inherit;
-      transition: all 0.2s ease;
-      box-sizing: border-box;
-    }
-
-    .form-input:focus,
-    .form-textarea:focus,
-    .form-select:focus {
-      outline: none;
-      border-color: var(--primary-blue);
-      box-shadow: 0 0 0 3px rgba(34, 116, 165, 0.1);
-      background: #fff;
-    }
-
-    .form-input::placeholder,
-    .form-textarea::placeholder {
-      color: #999;
-    }
-
-    .form-textarea {
-      resize: vertical;
-      min-height: 140px;
-      line-height: 1.5;
-    }
-
-    .select-wrapper {
-      position: relative;
-    }
-
-    .form-select {
-      width: 100%;
-      padding: 0.75em 1em;
-      background-color: #fff;
-      cursor: pointer;
-    }
-
-    .form-select option {
-      padding: 0.5em;
-      background: #fff;
-      color: #333;
-    }
-
-    .form-select option:checked {
-      background: linear-gradient(135deg, var(--primary-blue) 0%, #0056b3 100%);
-      color: #fff;
-    }
-
-    .form-hint {
-      font-size: 0.85em;
-      color: #666;
-      margin: 0;
-      font-style: italic;
-    }
-
-    .form-actions {
-      display: flex;
-      gap: 1em;
-      align-items: center;
-      padding-top: 1.5em;
-      border-top: 1px solid #f0f0f0;
-    }
-
-    .btn-secondary {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0.75em 1.5em;
-      background: #f0f0f0;
-      color: var(--primary-blue);
-      border: 2px solid rgba(34, 116, 165, 0.2);
-      border-radius: 8px;
-      font-size: 0.95em;
-      font-weight: 600;
-      text-decoration: none;
-      cursor: pointer;
-      transition: all 0.3s ease;
-    }
-
-    .btn-secondary:hover {
-      background: #e8e8e8;
-      border-color: var(--primary-blue);
-      transform: translateY(-2px);
-      box-shadow: 0 4px 8px rgba(34, 116, 165, 0.15);
-    }
-
-    /* Page header styling */
-    .orgservice-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 2.5em;
-      padding-bottom: 1.5em;
-      border-bottom: 2px solid rgba(34, 116, 165, 0.1);
-    }
-
-    .orgservice-header h1 {
-      margin: 0;
-      font-size: 2.2em;
-      color: var(--primary-blue);
-      font-weight: 700;
-      letter-spacing: -0.02em;
-    }
-
-    /* Responsive Design */
-    @media (max-width: 768px) {
-      .form-card {
-        padding: 1.5em;
-      }
-
-      .form-fields-container {
-        gap: 1.5em;
-        margin-bottom: 1.5em;
-      }
-
-      .orgservice-header h1 {
-        font-size: 1.8em;
-      }
-
-      .form-actions {
-        flex-direction: column;
-        gap: 0.8em;
-      }
-
-      .btn-create-primary,
-      .btn-secondary {
-        width: 100%;
-      }
-    }
-
-    @media (max-width: 480px) {
-      .form-card {
-        padding: 1.2em;
-        border-radius: 8px;
-      }
-
-      .form-label {
-        font-size: 0.9em;
-      }
-
-      .form-input,
-      .form-textarea,
-      .form-select {
-        font-size: 16px; /* Prevents zoom on iOS */
-      }
-
-      .orgservice-header h1 {
-        font-size: 1.5em;
-      }
-    }
-  </style>
 
 </body>
 

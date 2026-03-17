@@ -1,468 +1,12 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 
 <head>
     <title>Database Configuration</title>
-    <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <link rel="stylesheet" href="/style.css">
-    <!-- CSRF Token Meta Tags -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">    <!-- CSRF Token Meta Tags -->
     <meta th:name="${_csrf.headerName}" th:content="${_csrf.token}">
     <meta name="_csrf" th:content="${_csrf.token}">
     <meta name="_csrf_header" th:content="${_csrf.headerName}">
-    <style>
-        .db-config-container {
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-
-        .section-card {
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 25px;
-            background-color: #f9f9f9;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            transition: all 0.3s ease;
-            margin-bottom: 20px;
-        }
-
-        .section-card h3 {
-            margin-top: 0;
-            color: #333;
-            border-bottom: 3px solid #4364a3;
-            padding-bottom: 10px;
-            margin-bottom: 20px;
-        }
-
-        .db-status-section {
-            border-color: #2196f3;
-            background-color: #e3f2fd;
-        }
-
-        .db-status-section h3 {
-            color: #1565c0;
-            border-bottom-color: #2196f3;
-        }
-
-        .status-info {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-
-        .status-item {
-            background-color: #fff;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            padding: 15px;
-        }
-
-        .status-item label {
-            display: block;
-            font-weight: 600;
-            color: #666;
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 8px;
-        }
-
-        .status-item .value {
-            font-size: 18px;
-            font-weight: 600;
-            color: #333;
-        }
-
-        .migrations-section {
-            border-color: #ff9800;
-            background-color: #fff8f0;
-        }
-
-        .migrations-section h3 {
-            color: #e65100;
-            border-bottom-color: #ff9800;
-        }
-
-        .backup-section {
-            border-color: #4caf50;
-            background-color: #eef8ef;
-        }
-
-        .backup-section h3 {
-            color: #2e7d32;
-            border-bottom-color: #4caf50;
-        }
-
-        .section-header-actions {
-            display: flex;
-            justify-content: space-between;
-            gap: 10px;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-
-        .section-header-actions h3 {
-            margin-bottom: 0;
-            flex: 1;
-        }
-
-        .btn-success {
-            background-color: #4caf50;
-            color: #fff;
-        }
-
-        .btn-success:hover {
-            background-color: #2e7d32;
-        }
-
-        .backup-table {
-            width: 100%;
-            border-collapse: collapse;
-            background: #fff;
-            border-radius: 6px;
-            overflow: hidden;
-        }
-
-        .backup-table th,
-        .backup-table td {
-            padding: 10px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-            font-size: 13px;
-        }
-
-        .backup-table th {
-            background: #f3f3f3;
-            font-size: 12px;
-            color: #555;
-            text-transform: uppercase;
-            letter-spacing: 0.4px;
-        }
-
-        .backup-table td.actions-cell {
-            text-align: right;
-        }
-
-        .migration-item {
-            background-color: #fff;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            padding: 15px;
-            margin-bottom: 15px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .migration-info {
-            flex: 1;
-        }
-
-        .migration-info h4 {
-            margin: 0 0 5px 0;
-            color: #333;
-            font-size: 14px;
-        }
-
-        .migration-info p {
-            margin: 0;
-            color: #666;
-            font-size: 12px;
-        }
-
-        .version-range {
-            display: inline-block;
-            background-color: #f0f0f0;
-            padding: 4px 10px;
-            border-radius: 3px;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            font-weight: 600;
-            margin: 5px 0;
-        }
-
-        .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .btn-primary {
-            background-color: #4364a3;
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background-color: #334d7f;
-        }
-
-        .btn-warning {
-            background-color: #ff9800;
-            color: white;
-        }
-
-        .btn-warning:hover {
-            background-color: #e65100;
-        }
-
-        .btn-disabled {
-            background-color: #ccc;
-            color: #666;
-            cursor: not-allowed;
-            opacity: 0.6;
-        }
-
-        .migration-actions {
-            display: flex;
-            gap: 10px;
-        }
-
-        .alert {
-            padding: 12px 16px;
-            border-radius: 4px;
-            margin-bottom: 20px;
-            border-left: 4px solid;
-        }
-
-        .alert-info {
-            background-color: #e3f2fd;
-            border-color: #2196f3;
-            color: #1565c0;
-        }
-
-        .alert-warning {
-            background-color: #fff8f0;
-            border-color: #ff9800;
-            color: #e65100;
-        }
-
-        .alert-success {
-            background-color: #e8f5e9;
-            border-color: #4caf50;
-            color: #2e7d32;
-        }
-
-        .alert-error {
-            background-color: #ffebee;
-            border-color: #f44336;
-            color: #c62828;
-        }
-
-        .help-text {
-            font-size: 12px;
-            color: #666;
-            margin-top: 4px;
-            font-style: italic;
-        }
-
-        .no-migrations {
-            text-align: center;
-            padding: 30px;
-            color: #999;
-        }
-
-        .no-migrations p {
-            font-size: 14px;
-            margin: 0;
-        }
-
-        #statusMessage {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 20px;
-            border-radius: 4px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            display: none;
-            z-index: 2000;
-            max-width: 400px;
-            border-left: 4px solid;
-            animation: slideInRight 0.3s ease;
-        }
-
-        @keyframes slideInRight {
-            from {
-                transform: translateX(450px);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
-        }
-
-        @keyframes slideOutRight {
-            from {
-                transform: translateX(0);
-                opacity: 1;
-            }
-            to {
-                transform: translateX(450px);
-                opacity: 0;
-            }
-        }
-
-        #statusMessage.show {
-            display: block;
-        }
-
-        #statusMessage.hide {
-            animation: slideOutRight 0.3s ease forwards;
-        }
-
-        #statusMessage.success {
-            background-color: #e8f5e9;
-            border-color: #4caf50;
-            color: #2e7d32;
-        }
-
-        #statusMessage.error {
-            background-color: #ffebee;
-            border-color: #f44336;
-            color: #c62828;
-        }
-
-        #statusMessage.info {
-            background-color: #e3f2fd;
-            border-color: #2196f3;
-            color: #1565c0;
-        }
-
-        #statusMessage .status-icon {
-            margin-right: 10px;
-            font-weight: bold;
-        }
-
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.4);
-            animation: fadeIn 0.3s ease;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        .modal.show {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .modal-content {
-            background-color: #fefefe;
-            border: 2px solid #ff9800;
-            border-radius: 8px;
-            padding: 30px;
-            width: 90%;
-            max-width: 500px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-            animation: slideIn 0.3s ease;
-        }
-
-        @keyframes slideIn {
-            from {
-                transform: translateY(-50px);
-                opacity: 0;
-            }
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #ff9800;
-            padding-bottom: 15px;
-        }
-
-        .modal-header h2 {
-            margin: 0;
-            color: #e65100;
-            font-size: 20px;
-        }
-
-        .modal-close {
-            background: none;
-            border: none;
-            font-size: 28px;
-            cursor: pointer;
-            color: #666;
-            padding: 0;
-            width: 30px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal-close:hover {
-            color: #000;
-        }
-
-        .modal-body {
-            margin-bottom: 20px;
-        }
-
-        .modal-footer {
-            display: flex;
-            gap: 10px;
-            justify-content: flex-end;
-        }
-
-        .modal-footer button {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .modal-footer .btn-primary {
-            background-color: #4364a3;
-            color: white;
-        }
-
-        .modal-footer .btn-primary:hover {
-            background-color: #334d7f;
-        }
-
-        .modal-footer .btn-warning {
-            background-color: #ff9800;
-            color: white;
-        }
-
-        .modal-footer .btn-warning:hover {
-            background-color: #e65100;
-        }
-
-        .modal-footer .btn-secondary {
-            background-color: #ccc;
-            color: #333;
-        }
-
-        .modal-footer .btn-secondary:hover {
-            background-color: #bbb;
-        }
-    </style>
 </head>
 
 <body>
@@ -472,7 +16,7 @@
     <div id="statusMessage"></div>
 
     <div class="container db-config-container">
-        <h2>Database Configuration</h2>
+        <h1>Database Configuration</h1>
 
         <!-- Database Status Section -->
         <div class="section-card db-status-section">
@@ -485,7 +29,7 @@
                 </div>
                 <div class="status-item">
                     <label>Description</label>
-                    <div class="value" style="font-size: 12px; color: #666;" id="description" th:text="${databaseConfig.description}">-</div>
+                    <div class="value text-12-muted" id="description" th:text="${databaseConfig.description}">-</div>
                 </div>
             </div>
 
@@ -518,7 +62,7 @@
 
                     <div class="migration-actions">
                         <button type="button" 
-                                class="btn btn-warning migration-btn"
+                                class="btn-action migration-btn"
                                 th:data-to-version="${migration.toVersion}">
                             Update
                         </button>
@@ -531,7 +75,7 @@
         <div class="section-card backup-section">
             <div class="section-header-actions">
                 <h3>💾 Database Backups</h3>
-                <button type="button" id="createBackupBtn" class="btn btn-success">Create Full Backup</button>
+                <button type="button" id="createBackupBtn" class="btn-submit">Create Full Backup</button>
             </div>
 
             <div class="alert alert-info">
@@ -539,7 +83,7 @@
             </div>
 
             <div id="backupTableWrap">
-                <table class="backup-table">
+                <table class="table card">
                     <thead>
                         <tr>
                             <th>File</th>
@@ -559,7 +103,7 @@
                             <td th:text="${backup.createdAt}"></td>
                             <td th:text="${backup.sizeBytes}"></td>
                             <td class="actions-cell">
-                                <button type="button" class="btn btn-warning restore-btn" th:data-file-name="${backup.fileName}">Restore</button>
+                                <button type="button" class="btn-action restore-btn" th:data-file-name="${backup.fileName}">Restore</button>
                             </td>
                         </tr>
                     </tbody>
@@ -576,14 +120,14 @@
                 <button type="button" class="modal-close" onclick="closeMigrationConfirmModal()">×</button>
             </div>
             <div class="modal-body">
-                <p id="migrationMessage" style="font-size: 14px; margin: 15px 0;"></p>
+                <p id="migrationMessage" class="text-14 my-15"></p>
                 <div class="alert alert-warning">
                     ⚠ <strong>Important:</strong> Please ensure you have a backup of your database before proceeding.
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn-secondary" onclick="closeMigrationConfirmModal()">Cancel</button>
-                <button type="button" class="btn-warning" onclick="confirmAndExecuteMigration()">Proceed with Migration</button>
+                <button type="button" class="btn-cancel" onclick="closeMigrationConfirmModal()">Cancel</button>
+                <button type="button" class="btn-danger" onclick="confirmAndExecuteMigration()">Proceed with Migration</button>
             </div>
         </div>
     </div>
@@ -758,7 +302,7 @@
                         <td>${escapeHtml(createdAt)}</td>
                         <td>${escapeHtml(size)}</td>
                         <td class="actions-cell">
-                            <button type="button" class="btn btn-warning restore-btn" data-file-name="${escapeHtml(fileName)}">Restore</button>
+                            <button type="button" class="btn-action restore-btn" data-file-name="${escapeHtml(fileName)}">Restore</button>
                         </td>
                     </tr>
                 `;

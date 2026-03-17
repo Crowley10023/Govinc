@@ -3,15 +3,13 @@
 <head>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>Maturity Answer List</title>
-    <meta charset="UTF-8">
-    <link rel="stylesheet" href="/style.css">
-</head>
+    <meta charset="UTF-8"></head>
 <body>
     <div th:replace="~{navigation :: mainNav}"></div>
     <div class="container">
         <h1>Maturity Answers</h1>
-        <a href="/maturityanswer/create">Create New Maturity Answer</a>
-        <table border="1">
+        <a href="/maturityanswer/create" class="btn-action">Create New Maturity Answer</a>
+        <table class="table card">
             <thead>
                 <tr>
                     <th>ID</th>
@@ -28,16 +26,39 @@
                     <td th:text="${answerObj.description}"></td>
                     <td th:text="${answerObj.rating}"></td>
                     <td>
-                        <a th:href="@{'/maturityanswer/edit'(id=${answerObj.id})}">Edit</a>
-                        <form th:action="@{/maturityanswer/delete}" method="post" style="display:inline">
-                            <input type="hidden" name="id" th:value="${answerObj.id}" />
-                            <button type="submit" onclick="return confirm('Are you sure?')">Delete</button>
-                        </form>
+                        <a th:href="@{'/maturityanswer/edit'(id=${answerObj.id})}" class="btn-edit">Edit</a>
+                        <button type="button" class="btn-danger"
+                            th:data-id="${answerObj.id}"
+                            onclick="openDeleteModal(this)">Delete</button>
                     </td>
                 </tr>
             </tbody>
         </table>
-        <a href="/">Back to main</a>
     </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="answerDeleteModal" class="modal-bg" style="display:none;">
+        <div class="modal-popup-confirmation">
+            <h3>Delete Maturity Answer?</h3>
+            <p>This action cannot be undone.</p>
+            <div class="modal-btn-row">
+                <button type="button" class="btn-cancel" onclick="closeDeleteModal()">Cancel</button>
+                <form id="answerDeleteForm" action="/maturityanswer/delete" method="post" style="display:inline;">
+                    <input type="hidden" id="answerDeleteId" name="id" />
+                    <button type="submit" class="btn-danger">Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openDeleteModal(btn) {
+            document.getElementById('answerDeleteId').value = btn.getAttribute('data-id');
+            document.getElementById('answerDeleteModal').style.display = 'flex';
+        }
+        function closeDeleteModal() {
+            document.getElementById('answerDeleteModal').style.display = 'none';
+        }
+    </script>
 </body>
 </html>

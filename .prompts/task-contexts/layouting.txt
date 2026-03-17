@@ -1,0 +1,95 @@
+Layout, UI & UX Rules
+=====================
+
+1. FILE STRUCTURE
+   - ONE central stylesheet: /static/style.css — all structural, component & utility classes
+   - Color/font/spacing variables: fragments/theme-css.html (CSS custom properties from DB)
+   - Navigation markup: navigation.html (mainNav + minimalNav fragments)
+   - navigation.html navAssets fragment loads style.css + theme-css — templates must NOT add extra <link> tags
+   - No inline <style> blocks in templates
+   - No inline style="" attributes in templates (use CSS classes)
+   - JS files must not inject inline styles; use classList.add/remove instead (exception: dynamic width/display toggling)
+
+2. CSS VARIABLE PALETTE (defined in theme-css.html :root)
+   a) --text-main               Main font color
+   b) --background-light        Main background color
+   c) --primary-blue            Main accent / brand color
+   d) --accent-orange           Secondary accent color
+   e) --primary-blue-dark       Dark variant of brand color
+   f) --nav-violet              Navigation element background
+   g) --border                  Default border color
+   h) --success-green           Success / positive feedback
+   i) --error-red               Error / negative feedback
+   j) --modal-beige1..4         Popup/modal background tones
+   k) --table-bg1..5            Table gradient stops
+   l) --table-hover1..2         Table row hover
+   m) --yellow-highlight        Highlight / warning accent
+   n) --gray-777, --gray-888    Muted text
+   o) --shine-glare, --shine-highlight  Decorative gloss effects
+   Additional: --secondary-color, --header-grad-highlight, --alert-bg1/2, --alert-color,
+               --taken-over-bg, --dropdown-bg-hover, --secondary-nav-bg/border, --logo-border,
+               --dropdown-hover-blue, --mainnav-border, --faint-blue1,
+               --nav-font-family, --font-size-nav, --font-size-headline,
+               --org-name-color, --org-name-font-size, --tool-name-color, --tool-name-font-size
+
+3. STANDARD TEMPLATE STRUCTURE
+   <!DOCTYPE html>
+   <html xmlns:th="http://www.thymeleaf.org">
+   <head>
+       <link rel="icon" type="image/x-icon" href="/favicon.ico">
+       <title>Page Title</title>
+       <meta charset="UTF-8">
+       <meta name="_csrf" th:content="${_csrf.token}"/>            <!-- if needed -->
+       <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+   </head>
+   <body>
+       <div th:replace="~{navigation :: mainNav}"></div>           <!-- or minimalNav -->
+       <div class="container">
+           <h1 class="page-title">Page Title</h1>
+           <!-- page content -->
+       </div>
+   </body>
+   </html>
+
+4. COMPONENT CLASSES (defined in style.css)
+   Layout:       .container, .page-title, .secondary-nav, .general-button-bar
+   Tables:       .table (auto header gradient, hover, padding)
+   Forms:        .entity-edit-frame, .form-group, .form-row, .form-error
+   Buttons:      .btn-action, btn-submit, btn-edit, btn-cancel, .btn-secondary, .btn-nav, .btn-danger,                 
+   Cards:        .landing-card, .card-header, .card-body, .card-icon
+   Modals:       .modal-bg, .modal-popup (for rather large popups), .modal-popup-confirmation (small, quick user questions)
+   Navigation:   .main-navigation, .nav-row, .nav-entry, .dropdown, .dropdown-content,
+                 .dropdown-button, .dropdown-menu-btn, .meta-chip, .meta-label, .meta-value
+   Assessment:   .control-actions-flex-row, .answering-guide-row, .dropdown-row,
+                 .override-slider-row, .takenOver-row, .testarea-row
+   Filter bar:   .controls-filter-bar, .sticky-filter-bar, .filter-item, .filter-select
+   Progress:     .progress-bar-bg, .progress-bar-fill, .progress-popup
+   Tags:         .tag-pill, .tag-suggestions
+   Utilities:    .d-none, .d-flex, .d-inline, .d-inline-block,
+                 .flex-row, .flex-col, .flex-wrap, .flex-1,
+                 .align-center, .align-start, .justify-center, .justify-between,
+                 .gap-sm, .gap-md, .gap-lg,
+                 .mt-sm, .mt-md, .mt-lg, .mb-sm, .mb-md, .mb-lg, .ml-auto,
+                 .text-center, .text-left, .text-right,
+                 .text-muted, .text-success, .text-danger, .text-bold,
+                 .w-full, .w-auto, .cursor-pointer,
+                 .inline-form, .no-results
+
+5. DESIGN PRINCIPLES
+   - Responsive: desktop-first, mobile basically enabled
+   - Consistent spacing: use gap/padding utility classes, not ad-hoc px values
+   - All colors via CSS variables — never hard-code hex in templates or JS
+   - Gradients for header, nav, buttons, table headers — subtle, not overwhelming
+   - Modals/popups: use .modal-bg + .modal-popup pattern, dismiss via backdrop click + Escape
+   - Tables: always use .table class
+   - standards in theme-css.html: all colors, spacing, font declarations & sizes
+   - Fonts: four types: Navigation, Headline, Buttons/active elements, standards
+   - LayoutConfig allows persisting values for theme-css.html
+   - IMPORTANT: Unified look and feel based on central definitions
+   - NO nested css defintions.
+
+6. Exceptions:
+   - Organisation Chart Diagramm - allowed to have own styles
+   - Assessment-direct: No Navivgation
+
+

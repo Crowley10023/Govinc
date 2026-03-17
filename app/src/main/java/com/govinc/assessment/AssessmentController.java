@@ -548,8 +548,13 @@ public class AssessmentController {
             model.addAttribute("controlAnswerIsOverridden", controlAnswerIsOverridden);
             model.addAttribute("orgServiceControlComments", orgServiceControlComments);
 
-            // Summary table by answer type
-            model.addAttribute("answerSummary", assessmentDetailsService.computeAnswerSummary(details));
+                // Summary table by answer type (catalog-scoped)
+                Set<Long> catalogMaturityAnswerIds = maturityAnswers.stream()
+                    .map(MaturityAnswer::getId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+                model.addAttribute("answerSummary",
+                    assessmentDetailsService.computeAnswerSummary(details, catalogMaturityAnswerIds));
 
             // --- Pass securityControlDomains: all unique domains of controls in this
             // catalog ---
@@ -726,6 +731,26 @@ public class AssessmentController {
             }
         
         return "redirect:/assessment/" + id;
+    }
+
+    // Re-open assessment (POST) - Only ADMIN and INFORMATION_SECURITY_MANAGER can re-open
+    @PostMapping("/{id}/reopen")
+    @ResponseBody
+    public ResponseEntity<Void> reopenAssessment(@PathVariable Long id) {
+        boolean isAdmin = authorizationService.isAdmin();
+        boolean isISM = authorizationService.isInformationSecurityManager();
+        if (!isAdmin && !isISM) {
+            throw new UnauthorizedException("You do not have permission to re-open assessments.");
+        }
+
+        Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
+        if (assessmentOpt.isPresent()) {
+            Assessment assessment = assessmentOpt.get();
+            assessment.setStatus(AssessmentStatus.OPEN);
+            assessment.setCloseDate(null);
+            assessmentRepository.save(assessment);
+        }
+        return ResponseEntity.ok().build();
     }
 
     // Delete assessment (POST)

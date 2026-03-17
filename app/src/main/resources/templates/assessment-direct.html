@@ -5,15 +5,11 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <meta charset="UTF-8">
     <title>Assessment Direct Link</title>
-    <link rel="stylesheet" type="text/css" href="/style.css">
-    <link rel="stylesheet" href="/general.css">
-    <th:block th:replace="~{fragments/theme-css :: themeCss}" />
+    <link rel="stylesheet" type="text/css" href="/style.css">    <th:block th:replace="~{fragments/theme-css :: themeCss}" />
 </head>
 
 <body>
-    var(--font-size-nav)
-    <nav class="main-navigation fancy-shine"
-        style="font-family: var(--nav-font-family); font-size: var(--font-size-nav);">
+    <nav class="main-navigation fancy-shine">
 
         <div class="nav-row">
             <div class="landing-image">
@@ -45,9 +41,8 @@
             </div>
         </div>
 
-        <div style="margin: 3em 0; padding: 0 3em;">
-            <div class="domain-outline card domain-collapsible assessment-details-collapsible"
-                style="margin-bottom: 2.8em;">
+        <div class="assessment-direct-content">
+            <div class="domain-outline card domain-collapsible assessment-details-collapsible assessment-details-card">
                 <div class="domain-header" onclick="toggleAssessmentDetails(this)">
                     <div class="domain-header-info">
                         <span class="domain-title">Assessment Details</span>
@@ -62,7 +57,7 @@
                         </span>
                     </div>
                 </div>
-                <div class="domain-controls assessment-details-body" style="display:none;">
+                <div class="domain-controls assessment-details-body d-none">
                     <div class="domain-controls-tbl">
                         <table class="table card" id="public-assessment-table">
                             <tr>
@@ -114,7 +109,7 @@
 
         <!-- Finalize Button Section (Sticky at Bottom) -->
         <section class="general-button-bar sticky-button-bar" id="finalize-button-sticky">
-            <button id="finalize-btn" type="button" class="btn-nav">Finalize</button>
+            <button id="finalize-btn" type="button" class="btn-action">Finalize</button>
         </section>
 
         <!-- Finalize Confirmation Modal -->
@@ -123,7 +118,7 @@
                 <h3>Finalize Assessment</h3>
                 <div class="modal-content">
                     <p>Are you sure you want to finalize this assessment?</p>
-                    <p style="color: #666; font-size: 0.95em; margin-top: 10px;">
+                    <p class="text-muted text-sm mt-sm">
                         <strong>⚠️ Important:</strong> Once finalized, this assessment will be locked and no further edits will be allowed.
                     </p>
                 </div>
@@ -271,7 +266,7 @@
                 if (!isOpen && finalizeBar) { finalizeBar.style.display = 'none'; }
                 var controlsHtml = '';
                 domains.forEach(function (domain) {
-                    controlsHtml += '<div class="domain-outline card domain-collapsible" style="margin-bottom:2.5em;">' +
+                    controlsHtml += '<div class="domain-outline card domain-collapsible domain-card-spaced">' +
                         '<div class="domain-header" onclick="toggleDomain(this)">' +
                         '<div class="domain-header-info">' +
                         '<span class="domain-title">' + (domain.name != null ? domain.name : 'No Domain') + '</span>' +
@@ -284,8 +279,8 @@
                         '</span>' +
                         '</div>' +
                         '</div>' +
-                        '<div class="domain-controls" style="display:none;"><div class="domain-controls-tbl">';
-                    controlsHtml += '<table class="table card controls-table"><thead><tr><th style="width:350px;">Control</th><th>Answer & Comment</th></tr></thead><tbody>';
+                        '<div class="domain-controls d-none"><div class="domain-controls-tbl">';
+                    controlsHtml += '<table class="table card controls-table"><thead><tr><th class="control-col-wide">Control</th><th>Answer & Comment</th></tr></thead><tbody>';
                     controls.filter(function (ctrl) { return ctrl.domainId === domain.id; }).forEach(function (ctrl) {
                         var ansCell = '';
                         var selectId = 'select-control-' + ctrl.id;
@@ -299,11 +294,11 @@
                         });
                         ansCell += '</select><span class="answer-feedback"></span></div>' +
                             '<div class="testarea-row">' +
-                            '<textarea class="comment-textarea" name="comment_' + ctrl.id + '" data-control-id="' + ctrl.id + '" style="min-width:180px;min-height:36px;resize:vertical;" placeholder="Add comment (optional)"' + disabledAttr + '>' + (comments && comments[ctrl.id] ? comments[ctrl.id] : '') + '</textarea><span class="comment-feedback"></span>' +
+                            '<textarea class="comment-textarea comment-textarea-sized" name="comment_' + ctrl.id + '" data-control-id="' + ctrl.id + '" placeholder="Add comment (optional)"' + disabledAttr + '>' + (comments && comments[ctrl.id] ? comments[ctrl.id] : '') + '</textarea><span class="comment-feedback"></span>' +
                             '</div>' +
                             '</div>';
-                        controlsHtml += '<tr><td class="ctrl-name-col"><div class="ctrl-desc-wrap"><span style="font-weight:bold">' + (ctrl.name != null ? ctrl.name : '-') + '</span>' +
-                            '<div style="display: block;">' + ((ctrl.detail && ctrl.detail !== '') ? ctrl.detail : 'No detail') + '</div></div></td>' +
+                        controlsHtml += '<tr><td class="ctrl-name-col"><div class="ctrl-desc-wrap"><span class="text-bold">' + (ctrl.name != null ? ctrl.name : '-') + '</span>' +
+                            '<div>' + ((ctrl.detail && ctrl.detail !== '') ? ctrl.detail : 'No detail') + '</div></div></td>' +
                             '<td>' + ansCell + '</td></tr>';
                     });
                     controlsHtml += '</tbody></table></div></div></div>';
@@ -357,7 +352,7 @@
                                 })
                                 .then(function() {
                                     textarea.style.background = '#d8ffd8';
-                                    feedback.innerHTML = '<span style="color:#228B22;font-weight:bold;">Saved</span>';
+                                    feedback.innerHTML = '<span class="answer-success text-bold">Saved</span>';
                                     setTimeout(function() {
                                         feedback.innerHTML = '';
                                         textarea.style.background = '';
@@ -365,7 +360,7 @@
                                 })
                                 .catch(function() {
                                     textarea.style.background = '#ffd8d8';
-                                    feedback.innerHTML = '<span style="color:red;font-weight:bold;">Error saving</span>';
+                                    feedback.innerHTML = '<span class="answer-error text-bold">Error saving</span>';
                                 });
                             }, 650);
                         });
@@ -453,231 +448,6 @@
             }
         });
     </script>
-    <style>
-        .answer-feedback {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            vertical-align: middle;
-            margin-left: 5px;
-        }
-
-        .answer-feedback svg {
-            width: 18px;
-            height: 18px;
-        }
-
-        .answer-success {
-            color: #33aa33;
-        }
-
-        .answer-error {
-            color: #cc2222;
-        }
-
-        .ctrl-desc-tooltip-icon {
-            display: inline-block;
-            position: relative;
-            cursor: pointer;
-        }
-
-        .ctrl-desc-tooltip-icon svg {
-            vertical-align: middle;
-        }
-
-        .ctrl-desc-tooltip {
-            display: block !important;
-            background: #fffbe8;
-            color: #333;
-            border: 1px solid #d4cead;
-            border-radius: 5px;
-            padding: 12px 15px;
-            min-width: 240px;
-            max-width: 100%;
-            position: relative;
-            left: 0;
-            top: 0;
-            z-index: 99;
-            box-shadow: 0 0 10px 2px #0001;
-            font-size: 0.95em;
-            line-height: 1.3em;
-            text-align: left;
-            white-space: normal;
-            margin-top: 0.25em;
-        }
-
-        .general-button-bar {
-            margin: 2em 0;
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            padding: 0 3em;
-        }
-
-        .sticky-button-bar {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            width: 100%;
-            z-index: 9997;
-            margin: 0;
-            padding: 1em 1.2em;
-            border-top: 2px solid var(--primary-blue);
-            background: linear-gradient(90deg, #f8fbfd 0%, #f3f9fd 100%);
-            box-shadow: 0 -4px 12px rgba(34, 116, 165, 0.12);
-        }
-
-        .btn-nav {
-            background-color: #0066cc;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 1em;
-            font-weight: 500;
-            transition: background-color 0.2s;
-        }
-
-        .btn-nav:hover {
-            background-color: #0052a3;
-        }
-
-        .btn-primary {
-            background-color: #0066cc;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 1em;
-            font-weight: 500;
-            transition: background-color 0.2s;
-        }
-
-        .btn-primary:hover {
-            background-color: #0052a3;
-        }
-
-        .btn-secondary {
-            background-color: #6c757d;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 1em;
-            font-weight: 500;
-            transition: background-color 0.2s;
-        }
-
-        .btn-secondary:hover {
-            background-color: #5a6268;
-        }
-
-        .modal-bg {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal-popup {
-            background-color: white;
-            border-radius: 8px;
-            padding: 2em;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-            max-width: 500px;
-            width: 90%;
-        }
-
-        .modal-popup h3 {
-            margin-top: 0;
-            color: #333;
-        }
-
-        .modal-content {
-            margin: 20px 0;
-            line-height: 1.6;
-        }
-
-        .modal-btn-row {
-            display: flex;
-            gap: 10px;
-            justify-content: flex-end;
-            margin-top: 20px;
-        }
-
-        .progress-label {
-            margin-right: 10px;
-            font-weight: 500;
-        }
-
-        .progress-info {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .progress-bar-container {
-            width: 200px;
-            height: 20px;
-            background-color: #e9ecef;
-            border-radius: 10px;
-            overflow: hidden;
-            border: 1px solid #dee2e6;
-        }
-
-        .progress-bar-fill {
-            height: 100%;
-            background-color: #28a745;
-            transition: width 0.3s ease;
-        }
-
-        .progress-percentage {
-            min-width: 50px;
-            text-align: right;
-            font-weight: 600;
-            color: #333;
-        }
-
-        .controls-filter-bar {
-            padding: 15px 0;
-            border-bottom: 1px solid #dee2e6;
-            margin-bottom: 0;
-        }
-
-        #progress-bar-sticky {
-            position: fixed;
-            top: 56px;
-            left: 0;
-            right: 0;
-            width: 100%;
-            z-index: 9998;
-            padding: 0.9em 1.2em;
-            border-bottom: 2px solid var(--primary-blue);
-            background: linear-gradient(90deg, #f8fbfd 0%, #f3f9fd 100%);
-            box-shadow: 0 4px 12px rgba(34, 116, 165, 0.12);
-            margin-bottom: 0;
-        }
-
-        .progress-section {
-            display: flex;
-            justify-content: flex-start;
-        }
-
-        .container {
-            margin-top: calc(56px + 80px);
-            margin-bottom: 80px;
-        }
-    </style>
 </body>
 
 </html>

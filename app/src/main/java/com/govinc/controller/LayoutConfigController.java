@@ -161,23 +161,14 @@ public class LayoutConfigController {
         if (layoutConfig.getDropdownBgHover() != null && !layoutConfig.getDropdownBgHover().trim().isEmpty()) {
             persisted.setDropdownBgHover(layoutConfig.getDropdownBgHover());
         }
-        if (layoutConfig.getSecondaryNavBg() != null && !layoutConfig.getSecondaryNavBg().trim().isEmpty()) {
-            persisted.setSecondaryNavBg(layoutConfig.getSecondaryNavBg());
+        if (layoutConfig.getFontSizeBody() != null && !layoutConfig.getFontSizeBody().trim().isEmpty()) {
+            persisted.setFontSizeBody(layoutConfig.getFontSizeBody());
         }
-        if (layoutConfig.getSecondaryNavBorder() != null && !layoutConfig.getSecondaryNavBorder().trim().isEmpty()) {
-            persisted.setSecondaryNavBorder(layoutConfig.getSecondaryNavBorder());
+        if (layoutConfig.getFontSizeBtn() != null && !layoutConfig.getFontSizeBtn().trim().isEmpty()) {
+            persisted.setFontSizeBtn(layoutConfig.getFontSizeBtn());
         }
-        if (layoutConfig.getLogoBorder() != null && !layoutConfig.getLogoBorder().trim().isEmpty()) {
-            persisted.setLogoBorder(layoutConfig.getLogoBorder());
-        }
-        if (layoutConfig.getDropdownHoverBlue() != null && !layoutConfig.getDropdownHoverBlue().trim().isEmpty()) {
-            persisted.setDropdownHoverBlue(layoutConfig.getDropdownHoverBlue());
-        }
-        if (layoutConfig.getMainNavBorder() != null && !layoutConfig.getMainNavBorder().trim().isEmpty()) {
-            persisted.setMainNavBorder(layoutConfig.getMainNavBorder());
-        }
-        if (layoutConfig.getFaintBlue1() != null && !layoutConfig.getFaintBlue1().trim().isEmpty()) {
-            persisted.setFaintBlue1(layoutConfig.getFaintBlue1());
+        if (layoutConfig.getSpacingBase() != null && !layoutConfig.getSpacingBase().trim().isEmpty()) {
+            persisted.setSpacingBase(layoutConfig.getSpacingBase());
         }
 
         try {

@@ -3,179 +3,142 @@
 <head>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>Create Assessment</title>
-    <meta charset="UTF-8">
-    <link rel="stylesheet" href="/style.css">
-</head>
+    <meta charset="UTF-8"></head>
 <body>
     <div th:replace="~{navigation :: mainNav}"></div>
     <div class="container">
-        <div class="orgservice-header">
-            <h1>Create Assessment</h1>
-        </div>
-        
-        <form th:action="@{/assessment/create}" method="post" class="create-assessment-form" id="createAssessmentForm">
-            <div class="card">
-                <div class="card-body">
-                    <!-- Assessment Name -->
-                    <div class="card-section">
-                        <label for="name">Assessment Name</label>
-                        <input type="text" id="name" name="name" required class="form-control-input" placeholder="Enter assessment name">
-                        <span id="nameError" class="form-error" style="color:#b00020;display:none;margin-top:6px;">Please enter an assessment name.</span>
-                    </div>
+        <h1>Create Assessment</h1>
 
-                    <!-- Catalog Selection -->
-                    <div class="card-section">
+        <form th:action="@{/assessment/create}" method="post" id="createAssessmentForm">
+            <div style="max-width:800px;">
+                <!-- Row 1: Name + Catalog side by side -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="name">Assessment Name</label>
+                        <input type="text" id="name" name="name" required placeholder="Enter assessment name">
+                        <span id="nameError" class="form-error d-none">Please enter an assessment name.</span>
+                    </div>
+                    <div class="form-group">
                         <label for="catalog">Security Catalog</label>
-                        <select id="catalog" name="catalogId" required class="form-control-select">
+                        <select id="catalog" name="catalogId" required>
                             <option value="" disabled selected>-- Select a Catalog --</option>
-                            <option th:each="catalog: ${catalogs}" 
-                                    th:value="${catalog.id}" 
+                            <option th:each="catalog: ${catalogs}"
+                                    th:value="${catalog.id}"
                                     th:text="${catalog.name}"></option>
                         </select>
-                        <span id="catalogError" class="form-error" style="color:#b00020;display:none;margin-top:6px;">Please select a catalog.</span>
+                        <span id="catalogError" class="form-error d-none">Please select a catalog.</span>
                     </div>
+                </div>
 
-                    <!-- Org Unit Selection -->
-                    <div class="card-section">
-                        <label for="orgUnit">Organizational Unit</label>
-
-                        <!-- Hidden input to store selected org unit id -->
-                        <input type="hidden" id="orgUnitId" name="orgUnitId" required>
-
-                        <!-- Visible selector: button that opens a modal to search/filter org units -->
-                        <div style="display:flex;align-items:center;gap:8px;">
-                            <button type="button" id="openOrgUnitModal" class="btn-action">Select Org Unit</button>
-                            <span id="selectedOrgUnitName" class="muted">No org unit selected</span>
-                        </div>
-                        <span id="orgUnitError" class="form-error" style="color:#b00020;display:none;margin-top:6px;">Please select an organizational unit.</span>
-
-                        <!-- Modal for choosing org unit -->
-                        <div id="orgUnitModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;" aria-hidden="true">
-                            <div style="background:#fff;max-width:600px;margin:6% auto;padding:16px;border-radius:6px;max-height:70vh;overflow:auto;">
-                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                                    <h3 style="margin:0;">Choose Organizational Unit</h3>
-                                    <button type="button" id="closeOrgUnitModal" class="btn-action">Close</button>
-                                </div>
-
-                                <input type="text" id="orgUnitSearch" placeholder="Filter org units by name..." style="width:100%;padding:8px;margin-bottom:12px;border:1px solid #ccc;border-radius:4px;" />
-
-                                <ul id="orgUnitList" style="list-style:none;padding:0;margin:0;">
-                                    <li th:each="orgUnit : ${orgUnits}" th:attr="data-id=${orgUnit.id}" th:text="${orgUnit.name}" style="padding:8px;border-bottom:1px solid #eee;cursor:pointer;" onclick="selectOrgUnit(this)"></li>
-                                </ul>
-                            </div>
-                        </div>
-
+                <!-- Org Unit Selection -->
+                <div class="form-group">
+                    <label>Organizational Unit</label>
+                    <input type="hidden" id="orgUnitId" name="orgUnitId" required>
+                    <div style="display:flex;gap:1em;align-items:center;">
+                        <button type="button" id="openOrgUnitModal" class="btn-action">Select Org Unit</button>
+                        <span id="selectedOrgUnitName" class="text-muted">No org unit selected</span>
                     </div>
+                    <span id="orgUnitError" class="form-error d-none">Please select an organizational unit.</span>
+                </div>
 
-                    <script>
-                        (function(){
-                            var modal = document.getElementById('orgUnitModal');
-                            var openBtn = document.getElementById('openOrgUnitModal');
-                            var closeBtn = document.getElementById('closeOrgUnitModal');
-                            var searchInput = document.getElementById('orgUnitSearch');
-                            var list = document.getElementById('orgUnitList');
-                            var hiddenInput = document.getElementById('orgUnitId');
-                            var selectedName = document.getElementById('selectedOrgUnitName');
-
-                            if(openBtn){
-                                openBtn.addEventListener('click', function(){
-                                    modal.style.display = 'block';
-                                    modal.setAttribute('aria-hidden','false');
-                                    searchInput.value = '';
-                                    filterList('');
-                                    searchInput.focus();
-                                });
-                            }
-                            if(closeBtn){
-                                closeBtn.addEventListener('click', function(){
-                                    modal.style.display = 'none';
-                                    modal.setAttribute('aria-hidden','true');
-                                });
-                            }
-
-                            // Close modal when clicking outside content
-                            modal.addEventListener('click', function(e){
-                                if(e.target === modal){
-                                    modal.style.display = 'none';
-                                    modal.setAttribute('aria-hidden','true');
-                                }
-                            });
-
-                            // Close on Escape
-                            document.addEventListener('keydown', function(e){
-                                if(e.key === 'Escape' && modal.style.display === 'block'){
-                                    modal.style.display = 'none';
-                                    modal.setAttribute('aria-hidden','true');
-                                }
-                            });
-
-                            // Filter function
-                            function filterList(term){
-                                term = (term || '').toLowerCase();
-                                var items = list.querySelectorAll('li');
-                                items.forEach(function(li){
-                                    var text = li.textContent || li.innerText;
-                                    if(text.toLowerCase().indexOf(term) !== -1){
-                                        li.style.display = '';
-                                    } else {
-                                        li.style.display = 'none';
-                                    }
-                                });
-                            }
-
-                            // Attach input handler
-                            searchInput.addEventListener('input', function(){
-                                filterList(this.value);
-                            });
-
-                            // Expose select function globally for inline onclicks
-                            window.selectOrgUnit = function(el){
-                                var id = el.getAttribute('data-id');
-                                var name = el.textContent || el.innerText;
-                                hiddenInput.value = id;
-                                selectedName.textContent = name;
-                                // close modal
-                                modal.style.display = 'none';
-                                modal.setAttribute('aria-hidden','true');
-                            };
-
-                        })();
-                    </script>
-                    <!-- Org Services Selection -->
-                    <div class="card-section">
+                <!-- Row 2: Org Services + Users side by side -->
+                <div class="form-row">
+                    <div class="form-group">
                         <label for="orgService">Organizational Services</label>
-                        <select name="orgServiceIds" id="orgService" multiple class="form-control-select">
+                        <select name="orgServiceIds" id="orgService" multiple style="min-height:120px;">
                             <option th:each="orgService : ${orgServices}"
                                     th:value="${orgService.id}"
                                     th:text="${orgService.name}"></option>
                         </select>
-                        <p class="form-hint">(Hold Ctrl or Cmd to select multiple services)</p>
+                        <span class="help-text">Hold Ctrl/Cmd to select multiple</span>
                     </div>
-
-                    <!-- Users Selection -->
-                    <div class="card-section">
+                    <div class="form-group">
                         <label for="users">Assign Users</label>
-                        <select name="userIds" id="users" multiple class="form-control-select">
+                        <select name="userIds" id="users" multiple style="min-height:120px;">
                             <option th:each="user : ${users}"
                                     th:value="${user.id}"
                                     th:text="${user.name + ' (' + user.email + ')'}"></option>
                         </select>
-                        <p class="form-hint">(Hold Ctrl or Cmd to select multiple users)</p>
+                        <span class="help-text">Hold Ctrl/Cmd to select multiple</span>
                     </div>
                 </div>
 
-                <div class="card-actions">
-                    <button type="submit" class="btn-action btn-create-primary">Create Assessment</button>
+                <div class="form-actions">
+                    <button type="submit" class="btn-submit">Create Assessment</button>
                 </div>
             </div>
         </form>
+
+        <!-- Org Unit Modal -->
+        <div id="orgUnitModal" class="modal-bg" style="display:none;" aria-hidden="true">
+            <div class="modal-popup" style="max-height:70vh;display:flex;flex-direction:column;width:420px;">
+                <div class="modal-header-row">
+                    <h3 class="m-0">Choose Organizational Unit</h3>
+                    <button type="button" id="closeOrgUnitModal" class="btn-cancel">Close</button>
+                </div>
+                <input type="text" id="orgUnitSearch" placeholder="Filter org units by name..." class="modal-search-input" style="width:100%;margin:0.7em 0;flex-shrink:0;" />
+                <ul id="orgUnitList" class="list-unstyled" style="max-height:25vh;min-height:25vh;overflow-y:auto;margin:0;padding:0;">
+                    <li th:each="orgUnit : ${orgUnits}" th:attr="data-id=${orgUnit.id}" th:text="${orgUnit.name}" class="org-unit-list-item" onclick="selectOrgUnit(this)"></li>
+                </ul>
+            </div>
+        </div>
     </div>
 
     <script>
         (function(){
+            var modal = document.getElementById('orgUnitModal');
+            var openBtn = document.getElementById('openOrgUnitModal');
+            var closeBtn = document.getElementById('closeOrgUnitModal');
+            var searchInput = document.getElementById('orgUnitSearch');
+            var list = document.getElementById('orgUnitList');
+            var hiddenInput = document.getElementById('orgUnitId');
+            var selectedName = document.getElementById('selectedOrgUnitName');
+
+            if(openBtn){
+                openBtn.addEventListener('click', function(){
+                    modal.style.display = 'flex';
+                    modal.setAttribute('aria-hidden','false');
+                    searchInput.value = '';
+                    filterList('');
+                    searchInput.focus();
+                });
+            }
+            if(closeBtn){
+                closeBtn.addEventListener('click', function(){
+                    modal.style.display = 'none';
+                    modal.setAttribute('aria-hidden','true');
+                });
+            }
+            modal.addEventListener('click', function(e){
+                if(e.target === modal){
+                    modal.style.display = 'none';
+                    modal.setAttribute('aria-hidden','true');
+                }
+            });
+            document.addEventListener('keydown', function(e){
+                if(e.key === 'Escape' && modal.style.display === 'flex'){
+                    modal.style.display = 'none';
+                    modal.setAttribute('aria-hidden','true');
+                }
+            });
+            function filterList(term){
+                term = (term || '').toLowerCase();
+                list.querySelectorAll('li').forEach(function(li){
+                    li.style.display = li.textContent.toLowerCase().indexOf(term) !== -1 ? '' : 'none';
+                });
+            }
+            searchInput.addEventListener('input', function(){ filterList(this.value); });
+            window.selectOrgUnit = function(el){
+                hiddenInput.value = el.getAttribute('data-id');
+                selectedName.textContent = el.textContent || el.innerText;
+                modal.style.display = 'none';
+                modal.setAttribute('aria-hidden','true');
+            };
+        })();
+
+        (function(){
             var form = document.getElementById('createAssessmentForm');
             if(!form) return;
-
             var nameInput = document.getElementById('name');
             var catalog = document.getElementById('catalog');
             var orgUnitId = document.getElementById('orgUnitId');
@@ -184,51 +147,37 @@
             var orgUnitError = document.getElementById('orgUnitError');
 
             function clearErrors(){
-                if(nameError){ nameError.style.display = 'none'; }
-                if(catalogError){ catalogError.style.display = 'none'; }
-                if(orgUnitError){ orgUnitError.style.display = 'none'; }
+                [nameError,catalogError,orgUnitError].forEach(function(el){ if(el) el.style.display='none'; });
                 if(catalog) catalog.classList.remove('input-error');
                 if(nameInput) nameInput.classList.remove('input-error');
-                var selected = document.getElementById('selectedOrgUnitName');
-                if(selected) selected.classList.remove('input-error');
+                var sel = document.getElementById('selectedOrgUnitName');
+                if(sel) sel.classList.remove('input-error');
             }
 
             form.addEventListener('submit', function(e){
                 clearErrors();
                 var valid = true;
-
-                // Name must be provided
-                if(!nameInput || !nameInput.value || nameInput.value.trim() === ''){
-                    if(nameError) nameError.style.display = 'block';
+                if(!nameInput || !nameInput.value.trim()){
+                    if(nameError) nameError.style.display='block';
                     if(nameInput) nameInput.classList.add('input-error');
                     valid = false;
                 }
-
-                // Catalog must be selected (first option is placeholder)
                 if(!catalog || !catalog.value || catalog.selectedIndex === 0){
-                    if(catalogError){ catalogError.style.display = 'block'; }
+                    if(catalogError) catalogError.style.display='block';
                     if(catalog) catalog.classList.add('input-error');
                     valid = false;
                 }
-
-                // Org unit must be selected
-                if(!orgUnitId || !orgUnitId.value || orgUnitId.value.trim() === ''){
-                    if(orgUnitError){ orgUnitError.style.display = 'block'; }
-                    var selected = document.getElementById('selectedOrgUnitName');
-                    if(selected) selected.classList.add('input-error');
+                if(!orgUnitId || !orgUnitId.value.trim()){
+                    if(orgUnitError) orgUnitError.style.display='block';
+                    var sel = document.getElementById('selectedOrgUnitName');
+                    if(sel) sel.classList.add('input-error');
                     valid = false;
                 }
-
                 if(!valid){
                     e.preventDefault();
-                    // focus first invalid field: name -> catalog -> orgUnit
-                    if(!nameInput.value || nameInput.value.trim() === ''){
-                        nameInput.focus();
-                    } else if(!catalog.value){
-                        catalog.focus();
-                    } else {
-                        document.getElementById('openOrgUnitModal').focus();
-                    }
+                    if(!nameInput.value.trim()) nameInput.focus();
+                    else if(!catalog.value) catalog.focus();
+                    else document.getElementById('openOrgUnitModal').focus();
                 }
             });
         })();

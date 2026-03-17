@@ -3,149 +3,14 @@
 
 <head>
     <title>Login - Govinc</title>
-    <link rel="stylesheet" type="text/css" href="/style.css">
-    <link rel="stylesheet" href="/general.css">
-    <th:block th:replace="~{fragments/theme-css :: themeCss}" />
-    <style>
-        .login-container {
-            max-width: 400px;
-            margin: 100px auto;
-            padding: 30px;
-            background: #fff;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            text-align: center;
-        }
-
-        .login-container h2 {
-            margin-bottom: 24px;
-        }
-
-        .login-container input[type=text],
-        .login-container input[type=password] {
-            width: 100%;
-            padding: 10px;
-            margin: 8px 0 16px 0;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            box-sizing: border-box;
-        }
-
-        .login-container button {
-            width: 100%;
-            padding: 10px;
-            background-color: #3583ba;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 1.1em;
-        }
-
-        .login-container button:hover:not(:disabled) {
-            background-color: #25639a;
-        }
-
-        .or-separator {
-            margin: 24px 0;
-            display: flex;
-            align-items: center;
-        }
-
-        .or-separator span {
-            flex: 1;
-            height: 1px;
-            background: #e0e0e0;
-        }
-
-        .or-separator label {
-            margin: 0 15px;
-            color: #888;
-            font-weight: bold;
-            letter-spacing: 1px;
-        }
-
-        .error-message {
-            color: #d63c3c;
-            margin-bottom: 16px;
-        }
-
-        .oauth2-error-box {
-            background-color: #fde7e7;
-            border: 2px solid #d63c3c;
-            border-radius: 4px;
-            padding: 16px;
-            margin-bottom: 20px;
-            text-align: left;
-        }
-
-        .oauth2-error-box h3 {
-            color: #d63c3c;
-            margin: 0 0 8px 0;
-            font-size: 1.1em;
-        }
-
-        .oauth2-error-box p {
-            color: #333;
-            margin: 0;
-            font-size: 0.95em;
-            line-height: 1.5;
-        }
-
-        .oauth2-error-box .error-code {
-            color: #999;
-            font-size: 0.85em;
-            margin-top: 8px;
-            font-style: italic;
-        }
-
-        .oauth-btn {
-            display: inline-block;
-            text-decoration: none;
-            padding: 8px 0;
-            width: 100%;
-            border-radius: 4px;
-            font-weight: bold;
-            font-size: 1.07em;
-            margin-bottom: 8px;
-            border: none;
-            cursor: pointer;
-        }
-
-        .oauth-keycloak {
-            background: #49236d;
-            color: #fff;
-        }
-
-        .oauth-azure {
-            background: #0078d4;
-            color: #fff;
-        }
-
-        .oauth-google {
-            background: #db4437;
-            color: #fff;
-        }
-
-        .oauth-github {
-            background: #333;
-            color: #fff;
-        }
-
-        .oauth-btn:disabled,
-        .oauth-btn.disabled {
-            background: #dadada !important;
-            color: #ababab !important;
-            cursor: not-allowed;
-        }
-    </style>
+    <link rel="stylesheet" type="text/css" href="/style.css">    <th:block th:replace="~{fragments/theme-css :: themeCss}" />
 </head>
 
 <body>
     <div class="login-container">
         <div class="landing-image">
-            <img style="max-width: 20em;" th:if="${layoutConfig != null and layoutConfig.imageData != null and layoutConfig.imageData.length > 0}" src="/config/image-upload/preview"
-                alt="Compliance Incubator Logo" class="ci-logo-img-visible" />
+            <img class="logo-login ci-logo-img-visible" th:if="${layoutConfig != null and layoutConfig.imageData != null and layoutConfig.imageData.length > 0}" src="/config/image-upload/preview"
+                alt="Compliance Incubator Logo" />
             <img th:unless="${layoutConfig != null and layoutConfig.imageData != null and layoutConfig.imageData.length > 0}" src="/title.png"
                 alt="Default Compliance Incubator Logo" class="ci-logo-img-visible" />
         </div>
@@ -165,7 +30,7 @@
             </div>
             <input type="text" name="username" placeholder="Username" required autofocus>
             <input type="password" name="password" placeholder="Password" required>
-            <button type="submit">Login</button>
+            <button type="submit" class="btn-submit">Login</button>
         </form>
         <div class="or-separator">
             <span></span>

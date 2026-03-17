@@ -324,8 +324,7 @@ public class OpenAIConfigController {
               tableHover1, tableHover2,
               alertBg1, alertBg2, alertColor,
               takenOverBg, dropdownBgHover,org-name-color,org-name-font-size,tool-name-color,tool-name-font-size
-              secondaryNavBg, secondaryNavBorder,
-              logoBorder, dropdownHoverBlue, mainNavBorder, faintBlue1.
+              fontSizeBody, fontSizeBtn, spacingBase.
             Colors as valid hex (e.g. #RRGGBB) or rgba(...). Fonts as CSS font-family strings. Font sizes as common CSS units (e.g. 1em, 1.25em, etc).
             Logo image (base64): %s
             """.formatted(base64Image);
@@ -382,12 +381,89 @@ public class OpenAIConfigController {
             cfg.setAlertColor(map.get("alertColor"));
             cfg.setTakenOverBg(map.get("takenOverBg"));
             cfg.setDropdownBgHover(map.get("dropdownBgHover"));
-            cfg.setSecondaryNavBg(map.get("secondaryNavBg"));
-            cfg.setSecondaryNavBorder(map.get("secondaryNavBorder"));
-            cfg.setLogoBorder(map.get("logoBorder"));
-            cfg.setDropdownHoverBlue(map.get("dropdownHoverBlue"));
-            cfg.setMainNavBorder(map.get("mainNavBorder"));
-            cfg.setFaintBlue1(map.get("faintBlue1"));
+            layoutConfigurationRepository.save(cfg);
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(map);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(java.util.Map.of("error", "Error: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping(path = "/suggest-theme-noimage", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public ResponseEntity<?> suggestThemeNoImage() {
+        try {
+            String prompt = """
+            Suggest a modern, professional, bright UI color theme.
+            Respond ONLY with a single JSON object with the keys:
+              primaryColor, primaryColorDark, accentColor, backgroundColor, borderColor,
+              navViolet, textMain, shineGlare, shineHighlight, secondaryColor,
+              fontFamily, fontSizeNav, fontSizeHeadline,
+              successGreen, errorRed,
+              modalBeige1, modalBeige2, modalBeige3, modalBeige4,
+              labelGold, gray777, gray888,
+              tableBg1, tableBg2, tableBg3, tableBg4, tableBg5,
+              headerGradHighlight, yellowHighlight,
+              tableHover1, tableHover2,
+              alertBg1, alertBg2, alertColor,
+              takenOverBg, dropdownBgHover,org-name-color,org-name-font-size,tool-name-color,tool-name-font-size,
+              fontSizeBody, fontSizeBtn, spacingBase.
+            Colors as valid hex (e.g. #RRGGBB) or rgba(...). Fonts as CSS font-family strings. Font sizes as common CSS units (e.g. 1em, 1.25em, etc).
+            """;
+
+            String raw = openAIUtil.askAI(prompt, false);
+
+            String json = raw;
+            int start = raw.indexOf('{');
+            int end = raw.lastIndexOf('}');
+            if (start != -1 && end != -1 && end > start) {
+                json = raw.substring(start, end + 1);
+            }
+
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            java.util.Map<String, String> map = mapper.readValue(json, java.util.Map.class);
+            LayoutConfiguration cfg = layoutConfigurationRepository.findAll().stream()
+                    .findFirst().orElse(new LayoutConfiguration());
+
+            cfg.setPrimaryColor(map.get("primaryColor"));
+            cfg.setPrimaryColorDark(map.get("primaryColorDark"));
+            cfg.setAccentColor(map.get("accentColor"));
+            cfg.setBackgroundColor(map.get("backgroundColor"));
+            cfg.setBorderColor(map.get("borderColor"));
+            cfg.setNavViolet(map.get("navViolet"));
+            cfg.setTextMain(map.get("textMain"));
+            cfg.setShineGlare(map.get("shineGlare"));
+            cfg.setShineHighlight(map.get("shineHighlight"));
+            cfg.setSecondaryColor(map.get("secondaryColor"));
+            cfg.setFontFamily(map.get("fontFamily"));
+            cfg.setFontSizeNav(map.get("fontSizeNav"));
+            cfg.setFontSizeHeadline(map.get("fontSizeHeadline"));
+            cfg.setSuccessGreen(map.get("successGreen"));
+            cfg.setErrorRed(map.get("errorRed"));
+            cfg.setModalBeige1(map.get("modalBeige1"));
+            cfg.setModalBeige2(map.get("modalBeige2"));
+            cfg.setModalBeige3(map.get("modalBeige3"));
+            cfg.setModalBeige4(map.get("modalBeige4"));
+            cfg.setLabelGold(map.get("labelGold"));
+            cfg.setGray777(map.get("gray777"));
+            cfg.setGray888(map.get("gray888"));
+            cfg.setTableBg1(map.get("tableBg1"));
+            cfg.setTableBg2(map.get("tableBg2"));
+            cfg.setTableBg3(map.get("tableBg3"));
+            cfg.setTableBg4(map.get("tableBg4"));
+            cfg.setTableBg5(map.get("tableBg5"));
+            cfg.setHeaderGradHighlight(map.get("headerGradHighlight"));
+            cfg.setYellowHighlight(map.get("yellowHighlight"));
+            cfg.setTableHover1(map.get("tableHover1"));
+            cfg.setTableHover2(map.get("tableHover2"));
+            cfg.setAlertBg1(map.get("alertBg1"));
+            cfg.setAlertBg2(map.get("alertBg2"));
+            cfg.setAlertColor(map.get("alertColor"));
+            cfg.setTakenOverBg(map.get("takenOverBg"));
+            cfg.setDropdownBgHover(map.get("dropdownBgHover"));
             layoutConfigurationRepository.save(cfg);
 
             return ResponseEntity.ok()
