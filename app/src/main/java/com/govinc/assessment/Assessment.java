@@ -2,6 +2,7 @@ package com.govinc.assessment;
 
 import java.time.LocalDate;
 import com.govinc.catalog.SecurityCatalog;
+import com.govinc.compliance.ComplianceCheck;
 import com.govinc.user.User;
 import com.govinc.organization.OrgUnit;
 import com.govinc.organization.OrgService; // add this import
@@ -43,6 +44,15 @@ public class Assessment {
     @ManyToOne
     @JoinColumn(name = "predecessor_id")
     private Assessment predecessor;
+
+    // Compliance check selected for this assessment
+    @ManyToOne(optional = true)
+    @JoinColumn(name = "compliance_check_id")
+    private ComplianceCheck complianceCheck;
+
+    // AI-generated management summary
+    @Column(length = 10000)
+    private String managementSummary;
 
     @ManyToMany(cascade = { CascadeType.MERGE })
     @JoinTable(name = "assessment_orgservice", joinColumns = @JoinColumn(name = "assessment_id"), inverseJoinColumns = @JoinColumn(name = "orgservice_id"))
@@ -177,6 +187,22 @@ public class Assessment {
 
     public void setPredecessor(Assessment predecessor) {
         this.predecessor = predecessor;
+    }
+
+    public ComplianceCheck getComplianceCheck() {
+        return complianceCheck;
+    }
+
+    public void setComplianceCheck(ComplianceCheck complianceCheck) {
+        this.complianceCheck = complianceCheck;
+    }
+
+    public String getManagementSummary() {
+        return managementSummary;
+    }
+
+    public void setManagementSummary(String managementSummary) {
+        this.managementSummary = managementSummary;
     }
 
     public Set<OrgService> getOrgServices() {

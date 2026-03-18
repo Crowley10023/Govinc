@@ -42,6 +42,27 @@
                     <span id="orgUnitError" class="form-error d-none">Please select an organizational unit.</span>
                 </div>
 
+                <!-- Compliance Check Selection (shown when catalog is selected and checks exist) -->
+                <div class="form-group" id="complianceCheckGroup" style="display:none;">
+                    <label for="complianceCheckId">Compliance Check</label>
+                    <select id="complianceCheckId" name="complianceCheckId">
+                        <option value="">-- None --</option>
+                    </select>
+                    <span class="help-text">Select an applicable compliance check for the chosen catalog.</span>
+                </div>
+
+                <!-- Predecessor Assessment (shown when catalog + org unit selected) -->
+                <div class="form-group" id="predecessorGroup" style="display:none;">
+                    <label>Copy from Predecessor Assessment</label>
+                    <input type="hidden" id="predecessorId" name="predecessorId">
+                    <div style="display:flex;gap:1em;align-items:center;">
+                        <button type="button" id="openPredecessorModal" class="btn-action" disabled>Copy from Predecessor</button>
+                        <span id="selectedPredecessorName" class="text-muted">None selected</span>
+                        <button type="button" id="clearPredecessorBtn" class="btn-cancel" style="display:none;">Clear</button>
+                    </div>
+                    <span class="help-text">Answers from the predecessor will be copied into the new assessment.</span>
+                </div>
+
                 <!-- Row 2: Org Services + Users side by side -->
                 <div class="form-row">
                     <div class="form-group">
@@ -80,6 +101,20 @@
                 <input type="text" id="orgUnitSearch" placeholder="Filter org units by name..." class="modal-search-input" style="width:100%;margin:0.7em 0;flex-shrink:0;" />
                 <ul id="orgUnitList" class="list-unstyled" style="max-height:25vh;min-height:25vh;overflow-y:auto;margin:0;padding:0;">
                     <li th:each="orgUnit : ${orgUnits}" th:attr="data-id=${orgUnit.id}" th:text="${orgUnit.name}" class="org-unit-list-item" onclick="selectOrgUnit(this)"></li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Predecessor Assessment Modal -->
+        <div id="predecessorModal" class="modal-bg" style="display:none;" aria-hidden="true">
+            <div class="modal-popup" style="max-height:70vh;display:flex;flex-direction:column;width:520px;">
+                <div class="modal-header-row">
+                    <h3 class="m-0">Select Predecessor Assessment</h3>
+                    <button type="button" id="closePredecessorModal" class="btn-cancel">Close</button>
+                </div>
+                <p class="text-sm text-muted" style="margin:0.3em 0 0.7em;">Assessments with the same catalog and org unit. Answers will be copied to the new assessment.</p>
+                <ul id="predecessorList" class="list-unstyled" style="max-height:30vh;min-height:10vh;overflow-y:auto;margin:0;padding:0;">
+                    <li id="predecessorLoading" style="padding:0.5em;color:#888;">Loading...</li>
                 </ul>
             </div>
         </div>
@@ -134,7 +169,101 @@
                 selectedName.textContent = el.textContent || el.innerText;
                 modal.style.display = 'none';
                 modal.setAttribute('aria-hidden','true');
+                updatePredecessorButton();
             };
+        })();
+
+        // --- Compliance Check Logic ---
+        (function(){
+            var catalogSelect = document.getElementById('catalog');
+            var complianceGroup = document.getElementById('complianceCheckGroup');
+            var complianceSelect = document.getElementById('complianceCheckId');
+
+            function loadComplianceChecks(catalogId) {
+                complianceSelect.innerHTML = '<option value="">-- None --</option>';
+                complianceGroup.style.display = 'none';
+                if (!catalogId) return;
+                fetch('/assessment/compliance-checks?catalogId=' + encodeURIComponent(catalogId))
+                    .then(function(r){ return r.json(); })
+                    .then(function(checks){
+                        if (checks && checks.length > 0) {
+                            checks.forEach(function(cc){
+                                var opt = document.createElement('option');
+                                opt.value = cc.id;
+                                opt.textContent = cc.name + (cc.description ? ' – ' + cc.description : '');
+                                complianceSelect.appendChild(opt);
+                            });
+                            complianceGroup.style.display = '';
+                        }
+                    })
+                    .catch(function(){});
+            }
+
+            catalogSelect.addEventListener('change', function(){
+                loadComplianceChecks(this.value);
+                updatePredecessorButton();
+            });
+        })();
+
+        // --- Predecessor Logic ---
+        (function(){
+            var predecessorGroup = document.getElementById('predecessorGroup');
+            var predecessorBtn = document.getElementById('openPredecessorModal');
+            var clearBtn = document.getElementById('clearPredecessorBtn');
+            var predecessorModal = document.getElementById('predecessorModal');
+            var closeBtn = document.getElementById('closePredecessorModal');
+            var predecessorList = document.getElementById('predecessorList');
+            var predecessorHidden = document.getElementById('predecessorId');
+            var predecessorName = document.getElementById('selectedPredecessorName');
+
+            window.updatePredecessorButton = function(){
+                var catalogId = document.getElementById('catalog').value;
+                var orgUnitId = document.getElementById('orgUnitId').value;
+                predecessorGroup.style.display = (catalogId && orgUnitId) ? '' : 'none';
+                predecessorBtn.disabled = !(catalogId && orgUnitId);
+            };
+
+            predecessorBtn.addEventListener('click', function(){
+                var catalogId = document.getElementById('catalog').value;
+                var orgUnitId = document.getElementById('orgUnitId').value;
+                if (!catalogId || !orgUnitId) return;
+                predecessorList.innerHTML = '<li style="padding:0.5em;color:#888;">Loading...</li>';
+                predecessorModal.style.display = 'flex';
+                fetch('/assessment/predecessors?catalogId=' + encodeURIComponent(catalogId) + '&orgUnitId=' + encodeURIComponent(orgUnitId))
+                    .then(function(r){ return r.json(); })
+                    .then(function(items){
+                        predecessorList.innerHTML = '';
+                        if (!items || items.length === 0) {
+                            predecessorList.innerHTML = '<li style="padding:0.5em;color:#888;">No matching assessments found.</li>';
+                            return;
+                        }
+                        items.forEach(function(item){
+                            var li = document.createElement('li');
+                            li.className = 'org-unit-list-item';
+                            li.style.cssText = 'padding:0.5em 0.8em;cursor:pointer;display:flex;justify-content:space-between;align-items:center;';
+                            li.innerHTML = '<span>' + item.name + '</span><span style="font-size:0.85em;color:#888;">' + item.status + ' &bull; ' + (item.creationDate || '') + '</span>';
+                            li.addEventListener('click', function(){
+                                predecessorHidden.value = item.id;
+                                predecessorName.textContent = item.name;
+                                clearBtn.style.display = '';
+                                predecessorModal.style.display = 'none';
+                            });
+                            predecessorList.appendChild(li);
+                        });
+                    })
+                    .catch(function(){
+                        predecessorList.innerHTML = '<li style="padding:0.5em;color:#c00;">Error loading predecessors.</li>';
+                    });
+            });
+
+            closeBtn.addEventListener('click', function(){ predecessorModal.style.display = 'none'; });
+            predecessorModal.addEventListener('click', function(e){ if(e.target === this) this.style.display = 'none'; });
+
+            clearBtn.addEventListener('click', function(){
+                predecessorHidden.value = '';
+                predecessorName.textContent = 'None selected';
+                clearBtn.style.display = 'none';
+            });
         })();
 
         (function(){

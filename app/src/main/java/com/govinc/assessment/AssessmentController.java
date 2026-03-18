@@ -4,6 +4,10 @@ import com.govinc.catalog.SecurityCatalog;
 import com.govinc.catalog.SecurityCatalogService;
 import com.govinc.catalog.SecurityControl;
 import com.govinc.catalog.SecurityControlRepository;
+import com.govinc.compliance.ComplianceCheck;
+import com.govinc.compliance.ComplianceCheckRepository;
+import com.govinc.compliance.ComplianceService;
+import com.govinc.compliance.ComplianceThreshold;
 import com.govinc.maturity.MaturityAnswer;
 import com.govinc.maturity.MaturityAnswerRepository;
 import com.govinc.organization.OrgUnit;
@@ -85,6 +89,12 @@ public class AssessmentController {
     @Autowired
     private AuthorizationService authorizationService;
 
+    @Autowired
+    private ComplianceCheckRepository complianceCheckRepository;
+
+    @Autowired
+    private ComplianceService complianceService;
+
     @GetMapping("/create")
     public String showCreateAssessmentForm(Model model) {
         // Authorization check: only ADMIN and ISM can create assessments
@@ -105,6 +115,47 @@ public class AssessmentController {
         return "create-assessment";
     }
 
+    // AJAX: get predecessor candidates for catalog + orgUnit combination
+    @GetMapping("/predecessors")
+    @ResponseBody
+    public List<Map<String, Object>> getPredecessors(
+            @RequestParam Long catalogId,
+            @RequestParam Long orgUnitId) {
+        if (!authorizationService.canCreateAssessment()) {
+            throw new UnauthorizedException("You do not have permission.");
+        }
+        List<Assessment> candidates = assessmentRepository.findBySecurityCatalogIdAndOrgUnitId(catalogId, orgUnitId);
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Assessment a : candidates) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", a.getId());
+            item.put("name", a.getName());
+            item.put("status", a.getStatus().toString());
+            item.put("creationDate", a.getCreationDate() != null ? a.getCreationDate().toString() : "");
+            result.add(item);
+        }
+        return result;
+    }
+
+    // AJAX: get compliance checks for a given catalog
+    @GetMapping("/compliance-checks")
+    @ResponseBody
+    public List<Map<String, Object>> getComplianceChecksForCatalog(@RequestParam Long catalogId) {
+        if (!authorizationService.canCreateAssessment()) {
+            throw new UnauthorizedException("You do not have permission.");
+        }
+        List<ComplianceCheck> checks = complianceCheckRepository.findBySecurityCatalogId(catalogId);
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (ComplianceCheck cc : checks) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", cc.getId());
+            item.put("name", cc.getName());
+            item.put("description", cc.getDescription() != null ? cc.getDescription() : "");
+            result.add(item);
+        }
+        return result;
+    }
+
     // POST handler for create-assessment
     @PostMapping("/create")
     public String createAssessment(
@@ -112,10 +163,11 @@ public class AssessmentController {
             @RequestParam(value = "name", required = false) String providedName,
             @RequestParam(value = "orgUnitId", required = false) Long orgUnitId,
             @RequestParam(value = "userIds", required = false) List<Long> userIds,
-            @RequestParam(value = "orgServiceIds", required = false) List<Long> orgServiceIds) {
+            @RequestParam(value = "orgServiceIds", required = false) List<Long> orgServiceIds,
+            @RequestParam(value = "predecessorId", required = false) Long predecessorId,
+            @RequestParam(value = "complianceCheckId", required = false) Long complianceCheckId) {
         SecurityCatalog catalog = securityCatalogService.findById(catalogId).orElse(null);
         if (catalog == null) {
-            // handle error, redirect back or show error (for now, redirect to list)
             return "redirect:/assessment/list";
         }
         Assessment assessment = new Assessment();
@@ -124,7 +176,6 @@ public class AssessmentController {
         if (providedName != null && !providedName.trim().isEmpty()) {
             assessmentName = providedName.trim();
         } else {
-            // Generate assessment name as OrgUnitName_YYYY-MM-DD or Assessment_YYYY-MM-DD
             assessmentName = "Assessment_" + java.time.LocalDate.now();
             if (orgUnitId != null) {
                 OrgUnit orgUnit = orgUnitService.getOrgUnit(orgUnitId).orElse(null);
@@ -136,20 +187,17 @@ public class AssessmentController {
         assessment.setName(assessmentName);
         assessment.setSecurityCatalog(catalog);
         assessment.setCreationDate(LocalDate.now());
-        // Set createdBy to current user if available
         try {
             assessment.setCreatedBy(authorizationService.getCurrentUser());
         } catch (Exception e) {
             // ignore if current user cannot be determined
         }
-        // Persist org unit if set
         if (orgUnitId != null) {
             OrgUnit orgUnit = orgUnitService.getOrgUnit(orgUnitId).orElse(null);
             if (orgUnit != null) {
                 assessment.setOrgUnit(orgUnit);
             }
         }
-        // Persist selected users
         if (userIds != null && !userIds.isEmpty()) {
             Set<User> users = userIds.stream()
                     .map(id -> userRepository.findById(id).orElse(null))
@@ -157,7 +205,6 @@ public class AssessmentController {
                     .collect(Collectors.toSet());
             assessment.setUsers(users);
         }
-        // Persist selected org services
         if (orgServiceIds != null && !orgServiceIds.isEmpty()) {
             Set<OrgService> orgServices = orgServiceIds.stream()
                     .map(id -> orgServiceService.getOrgService(id).orElse(null))
@@ -165,8 +212,49 @@ public class AssessmentController {
                     .collect(Collectors.toSet());
             assessment.setOrgServices(orgServices);
         }
+        // Set predecessor
+        Assessment predecessor = null;
+        if (predecessorId != null) {
+            predecessor = assessmentRepository.findById(predecessorId).orElse(null);
+            if (predecessor != null) {
+                assessment.setPredecessor(predecessor);
+            }
+        }
+        // Set compliance check
+        if (complianceCheckId != null) {
+            ComplianceCheck cc = complianceCheckRepository.findById(complianceCheckId).orElse(null);
+            if (cc != null) {
+                assessment.setComplianceCheck(cc);
+            }
+        }
         assessment = assessmentRepository.save(assessment);
-        return "redirect:/assessment/" + assessment.getId(); // Jump directly to details
+
+        // Copy answers from predecessor if selected
+        if (predecessor != null) {
+            Optional<AssessmentDetails> predDetailsOpt = assessmentDetailsService.findById(predecessor.getId());
+            if (predDetailsOpt.isPresent()) {
+                AssessmentDetails predDetails = predDetailsOpt.get();
+                AssessmentDetails newDetails = new AssessmentDetails();
+                Set<Assessment> aSet = new HashSet<>();
+                aSet.add(assessment);
+                newDetails.setAssessments(aSet);
+                newDetails.setDate(LocalDate.now());
+                Set<AssessmentControlAnswer> copiedAnswers = new HashSet<>();
+                for (AssessmentControlAnswer orig : predDetails.getControlAnswers()) {
+                    AssessmentControlAnswer copy = new AssessmentControlAnswer(
+                            orig.getSecurityControl(),
+                            orig.getMaturityAnswer(),
+                            orig.getComment());
+                    copy.setIsOverride(orig.getIsOverride());
+                    copy = assessmentControlAnswerRepository.save(copy);
+                    copiedAnswers.add(copy);
+                }
+                newDetails.setControlAnswers(copiedAnswers);
+                assessmentDetailsService.save(newDetails);
+            }
+        }
+
+        return "redirect:/assessment/" + assessment.getId();
     }
 
     @GetMapping("/list")
@@ -576,6 +664,63 @@ public class AssessmentController {
             model.addAttribute("isAdminOrISM", isAdminOrISM);
             model.addAttribute("isAssessor", currentRole == Role.ASSESSOR);
             model.addAttribute("canManageAssessors", canManageAssessors);
+
+            // Compliance check score calculation
+            if (assessment.getComplianceCheck() != null && details != null) {
+                ComplianceCheck cc = assessment.getComplianceCheck();
+                Set<Long> catalogControlIds = new java.util.LinkedHashSet<>();
+                if (assessment.getSecurityCatalog() != null && assessment.getSecurityCatalog().getSecurityControls() != null) {
+                    for (SecurityControl sc : assessment.getSecurityCatalog().getSecurityControls()) {
+                        catalogControlIds.add(sc.getId());
+                    }
+                }
+                List<AssessmentControlAnswer> answerList = new ArrayList<>();
+                int answered = 0;
+                double scoreSum = 0;
+                int scoreCount = 0;
+                if (details.getControlAnswers() != null) {
+                    for (AssessmentControlAnswer aca : details.getControlAnswers()) {
+                        if (aca.getSecurityControl() != null && catalogControlIds.contains(aca.getSecurityControl().getId())) {
+                            answerList.add(aca);
+                            answered++;
+                            if (aca.getMaturityAnswer() != null) {
+                                scoreSum += aca.getMaturityAnswer().getRating();
+                                scoreCount++;
+                            }
+                        }
+                    }
+                }
+                double avgScore = scoreCount > 0 ? scoreSum / scoreCount : 0.0;
+                double coverage = catalogControlIds.isEmpty() ? 0.0 : (answered * 100.0 / catalogControlIds.size());
+                // Evaluate thresholds
+                boolean compliant = !answerList.isEmpty();
+                List<Map<String, Object>> thresholdResults = new ArrayList<>();
+                if (cc.getThresholds() != null) {
+                    for (ComplianceThreshold t : cc.getThresholds()) {
+                        boolean passed = false;
+                        if (!answerList.isEmpty()) {
+                            if ("ALL_ABOVE".equals(t.getType())) {
+                                passed = answerList.stream()
+                                        .allMatch(a2 -> a2.getMaturityAnswer() != null && a2.getMaturityAnswer().getRating() >= t.getValue());
+                            } else if ("AVERAGE_ABOVE".equals(t.getType())) {
+                                passed = avgScore >= t.getValue();
+                            }
+                        }
+                        if (!passed) compliant = false;
+                        Map<String, Object> td = new LinkedHashMap<>();
+                        td.put("description", t.getRuleDescription());
+                        td.put("type", t.getType());
+                        td.put("value", t.getValue());
+                        td.put("passed", passed);
+                        thresholdResults.add(td);
+                    }
+                }
+                model.addAttribute("complianceCheck", cc);
+                model.addAttribute("complianceCompliant", compliant);
+                model.addAttribute("complianceAvgScore", Math.round(avgScore * 10.0) / 10.0);
+                model.addAttribute("complianceCoverage", Math.round(coverage * 10.0) / 10.0);
+                model.addAttribute("complianceThresholdResults", thresholdResults);
+            }
 
             return "assessment-details";
         } else {
@@ -1163,5 +1308,80 @@ public class AssessmentController {
         }
         
         return state;
+    }
+
+    // Generate AI management summary for an assessment
+    @PostMapping("/{id}/management-summary")
+    @ResponseBody
+    public Map<String, Object> generateManagementSummary(@PathVariable Long id) {
+        if (!authorizationService.canModifyAssessment(id)) {
+            return Map.of("error", "forbidden");
+        }
+        Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
+        if (assessmentOpt.isEmpty()) {
+            return Map.of("error", "not_found");
+        }
+        Assessment assessment = assessmentOpt.get();
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
+        AssessmentDetails details = detailsOpt.orElse(null);
+
+        // Build a comprehensive prompt for the AI
+        StringBuilder prompt = new StringBuilder();
+        prompt.append("You are a security expert. Generate a concise management summary for the following security assessment.\n\n");
+        prompt.append("Assessment Name: ").append(assessment.getName()).append("\n");
+        if (assessment.getOrgUnit() != null) {
+            prompt.append("Organizational Unit: ").append(assessment.getOrgUnit().getName()).append("\n");
+        }
+        if (assessment.getSecurityCatalog() != null) {
+            prompt.append("Security Catalog: ").append(assessment.getSecurityCatalog().getName()).append("\n");
+        }
+        prompt.append("Status: ").append(assessment.getStatus()).append("\n");
+        prompt.append("Creation Date: ").append(assessment.getCreationDate()).append("\n");
+
+        if (details != null && details.getControlAnswers() != null && !details.getControlAnswers().isEmpty()) {
+            prompt.append("\nControl Answers Summary:\n");
+            Map<String, Integer> answerCounts = new LinkedHashMap<>();
+            int totalAnswered = 0;
+            int totalControls = 0;
+            double scoreSum = 0;
+            int scoreCount = 0;
+            for (AssessmentControlAnswer aca : details.getControlAnswers()) {
+                totalControls++;
+                if (aca.getMaturityAnswer() != null) {
+                    totalAnswered++;
+                    String ans = aca.getMaturityAnswer().getAnswer();
+                    answerCounts.merge(ans, 1, Integer::sum);
+                    scoreSum += aca.getMaturityAnswer().getRating();
+                    scoreCount++;
+                    prompt.append("- ").append(aca.getSecurityControl() != null ? aca.getSecurityControl().getName() : "Unknown")
+                          .append(": ").append(ans);
+                    if (aca.getComment() != null && !aca.getComment().isBlank()) {
+                        prompt.append(" (Comment: ").append(aca.getComment()).append(")");
+                    }
+                    prompt.append("\n");
+                }
+            }
+            prompt.append("\nTotal controls: ").append(totalControls)
+                  .append(", Answered: ").append(totalAnswered).append("\n");
+            if (scoreCount > 0) {
+                prompt.append("Average Maturity Score: ").append(String.format("%.1f", scoreSum / scoreCount)).append("\n");
+            }
+            prompt.append("Answer distribution: ").append(answerCounts).append("\n");
+        }
+
+        if (assessment.getComplianceCheck() != null) {
+            prompt.append("\nCompliance Check: ").append(assessment.getComplianceCheck().getName()).append("\n");
+        }
+
+        prompt.append("\nPlease provide a 3-5 paragraph management summary covering: overall security posture, key findings, risks, and recommendations. Use plain text without markdown headers.");
+
+        try {
+            String summary = openAIUtil.askAI(prompt.toString(), false);
+            assessment.setManagementSummary(summary);
+            assessmentRepository.save(assessment);
+            return Map.of("summary", summary);
+        } catch (Exception e) {
+            return Map.of("error", "AI generation failed: " + e.getMessage());
+        }
     }
 }

@@ -17,4 +17,6 @@ public interface AssessmentRepository extends JpaRepository<Assessment, Long> {
     List<Assessment> findByUsersId(Long userId);
 
     List<Assessment> findByCreatedById(Long userId);
+
+    List<Assessment> findBySecurityCatalogIdAndOrgUnitId(Long catalogId, Long orgUnitId);
 }
