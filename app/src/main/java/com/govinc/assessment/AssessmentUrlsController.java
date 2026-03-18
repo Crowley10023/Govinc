@@ -52,4 +52,11 @@ public class AssessmentUrlsController {
         model.addAttribute("urls", urls);
         return "assessment-urls-list";
     }
+
+    // Manual expiration check — deletes all URLs that have passed their expiration date
+    @PostMapping("/urls/check-expiration")
+    public String checkExpiration() {
+        assessmentUrlsService.cleanupExpiredUrls();
+        return "redirect:/assessment-direct/urls";
+    }
 }

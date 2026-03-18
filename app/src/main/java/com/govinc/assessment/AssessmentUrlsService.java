@@ -4,6 +4,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
+import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -21,6 +23,8 @@ public class AssessmentUrlsService {
     private static final int OBFUSCATED_LENGTH = 100;
     private static final String URL_CHARS = "123456789";
     private static final SecureRandom random = new SecureRandom();
+    /** Default lifetime (days) for a newly created direct URL. */
+    private static final int DEFAULT_URL_LIFETIME_DAYS = 30;
 
     /**
      * Generate new obfuscated url, removing previous for this assessment if present.
@@ -40,8 +44,8 @@ public class AssessmentUrlsService {
         newUrl.setUrl(obfuscated);
         newUrl.setAssessment(assessment);
         assessment.setAssessmentUrls(newUrl);
-        // The direct URL path (if needed in a response):
-        // String directUrl = "/assessment/" + assessment.getId() + "/" + obfuscated;
+        // Set the absolute expiration date on the assessment entity
+        assessment.setUrlExpirationDate(LocalDate.now().plusDays(DEFAULT_URL_LIFETIME_DAYS));
         // Only save the parent (Assessment); CascadeType.ALL on assessmentUrls will persist the child as well
         assessmentRepository.save(assessment);
         // Do NOT save newUrl directly to prevent duplicate entries
@@ -66,11 +70,13 @@ public class AssessmentUrlsService {
         Optional<AssessmentUrls> optionalUrl = urlsRepository.findById(id);
         if (optionalUrl.isPresent()) {
             AssessmentUrls url = optionalUrl.get();
-            // Prolong by 5 days
-            Integer currentLifetime = url.getLifetime();
-            if (currentLifetime == null) currentLifetime = 0;
-            url.setLifetime(currentLifetime + 5);
-            urlsRepository.save(url);
+            Assessment assessment = url.getAssessment();
+            if (assessment != null) {
+                LocalDate current = assessment.getUrlExpirationDate();
+                if (current == null) current = LocalDate.now();
+                assessment.setUrlExpirationDate(current.plusDays(5));
+                assessmentRepository.save(assessment);
+            }
         }
     }
 
@@ -81,7 +87,7 @@ public class AssessmentUrlsService {
             Assessment assessment = url.getAssessment();
             if (assessment != null) {
                 assessment.setAssessmentUrls(null);
-                // assessment.setAssessmentUrl(null); // obsolete, removed
+                assessment.setUrlExpirationDate(null);
                 assessmentRepository.save(assessment);
             }
             urlsRepository.deleteById(id);
@@ -90,5 +96,27 @@ public class AssessmentUrlsService {
 
     public List<AssessmentUrls> findAll() {
         return urlsRepository.findAll();
+    }
+
+    /**
+     * Removes all assessment URLs whose expiration date has been reached.
+     * Called by the scheduled cleanup and by the manual "Check Expiration" button.
+     */
+    @Transactional
+    public int cleanupExpiredUrls() {
+        LocalDate today = LocalDate.now();
+        List<AssessmentUrls> allUrls = urlsRepository.findAll();
+        List<Long> toDelete = new ArrayList<>();
+        for (AssessmentUrls url : allUrls) {
+            Assessment assessment = url.getAssessment();
+            if (assessment != null && assessment.getUrlExpirationDate() != null
+                    && !today.isBefore(assessment.getUrlExpirationDate())) {
+                toDelete.add(url.getId());
+            }
+        }
+        for (Long urlId : toDelete) {
+            deleteUrl(urlId);
+        }
+        return toDelete.size();
     }
 }

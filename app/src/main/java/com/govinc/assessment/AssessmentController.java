@@ -165,7 +165,8 @@ public class AssessmentController {
             @RequestParam(value = "userIds", required = false) List<Long> userIds,
             @RequestParam(value = "orgServiceIds", required = false) List<Long> orgServiceIds,
             @RequestParam(value = "predecessorId", required = false) Long predecessorId,
-            @RequestParam(value = "complianceCheckId", required = false) Long complianceCheckId) {
+            @RequestParam(value = "complianceCheckId", required = false) Long complianceCheckId,
+            @RequestParam(value = "guideVisibleInDirect", defaultValue = "false") boolean guideVisibleInDirect) {
         SecurityCatalog catalog = securityCatalogService.findById(catalogId).orElse(null);
         if (catalog == null) {
             return "redirect:/assessment/list";
@@ -187,6 +188,7 @@ public class AssessmentController {
         assessment.setName(assessmentName);
         assessment.setSecurityCatalog(catalog);
         assessment.setCreationDate(LocalDate.now());
+        assessment.setGuideVisibleInDirect(guideVisibleInDirect);
         try {
             assessment.setCreatedBy(authorizationService.getCurrentUser());
         } catch (Exception e) {
@@ -1383,5 +1385,20 @@ public class AssessmentController {
         } catch (Exception e) {
             return Map.of("error", "AI generation failed: " + e.getMessage());
         }
+    }
+
+    // Toggle guide visibility in assessment-direct view
+    @PostMapping("/{id}/guide-visible")
+    @ResponseBody
+    public Map<String, Object> setGuideVisible(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
+        if (assessmentOpt.isEmpty()) {
+            return Map.of("error", "not_found");
+        }
+        Assessment assessment = assessmentOpt.get();
+        boolean visible = Boolean.TRUE.equals(body.get("guideVisibleInDirect"));
+        assessment.setGuideVisibleInDirect(visible);
+        assessmentRepository.save(assessment);
+        return Map.of("guideVisibleInDirect", assessment.isGuideVisibleInDirect());
     }
 }

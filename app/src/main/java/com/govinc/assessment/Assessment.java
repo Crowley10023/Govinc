@@ -209,4 +209,38 @@ public class Assessment {
         return orgServices;
     }
 
+    // Whether the AI answering guide should be shown in the assessment-direct (public URL) view
+    // Nullable so existing rows (NULL) default to false without a migration
+    @Column(name = "guide_visible_in_direct")
+    private Boolean guideVisibleInDirect;
+
+    public boolean isGuideVisibleInDirect() {
+        return Boolean.TRUE.equals(guideVisibleInDirect);
+    }
+
+    public void setGuideVisibleInDirect(boolean guideVisibleInDirect) {
+        this.guideVisibleInDirect = guideVisibleInDirect;
+    }
+
+    // Absolute expiration date for the assessment's direct URL (replaces day-decrement counter)
+    @Column(name = "url_expiration_date")
+    private LocalDate urlExpirationDate;
+
+    public LocalDate getUrlExpirationDate() {
+        return urlExpirationDate;
+    }
+
+    public void setUrlExpirationDate(LocalDate urlExpirationDate) {
+        this.urlExpirationDate = urlExpirationDate;
+    }
+
+    /**
+     * Returns the number of days until the direct URL expires.
+     * Negative values mean the URL has already expired.
+     */
+    public long getDaysUntilUrlExpiration() {
+        if (urlExpirationDate == null) return 0;
+        return java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), urlExpirationDate);
+    }
+
     }

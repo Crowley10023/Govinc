@@ -123,6 +123,18 @@
                                     set</span></td>
                         </tr>
                         <tr>
+                            <th>Guide in Direct View</th>
+                            <td>
+                                <label class="override-slider-label" title="Toggle AI answering guide visibility for assessors using the direct assessment URL">
+                                    <input type="checkbox" class="override-slider-checkbox" id="guide-visible-toggle"
+                                        th:checked="${assessment.guideVisibleInDirect}"
+                                        onchange="toggleGuideVisible(this)">
+                                    <span class="override-slider"></span>
+                                </label>
+                                <span id="guide-visible-status" class="text-muted text-sm" style="margin-left:0.5em;"></span>
+                            </td>
+                        </tr>
+                        <tr>
                             <th>Users</th>
                             <td id="assessment-users-cell"><span
                                     th:if="${assessment.users == null || #lists.isEmpty(assessment.users)}">None</span><span
@@ -207,37 +219,16 @@
                             </tr>
                         </table>
                     </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="controls-viewport">
-            <!-- Management Summary Section -->
-            <div class="domain-outline card domain-collapsible management-summary-section">
-                <div class="domain-header" onclick="toggleDomain(this)">
-                    <div class="domain-header-info">
-                        <span class="domain-title">Management Summary</span>
-                        <span class="domain-desc">AI-generated comprehensive summary of this assessment</span>
-                    </div>
-                    <div class="domain-header-actions">
-                        <span class="domain-checkmark"></span>
-                        <span class="domain-chevron">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
-                                <polyline points="4,7 9,12 14,7" fill="none" stroke="#2274A5" stroke-width="2"
-                                    stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
-                        </span>
-                    </div>
-                </div>
-                <div class="domain-controls">
-                    <div style="padding:1em 1.2em;">
-                        <div id="management-summary-text" style="white-space:pre-wrap;line-height:1.6;min-height:3em;">
+                    <!-- Management Summary -->
+                    <h2>Management Summary</h2>
+                    <div style="margin-bottom:1em;">
+                        <div id="management-summary-text" style="white-space:pre-wrap;line-height:1.6;min-height:3em;background:#f9f9f9;border-radius:6px;padding:0.8em 1em;border:1px solid #e0e0e0;">
                             <span th:if="${assessment.managementSummary != null and !assessment.managementSummary.blank}"
                                   th:text="${assessment.managementSummary}"></span>
                             <span th:if="${assessment.managementSummary == null or assessment.managementSummary.blank}"
                                   class="text-muted">No summary generated yet. Click "Update" to generate an AI-based summary.</span>
                         </div>
-                        <div style="margin-top:1em;display:flex;align-items:center;gap:1em;">
+                        <div style="margin-top:0.7em;display:flex;align-items:center;gap:1em;">
                             <button type="button" id="update-management-summary-btn" class="btn-action"
                                     th:if="${isAdminOrISM or !isAssessor}">Update</button>
                             <span id="management-summary-status" class="text-muted text-sm"></span>
@@ -245,7 +236,9 @@
                     </div>
                 </div>
             </div>
+        </div>
 
+        <div class="controls-viewport">
             <!-- Security Control Domains (Group) -->
             <div th:each="domain : ${securityControlDomains}" class="domain-outline card domain-collapsible">
                 <div class="domain-header" onclick="toggleDomain(this)">
@@ -762,13 +755,9 @@
             var ctx = document.getElementById('maturityRatingChart');
             if (!ctx) return;
 
-            var controlsViewport = document.querySelector('.controls-viewport');
-            if (!controlsViewport) return;
-
             var domainData = [];
 
-            // Build domain aggregates using the same approach as the pie chart: read pre-built hidden data items
-            var items = Array.from(document.querySelectorAll('.maturity-domain-data .domain-item-data'));
+            // Build domain name map from server-rendered elements
             var nameMapEls = Array.from(document.querySelectorAll('.maturity-domain-data .domain-name-map'));
             var domainNames = {};
             nameMapEls.forEach(function(e){
@@ -777,16 +766,32 @@
                 if (id) domainNames[id] = n || ('Domain ' + id);
             });
 
-            var agg = {}; // id -> { sum, count }
+            // Always read from live DOM selects so the chart reflects current user selections
+            var selects = Array.from(document.querySelectorAll('select.answer-select'));
+            var agg = {}; // domainId -> { sum, count }
             var ratingsList = [];
-            items.forEach(function(it){
-                var did = it.getAttribute('data-domain-id');
-                var rating = parseFloat(it.getAttribute('data-rating'));
-                if (!did || isNaN(rating)) return;
+            var ratingToLabel = {}; // numeric rating -> answer label text
+
+            selects.forEach(function(sel) {
+                // Build ratingToLabel from all options (same for all selects)
+                Array.from(sel.options).forEach(function(opt) {
+                    var r = parseFloat(opt.getAttribute('data-rating'));
+                    var t = (opt.textContent || opt.text || '').trim();
+                    if (!isNaN(r) && t && t !== '-- select an answer --') {
+                        ratingToLabel[r] = t;
+                    }
+                });
+
+                var domainId = sel.getAttribute('data-domain-id');
+                if (!domainId) return;
+                var selectedOpt = sel.options[sel.selectedIndex];
+                if (!selectedOpt || !selectedOpt.value || selectedOpt.value === '') return;
+                var rating = parseFloat(selectedOpt.getAttribute('data-rating'));
+                if (isNaN(rating)) return;
                 ratingsList.push(rating);
-                if (!agg[did]) agg[did] = { sum: 0, count: 0 };
-                agg[did].sum += rating;
-                agg[did].count += 1;
+                if (!agg[domainId]) agg[domainId] = { sum: 0, count: 0 };
+                agg[domainId].sum += rating;
+                agg[domainId].count += 1;
             });
 
             Object.keys(agg).forEach(function(did){
@@ -797,48 +802,12 @@
             });
 
             // Determine rating scale dynamically from available ratings; default to 1..5
-            var detectedMaxRating = ratingsList.length > 0 ? Math.max.apply(null, ratingsList) : 5;
+            var allRatings = Object.keys(ratingToLabel).map(Number).sort(function(a,b){return a-b;});
+            var detectedMaxRating = allRatings.length > 0 ? allRatings[allRatings.length - 1] : (ratingsList.length > 0 ? Math.max.apply(null, ratingsList) : 5);
 
             if (domainData.length === 0) {
-                // If no domain items are present, try to compute on-the-fly from visible rows as a fallback
-                var controlsViewport2 = document.querySelector('.controls-viewport');
-                if (controlsViewport2) {
-                    var domainSections = Array.from(controlsViewport2.querySelectorAll('.domain-collapsible'))
-                        .filter(function(sec) { return sec.querySelector('.controls-table'); });
-                    domainSections.forEach(function(domainSection) {
-                        var domainTitle = domainSection.querySelector('.domain-header .domain-title');
-                        if (!domainTitle) return;
-                        var domainName = domainTitle.textContent.trim();
-                        var controlRows = Array.from(domainSection.querySelectorAll('.controls-table tbody tr'))
-                            .filter(function(r){ return r.getAttribute('data-control-id') !== null; });
-                        var total = 0, cnt = 0;
-                        controlRows.forEach(function(row){
-                            var selectedAnswer = row.getAttribute('data-selected-answer');
-                            if (selectedAnswer && selectedAnswer.trim() !== '') {
-                                var select = row.querySelector('select.answer-select');
-                                var rating = null;
-                                if (select) {
-                                    var matching = Array.from(select.options).find(function(o){ return (o.textContent || '').trim() === selectedAnswer.trim(); });
-                                    if (matching) {
-                                        var ra = matching.getAttribute('data-rating');
-                                        if (ra != null && ra !== '' && !isNaN(parseFloat(ra))) rating = parseFloat(ra);
-                                    }
-                                }
-                                if (rating === null) {
-                                    var parsed = parseMaturityLevel(selectedAnswer.trim());
-                                    if (parsed !== null) rating = parsed;
-                                }
-                                if (rating !== null) { total += rating; cnt++; }
-                            }
-                        });
-                        var avg = cnt > 0 ? total / cnt : 0;
-                        domainData.push({ name: domainName, average: avg, answeredCount: cnt });
-                    });
-                }
-                if (domainData.length === 0) {
-                    console.warn('No domain data found');
-                    return;
-                }
+                console.warn('No answered controls found for chart');
+                return;
             }
 
             // Sort by domain name alphabetically
@@ -852,24 +821,21 @@
                 var chartCanvas = document.getElementById('maturityRatingChart');
                 if (chartCanvas && chartCanvas.parentElement) {
                     var barCount = labels.length || 1;
-                    var barHeightEm = 1.5; // desired height per bar
-                    var paddingEm = 2;   // extra padding for legend/axes
+                    var barHeightEm = 1.5;
+                    var paddingEm = 2;
                     var totalEm = (barCount * barHeightEm) + paddingEm;
-                    // Convert em to pixels using the root font size
                     var rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
                     var totalPx = totalEm * rootFontSize;
                     chartCanvas.parentElement.style.height = totalPx + 'px';
                 }
-            } catch (e) {
-                // non-fatal; chart will just use default height
-            }
+            } catch (e) {}
 
             if (maturityChartInstance) {
                 maturityChartInstance.destroy();
             }
 
-            // Choose axis max dynamically based on detected rating scale
-            var xMax = detectedMaxRating > 5 ? 100 : 5;
+            // Choose axis max and tick positions based on detected rating scale
+            var xMax = detectedMaxRating > 5 ? 100 : detectedMaxRating;
             var step = detectedMaxRating > 5 ? 10 : 1;
 
             maturityChartInstance = new Chart(ctx, {
@@ -877,7 +843,7 @@
                 data: {
                     labels: labels,
                     datasets: [{
-                        label: 'Average Maturity Rating',
+                        label: 'Average Maturity per Domain',
                         data: values,
                         backgroundColor: '#36A2EB',
                         borderColor: '#2274A5',
@@ -893,22 +859,37 @@
                         legend: {
                             display: true,
                             position: 'top'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    var v = context.parsed.x;
+                                    // Find the closest rated answer for the tooltip
+                                    var closest = null;
+                                    var closestDiff = Infinity;
+                                    allRatings.forEach(function(r) {
+                                        var diff = Math.abs(r - v);
+                                        if (diff < closestDiff) { closestDiff = diff; closest = r; }
+                                    });
+                                    var answerLabel = (closest !== null && ratingToLabel[closest]) ? ratingToLabel[closest] : '';
+                                    return answerLabel ? (answerLabel + ' (avg ' + v.toFixed(1) + ')') : ('avg ' + v.toFixed(1));
+                                }
+                            }
                         }
                     },
                     layout: {
-                        padding: {
-                            top: 0,
-                            right: 0,
-                            bottom: 0,
-                            left: 0
-                        }
+                        padding: { top: 0, right: 0, bottom: 0, left: 0 }
                     },
                     scales: {
                         x: {
                             beginAtZero: true,
                             max: xMax,
                             ticks: {
-                                stepSize: step
+                                stepSize: step,
+                                callback: function(value) {
+                                    // Replace numeric tick with the maturity answer label if available
+                                    return ratingToLabel[value] || value;
+                                }
                             }
                         },
                         y: {
@@ -939,6 +920,26 @@
             if (m && m[1]) return parseInt(m[1], 10);
 
             return null;
+        }
+
+        function toggleGuideVisible(checkbox) {
+            var csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+            var csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+            var statusEl = document.getElementById('guide-visible-status');
+            fetch('/assessment/' + window.assessmentId + '/guide-visible', {
+                method: 'POST',
+                headers: { [csrfHeader]: csrfToken, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ guideVisibleInDirect: checkbox.checked })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                statusEl.textContent = 'Saved';
+                setTimeout(function() { statusEl.textContent = ''; }, 2000);
+            })
+            .catch(function() {
+                statusEl.textContent = 'Error saving';
+                checkbox.checked = !checkbox.checked;
+            });
         }
     </script>
 </body>

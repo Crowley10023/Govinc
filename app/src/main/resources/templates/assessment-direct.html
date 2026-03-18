@@ -128,6 +128,39 @@
                 </div>
             </div>
         </div>
+
+        <!-- Answering Guide Modal (shown when guideVisibleInDirect=true) -->
+        <div class="modal-bg" id="direct-guide-modal-bg" style="display:none;">
+            <div class="modal-popup answering-guide-popup">
+                <div class="answering-guide-header">
+                    <h3>Answering Guide</h3>
+                    <button type="button" class="modal-close-btn" onclick="closeDirectGuide()">X</button>
+                </div>
+                <div class="answering-guide-body">
+                    <div class="guide-left-panel">
+                        <div class="answering-guide-content">
+                            <div id="direct-guide-control-name" class="guide-control-name"></div>
+                            <div id="direct-guide-loading" class="guide-loading guide-loading-initial">
+                                <div class="loading-spinner"></div>
+                                <p>Generating questions from AI...</p>
+                            </div>
+                            <div id="direct-guide-questions" class="guide-questions"></div>
+                            <div id="direct-guide-generating" class="guide-loading guide-loading-submit" style="display:none;">
+                                <div class="loading-spinner"></div>
+                                <p>Generating answer from AI...</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="guide-right-panel">
+                        <h4 class="guide-right-panel-title">Maturity Answers</h4>
+                        <div id="direct-guide-maturity-list" class="guide-maturity-answers-list"></div>
+                    </div>
+                </div>
+                <div class="modal-btn-row">
+                    <button type="button" class="btn-cancel" onclick="closeDirectGuide()">Close</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -139,6 +172,14 @@
             container.innerHTML = '<span class="answer-error" title="Error saving"><svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="#ffd8d8" stroke="#cc2222" stroke-width="2"/><path d="M6 6l6 6M12 6l-6 6" fill="none" stroke="#cc2222" stroke-width="2"/></svg></span>';
         }
         function clearIcon(container) { container.innerHTML = ''; }
+        function escapeHtml(str) {
+            var d = document.createElement('div');
+            d.appendChild(document.createTextNode(str || ''));
+            return d.innerHTML;
+        }
+        function escapeAttr(str) {
+            return (str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
         var CHECKMARK_SVG = '<svg width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" stroke="#22b573" stroke-width="2" fill="#fff"/><polyline points="6,12 10,16 16,7" stroke="#22b573" stroke-width="2.5" fill="none"/></svg>';
         function toggleDomain(header) {
             var controlsDiv = header.nextElementSibling;
@@ -261,6 +302,9 @@
                 var controlAnswers = data.controlAnswers || {};
                 var comments = data.controlComments || {};
                 var isOpen = data.isOpen;
+                var guideVisible = data.guideVisibleInDirect === true;
+                window._directCatalogId = data.securityCatalogId || 0;
+                window._directMaturityAnswers = answers;
                 // Hide finalize bar if finalized (read-only mode)
                 var finalizeBar = document.getElementById('finalize-button-sticky');
                 if (!isOpen && finalizeBar) { finalizeBar.style.display = 'none'; }
@@ -285,7 +329,17 @@
                         var ansCell = '';
                         var selectId = 'select-control-' + ctrl.id;
                         var disabledAttr = isOpen ? '' : ' disabled';
+                        var guideBtnHtml = '';
+                        if (guideVisible && isOpen) {
+                            guideBtnHtml = '<div class="answering-guide-row">' +
+                                '<button type="button" class="answering-guide-btn" ' +
+                                'data-control-id="' + ctrl.id + '" ' +
+                                'data-control-name="' + escapeAttr(ctrl.name || '') + '" ' +
+                                'data-control-detail="' + escapeAttr(ctrl.detail || '') + '" ' +
+                                'onclick="openDirectGuide(this)">&#128161; Guide</button></div>';
+                        }
                         ansCell = '<div class="control-actions-flex-row">' +
+                            guideBtnHtml +
                             '<div class="dropdown-row">' +
                             '<select name="control_' + ctrl.id + '" data-control-id="' + ctrl.id + '" data-domain-id="' + domain.id + '" class="answer-select" id="' + selectId + '"' + disabledAttr + '><option value="">-- select an answer --</option>';
                         answers.forEach(function (ans) {
@@ -446,6 +500,156 @@
                     }
                 });
             }
+        });
+
+        // =================== Answering Guide (Direct View) ===================
+        var _directGuideState = { controlId: null, catalogId: 0, questions: [], maturityAnswers: [], proposedAnswer: null };
+
+        function openDirectGuide(btn) {
+            var controlId = btn.getAttribute('data-control-id');
+            var controlName = btn.getAttribute('data-control-name');
+            var controlDetail = btn.getAttribute('data-control-detail');
+            _directGuideState = {
+                controlId: controlId,
+                catalogId: window._directCatalogId || 0,
+                questions: [],
+                maturityAnswers: window._directMaturityAnswers || [],
+                proposedAnswer: null
+            };
+            document.getElementById('direct-guide-control-name').innerHTML =
+                '<h4>' + escapeHtml(controlName) + '</h4><p>' + escapeHtml(controlDetail || '') + '</p>';
+            document.getElementById('direct-guide-questions').innerHTML = '';
+            document.getElementById('direct-guide-questions').style.display = '';
+            document.getElementById('direct-guide-generating').style.display = 'none';
+            var loadingEl = document.getElementById('direct-guide-loading');
+            loadingEl.style.display = 'flex';
+            document.getElementById('direct-guide-modal-bg').style.display = 'flex';
+            populateDirectGuideMaturity();
+            fetch('/assessment/generate-answering-guide-questions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ controlId: controlId, controlName: controlName, controlDetail: controlDetail, securityCatalogId: _directGuideState.catalogId })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(resp) {
+                loadingEl.style.display = 'none';
+                if (resp && resp.questions && Array.isArray(resp.questions)) {
+                    _directGuideState.questions = resp.questions;
+                    renderDirectGuideQuestions(resp.questions);
+                } else {
+                    document.getElementById('direct-guide-questions').innerHTML = '<p style="color:red;">' + escapeHtml(resp.message || 'Could not load questions.') + '</p>';
+                    document.getElementById('direct-guide-questions').style.display = 'block';
+                }
+            })
+            .catch(function() {
+                loadingEl.style.display = 'none';
+                document.getElementById('direct-guide-questions').innerHTML = '<p style="color:red;">Error generating questions. Please try again.</p>';
+                document.getElementById('direct-guide-questions').style.display = 'block';
+            });
+        }
+
+        function renderDirectGuideQuestions(questions) {
+            var html = '<div class="questions-container">';
+            questions.forEach(function(q, i) {
+                html += '<div class="question-item">';
+                html += '<div class="question-label">' + (i + 1) + '. ' + escapeHtml(q) + '</div>';
+                html += '<div class="question-answer-options">';
+                html += '<button type="button" class="question-pill" data-qi="' + i + '" data-val="Yes" onclick="selectDirectGuidePill(this)">Yes</button>';
+                html += '<button type="button" class="question-pill" data-qi="' + i + '" data-val="No" onclick="selectDirectGuidePill(this)">No</button>';
+                html += '</div></div>';
+            });
+            html += '<button type="button" class="guide-submit-answers-btn" onclick="submitDirectGuideAnswers()">Submit Answers</button>';
+            html += '</div>';
+            var el = document.getElementById('direct-guide-questions');
+            el.innerHTML = html;
+            el.style.display = 'flex';
+        }
+
+        function selectDirectGuidePill(btn) {
+            var qi = btn.getAttribute('data-qi');
+            document.querySelectorAll('#direct-guide-questions .question-pill[data-qi="' + qi + '"]').forEach(function(p) {
+                p.classList.remove('question-pill-selected');
+            });
+            btn.classList.add('question-pill-selected');
+        }
+
+        function submitDirectGuideAnswers() {
+            var answers = [];
+            var allAnswered = true;
+            for (var i = 0; i < _directGuideState.questions.length; i++) {
+                var sel = document.querySelector('#direct-guide-questions .question-pill[data-qi="' + i + '"].question-pill-selected');
+                if (!sel) { allAnswered = false; break; }
+                answers.push(sel.getAttribute('data-val'));
+            }
+            if (!allAnswered) { alert('Please answer all questions before submitting.'); return; }
+            var maturityModelAnswers = (_directGuideState.maturityAnswers || []).map(function(a) {
+                return { id: a.id, answer: a.answer };
+            });
+            document.getElementById('direct-guide-questions').style.display = 'none';
+            document.getElementById('direct-guide-generating').style.display = 'flex';
+            fetch('/assessment/generate-answer-from-guide', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    controlId: _directGuideState.controlId,
+                    securityCatalogId: _directGuideState.catalogId,
+                    questions: _directGuideState.questions,
+                    answers: answers,
+                    maturityModelAnswers: maturityModelAnswers
+                })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(resp) {
+                document.getElementById('direct-guide-generating').style.display = 'none';
+                if (resp && resp.proposedAnswer) {
+                    _directGuideState.proposedAnswer = resp.proposedAnswer;
+                    document.getElementById('direct-guide-questions').style.display = 'flex';
+                    highlightDirectGuideAnswer(resp.proposedAnswer);
+                } else {
+                    alert('Error generating answer. Please try again.');
+                    document.getElementById('direct-guide-questions').style.display = 'flex';
+                }
+            })
+            .catch(function() {
+                document.getElementById('direct-guide-generating').style.display = 'none';
+                document.getElementById('direct-guide-questions').style.display = 'flex';
+                alert('Error generating answer. Please try again.');
+            });
+        }
+
+        function highlightDirectGuideAnswer(proposedAnswer) {
+            document.querySelectorAll('#direct-guide-maturity-list .maturity-answer-card').forEach(function(card) {
+                if (card.getAttribute('data-answer') === proposedAnswer) {
+                    card.classList.add('maturity-answer-suggested');
+                } else {
+                    card.classList.remove('maturity-answer-suggested');
+                }
+            });
+        }
+
+        function populateDirectGuideMaturity() {
+            var list = document.getElementById('direct-guide-maturity-list');
+            list.innerHTML = '';
+            (_directGuideState.maturityAnswers || []).forEach(function(a) {
+                var card = document.createElement('div');
+                card.className = 'maturity-answer-card';
+                card.setAttribute('data-answer', a.answer || '');
+                card.innerHTML = '<span class="maturity-answer-name">' + escapeHtml(a.answer || '') + '</span>';
+                list.appendChild(card);
+            });
+        }
+
+        function closeDirectGuide() {
+            document.getElementById('direct-guide-modal-bg').style.display = 'none';
+            _directGuideState = { controlId: null, catalogId: 0, questions: [], maturityAnswers: [], proposedAnswer: null };
+            document.getElementById('direct-guide-loading').style.display = 'flex';
+            document.getElementById('direct-guide-questions').innerHTML = '';
+            document.getElementById('direct-guide-questions').style.display = '';
+            document.getElementById('direct-guide-generating').style.display = 'none';
+            document.getElementById('direct-guide-maturity-list').innerHTML = '';
+        }
+        document.getElementById('direct-guide-modal-bg').addEventListener('mousedown', function(e) {
+            if (e.target === this) closeDirectGuide();
         });
     </script>
 </body>

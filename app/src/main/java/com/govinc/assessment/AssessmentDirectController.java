@@ -62,6 +62,8 @@ public class AssessmentDirectController {
             assessmentMap.put("orgUnit", assessment.getOrgUnit() != null ? assessment.getOrgUnit().getName() : "-");
             assessmentMap.put("createdBy", assessment.getCreatedBy() != null ? (assessment.getCreatedBy().getName() + " (" + assessment.getCreatedBy().getEmail() + ")") : null);
             out.put("assessment", assessmentMap);
+            out.put("guideVisibleInDirect", assessment.isGuideVisibleInDirect());
+            out.put("securityCatalogId", assessment.getSecurityCatalog() != null ? assessment.getSecurityCatalog().getId() : null);
 
             // Controls, sorted
             List<SecurityControl> controls = new ArrayList<>();
