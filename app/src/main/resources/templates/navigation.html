@@ -69,12 +69,13 @@
       <div class="nav-entry" th:if="${canViewAssessmentList}">
         <a href="/assessment/list" class="entry-link btn-nav shiny">Assessments</a>
       </div>
-      <!-- Compliance Check: Only visible to ADMIN and ISM -->
+      <!-- Reporting: Only visible to ADMIN and ISM -->
       <div class="nav-entry dropdown" th:if="${canAccessCompliance}">
-        <button type="button" class="dropdown-button btn-nav shiny">Compliance Check</button>
+        <button type="button" class="dropdown-button btn-nav shiny">Reporting</button>
         <div class="dropdown-content">
           <a href="/compliance/view" class="dropdown-menu-btn">Compliance Check</a>
           <a href="/compliance/checks" class="dropdown-menu-btn">Compliance Check List</a>
+          <a href="/reporting/org-unit" class="dropdown-menu-btn">Org Unit Reporting</a>
         </div>
       </div>
       <!-- Statistics: Only visible to ADMIN and ISM -->

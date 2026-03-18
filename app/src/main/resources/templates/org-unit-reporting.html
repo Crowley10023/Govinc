@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <meta charset="UTF-8">
+    <meta name="_csrf" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:content="${_csrf.headerName}">
+    <title>Org Unit Reporting</title>
+    <script src="/webjars/chart.js/3.9.1/dist/chart.min.js"></script>
+    <th:block th:replace="~{navigation :: navHead}"></th:block>
+    <style>
+        .reporting-card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            padding: 1.5rem 2rem;
+            margin-bottom: 1.5rem;
+        }
+        .reporting-selector {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .reporting-selector label {
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .reporting-selector select {
+            min-width: 220px;
+        }
+        .chart-wrapper {
+            position: relative;
+            width: 100%;
+            height: 260px;
+        }
+        #loading-indicator {
+            display: none;
+            color: #555;
+            margin-top: 0.5rem;
+        }
+        #chart-placeholder {
+            color: #888;
+            font-style: italic;
+            margin-top: 0.5rem;
+        }
+        .catalog-chart-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+        .coverage-note {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div th:replace="~{navigation :: mainNav}"></div>
+    <div class="container">
+        <h1>Org Unit Reporting</h1>
+        <p class="text-muted">Select an organisation unit to view the maturity development and answer coverage per security catalog, across all assessments in chronological order.</p>
+
+        <div class="reporting-card">
+            <div class="reporting-selector">
+                <label for="org-unit-select">Organisation Unit:</label>
+                <select id="org-unit-select" class="form-control">
+                    <option value="">-- Select an org unit --</option>
+                    <option th:each="ou : ${orgUnits}" th:value="${ou.id}" th:text="${ou.name}">Org Unit</option>
+                </select>
+            </div>
+            <div id="loading-indicator">Loading chart data...</div>
+            <div id="chart-placeholder">Please select an organisation unit to display the charts.</div>
+            <div id="no-data-msg" style="display:none; color:#888; font-style:italic;">
+                No assessment data found for the selected organisation unit.
+            </div>
+        </div>
+
+        <div id="charts-container"></div>
+    </div>
+
+    <script>
+        var catalogChartInstances = [];
+
+        function escHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        document.getElementById('org-unit-select').addEventListener('change', function () {
+            var orgUnitId = this.value;
+
+            // Destroy previous charts
+            catalogChartInstances.forEach(function (c) { try { c.destroy(); } catch(e) {} });
+            catalogChartInstances = [];
+            document.getElementById('charts-container').innerHTML = '';
+            document.getElementById('no-data-msg').style.display = 'none';
+            document.getElementById('chart-placeholder').style.display = 'none';
+
+            if (!orgUnitId) {
+                document.getElementById('chart-placeholder').style.display = 'block';
+                return;
+            }
+
+            document.getElementById('loading-indicator').style.display = 'block';
+
+            fetch('/reporting/org-unit/data?orgUnitId=' + encodeURIComponent(orgUnitId))
+                .then(function (resp) {
+                    if (!resp.ok) throw new Error('Request failed');
+                    return resp.json();
+                })
+                .then(function (catalogs) {
+                    document.getElementById('loading-indicator').style.display = 'none';
+                    if (!catalogs || catalogs.length === 0) {
+                        document.getElementById('no-data-msg').style.display = 'block';
+                        return;
+                    }
+                    renderCatalogCharts(catalogs);
+                })
+                .catch(function () {
+                    document.getElementById('loading-indicator').style.display = 'none';
+                    document.getElementById('no-data-msg').textContent = 'Error loading data. Please try again.';
+                    document.getElementById('no-data-msg').style.display = 'block';
+                });
+        });
+
+        function renderCatalogCharts(catalogs) {
+            var container = document.getElementById('charts-container');
+
+            catalogs.forEach(function (catalog, idx) {
+                var pts = catalog.assessments;
+                if (!pts || pts.length === 0) return;
+
+                var canvasId = 'catalog-chart-' + idx;
+                var card = document.createElement('div');
+                card.className = 'reporting-card';
+                card.innerHTML =
+                    '<div class="catalog-chart-title">' + escHtml(catalog.catalogName) + '</div>' +
+                    '<div class="chart-wrapper"><canvas id="' + canvasId + '"></canvas></div>' +
+                    '<p class="coverage-note">' +
+                        '<span style="display:inline-block;width:12px;height:12px;background:rgba(54,162,235,0.75);border:1px solid #2274A5;margin-right:4px;vertical-align:middle;"></span>Avg Maturity (%)&nbsp;&nbsp;' +
+                        '<span style="display:inline-block;width:20px;height:3px;background:#FFA726;margin-right:4px;vertical-align:middle;"></span>Coverage (% controls answered)' +
+                    '</p>';
+                container.appendChild(card);
+
+                var maturityData = pts.map(function (p) { return p.averageRating; });
+                var coverageData = pts.map(function (p) { return p.coveragePercent; });
+                var dateLabels  = pts.map(function (p) { return p.dateLabel; });
+
+                var ctx = document.getElementById(canvasId);
+                var instance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: dateLabels,
+                        datasets: [
+                            {
+                                type: 'bar',
+                                label: 'Avg Maturity (%)',
+                                data: maturityData,
+                                backgroundColor: 'rgba(54,162,235,0.75)',
+                                borderColor: '#2274A5',
+                                borderWidth: 1,
+                                order: 2,
+                                yAxisID: 'y'
+                            },
+                            {
+                                type: 'line',
+                                label: 'Coverage (%)',
+                                data: coverageData,
+                                borderColor: '#FFA726',
+                                backgroundColor: 'rgba(255,167,38,0.10)',
+                                borderWidth: 2,
+                                pointRadius: 4,
+                                pointBackgroundColor: '#FFA726',
+                                fill: false,
+                                tension: 0.2,
+                                order: 1,
+                                yAxisID: 'y'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: true, position: 'top' },
+                            tooltip: {
+                                callbacks: {
+                                    afterBody: function (context) {
+                                        if (!context || context.length === 0) return [];
+                                        var i = context[0].dataIndex;
+                                        var p = pts[i];
+                                        return [
+                                            'Assessment: ' + p.assessmentName,
+                                            'Answered: ' + p.answeredCount + ' / ' + p.totalControls
+                                        ];
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: { display: true, text: 'Assessment date' },
+                                ticks: { maxRotation: 30, minRotation: 0 }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                max: 100,
+                                ticks: { stepSize: 10 },
+                                title: { display: true, text: '%' }
+                            }
+                        }
+                    }
+                });
+                catalogChartInstances.push(instance);
+            });
+        }
+    </script>
+</body>
+</html>

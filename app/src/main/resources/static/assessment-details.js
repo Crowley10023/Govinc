@@ -408,39 +408,40 @@ $(document).ready(function () {
     $("#create-url-btn").click(function () {
         let assessmentId = window.assessmentId || 0;
         $("#create-url-btn").prop('disabled', true);
-        $("#create-url-feedback").text('Creating...');
         $.ajax({
             url: '/assessment/' + assessmentId + '/create-url',
             type: 'POST',
             success: function (data) {
-                $("#create-url-feedback").html('<span style="color: green;">Created!</span>');
-                setTimeout(function () {
-                    $("#create-url-feedback").empty();
-                    $("#create-url-btn").prop('disabled', false);
-                }, 1800);
+                $("#create-url-btn").prop('disabled', false);
                 if (data && data.directUrl) {
-                    $("#direct-url-link").attr('href', data.directUrl);
-                    $("#direct-url-link").text(window.location.origin + data.directUrl);
-                    $("#direct-url-row").show();
+                    var fullUrl = window.location.origin + data.directUrl;
+                    $('#create-url-modal-link').attr('href', data.directUrl).text(fullUrl);
+                    $('#create-url-modal-expiry').text(data.expirationDate || '');
+                    $('#create-url-modal').css('display', 'flex');
+                    // Also update the Assessment URL cell in the details table
                     var $urlTd = $("th:contains('Assessment URL')").next('td');
                     if ($urlTd.length > 0) {
                         var anchor = $urlTd.find('a');
                         if (anchor.length > 0) {
                             anchor.attr('href', data.directUrl);
-                            anchor.text(window.location.origin + data.directUrl);
+                            anchor.text(fullUrl);
                             anchor.parent().show();
                             anchor.parent().siblings('span').hide();
                         } else {
-                            $urlTd.html('<span><a href="' + data.directUrl + '" target="_blank">' + window.location.origin + data.directUrl + '</a></span>');
+                            $urlTd.html('<span><a href="' + data.directUrl + '" target="_blank">' + $('<span/>').text(fullUrl).html() + '</a></span>');
                         }
                     }
                 }
             },
-            error: function (err) {
-                $("#create-url-feedback").html('<span style="color: red;">Error creating URL</span>');
+            error: function () {
                 $("#create-url-btn").prop('disabled', false);
+                alert('Error creating URL. Please try again.');
             }
         });
+    });
+
+    $('#create-url-modal-close').click(function () {
+        $('#create-url-modal').css('display', 'none');
     });
 
     // Save answer on dropdown change (delegated handler to support dynamic elements)
@@ -520,6 +521,7 @@ $(document).ready(function () {
                             // Recompute completion and charts
                             updateAnsweredCount();
                             debouncedUpdateMaturityChart();
+                            debouncedUpdatePieChart();
                             checkDomainCompleteness();
                         } catch (e) {
                             console.debug('Could not update local DOM state after save', e);
@@ -1198,6 +1200,62 @@ var debouncedUpdateMaturityChart = debounce(function() {
     }
 }, 300);
 
+function generateGradientColorsForPie(n) {
+    if (n === 0) return [];
+    var start = { r: 220, g: 53, b: 69 };   // red
+    var end   = { r: 40,  g: 167, b: 69 };  // green
+    var cols = [];
+    for (var i = 0; i < n; i++) {
+        var t = n === 1 ? 0 : i / (n - 1);
+        var r = Math.round(start.r + (end.r - start.r) * t);
+        var g = Math.round(start.g + (end.g - start.g) * t);
+        var b = Math.round(start.b + (end.b - start.b) * t);
+        cols.push('rgb(' + r + ',' + g + ',' + b + ')');
+    }
+    return cols;
+}
+
+function updatePieChart() {
+    if (typeof chartInstance === 'undefined' || !chartInstance) return;
+    var selects = Array.from(document.querySelectorAll('.answer-select'));
+    var counts = {};
+    selects.forEach(function(sel) {
+        var selected = sel.options[sel.selectedIndex];
+        if (!selected || !selected.value || selected.value === '') return;
+        var label = (selected.textContent || selected.text || '').trim();
+        if (!label || label.indexOf('select an answer') !== -1) return;
+        counts[label] = (counts[label] || 0) + 1;
+    });
+    var data = Object.keys(counts).map(function(label) {
+        return { label: label, count: counts[label] };
+    }).sort(function(a, b) { return a.label.localeCompare(b.label); });
+    if (data.length === 0) return;
+    var total = data.reduce(function(sum, d) { return sum + d.count; }, 0);
+    var labels = data.map(function(d) { return d.label; });
+    var values = data.map(function(d) { return d.count; });
+    var colors = generateGradientColorsForPie(data.length);
+    chartInstance.data.labels = labels;
+    chartInstance.data.datasets[0].data = values;
+    chartInstance.data.datasets[0].backgroundColor = colors;
+    chartInstance.update();
+    var legendContainer = document.querySelector('.summary-legend');
+    if (legendContainer) {
+        var html = '';
+        data.forEach(function(item, idx) {
+            var percent = total > 0 ? Math.round(item.count / total * 100) : 0;
+            html += '<div class="legend-item" style="border-left-color: ' + colors[idx] + ';">' +
+                '<div class="legend-label"><strong>' + item.label + '</strong></div>' +
+                '<div class="legend-values">' +
+                '<span class="legend-count">' + item.count + ' answer(s)</span>' +
+                '<span class="legend-percent">' + percent + '%</span>' +
+                '</div></div>';
+        });
+        legendContainer.innerHTML = html;
+    }
+}
+
+var debouncedUpdatePieChart = debounce(updatePieChart, 300);
+
 document.addEventListener("DOMContentLoaded", function () {
     // Initialize filter bar first
     initializeFilterBar();
@@ -1215,8 +1273,9 @@ document.addEventListener("DOMContentLoaded", function () {
         if (e.target.classList.contains("answer-select")) {
             checkDomainCompleteness();
             updateAnsweredCount();
-            // Update chart when answers change (including taken-over ones via data-selected-answer)
+            // Update charts when answers change
             debouncedUpdateMaturityChart();
+            debouncedUpdatePieChart();
         }
     });
 

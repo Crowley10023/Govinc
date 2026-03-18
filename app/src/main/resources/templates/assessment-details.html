@@ -364,9 +364,20 @@
             <a th:if="${!isAssessor}" id="word-report-btn" th:href="@{'/assessment/' + ${assessment.id} + '/word-report'}" class="btn-action">Create Report (Word)</a>
             <a th:if="${!isAssessor}" th:href="@{'/assessment/' + ${assessment.id} + '/excel'}" class="btn-action">Export to Excel</a>
             <button th:if="${isAdminOrISM and assessment.isOpen}" id="create-url-btn" type="button" class="btn-action">Create URL</button>
-            <span id="create-url-feedback"></span>
-            <div id="direct-url-row" class="direct-url-row">
-                <a id="direct-url-link" href="#" target="_blank"></a>
+
+            <!-- Create URL Modal -->
+            <div id="create-url-modal" class="modal-bg">
+                <div class="modal-popup">
+                    <h3>Assessment URL Created</h3>
+                    <div class="modal-content">
+                        <p>The following link grants direct access to this assessment:</p>
+                        <p><a id="create-url-modal-link" href="#" target="_blank" style="word-break: break-all;"></a></p>
+                        <p class="text-muted text-sm mt-sm">Expiration date: <strong id="create-url-modal-expiry"></strong></p>
+                    </div>
+                    <div class="modal-btn-row">
+                        <button type="button" id="create-url-modal-close" class="btn-action">Close</button>
+                    </div>
+                </div>
             </div>
 
             <!-- Re-open Assessment Confirmation Modal -->
@@ -872,7 +883,7 @@
                                         if (diff < closestDiff) { closestDiff = diff; closest = r; }
                                     });
                                     var answerLabel = (closest !== null && ratingToLabel[closest]) ? ratingToLabel[closest] : '';
-                                    return answerLabel ? (answerLabel + ' (avg ' + v.toFixed(1) + ')') : ('avg ' + v.toFixed(1));
+                                    return answerLabel ? answerLabel : ('avg ' + v.toFixed(1));
                                 }
                             }
                         }

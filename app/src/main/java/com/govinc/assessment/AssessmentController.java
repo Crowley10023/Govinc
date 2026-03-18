@@ -1057,7 +1057,15 @@ public class AssessmentController {
         }
         AssessmentUrls url = assessmentUrlsService.createOrReplaceUrl(id);
         String fullUrl = "/assessment-direct/" + url.getUrl();
-        return Map.of("directUrl", fullUrl);
+        Assessment updated = assessmentRepository.findById(id).orElse(null);
+        String expiry = "";
+        if (updated != null && updated.getUrlExpirationDate() != null) {
+            expiry = updated.getUrlExpirationDate().format(java.time.format.DateTimeFormatter.ofPattern("dd MMM yyyy"));
+        }
+        Map<String, String> result = new java.util.HashMap<>();
+        result.put("directUrl", fullUrl);
+        result.put("expirationDate", expiry);
+        return result;
     }
 
     // --- Set OrgUnit for Assessment ---

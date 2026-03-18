@@ -118,6 +118,7 @@ public class SecurityConfig {
                     "/maturitymodel/**",
                     "/maturityanswer/**",
                     "/compliance/**",
+                    "/reporting/**",
                     "/orgservice-assessment/**",
                     "/orgservices/**",
                     "/orgunits/**",
