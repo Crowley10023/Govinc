@@ -1,0 +1,6 @@
+-- Govinc database backup generated at 2026-03-18T08:06:25.8070252
+-- Database: TESTDB
+SET FOREIGN_KEY_CHECKS=0;
+
+-- Table: `AI_PROMPT_CACHE`
+DROP TABLE IF EXISTS `AI_PROMPT_CACHE`;

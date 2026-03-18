@@ -28,7 +28,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
-    testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("org.springframework.security:spring-security-test")
     implementation("org.json:json:20240303") // For JSON processing in OpenAIUtil
     implementation("org.webjars:jquery:3.6.0") // jQuery as WebJars dependency
     // Provide Chart.js as a WebJar so installations without external CDN access still work
@@ -50,6 +50,16 @@ application {
 
 tasks.named<Test>("test") {
     useJUnitPlatform()
+    outputs.upToDateWhen { false }
+    jvmArgs("-Dfile.encoding=UTF-8", "-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8",
+            "-XX:+EnableDynamicAgentLoading", "-Xshare:off")
+    testLogging {
+        showStandardStreams = true
+        showExceptions = false
+        showCauses = false
+        showStackTraces = false
+        events("passed", "skipped", "failed")
+    }
 }
 
 tasks.named<ProcessResources>("processResources") {

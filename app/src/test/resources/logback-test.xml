@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Only print to console, no file appender during tests -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <target>System.out</target>
+        <encoder>
+            <pattern>%msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Suppress all framework/library logging -->
+    <logger name="org.springframework"         level="OFF" />
+    <logger name="org.hibernate"               level="OFF" />
+    <logger name="org.thymeleaf"               level="OFF" />
+    <logger name="com.zaxxer.hikari"           level="OFF" />
+    <logger name="org.apache.catalina"         level="OFF" />
+    <logger name="org.apache.tomcat"           level="OFF" />
+    <logger name="com.fasterxml.jackson"       level="OFF" />
+    <logger name="org.flywaydb"                level="OFF" />
+
+    <!-- Suppress application-level startup noise expected in tests -->
+    <logger name="com.govinc.configuration"    level="OFF" />
+    <logger name="com.govinc.service.AuthProviderHealthService" level="OFF" />
+
+    <!-- Allow explicit test output (System.out.println from @AfterAll summaries) -->
+    <!-- Everything else at ERROR so truly unexpected errors still surface -->
+    <root level="ERROR">
+        <appender-ref ref="CONSOLE" />
+    </root>
+</configuration>
