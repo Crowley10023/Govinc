@@ -225,7 +225,7 @@
 .domain-outline {
     border: 2px solid var(--primary-blue);
     border-radius: 9px;
-    margin-bottom: 2.5em;
+    margin-bottom: 0.5em;
     background: linear-gradient(94deg, var(--table-bg1) 94%, var(--table-bg2) 100%);
 }
 
@@ -1983,7 +1983,7 @@ body::before {
 .controls-viewport {
     display: flex;
     flex-direction: column;
-    gap: 1.5em;
+    gap: 0.2em;
     margin-bottom: 2em;
     padding-bottom: 5em;
 }
@@ -2359,7 +2359,7 @@ body::before {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1.2em;
+    padding: 0.8em;
     background: linear-gradient(135deg, rgba(34, 116, 165, 0.05) 0%, rgba(255, 149, 5, 0.03) 100%);
     border-radius: 8px;
     border: 1px solid rgba(34, 116, 165, 0.1);
@@ -4078,7 +4078,7 @@ body::before {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 14px 18px;
+    padding: 2px 18px;
     border-left: 18px solid var(--primary-blue);
     background-color: #fff;
     border-radius: 6px;
@@ -10195,7 +10195,6 @@ table tr.hidden {
 .card {
     background: #fff;
     border-radius: 6px;
-    padding: 1rem;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
