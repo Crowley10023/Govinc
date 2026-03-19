@@ -107,11 +107,14 @@
             return fetch(state.treeApiUrl)
                 .then(resp => resp.json())
                 .then(tree => {
+                    const previousFocusId = state.focusId;
                     state.nodesById.clear();
                     state.parentById.clear();
                     indexTree(tree, null);
                     state.rootId = tree.id;
-                    state.focusId = tree.id;
+                    state.focusId = (previousFocusId !== null && state.nodesById.has(previousFocusId))
+                        ? previousFocusId
+                        : tree.id;
                     state.treeLoaded = true;
                     renderFocusedTree();
                 })
