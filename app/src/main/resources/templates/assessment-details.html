@@ -883,7 +883,7 @@
                                         if (diff < closestDiff) { closestDiff = diff; closest = r; }
                                     });
                                     var answerLabel = (closest !== null && ratingToLabel[closest]) ? ratingToLabel[closest] : '';
-                                    return answerLabel ? answerLabel : ('avg ' + v.toFixed(1));
+                                    return answerLabel ? answerLabel : '';
                                 }
                             }
                         }
@@ -898,8 +898,9 @@
                             ticks: {
                                 stepSize: step,
                                 callback: function(value) {
-                                    // Replace numeric tick with the maturity answer label if available
-                                    return ratingToLabel[value] || value;
+                                    // Replace numeric tick with the maturity answer label if available.
+                                    // If no matching label exists, return empty string to avoid showing raw numbers.
+                                    return ratingToLabel[value] || '';
                                 }
                             }
                         },
