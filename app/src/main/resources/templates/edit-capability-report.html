@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <title th:text="${report.id != null} ? 'Edit Capability Report' : 'Create Capability Report'"></title>
+    <meta charset="UTF-8">
+    <th:block th:replace="~{navigation :: navHead}"></th:block>
+</head>
+<body>
+<div th:replace="~{navigation :: mainNav}"></div>
+<div class="container">
+    <h1 class="page-title"
+        th:text="${report.id != null} ? 'Edit Capability Report' : 'Create Capability Report'"></h1>
+
+    <form th:action="@{'/capability-report/save'}" method="post">
+        <input type="hidden" name="id" th:value="${report.id}" />
+        <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+
+        <div class="form-group">
+            <label for="name">Report Name <span class="text-danger">*</span></label>
+            <input type="text" id="name" name="name" th:value="${report.name}" required />
+        </div>
+
+        <div class="form-group">
+            <label for="description">Description</label>
+            <textarea id="description" name="description" rows="3"
+                      th:text="${report.description}"></textarea>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="catalogId">Related Security Catalog</label>
+                <select id="catalogId" name="catalogId">
+                    <option value="">(none — all catalogs)</option>
+                    <option th:each="cat : ${allCatalogs}"
+                            th:value="${cat.id}"
+                            th:text="${cat.name}"
+                            th:selected="${report.securityCatalog != null and cat.id == report.securityCatalog.id}">
+                    </option>
+                </select>
+                <span class="help-text">Restricts scoring to assessments and controls from this catalog</span>
+            </div>
+
+            <div class="form-group">
+                <label for="maturityModelId">Maturity Model</label>
+                <select id="maturityModelId" name="maturityModelId">
+                    <option value="">(none)</option>
+                    <option th:each="mm : ${allMaturityModels}"
+                            th:value="${mm.id}"
+                            th:text="${mm.name}"
+                            th:selected="${report.maturityModel != null and mm.id == report.maturityModel.id}">
+                    </option>
+                </select>
+                <span class="help-text">If set, score numbers are replaced by nearest maturity level labels</span>
+            </div>
+
+            <div class="form-group">
+                <label for="orgUnitId">Org Unit (Scope)</label>
+                <select id="orgUnitId" name="orgUnitId">
+                    <option value="">(none)</option>
+                    <option th:each="ou : ${allOrgUnits}"
+                            th:value="${ou.id}"
+                            th:text="${ou.name}"
+                            th:selected="${report.orgUnit != null and ou.id == report.orgUnit.id}">
+                    </option>
+                </select>
+                <span class="help-text">The calculation includes this org unit and all its children</span>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="capabilityIds">Security Capabilities</label>
+            <select id="capabilityIds" name="capabilityIds" multiple size="8">
+                <option th:each="cap : ${allCapabilities}"
+                        th:value="${cap.id}"
+                        th:text="${cap.name}"
+                        th:selected="${report.capabilities != null and report.capabilities.contains(cap)}">
+                </option>
+            </select>
+            <span class="help-text">Hold Ctrl / Cmd to select the capabilities to include in this report</span>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn-submit">Save Report</button>
+            <a th:href="@{'/capability-report/list'}" class="btn-cancel">Cancel</a>
+        </div>
+    </form>
+</div>
+</body>
+</html>

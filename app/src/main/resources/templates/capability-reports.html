@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <title>Capability Reports</title>
+    <meta charset="UTF-8">
+    <meta name="_csrf" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:content="${_csrf.headerName}">
+    <th:block th:replace="~{navigation :: navHead}"></th:block>
+</head>
+<body>
+<div th:replace="~{navigation :: mainNav}"></div>
+<div class="container">
+    <h1 class="page-title">Capability Reports</h1>
+    <p class="text-muted">Capability reports aggregate assessment scores across org units scoped to your defined security capabilities.</p>
+
+    <div class="general-button-bar">
+        <a href="/capability-report/create" class="btn-action">Create New Report</a>
+    </div>
+
+    <div th:if="${#lists.isEmpty(reports)}" class="no-results">
+        <p>No capability reports defined yet.</p>
+        <a href="/capability-report/create">Create the first one</a>
+    </div>
+
+    <table th:if="${not #lists.isEmpty(reports)}" class="table" id="reportsTable">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Catalog</th>
+                <th>Org Unit</th>
+                <th>Capabilities</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="report : ${reports}">
+                <td th:text="${report.name}"></td>
+                <td th:text="${report.description}"></td>
+                <td th:text="${report.securityCatalog != null ? report.securityCatalog.name : '—'}"></td>
+                <td th:text="${report.orgUnit != null ? report.orgUnit.name : '—'}"></td>
+                <td th:text="${#lists.size(report.capabilities)}"></td>
+                <td>
+                    <div class="flex-row gap-sm">
+                        <a th:href="@{'/capability-report/calculate'(id=${report.id})}" class="btn-action">Calculate</a>
+                        <a th:href="@{'/capability-report/edit'(id=${report.id})}" class="btn-edit">Edit</a>
+                        <button type="button" class="btn-danger"
+                                th:data-id="${report.id}"
+                                th:data-name="${report.name}"
+                                onclick="handleDeleteClick(event)">Delete</button>
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="deleteModal" class="modal-bg">
+    <div class="modal-popup-confirmation">
+        <h3>Confirm Deletion</h3>
+        <p>Are you sure you want to delete <strong id="reportName"></strong>?</p>
+        <p class="text-muted">This action cannot be undone.</p>
+        <div class="modal-btn-row">
+            <button type="button" class="btn-cancel" onclick="closeDeleteModal()">Cancel</button>
+            <button type="button" class="btn-danger" onclick="confirmDelete()">Delete</button>
+        </div>
+    </div>
+</div>
+
+<!-- Result Modal -->
+<div id="resultModal" class="modal-bg">
+    <div class="modal-popup-confirmation">
+        <h3 id="resultTitle">Success</h3>
+        <p id="resultMessage"></p>
+        <div class="modal-btn-row">
+            <button type="button" class="btn-action" onclick="closeResultModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let pendingDeleteId = null;
+
+    function handleDeleteClick(event) {
+        const btn = event.currentTarget;
+        pendingDeleteId = btn.getAttribute('data-id');
+        document.getElementById('reportName').textContent = btn.getAttribute('data-name');
+        document.getElementById('deleteModal').style.display = 'flex';
+    }
+
+    function closeDeleteModal() {
+        document.getElementById('deleteModal').style.display = 'none';
+        pendingDeleteId = null;
+    }
+
+    function confirmDelete() {
+        if (!pendingDeleteId) return;
+        const idToDelete = pendingDeleteId;
+        closeDeleteModal();
+
+        const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+        const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+
+        fetch('/capability-report/delete', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                [csrfHeader]: csrfToken
+            },
+            body: 'id=' + encodeURIComponent(idToDelete)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                showResultModal('Deleted', 'The capability report has been deleted.', true);
+            } else {
+                showResultModal(data.title || 'Error', data.message || 'Delete failed.', false);
+            }
+        })
+        .catch(() => showResultModal('Error', 'An unexpected error occurred.', false));
+    }
+
+    function showResultModal(title, message, reload) {
+        document.getElementById('resultTitle').textContent = title;
+        document.getElementById('resultMessage').textContent = message;
+        document.getElementById('resultModal').style.display = 'flex';
+        if (reload) setTimeout(() => location.reload(), 1500);
+    }
+
+    function closeResultModal() {
+        document.getElementById('resultModal').style.display = 'none';
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <title th:text="${capability.id != null} ? 'Edit Security Capability' : 'Create Security Capability'"></title>
+    <meta charset="UTF-8">
+    <th:block th:replace="~{navigation :: navHead}"></th:block>
+</head>
+<body>
+<div th:replace="~{navigation :: mainNav}"></div>
+<div class="container">
+    <h1 class="page-title"
+        th:text="${capability.id != null} ? 'Edit Security Capability' : 'Create Security Capability'"></h1>
+
+    <form th:action="@{'/security-capability/save'}" method="post">
+        <input type="hidden" name="id" th:value="${capability.id}" />
+        <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+
+        <div class="form-group">
+            <label for="name">Name <span class="text-danger">*</span></label>
+            <input type="text" id="name" name="name" th:value="${capability.name}" required />
+            <span class="help-text">Descriptive name for this security capability</span>
+        </div>
+
+        <div class="form-group">
+            <label for="description">Description</label>
+            <textarea id="description" name="description" rows="4"
+                      th:text="${capability.description}"></textarea>
+            <span class="help-text">Optional description of the scope and intent of this capability</span>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="catalogId">Related Security Catalog</label>
+                <select id="catalogId" name="catalogId">
+                    <option value="">(none)</option>
+                    <option th:each="cat : ${allCatalogs}"
+                            th:value="${cat.id}"
+                            th:text="${cat.name}"
+                            th:selected="${capability.securityCatalog != null and cat.id == capability.securityCatalog.id}">
+                    </option>
+                </select>
+                <span class="help-text">Optionally associate this capability with a security catalog</span>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="domainIds">Security Control Domains</label>
+            <select id="domainIds" name="domainIds" multiple size="8">
+                <option th:each="domain : ${allDomains}"
+                        th:value="${domain.id}"
+                        th:text="${domain.name}"
+                        th:selected="${capability.domains != null and capability.domains.contains(domain)}">
+                </option>
+            </select>
+            <span class="help-text">Hold Ctrl / Cmd to select multiple domains. A domain can be shared across capabilities.</span>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn-submit">Save Capability</button>
+            <a th:href="@{'/security-capability/list'}" class="btn-cancel">Cancel</a>
+        </div>
+    </form>
+</div>
+</body>
+</html>

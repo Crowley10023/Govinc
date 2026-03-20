@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <title>Security Capabilities</title>
+    <meta charset="UTF-8">
+    <meta name="_csrf" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:content="${_csrf.headerName}">
+    <th:block th:replace="~{navigation :: navHead}"></th:block>
+</head>
+<body>
+<div th:replace="~{navigation :: mainNav}"></div>
+<div class="container">
+    <h1 class="page-title">Security Capabilities</h1>
+    <p class="text-muted">Capabilities group security control domains into higher-level structuring elements.</p>
+
+    <div class="general-button-bar">
+        <a href="/security-capability/create" class="btn-action">Create New Capability</a>
+    </div>
+
+    <div th:if="${#lists.isEmpty(capabilities)}" class="no-results">
+        <p>No security capabilities defined yet.</p>
+        <a href="/security-capability/create">Create the first one</a>
+    </div>
+
+    <table th:if="${not #lists.isEmpty(capabilities)}" class="table" id="capabilitiesTable">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Related Catalog</th>
+                <th>Domains Mapped</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="cap : ${capabilities}">
+                <td th:text="${cap.name}"></td>
+                <td th:text="${cap.description}"></td>
+                <td th:text="${cap.securityCatalog != null ? cap.securityCatalog.name : '—'}"></td>
+                <td th:text="${#sets.size(cap.domains)}"></td>
+                <td>
+                    <div class="flex-row gap-sm">
+                        <a th:href="@{'/security-capability/edit'(id=${cap.id})}" class="btn-edit">Edit</a>
+                        <button type="button" class="btn-danger"
+                                th:data-id="${cap.id}"
+                                th:data-name="${cap.name}"
+                                onclick="handleDeleteClick(event)">Delete</button>
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="deleteModal" class="modal-bg">
+    <div class="modal-popup-confirmation">
+        <h3>Confirm Deletion</h3>
+        <p>Are you sure you want to delete <strong id="capabilityName"></strong>?</p>
+        <p class="text-muted">This action cannot be undone.</p>
+        <div class="modal-btn-row">
+            <button type="button" class="btn-cancel" onclick="closeDeleteModal()">Cancel</button>
+            <button type="button" class="btn-danger" onclick="confirmDelete()">Delete</button>
+        </div>
+    </div>
+</div>
+
+<!-- Result Modal -->
+<div id="resultModal" class="modal-bg">
+    <div class="modal-popup-confirmation" id="resultModalContent">
+        <h3 id="resultTitle">Success</h3>
+        <p id="resultMessage"></p>
+        <div class="modal-btn-row">
+            <button type="button" class="btn-action" onclick="closeResultModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let pendingDeleteId = null;
+
+    function handleDeleteClick(event) {
+        const btn = event.currentTarget;
+        pendingDeleteId = btn.getAttribute('data-id');
+        document.getElementById('capabilityName').textContent = btn.getAttribute('data-name');
+        document.getElementById('deleteModal').style.display = 'flex';
+    }
+
+    function closeDeleteModal() {
+        document.getElementById('deleteModal').style.display = 'none';
+        pendingDeleteId = null;
+    }
+
+    function confirmDelete() {
+        if (!pendingDeleteId) return;
+        const idToDelete = pendingDeleteId;
+        closeDeleteModal();
+
+        const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+        const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+
+        fetch('/security-capability/delete', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                [csrfHeader]: csrfToken
+            },
+            body: 'id=' + encodeURIComponent(idToDelete)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                showResultModal('Deleted', 'The security capability has been deleted.', true);
+            } else {
+                showResultModal(data.title || 'Error', data.message || 'Delete failed.', false);
+            }
+        })
+        .catch(() => showResultModal('Error', 'An unexpected error occurred.', false));
+    }
+
+    function showResultModal(title, message, reload) {
+        document.getElementById('resultTitle').textContent = title;
+        document.getElementById('resultMessage').textContent = message;
+        document.getElementById('resultModal').style.display = 'flex';
+        if (reload) setTimeout(() => location.reload(), 1500);
+    }
+
+    function closeResultModal() {
+        document.getElementById('resultModal').style.display = 'none';
+    }
+</script>
+</body>
+</html>

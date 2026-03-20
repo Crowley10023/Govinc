@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <title th:text="'Capability Report: ' + ${result.report.name}"></title>
+    <meta charset="UTF-8">
+    <th:block th:replace="~{navigation :: navHead}"></th:block>
+</head>
+<body>
+<div th:replace="~{navigation :: mainNav}"></div>
+<div class="container">
+
+    <div class="flex-row justify-between align-center mb-md">
+        <h1 class="page-title" th:text="${result.report.name}"></h1>
+        <a th:href="@{'/capability-report/list'}" class="btn-secondary">&#8592; Back to Reports</a>
+    </div>
+
+    <div th:if="${result.report.description}" class="text-muted mb-md">
+        <span th:text="${result.report.description}"></span>
+    </div>
+
+    <!-- Meta bar -->
+    <div class="controls-filter-bar mb-md">
+        <span class="filter-item">
+            <span class="text-muted">Catalog:</span>
+            <strong th:text="${result.report.securityCatalog != null ? result.report.securityCatalog.name : 'All'}"></strong>
+        </span>
+        <span class="filter-item">
+            <span class="text-muted">Scope:</span>
+            <strong th:text="${result.report.orgUnit != null ? result.report.orgUnit.name : 'All org units'}"></strong>
+        </span>
+        <span class="filter-item">
+            <span class="text-muted">Org units included:</span>
+            <strong th:text="${result.orgUnitsIncluded}"></strong>
+        </span>
+        <span class="filter-item">
+            <span class="text-muted">Assessments used:</span>
+            <strong th:text="${result.assessmentsIncluded}"></strong>
+        </span>
+        <span class="filter-item">
+            <span class="text-muted">Maturity model:</span>
+            <strong th:text="${result.report.maturityModel != null ? result.report.maturityModel.name : 'None'}"></strong>
+        </span>
+    </div>
+
+    <!-- No data state -->
+    <div th:if="${#lists.isEmpty(result.capabilityScores)}" class="no-results">
+        <p>No capabilities are configured for this report, or no matching assessments were found.</p>
+    </div>
+
+    <!-- Capability tree -->
+    <div class="cap-tree-forest">
+    <div th:each="cs : ${result.capabilityScores}" class="cap-tree-block mb-lg">
+
+        <div class="cap-tree-root">
+            <div class="cap-node-card cap-node-card-capability">
+                <div class="cap-node-title-wrap">
+                    <span class="cap-node-title" th:text="${cs.capability.name}"></span>
+                </div>
+                <div class="cap-node-stats">
+                    <div class="cap-stat-box">
+                        <span th:if="${result.report.maturityModel != null}" class="maturity-level-pill"
+                            th:classappend="${cs.maturityLevel != null} ? ' maturity-level-' + ${cs.maturityLevel.tone} : ' maturity-level-none'"
+                            th:text="${cs.maturityLevel != null ? cs.maturityLevel.answer : 'No level'}"></span>
+                        <span th:unless="${result.report.maturityModel != null}" class="cap-stat-value"
+                              th:classappend="${cs.score >= 70} ? 'score-high' : (${cs.score >= 40} ? 'score-mid' : 'score-low')"
+                              th:text="${#numbers.formatDecimal(cs.score, 1, 1)} + ' / 100'"></span>
+                    </div>
+                    <div class="cap-stat-box">
+                        <span class="cap-stat-label">Coverage</span>
+                        <span class="cap-stat-value"
+                              th:text="${#numbers.formatDecimal(cs.coverage, 1, 1)} + '%'"></span>
+                    </div>
+                </div>
+                <div class="progress-bar-bg cap-node-bar">
+                    <div class="progress-bar-fill"
+                         th:classappend="${cs.score >= 70} ? 'bar-high' : (${cs.score >= 40} ? 'bar-mid' : 'bar-low')"
+                         th:style="'width:' + ${cs.score} + '%'"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Domain child nodes -->
+        <div class="cap-card-body tree-view cap-tree-children">
+
+            <div th:if="${#lists.isEmpty(cs.domainScores)}" class="cap-domain-empty">
+                <span class="text-muted">No security control domains mapped to this capability.</span>
+            </div>
+
+            <div th:each="ds : ${cs.domainScores}" class="cap-domain-tree-item">
+                <div class="cap-domain-branch"></div>
+                <div class="cap-node-card cap-node-card-domain">
+                    <div class="cap-node-title-wrap">
+                        <span class="cap-node-title" th:text="${ds.domain.name}"></span>
+                    </div>
+                    <div class="cap-node-stats">
+                        <div class="cap-stat-box">
+                            <span th:if="${result.report.maturityModel != null}" class="maturity-level-pill"
+                                th:classappend="${ds.maturityLevel != null} ? ' maturity-level-' + ${ds.maturityLevel.tone} : ' maturity-level-none'"
+                                th:text="${ds.maturityLevel != null ? ds.maturityLevel.answer : 'No level'}"></span>
+                            <span th:unless="${result.report.maturityModel != null}" class="cap-stat-value"
+                                  th:classappend="${ds.score >= 70} ? 'score-high' : (${ds.score >= 40} ? 'score-mid' : 'score-low')"
+                                  th:text="${#numbers.formatDecimal(ds.score, 1, 1)} + ' / 100'"></span>
+                        </div>
+                        <div class="cap-stat-box">
+                            <span class="cap-stat-label">Coverage</span>
+                            <span class="cap-stat-value cap-stat-sm"
+                                  th:text="${#numbers.formatDecimal(ds.coverage, 1, 1)} + '%'"></span>
+                        </div>
+                    </div>
+                    <div class="progress-bar-bg cap-node-bar">
+                        <div class="progress-bar-fill"
+                             th:classappend="${ds.score >= 70} ? 'bar-high' : (${ds.score >= 40} ? 'bar-mid' : 'bar-low')"
+                             th:style="'width:' + ${ds.score} + '%'"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- end cap-tree-children -->
+
+    </div><!-- end cap-tree-block -->
+    </div><!-- end cap-tree-forest -->
+
+</div>
+</body>
+</html>
