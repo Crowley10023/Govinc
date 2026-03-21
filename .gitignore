@@ -5,5 +5,5 @@
 build
 # ignore local build settings
 .build-setup.local
-app/backup/*
+app/backups/*
 templates/uploads/*
