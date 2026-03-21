@@ -128,6 +128,16 @@ public class OrgUnitController {
             orgUnit.setChildren(null);
         }
         OrgUnit saved = orgUnitService.addOrgUnit(orgUnit);
+        // children relationship is mapped by child.parent, so persist that side explicitly
+        if (childrenIds != null && !childrenIds.isEmpty()) {
+            List<OrgUnit> selectedChildren = orgUnitService.getAllOrgUnits().stream()
+                    .filter(ou -> childrenIds.contains(ou.getId()))
+                    .collect(java.util.stream.Collectors.toList());
+            for (OrgUnit child : selectedChildren) {
+                child.setParent(saved);
+                orgUnitService.addOrgUnit(child);
+            }
+        }
         if (embed) {
             model.addAttribute("savedOrgUnitId", saved.getId());
             return "orgunit-edit-embedded-saved";

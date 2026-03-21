@@ -71,14 +71,13 @@
                     </div>
                 </div>
             </div>
-            <!-- Org Unit Selection Modal -->
+            <!-- Org Unit Selection Wizard Modal -->
             <div id="orgUnitModal" class="modal-bg" style="display:none">
-                <div class="modal-popup" style="max-height:70vh;display:flex;flex-direction:column;width:420px;overflow:hidden;">
-                    <h2 style="flex-shrink:0;margin-bottom:0.5em;">Select Org Unit</h2>
-                    <div id="orgUnitList" style="max-height:25vh;overflow-y:auto;min-height:25vh;margin-bottom:1em;"></div>
-                    <div class="modal-btn-row" style="flex-shrink:0;">
+                <div class="modal-popup ou-wizard-modal-inner">
+                    <h2 class="ou-wizard-title">Select Org Unit</h2>
+                    <div id="orgUnitWizardViewport" class="ou-wizard-viewport"></div>
+                    <div class="modal-btn-row ou-wizard-footer">
                         <button id="orgUnitCancelBtn" class="btn-cancel" type="button">Cancel</button>
-                        <button id="orgUnitConfirmBtn" class="btn-action" type="button">Confirm</button>
                     </div>
                 </div>
             </div>
@@ -181,63 +180,149 @@
                     }
                 });
 
-                document.getElementById('orgUnitFilterBtn').addEventListener('click', function () {
+                // ── Org Unit Wizard ──────────────────────────────────────
+                let orgUnitMap = {};
+                let wizardStack = [];
+
+                function buildOrgUnitTree(units) {
+                    orgUnitMap = {};
+                    units.forEach(u => { orgUnitMap[u.id] = u; });
+                    const childIds = new Set();
+                    units.forEach(u => {
+                        if (u.children) {
+                            u.children.forEach(c => { if (orgUnitMap[c.id]) childIds.add(c.id); });
+                        }
+                    });
+                    return units.filter(u => !childIds.has(u.id))
+                                .sort((a, b) => a.name.localeCompare(b.name));
+                }
+
+                function getWizardChildren(unit) {
+                    if (!unit.children || unit.children.length === 0) return [];
+                    return unit.children
+                        .map(c => orgUnitMap[c.id])
+                        .filter(Boolean)
+                        .sort((a, b) => a.name.localeCompare(b.name));
+                }
+
+                function openOrgUnitWizard() {
+                    const topLevel = buildOrgUnitTree(orgUnitsCache);
+                    wizardStack = [topLevel];
+                    const vp = document.getElementById('orgUnitWizardViewport');
+                    vp.innerHTML = '';
+                    renderWizardPanel(topLevel, null);
                     document.getElementById('orgUnitModal').style.display = 'flex';
+                }
+
+                function renderWizardPanel(units, direction) {
+                    const vp = document.getElementById('orgUnitWizardViewport');
+                    const panel = document.createElement('div');
+                    panel.classList.add('ou-wizard-panel');
+
+                    const content = document.createElement('div');
+                    content.classList.add('ou-wizard-content');
+
+                    const listShell = document.createElement('div');
+                    listShell.classList.add('ou-wizard-list-shell');
+
+                    const list = document.createElement('div');
+                    list.classList.add('ou-wizard-list');
+
+                    // Back button when not at root — identical styling to drill-btn
+                    if (wizardStack.length > 1) {
+                        const sideNav = document.createElement('div');
+                        sideNav.classList.add('ou-wizard-side-nav');
+                        const backBtn = document.createElement('button');
+                        backBtn.type = 'button';
+                        backBtn.title = 'Go up one level';
+                        backBtn.classList.add('ou-wizard-nav-btn');
+                        backBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="9" height="13" viewBox="0 0 9 13"><polygon points="8,1 1,6.5 8,12" fill="currentColor"/></svg>';
+                        backBtn.addEventListener('click', () => {
+                            wizardStack.pop();
+                            renderWizardPanel(wizardStack[wizardStack.length - 1], 'back');
+                        });
+                        sideNav.appendChild(backBtn);
+                        content.appendChild(sideNav);
+                    }
+
+                    if (!units || units.length === 0) {
+                        const empty = document.createElement('div');
+                        empty.classList.add('ou-wizard-empty');
+                        empty.textContent = 'No org units available.';
+                        list.appendChild(empty);
+                    } else {
+                        units.forEach(unit => {
+                            const children = getWizardChildren(unit);
+                            const row = document.createElement('div');
+                            row.classList.add('ou-wizard-row');
+
+                            const selectBtn = document.createElement('button');
+                            selectBtn.type = 'button';
+                            selectBtn.textContent = unit.name;
+                            selectBtn.classList.add('ou-wizard-select-btn');
+                            if (children.length > 0) selectBtn.classList.add('has-children');
+                            if (selectedOrgUnit && selectedOrgUnit.id === unit.id) selectBtn.classList.add('selected');
+                            selectBtn.addEventListener('click', () => {
+                                selectedOrgUnit = unit;
+                                document.getElementById('orgUnitModal').style.display = 'none';
+                                applyOrgUnitFilter();
+                            });
+                            row.appendChild(selectBtn);
+
+                            if (children.length > 0) {
+                                const drillBtn = document.createElement('button');
+                                drillBtn.type = 'button';
+                                drillBtn.title = 'Show sub-units';
+                                drillBtn.classList.add('ou-wizard-nav-btn', 'drill-btn');
+                                drillBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="9" height="13" viewBox="0 0 9 13"><polygon points="1,1 8,6.5 1,12" fill="currentColor"/></svg>';
+                                drillBtn.addEventListener('click', () => {
+                                    wizardStack.push(children);
+                                    renderWizardPanel(children, 'forward');
+                                });
+                                row.appendChild(drillBtn);
+                            }
+
+                            list.appendChild(row);
+                        });
+                    }
+
+                    listShell.appendChild(list);
+                    content.appendChild(listShell);
+                    panel.appendChild(content);
+
+                    // Slide animation (transform/transition set in JS — required for dynamic animation)
+                    const existing = vp.querySelector('.ou-wizard-panel');
+                    if (!direction || !existing) {
+                        vp.innerHTML = '';
+                        vp.appendChild(panel);
+                        return;
+                    }
+                    const enterFrom = direction === 'forward' ? '100%' : '-100%';
+                    const exitTo   = direction === 'forward' ? '-100%' : '100%';
+                    panel.style.transform = `translateX(${enterFrom})`;
+                    vp.appendChild(panel);
+                    requestAnimationFrame(() => requestAnimationFrame(() => {
+                        panel.style.transition = 'transform 0.24s cubic-bezier(.4,0,.2,1)';
+                        panel.style.transform = 'translateX(0)';
+                        existing.style.transition = 'transform 0.24s cubic-bezier(.4,0,.2,1)';
+                        existing.style.transform = `translateX(${exitTo})`;
+                        existing.addEventListener('transitionend', () => existing.remove(), { once: true });
+                    }));
+                }
+
+                document.getElementById('orgUnitFilterBtn').addEventListener('click', function () {
                     if (!orgUnitsCache) {
                         fetch('/assessmentdetails/orgunits')
                             .then(res => res.json())
-                            .then(orgUnits => {
-                                orgUnitsCache = orgUnits;
-                                populateOrgUnitList(orgUnits);
-                            });
+                            .then(units => { orgUnitsCache = units; openOrgUnitWizard(); });
                     } else {
-                        populateOrgUnitList(orgUnitsCache);
+                        openOrgUnitWizard();
                     }
                 });
-                document.getElementById('orgUnitCancelBtn').onclick = function () {
+
+                document.getElementById('orgUnitCancelBtn').addEventListener('click', function () {
                     document.getElementById('orgUnitModal').style.display = 'none';
-                };
-                function populateOrgUnitList(units) {
-                    let listDiv = document.getElementById('orgUnitList');
-                    listDiv.innerHTML = '';
-                    if (!units || units.length === 0) {
-                        listDiv.innerHTML = '<div style="text-align:left;padding:0.5em;">No org units available.</div>';
-                        return;
-                    }
-                    let selectedId = selectedOrgUnit ? selectedOrgUnit.id : null;
-                    units.forEach(ou => {
-                        let label = document.createElement('label');
-                        label.style.display = 'flex';
-                        label.style.alignItems = 'center';
-                        label.style.gap = '0.5em';
-                        label.style.padding = '0.3em 0.5em';
-                        label.style.cursor = 'pointer';
-                        label.style.textAlign = 'left';
-                        label.style.borderRadius = '4px';
-                        let radio = document.createElement('input');
-                        radio.type = 'radio';
-                        radio.name = 'orgUnitChoice';
-                        radio.value = ou.id;
-                        if (selectedId && ou.id === selectedId) radio.checked = true;
-                        label.appendChild(radio);
-                        label.appendChild(document.createTextNode(ou.name));
-                        listDiv.appendChild(label);
-                        radio.addEventListener('change', () => {
-                            selectedOrgUnit = ou;
-                        });
-                    });
-                }
-                document.getElementById('orgUnitConfirmBtn').onclick = function () {
-                    // Always get the checked radio on confirm
-                    const checkedRadio = document.querySelector('#orgUnitList input[type=radio]:checked');
-                    if (checkedRadio) {
-                        selectedOrgUnit = orgUnitsCache.find(u => u.id == checkedRadio.value);
-                    } else {
-                        selectedOrgUnit = null;
-                    }
-                    document.getElementById('orgUnitModal').style.display = 'none';
-                    applyOrgUnitFilter();
-                };
+                });
 
                 document.getElementById('clearOrgUnitFilter').onclick = function () {
                     selectedOrgUnit = null;

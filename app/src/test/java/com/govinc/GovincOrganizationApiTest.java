@@ -301,6 +301,94 @@ class GovincOrganizationApiTest {
         TESTED_ENDPOINTS.add("DELETE /orgunits/{id}");
     }
 
+    @Test
+    @Order(3012)
+    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    void orgUnit_formSave_createsParentWithChildren() throws Exception {
+        String suffix = String.valueOf(System.nanoTime());
+
+        mockMvc.perform(post("/orgunits/save")
+                        .with(csrf())
+                        .param("name", "Child Unit " + suffix))
+                .andExpect(status().is3xxRedirection());
+
+        OrgUnit child = orgUnitRepository.findAll().stream()
+                .filter(u -> ("Child Unit " + suffix).equals(u.getName()))
+                .findFirst()
+                .orElseThrow();
+
+        mockMvc.perform(post("/orgunits/save")
+                        .with(csrf())
+                        .param("name", "Parent Unit " + suffix)
+                        .param("childrenIds", child.getId().toString()))
+                .andExpect(status().is3xxRedirection());
+
+        OrgUnit parent = orgUnitRepository.findAll().stream()
+                .filter(u -> ("Parent Unit " + suffix).equals(u.getName()))
+                .findFirst()
+                .orElseThrow();
+
+        OrgUnit hydratedParent = orgUnitRepository.findById(parent.getId()).orElseThrow();
+        assertThat(hydratedParent.getChildren()).extracting(OrgUnit::getId).contains(child.getId());
+        TESTED_ENDPOINTS.add("POST /orgunits/save (parent with childrenIds)");
+    }
+
+    @Test
+    @Order(3013)
+    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    void orgUnit_delete_parentWithChildren_returnsConflict() throws Exception {
+        String suffix = String.valueOf(System.nanoTime());
+
+        OrgUnit parent = new OrgUnit();
+        parent.setName("Delete Parent " + suffix);
+        parent = orgUnitRepository.save(parent);
+
+        OrgUnit child = new OrgUnit();
+        child.setName("Delete Child " + suffix);
+        child.setParent(parent);
+        child = orgUnitRepository.save(child);
+
+        parent.setChildren(new HashSet<>(Collections.singletonList(child)));
+        orgUnitRepository.save(parent);
+
+        MvcResult result = mockMvc.perform(delete("/orgunits/{id}", parent.getId())
+                        .with(csrf())
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isConflict())
+                .andReturn();
+
+        assertThat(result.getResponse().getContentAsString())
+                .contains("Cannot delete organization unit that still has children");
+        TESTED_ENDPOINTS.add("DELETE /orgunits/{id} (conflict when parent has children)");
+    }
+
+    @Test
+    @Order(3014)
+    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    void orgUnit_formSave_updatesParentRelationship() throws Exception {
+        String suffix = String.valueOf(System.nanoTime());
+
+        OrgUnit newParent = new OrgUnit();
+        newParent.setName("New Parent " + suffix);
+        newParent = orgUnitRepository.save(newParent);
+
+        OrgUnit movingChild = new OrgUnit();
+        movingChild.setName("Moving Child " + suffix);
+        movingChild = orgUnitRepository.save(movingChild);
+
+        mockMvc.perform(post("/orgunits/save")
+                        .with(csrf())
+                        .param("id", movingChild.getId().toString())
+                        .param("name", movingChild.getName())
+                        .param("parentId", newParent.getId().toString()))
+                .andExpect(status().is3xxRedirection());
+
+        OrgUnit updatedChild = orgUnitRepository.findById(movingChild.getId()).orElseThrow();
+        assertThat(updatedChild.getParent()).isNotNull();
+        assertThat(updatedChild.getParent().getId()).isEqualTo(newParent.getId());
+        TESTED_ENDPOINTS.add("POST /orgunits/save (update parentId)");
+    }
+
     // ──────────────────────────────────────────────
     // OrgService REST JSON endpoints
     // ──────────────────────────────────────────────

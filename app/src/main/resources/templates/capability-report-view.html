@@ -57,12 +57,12 @@
                 <div class="cap-node-title-wrap">
                     <span class="cap-node-title" th:text="${cs.capability.name}"></span>
                 </div>
-                <div class="cap-node-stats">
+                <div class="cap-node-stats cap-node-stats-stacked">
                     <div class="cap-stat-box">
-                        <span th:if="${result.report.maturityModel != null}" class="maturity-level-pill"
+                        <span th:if="${result.report.maturityModel != null}" class="maturity-level-pill cap-primary-rating"
                             th:classappend="${cs.maturityLevel != null} ? ' maturity-level-' + ${cs.maturityLevel.tone} : ' maturity-level-none'"
                             th:text="${cs.maturityLevel != null ? cs.maturityLevel.answer : 'No level'}"></span>
-                        <span th:unless="${result.report.maturityModel != null}" class="cap-stat-value"
+                        <span th:unless="${result.report.maturityModel != null}" class="cap-stat-value cap-primary-rating"
                               th:classappend="${cs.score >= 70} ? 'score-high' : (${cs.score >= 40} ? 'score-mid' : 'score-low')"
                               th:text="${#numbers.formatDecimal(cs.score, 1, 1)} + ' / 100'"></span>
                     </div>
@@ -93,12 +93,12 @@
                     <div class="cap-node-title-wrap">
                         <span class="cap-node-title" th:text="${ds.domain.name}"></span>
                     </div>
-                    <div class="cap-node-stats">
+                    <div class="cap-node-stats cap-node-stats-stacked">
                         <div class="cap-stat-box">
-                            <span th:if="${result.report.maturityModel != null}" class="maturity-level-pill"
+                            <span th:if="${result.report.maturityModel != null}" class="maturity-level-pill cap-primary-rating"
                                 th:classappend="${ds.maturityLevel != null} ? ' maturity-level-' + ${ds.maturityLevel.tone} : ' maturity-level-none'"
                                 th:text="${ds.maturityLevel != null ? ds.maturityLevel.answer : 'No level'}"></span>
-                            <span th:unless="${result.report.maturityModel != null}" class="cap-stat-value"
+                            <span th:unless="${result.report.maturityModel != null}" class="cap-stat-value cap-primary-rating"
                                   th:classappend="${ds.score >= 70} ? 'score-high' : (${ds.score >= 40} ? 'score-mid' : 'score-low')"
                                   th:text="${#numbers.formatDecimal(ds.score, 1, 1)} + ' / 100'"></span>
                         </div>

@@ -102,15 +102,12 @@
 
         <!-- Org Unit Modal -->
         <div id="orgUnitModal" class="modal-bg" style="display:none;" aria-hidden="true">
-            <div class="modal-popup" style="max-height:70vh;display:flex;flex-direction:column;width:420px;">
+            <div class="modal-popup ou-wizard-modal-inner">
                 <div class="modal-header-row">
                     <h3 class="m-0">Choose Organizational Unit</h3>
                     <button type="button" id="closeOrgUnitModal" class="btn-cancel">Close</button>
                 </div>
-                <input type="text" id="orgUnitSearch" placeholder="Filter org units by name..." class="modal-search-input" style="width:100%;margin:0.7em 0;flex-shrink:0;" />
-                <ul id="orgUnitList" class="list-unstyled" style="max-height:25vh;min-height:25vh;overflow-y:auto;margin:0;padding:0;">
-                    <li th:each="orgUnit : ${orgUnits}" th:attr="data-id=${orgUnit.id}" th:text="${orgUnit.name}" class="org-unit-list-item" onclick="selectOrgUnit(this)"></li>
-                </ul>
+                <div id="createOrgUnitWizardViewport" class="ou-wizard-viewport"></div>
             </div>
         </div>
 
@@ -129,57 +126,28 @@
         </div>
     </div>
 
+    <script src="/org-unit-wizard.js"></script>
     <script>
         (function(){
             var modal = document.getElementById('orgUnitModal');
-            var openBtn = document.getElementById('openOrgUnitModal');
-            var closeBtn = document.getElementById('closeOrgUnitModal');
-            var searchInput = document.getElementById('orgUnitSearch');
-            var list = document.getElementById('orgUnitList');
             var hiddenInput = document.getElementById('orgUnitId');
             var selectedName = document.getElementById('selectedOrgUnitName');
 
-            if(openBtn){
-                openBtn.addEventListener('click', function(){
-                    modal.style.display = 'flex';
-                    modal.setAttribute('aria-hidden','false');
-                    searchInput.value = '';
-                    filterList('');
-                    searchInput.focus();
+            if (window.createOrgUnitWizard && modal) {
+                window.createOrgUnitWizard({
+                    modalId: 'orgUnitModal',
+                    viewportId: 'createOrgUnitWizardViewport',
+                    openButtonId: 'openOrgUnitModal',
+                    cancelButtonId: 'closeOrgUnitModal',
+                    closeOnSelect: true,
+                    selectedId: function () { return hiddenInput.value || ''; },
+                    onSelect: function (unit) {
+                        hiddenInput.value = String(unit.id);
+                        selectedName.textContent = unit.name;
+                        updatePredecessorButton();
+                    }
                 });
             }
-            if(closeBtn){
-                closeBtn.addEventListener('click', function(){
-                    modal.style.display = 'none';
-                    modal.setAttribute('aria-hidden','true');
-                });
-            }
-            modal.addEventListener('click', function(e){
-                if(e.target === modal){
-                    modal.style.display = 'none';
-                    modal.setAttribute('aria-hidden','true');
-                }
-            });
-            document.addEventListener('keydown', function(e){
-                if(e.key === 'Escape' && modal.style.display === 'flex'){
-                    modal.style.display = 'none';
-                    modal.setAttribute('aria-hidden','true');
-                }
-            });
-            function filterList(term){
-                term = (term || '').toLowerCase();
-                list.querySelectorAll('li').forEach(function(li){
-                    li.style.display = li.textContent.toLowerCase().indexOf(term) !== -1 ? '' : 'none';
-                });
-            }
-            searchInput.addEventListener('input', function(){ filterList(this.value); });
-            window.selectOrgUnit = function(el){
-                hiddenInput.value = el.getAttribute('data-id');
-                selectedName.textContent = el.textContent || el.innerText;
-                modal.style.display = 'none';
-                modal.setAttribute('aria-hidden','true');
-                updatePredecessorButton();
-            };
         })();
 
         // --- Compliance Check Logic ---

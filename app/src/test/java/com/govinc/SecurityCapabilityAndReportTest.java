@@ -1,10 +1,25 @@
 package com.govinc;
 
+import com.govinc.assessment.Assessment;
+import com.govinc.assessment.AssessmentDetails;
+import com.govinc.assessment.AssessmentDetailsService;
+import com.govinc.assessment.AssessmentRepository;
+import com.govinc.assessment.AssessmentStatus;
 import com.govinc.catalog.*;
+import com.govinc.maturity.MaturityAnswer;
+import com.govinc.maturity.MaturityAnswerRepository;
+import com.govinc.maturity.MaturityModel;
+import com.govinc.maturity.MaturityModelRepository;
+import com.govinc.organization.OrgService;
+import com.govinc.organization.OrgServiceAssessment;
+import com.govinc.organization.OrgServiceAssessmentControl;
+import com.govinc.organization.OrgServiceAssessmentRepository;
+import com.govinc.organization.OrgServiceRepository;
 import com.govinc.organization.OrgUnit;
 import com.govinc.organization.OrgUnitRepository;
 import com.govinc.reporting.CapabilityReport;
 import com.govinc.reporting.CapabilityReportRepository;
+import com.govinc.reporting.CapabilityReportService;
 import com.govinc.user.Role;
 import com.govinc.user.User;
 import com.govinc.user.UserRepository;
@@ -17,7 +32,11 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
+import java.time.LocalDate;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -52,9 +71,16 @@ class SecurityCapabilityAndReportTest {
 
     @Autowired private MockMvc mockMvc;
     @Autowired private UserRepository userRepository;
+        @Autowired private AssessmentRepository assessmentRepository;
+        @Autowired private AssessmentDetailsService assessmentDetailsService;
     @Autowired private SecurityCapabilityRepository capabilityRepository;
     @Autowired private SecurityControlDomainRepository domainRepository;
     @Autowired private SecurityCatalogRepository catalogRepository;
+        @Autowired private SecurityControlRepository securityControlRepository;
+        @Autowired private MaturityAnswerRepository maturityAnswerRepository;
+        @Autowired private MaturityModelRepository maturityModelRepository;
+        @Autowired private OrgServiceRepository orgServiceRepository;
+        @Autowired private OrgServiceAssessmentRepository orgServiceAssessmentRepository;
     @Autowired private CapabilityReportRepository reportRepository;
     @Autowired private OrgUnitRepository orgUnitRepository;
 
@@ -88,6 +114,45 @@ class SecurityCapabilityAndReportTest {
         ou.setName("Test OrgUnit Cap");
         ou = orgUnitRepository.save(ou);
         orgUnitId = ou.getId();
+    }
+
+    private MaturityAnswer createMaturityAnswer(String answer, int rating) {
+        MaturityAnswer ma = new MaturityAnswer(answer, "test");
+        ma.setRating(rating);
+        return maturityAnswerRepository.save(ma);
+    }
+
+    private SecurityCatalog createCatalogWithOneControl(String suffix, MaturityModel model, SecurityControlDomain domain) {
+        SecurityControl control = new SecurityControl("Control " + suffix, "desc", "CID-" + suffix);
+        control.setSecurityControlDomain(domain);
+        control = securityControlRepository.save(control);
+
+        SecurityCatalog catalog = new SecurityCatalog();
+        catalog.setName("Catalog " + suffix);
+        catalog.setDescription("desc");
+        catalog.setRevision("1");
+        catalog.setMaturityModel(model);
+        catalog.setSecurityControls(new LinkedHashSet<>(List.of(control)));
+        return catalogRepository.save(catalog);
+    }
+
+    private Assessment createAssessment(SecurityCatalog catalog, OrgUnit unit, String suffix) {
+        Assessment assessment = new Assessment();
+        assessment.setName("Assessment " + suffix);
+        assessment.setCreationDate(LocalDate.now());
+        assessment.setStatus(AssessmentStatus.OPEN);
+        assessment.setSecurityCatalog(catalog);
+        assessment.setOrgUnit(unit);
+        return assessmentRepository.save(assessment);
+    }
+
+    private CapabilityReportService.CalculationResult calculateViaEndpoint(Long reportId) throws Exception {
+        MvcResult mvcResult = mockMvc.perform(get("/capability-report/calculate").param("id", reportId.toString()))
+                .andExpect(status().isOk())
+                .andReturn();
+        Object result = mvcResult.getModelAndView().getModel().get("result");
+        assertThat(result).isInstanceOf(CapabilityReportService.CalculationResult.class);
+        return (CapabilityReportService.CalculationResult) result;
     }
 
     // ─── Security Capabilities ────────────────────────────────────────────────
@@ -260,6 +325,131 @@ class SecurityCapabilityAndReportTest {
         assertThat(response.getResponse().getContentAsString())
                 .contains("Integration Test Report (updated)");
     }
+
+        @Test
+        @Order(27)
+        @WithMockUser(username = "admin", roles = {"ADMIN"})
+        void assessment_orgServiceInheritanceAndOverride_driveCapabilityCalculation() throws Exception {
+        String suffix = "inherit-" + System.nanoTime();
+
+        MaturityAnswer low = createMaturityAnswer("Low " + suffix, 20);
+        MaturityAnswer high = createMaturityAnswer("High " + suffix, 80);
+
+        MaturityModel model = new MaturityModel();
+        model.setName("Model " + suffix);
+        model.setMaturityAnswers(new LinkedHashSet<>(List.of(low, high)));
+        model = maturityModelRepository.save(model);
+
+        SecurityControlDomain domain = domainRepository.save(
+            new SecurityControlDomain("Domain " + suffix, "desc"));
+        SecurityCatalog catalog = createCatalogWithOneControl(suffix, model, domain);
+        SecurityControl control = catalog.getSecurityControls().iterator().next();
+
+        SecurityCapability capability = new SecurityCapability();
+        capability.setName("Capability " + suffix);
+        capability.setDescription("desc");
+        capability.setSecurityCatalog(catalog);
+        capability.setDomains(new LinkedHashSet<>(Set.of(domain)));
+        capability = capabilityRepository.save(capability);
+
+        OrgUnit root = new OrgUnit();
+        root.setName("Root " + suffix);
+        root = orgUnitRepository.save(root);
+
+        OrgUnit child = new OrgUnit();
+        child.setName("Child " + suffix);
+        child.setParent(root);
+        child = orgUnitRepository.save(child);
+
+        OrgService orgService = new OrgService("Service " + suffix, "desc");
+        orgService = orgServiceRepository.save(orgService);
+
+        Assessment assessment = createAssessment(catalog, child, suffix);
+        assessment.setOrgServices(new LinkedHashSet<>(Set.of(orgService)));
+        assessment = assessmentRepository.save(assessment);
+
+        AssessmentDetails details = new AssessmentDetails();
+        details.setAssessments(new LinkedHashSet<>(Set.of(assessment)));
+        details.setDate(LocalDate.now());
+        assessmentDetailsService.save(details);
+
+        orgServiceAssessmentRepository.findByOrgServiceId(orgService.getId())
+            .forEach(orgServiceAssessmentRepository::delete);
+        OrgServiceAssessment osa = new OrgServiceAssessment(orgService, LocalDate.now());
+        OrgServiceAssessmentControl osac = new OrgServiceAssessmentControl(control, true, 80,
+            "Inherited from org service");
+        osac.setOrgServiceAssessment(osa);
+        osa.setControls(new java.util.ArrayList<>(List.of(osac)));
+        orgServiceAssessmentRepository.save(osa);
+
+        mockMvc.perform(get("/assessment/{id}", assessment.getId()))
+            .andExpect(status().isOk());
+
+        CapabilityReport calcReport = new CapabilityReport();
+        calcReport.setName("Calc Report " + suffix);
+        calcReport.setSecurityCatalog(catalog);
+        calcReport.setMaturityModel(model);
+        calcReport.setOrgUnit(root);
+        calcReport.setCapabilities(List.of(capability));
+        calcReport = reportRepository.save(calcReport);
+
+        CapabilityReportService.CalculationResult inheritedResult = calculateViaEndpoint(calcReport.getId());
+        assertThat(inheritedResult.assessmentsIncluded).isEqualTo(1);
+        assertThat(inheritedResult.capabilityScores).hasSize(1);
+        assertThat(inheritedResult.capabilityScores.get(0).score).isEqualTo(80.0);
+        assertThat(inheritedResult.capabilityScores.get(0).answeredControls).isEqualTo(1);
+
+        mockMvc.perform(get("/assessment/{id}/control/{controlId}/state", assessment.getId(), control.getId())
+                .accept(MediaType.APPLICATION_JSON))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.orgServiceAnswerId").value(high.getId()))
+            .andExpect(jsonPath("$.orgServiceComment").value("Inherited from org service"));
+
+        mockMvc.perform(post("/assessment/{id}/answer-override", assessment.getId())
+                .with(csrf())
+                .param("controlId", control.getId().toString())
+                .param("answerId", low.getId().toString()))
+            .andExpect(status().isOk())
+            .andExpect(content().string("ok"));
+
+        CapabilityReportService.CalculationResult overrideResult = calculateViaEndpoint(calcReport.getId());
+        assertThat(overrideResult.capabilityScores.get(0).score).isEqualTo(20.0);
+
+        mockMvc.perform(post("/assessment/{id}/control/{controlId}/remove-override", assessment.getId(), control.getId())
+                .with(csrf()))
+            .andExpect(status().isOk())
+            .andExpect(content().string("ok"));
+
+        mockMvc.perform(get("/assessment/{id}", assessment.getId()))
+            .andExpect(status().isOk());
+
+        CapabilityReportService.CalculationResult revertedResult = calculateViaEndpoint(calcReport.getId());
+        assertThat(revertedResult.capabilityScores.get(0).score).isEqualTo(80.0);
+        }
+
+        @Test
+        @Order(28)
+        @WithMockUser(username = "admin", roles = {"ADMIN"})
+        void capabilityReport_calculate_invalidId_redirectsToList() throws Exception {
+        mockMvc.perform(get("/capability-report/calculate").param("id", "999999"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/capability-report/list"));
+        }
+
+        @Test
+        @Order(29)
+        @WithMockUser(username = "admin", roles = {"ADMIN"})
+        void capabilityReport_delete_missingId_returnsStructuredError() throws Exception {
+        var result = mockMvc.perform(post("/capability-report/delete")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        assertThat(result.getResponse().getContentAsString())
+            .contains("\"success\":false")
+            .contains("Invalid ID");
+        }
 
     // ─── Delete (last, so IDs are still valid) ────────────────────────────────
 

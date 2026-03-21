@@ -9,6 +9,31 @@
     <!-- CSRF meta tags for AJAX -->
     <meta name="_csrf" th:content="${_csrf.token}" />
     <meta name="_csrf_header" th:content="${_csrf.headerName}" />
+    <style>
+        .detail-inline-edit {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .pill-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .user-pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.28rem 0.75rem;
+            border-radius: 999px;
+            background: #eaf4fb;
+            color: #1f4f6f;
+            font-weight: 600;
+            line-height: 1.2;
+        }
+    </style>
 </head>
 
 <body>
@@ -73,15 +98,15 @@
                         </tr>
                         <tr>
                             <th>Creation Date</th>
-                            <td th:text="${assessment.creationDate}"></td>
+                            <td th:text="${creationDateDisplay}"></td>
                         </tr>
                         <tr>
                             <th>Created By</th>
-                            <td th:text="${assessment.createdBy != null ? (assessment.createdBy.name + ' (' + assessment.createdBy.email + ')') : 'Unknown'}"></td>
+                            <td th:text="${assessment.createdBy != null ? assessment.createdBy.name : 'Unknown'}"></td>
                         </tr>
                         <tr th:if="${assessment.closeDate != null}">
                             <th>Close Date</th>
-                            <td th:text="${assessment.closeDate}"></td>
+                            <td th:text="${closeDateDisplay}"></td>
                         </tr>
                         <tr>
                             <th>Organization Unit</th>
@@ -90,6 +115,17 @@
                         <tr>
                             <th>Security Catalog</th>
                             <td th:text="${assessment.securityCatalog.name}"></td>
+                        </tr>
+                        <tr>
+                            <th>Compliance Check</th>
+                            <td>
+                                <div class="detail-inline-edit">
+                                    <span id="assessment-compliance-check-name"
+                                        th:text="${assessment.complianceCheck != null ? assessment.complianceCheck.name : 'None'}"></span>
+                                    <button th:if="${isAdminOrISM and assessment.isOpen}" id="choose-compliance-check-btn"
+                                        type="button" class="btn-action">Modify</button>
+                                </div>
+                            </td>
                         </tr>
                         <tr th:if="${assessment.predecessor != null}">
                             <th>Predecessor Assessment</th>
@@ -103,7 +139,7 @@
                         </tr>
                         <tr th:if="${assessment.status == 'CLOSED' and details != null and details.completedDate != null}">
                             <th>Completed Date</th>
-                            <td th:text="${details.completedDate}"></td>
+                            <td th:text="${completedDateDisplay}"></td>
                         </tr>
                         <tr th:if="${orgServices != null}">
                             <th>Org Services</th>
@@ -136,11 +172,12 @@
                         </tr>
                         <tr>
                             <th>Users</th>
-                            <td id="assessment-users-cell"><span
-                                    th:if="${assessment.users == null || #lists.isEmpty(assessment.users)}">None</span><span
-                                    th:each="user,iterStat : ${assessment.users}"><span
-                                        th:text="${user.name + ' (' + user.email + ')'}"></span><span
-                                        th:if="${!iterStat.last}">, </span></span></td>
+                            <td id="assessment-users-cell">
+                                <span th:if="${assessment.users == null || #lists.isEmpty(assessment.users)}" class="text-muted">None</span>
+                                <div th:if="${assessment.users != null && !#lists.isEmpty(assessment.users)}" class="pill-list">
+                                    <span th:each="user : ${assessment.users}" class="user-pill" th:text="${user.name}"></span>
+                                </div>
+                            </td>
                         </tr>
                     </table>
                     
@@ -444,16 +481,16 @@
 
             <!-- Org Unit Selection Modal -->
             <div class="modal-bg" id="orgunit-modal-bg">
-                <div class="modal-popup" style="max-height:70vh;display:flex;flex-direction:column;width:420px;overflow:hidden;">
-                    <h3 style="flex-shrink:0;">Choose Organization Unit</h3>
+                <div class="modal-popup ou-wizard-modal-inner">
+                    <h3 class="ou-wizard-title">Choose Organization Unit</h3>
                     <form id="orgunit-form" th:action="@{'/assessment/' + ${assessment.id} + '/set-orgunit'}"
-                        method="post" style="display:flex;flex-direction:column;flex:1;min-height:0;">
+                        method="post" class="d-flex flex-col flex-1 min-h-0">
                         <input type="hidden" id="orgunit-hidden" name="orgUnitId">
-                        <input type="text" id="orgunit-search" placeholder="Filter org units…" style="flex-shrink:0;width:100%;box-sizing:border-box;padding:0.3em 0.5em;margin-bottom:0.5em;">
-                        <div id="orgunit-list" style="min-height:25vh;max-height:25vh;overflow-y:auto;flex:1;"></div>
-                        <div class="modal-btn-row" style="flex-shrink:0;">
+                        <div id="orgunitWizardViewport" class="ou-wizard-viewport"></div>
+                        <div id="orgunit-selected-label" class="text-muted mt-sm mb-sm">No org unit selected</div>
+                        <div class="modal-btn-row ou-wizard-footer">
                             <button type="submit" class="btn-action">Confirm</button>
-                            <button type="button" class="btn-cancel" onclick="closeOrgUnitModal()">Cancel</button>
+                            <button type="button" id="orgunit-cancel-btn" class="btn-cancel">Cancel</button>
                         </div>
                     </form>
                 </div>
@@ -475,6 +512,23 @@
                         </div>
                     </form>
                     <div id="users-modal-error" class="modal-error"></div>
+                </div>
+            </div>
+
+            <div class="modal-bg" id="compliance-check-modal-bg">
+                <div class="modal-popup" style="max-height:70vh;display:flex;flex-direction:column;width:480px;">
+                    <h3 style="flex-shrink:0;">Select Compliance Check</h3>
+                    <form id="compliance-check-form" style="display:flex;flex-direction:column;gap:0.8em;">
+                        <select id="compliance-check-select" name="complianceCheckId">
+                            <option value="">-- None --</option>
+                        </select>
+                        <span class="text-muted text-sm">Choose the compliance check that applies to this assessment's security catalog.</span>
+                        <div class="modal-btn-row" style="flex-shrink:0;">
+                            <button id="compliance-check-save-btn" type="submit" class="btn-action">Save</button>
+                            <button id="compliance-check-cancel-btn" type="button" class="btn-cancel">Cancel</button>
+                        </div>
+                    </form>
+                    <div id="compliance-check-modal-error" class="modal-error"></div>
                 </div>
             </div>
 
@@ -540,6 +594,7 @@
 
     <!-- External JavaScript Files -->
     <script src="/webjars/jquery/3.6.0/jquery.min.js"></script>
+    <script src="/org-unit-wizard.js"></script>
     <script src="/assessment-details.js"></script>
 
     <!-- Global Variables and Finalize Modal Handler -->
@@ -549,6 +604,7 @@
         window.securityCatalogId = /*[[${assessment.securityCatalog != null ? assessment.securityCatalog.id : 0}]]*/ 0;
         window.currentOrgUnitId = /*[[${assessment.orgUnit != null ? assessment.orgUnit.id : ''}]]*/ '';
         window.assessmentAssignedUserIds = /*[[${assessment.users != null ? assessment.users.![id] : {}}]]*/[];
+        window.currentComplianceCheckId = /*[[${assessment.complianceCheck != null ? assessment.complianceCheck.id : null}]]*/ null;
         window.assessmentAddAssessorMode = /*[[${canManageAssessors}]]*/ false;
         window.currentAssessmentIdForProgress = /*[[${assessment.id}]]*/ 0;
         /*]]>*/

@@ -188,34 +188,41 @@ function updateControlAfterRemoveOverride(controlId, assessmentId) {
 
 // =================== Modal Logic and Dynamic Content Loading ===================
 $(document).ready(function () {
-    // Org Unit modal logic
-    $('#choose-orgunit-btn').click(function () {
-        var currentOrgUnitId = window.currentOrgUnitId || '';
-        var $list = $('#orgunit-list');
-        var $hidden = $('#orgunit-hidden');
-        var $search = $('#orgunit-search');
-        $list.html('<div style="padding:0.5em;">Loading\u2026</div>');
-        $hidden.val(currentOrgUnitId || '');
-        $.getJSON('/assessmentdetails/orgunits', function (units) {
-            $list.empty();
-            units.forEach(function (unit) {
-                var isSelected = currentOrgUnitId && String(unit.id) === String(currentOrgUnitId);
-                var $label = $('<label>').css({display:'flex', alignItems:'center', gap:'0.5em', padding:'0.3em 0.5em', cursor:'pointer', borderRadius:'4px'});
-                var $radio = $('<input>').attr({type:'radio', name:'orgUnitChoice', value: unit.id}).css('cursor','pointer');
-                if (isSelected) { $radio.prop('checked', true); }
-                $radio.on('change', function () { $hidden.val(this.value); });
-                $label.append($radio).append($('<span>').text(unit.name));
-                $list.append($label);
-            });
-            $search.val('').off('input').on('input', function () {
-                var val = $(this).val().trim().toLowerCase();
-                $list.children('label').each(function () {
-                    $(this).toggle($(this).find('span').text().toLowerCase().indexOf(val) !== -1);
-                });
-            });
+    function renderUserPills(users) {
+        if (!Array.isArray(users) || users.length === 0) {
+            return '<span class="text-muted">None</span>';
+        }
+
+        var html = '<div class="pill-list">';
+        users.forEach(function (user) {
+            html += $('<span/>').addClass('user-pill').text(user.name || '').prop('outerHTML');
         });
-        $('#orgunit-modal-bg').css('display', 'flex');
-    });
+        html += '</div>';
+        return html;
+    }
+
+    // Org Unit modal logic (shared wizard)
+    if (window.createOrgUnitWizard && document.getElementById('choose-orgunit-btn')) {
+        var hiddenInput = document.getElementById('orgunit-hidden');
+        var selectedLabel = document.getElementById('orgunit-selected-label');
+
+        hiddenInput.value = window.currentOrgUnitId || '';
+
+        window.createOrgUnitWizard({
+            modalId: 'orgunit-modal-bg',
+            viewportId: 'orgunitWizardViewport',
+            openButtonId: 'choose-orgunit-btn',
+            cancelButtonId: 'orgunit-cancel-btn',
+            closeOnSelect: false,
+            selectedId: function () {
+                return hiddenInput.value || window.currentOrgUnitId || '';
+            },
+            onSelect: function (unit) {
+                hiddenInput.value = String(unit.id);
+                selectedLabel.textContent = unit.name;
+            }
+        });
+    }
 
     // User modal logic
     $('#choose-users-btn').click(function () {
@@ -279,6 +286,81 @@ $(document).ready(function () {
         if (event.target === this) { $('#users-modal-bg').hide(); }
     });
 
+    $('#choose-compliance-check-btn').click(function () {
+        var $modal = $('#compliance-check-modal-bg');
+        var $select = $('#compliance-check-select');
+        var $error = $('#compliance-check-modal-error');
+        var currentComplianceCheckId = window.currentComplianceCheckId;
+        var securityCatalogId = window.securityCatalogId || 0;
+
+        $error.hide().text('');
+        $select.prop('disabled', true).html('<option value="">Loading...</option>');
+        $modal.css('display', 'flex');
+
+        $.getJSON('/assessment/compliance-checks?catalogId=' + encodeURIComponent(securityCatalogId), function (checks) {
+            $select.empty();
+            $select.append($('<option>').val('').text('-- None --'));
+            if (Array.isArray(checks)) {
+                checks.forEach(function (check) {
+                    var label = check.name || '';
+                    if (check.description) {
+                        label += ' - ' + check.description;
+                    }
+                    var $option = $('<option>').val(check.id).text(label);
+                    if (currentComplianceCheckId != null && String(check.id) === String(currentComplianceCheckId)) {
+                        $option.prop('selected', true);
+                    }
+                    $select.append($option);
+                });
+            }
+            $select.prop('disabled', false);
+        }).fail(function () {
+            $select.html('<option value="">(Could not load compliance checks)</option>').prop('disabled', true);
+            $error.show().text('Could not load compliance checks.');
+        });
+    });
+
+    $('#compliance-check-cancel-btn').click(function () {
+        $('#compliance-check-modal-bg').hide();
+    });
+
+    $('#compliance-check-modal-bg').on('mousedown', function (event) {
+        if (event.target === this) {
+            $('#compliance-check-modal-bg').hide();
+        }
+    });
+
+    $('#compliance-check-form').submit(function (event) {
+        event.preventDefault();
+        var assessmentId = window.assessmentId || 0;
+        var selectedValue = $('#compliance-check-select').val();
+        var selectedId = selectedValue ? Number(selectedValue) : null;
+
+        $('#compliance-check-save-btn').prop('disabled', true);
+        $('#compliance-check-modal-error').hide().text('');
+
+        $.ajax({
+            url: '/assessment/' + assessmentId + '/compliance-check',
+            type: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify({ complianceCheckId: selectedId }),
+            success: function (response) {
+                window.currentComplianceCheckId = response && response.id != null ? response.id : null;
+                $('#assessment-compliance-check-name').text(response && response.name ? response.name : 'None');
+                $('#compliance-check-modal-bg').hide();
+                window.location.reload();
+            },
+            error: function (xhr) {
+                var message = 'Could not update the compliance check.';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    message += ' ' + xhr.responseJSON.message;
+                }
+                $('#compliance-check-modal-error').show().text(message);
+                $('#compliance-check-save-btn').prop('disabled', false);
+            }
+        });
+    });
+
     // AJAX Save users selection
     $('#users-modal-form').submit(function (event) {
         event.preventDefault();
@@ -304,19 +386,7 @@ $(document).ready(function () {
             data: JSON.stringify(selected),
             success: function (updatedUsers) {
                 // Update users in the table
-                if (updatedUsers && Array.isArray(updatedUsers)) {
-                    var html = '';
-                    if (updatedUsers.length === 0) {
-                        html = 'None';
-                    } else {
-                        for (let i = 0; i < updatedUsers.length; i++) {
-                            const u = updatedUsers[i];
-                            html += $('<span/>').text(u.name + ' (' + u.email + ')').prop('outerHTML');
-                            if (i !== updatedUsers.length - 1) html += ', ';
-                        }
-                    }
-                    $('#assessment-users-cell').html(html);
-                }
+                $('#assessment-users-cell').html(renderUserPills(updatedUsers));
                 $('#users-modal-bg').hide();
                 $('#users-modal-save-btn').prop('disabled', false);
                 $('#users-modal-error').hide();
@@ -854,10 +924,6 @@ function applyAnswerFromGuide(answerId, answerText) {
     } else {
         alert('Could not find answer dropdown for this control.');
     }
-}
-
-function closeOrgUnitModal() {
-    $('#orgunit-modal-bg').hide();
 }
 
 // =================== Collapsible Domain Logic ===================

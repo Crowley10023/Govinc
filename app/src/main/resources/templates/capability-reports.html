@@ -43,7 +43,7 @@
                 <td th:text="${#lists.size(report.capabilities)}"></td>
                 <td>
                     <div class="flex-row gap-sm">
-                        <a th:href="@{'/capability-report/calculate'(id=${report.id})}" class="btn-action">Calculate</a>
+                        <a th:href="@{'/capability-report/calculate-progress'(id=${report.id})}" class="btn-action">Calculate</a>
                         <a th:href="@{'/capability-report/edit'(id=${report.id})}" class="btn-edit">Edit</a>
                         <button type="button" class="btn-danger"
                                 th:data-id="${report.id}"

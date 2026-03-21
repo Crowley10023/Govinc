@@ -123,6 +123,23 @@ public class CapabilityReportController {
         }
     }
 
+    // ─── Calculate Progress ───────────────────────────────────────────────────
+
+    @GetMapping("/calculate-progress")
+    public String calculateProgress(@RequestParam Long id, Model model) {
+        if (!authorizationService.canAccessCompliance()) {
+            throw new UnauthorizedException("You do not have permission to calculate capability reports.");
+        }
+        CapabilityReport report = service.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Report not found: " + id));
+        model.addAttribute("reportId", id);
+        model.addAttribute("reportName", report.getName());
+        model.addAttribute("orgUnitName",
+                report.getOrgUnit() != null ? report.getOrgUnit().getName() : "all org units");
+        model.addAttribute("capabilityCount", report.getCapabilities().size());
+        return "capability-report-progress";
+    }
+
     // ─── Calculate ───────────────────────────────────────────────────────────
 
     @GetMapping("/calculate")

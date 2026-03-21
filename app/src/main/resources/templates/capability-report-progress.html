@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <title th:text="'Calculating: ' + ${reportName}">Calculating…</title>
+    <meta charset="UTF-8">
+    <th:block th:replace="~{navigation :: navHead}"></th:block>
+    <style>
+        .calc-card {
+            max-width: 640px;
+            margin: 2.5rem auto;
+            border: 1px solid #dde3ec;
+            border-radius: 10px;
+            padding: 2rem 2.2rem;
+            background: #fff;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+        }
+        .calc-title {
+            font-size: 1.15em;
+            font-weight: 700;
+            margin-bottom: 0.3rem;
+        }
+        .calc-meta {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 1.5rem;
+        }
+        .calc-progress-wrap {
+            height: 1.1rem;
+            background: #e5ecf5;
+            border-radius: 999px;
+            overflow: hidden;
+            margin-bottom: 0.7rem;
+        }
+        #calc-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #2274a5, #5aade0);
+            border-radius: 999px;
+            transition: width 0.45s cubic-bezier(0.4,0,0.2,1);
+        }
+        #calc-step {
+            font-size: 0.88em;
+            color: #555;
+            min-height: 1.4em;
+            margin-bottom: 1.2rem;
+        }
+        #calc-error {
+            display: none;
+            margin-top: 1rem;
+            padding: 0.8rem 1rem;
+            background: #fdf0ef;
+            border: 1px solid #e8b4b0;
+            border-radius: 6px;
+            color: #a93226;
+            font-size: 0.9em;
+        }
+        .calc-back-link {
+            font-size: 0.88em;
+            color: #888;
+            text-decoration: none;
+        }
+        .calc-back-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+<div th:replace="~{navigation :: mainNav}"></div>
+<div class="container">
+    <div class="calc-card">
+        <div class="calc-title" th:text="${reportName}">Report Name</div>
+        <div class="calc-meta">
+            Calculating for org unit: <strong th:text="${orgUnitName}">—</strong>
+            &nbsp;&bull;&nbsp; including all child org units
+            &nbsp;&bull;&nbsp; <span th:text="${capabilityCount}">0</span> capabilities
+        </div>
+
+        <div class="calc-progress-wrap">
+            <div id="calc-bar"></div>
+        </div>
+        <div id="calc-step">Initializing…</div>
+
+        <div id="calc-error">
+            <strong>Calculation failed</strong><br>
+            <span id="calc-error-msg"></span>
+            <div style="margin-top:0.7rem;">
+                <a th:href="@{'/capability-report/list'}" class="btn-secondary">Back to Reports</a>
+            </div>
+        </div>
+
+        <a th:href="@{'/capability-report/list'}" class="calc-back-link">&#8592; Back to Reports</a>
+    </div>
+</div>
+
+<script th:inline="javascript">
+    const reportId = /*[[${reportId}]]*/ 0;
+
+    const steps = [
+        { pct: 12, msg: 'Collecting org unit hierarchy and all child units\u2026' },
+        { pct: 28, msg: 'Locating assessments for each org unit\u2026' },
+        { pct: 46, msg: 'Selecting most-recent assessment per org unit\u2026' },
+        { pct: 60, msg: 'Loading control answers from assessments\u2026' },
+        { pct: 74, msg: 'Applying security catalog filter\u2026' },
+        { pct: 86, msg: 'Calculating scores for each security control domain\u2026' },
+        { pct: 94, msg: 'Aggregating capability scores\u2026' },
+        { pct: 99, msg: 'Finishing up\u2026' }
+    ];
+
+    const bar      = document.getElementById('calc-bar');
+    const stepEl   = document.getElementById('calc-step');
+    const errorBox = document.getElementById('calc-error');
+    const errorMsg = document.getElementById('calc-error-msg');
+
+    let stepIdx = 0;
+
+    function advance() {
+        if (stepIdx < steps.length) {
+            const s = steps[stepIdx++];
+            bar.style.width = s.pct + '%';
+            stepEl.textContent = s.msg;
+        }
+    }
+
+    advance(); // show first step immediately
+    const timer = setInterval(advance, 650);
+
+    // Fetch the full calculation in the background.
+    // When the server responds with the rendered HTML, replace the page.
+    fetch('/capability-report/calculate?id=' + encodeURIComponent(reportId), {
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Server returned HTTP ' + response.status);
+        }
+        return response.text();
+    })
+    .then(html => {
+        clearInterval(timer);
+        bar.style.width = '100%';
+        bar.style.background = 'linear-gradient(90deg, #27ae60, #2ecc71)';
+        stepEl.textContent = 'Done!';
+        // Small delay so the user sees 100% before content replaces
+        setTimeout(() => {
+            document.open();
+            document.write(html);
+            document.close();
+        }, 350);
+    })
+    .catch(err => {
+        clearInterval(timer);
+        bar.style.background = '#e74c3c';
+        stepEl.textContent = '';
+        errorMsg.textContent = err.message || 'An unexpected error occurred.';
+        errorBox.style.display = 'block';
+    });
+</script>
+</body>
+</html>

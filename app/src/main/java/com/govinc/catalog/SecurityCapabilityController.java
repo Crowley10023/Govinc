@@ -9,11 +9,14 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/security-capability")
@@ -86,6 +89,84 @@ public class SecurityCapabilityController {
         service.save(capability);
         return "redirect:/security-capability/list";
     }
+
+    // ─── Mapping ─────────────────────────────────────────────────────────────
+
+    @GetMapping("/mapping")
+    public String mappingPage(Model model) {
+        if (!authorizationService.canAccessSecurityFramework()) {
+            throw new UnauthorizedException("You do not have permission to manage capability mappings.");
+        }
+        List<SecurityControlDomain> allDomains = domainService.findAll();
+        List<SecurityCatalog> allCatalogs = catalogService.findAll();
+        List<SecurityCapability> allCapabilities = service.findAll();
+
+        // domainCapabilities: domain ID → list of capabilities mapped to it
+        Map<Long, List<SecurityCapability>> domainCapabilities = new HashMap<>();
+        for (SecurityControlDomain domain : allDomains) {
+            domainCapabilities.put(domain.getId(), new ArrayList<>());
+        }
+        for (SecurityCapability cap : allCapabilities) {
+            for (SecurityControlDomain domain : cap.getDomains()) {
+                List<SecurityCapability> list = domainCapabilities.get(domain.getId());
+                if (list != null) list.add(cap);
+            }
+        }
+
+        // domainCatalogIds: domain ID → comma-separated catalog IDs (for JS filter)
+        Map<Long, String> domainCatalogIds = new HashMap<>();
+        for (SecurityControlDomain domain : allDomains) {
+            String catIds = domain.getSecurityControls().stream()
+                    .flatMap(ctrl -> ctrl.getSecurityCatalogs().stream())
+                    .map(c -> String.valueOf(c.getId()))
+                    .distinct()
+                    .collect(Collectors.joining(","));
+            domainCatalogIds.put(domain.getId(), catIds);
+        }
+
+        model.addAttribute("allDomains", allDomains);
+        model.addAttribute("allCatalogs", allCatalogs);
+        model.addAttribute("allCapabilities", allCapabilities);
+        model.addAttribute("domainCapabilities", domainCapabilities);
+        model.addAttribute("domainCatalogIds", domainCatalogIds);
+        return "security-capability-mapping";
+    }
+
+    @PostMapping("/mapping/add")
+    @ResponseBody
+    public String mappingAdd(@RequestParam Long capabilityId, @RequestParam Long domainId) {
+        if (!authorizationService.canAccessSecurityFramework()) {
+            return buildErrorResponse("Forbidden", "You do not have permission to manage capability mappings.");
+        }
+        try {
+            SecurityControlDomain domain = domainService.findById(domainId)
+                    .orElseThrow(() -> new NoSuchElementException("Domain not found: " + domainId));
+            service.addDomainToCapability(capabilityId, domain);
+            return buildSuccessResponse();
+        } catch (NoSuchElementException e) {
+            return buildErrorResponse("Not Found", e.getMessage());
+        } catch (Exception e) {
+            return buildErrorResponse("Error", "Unable to add mapping.");
+        }
+    }
+
+    @PostMapping("/mapping/remove")
+    @ResponseBody
+    public String mappingRemove(@RequestParam Long capabilityId, @RequestParam Long domainId) {
+        if (!authorizationService.canAccessSecurityFramework()) {
+            return buildErrorResponse("Forbidden", "You do not have permission to manage capability mappings.");
+        }
+        try {
+            service.removeDomainFromCapability(capabilityId, domainId);
+            return buildSuccessResponse();
+        } catch (NoSuchElementException e) {
+            return buildErrorResponse("Not Found", e.getMessage());
+        } catch (Exception e) {
+            return buildErrorResponse("Error", "Unable to remove mapping.");
+        }
+    }
+
+    // ─── Delete ──────────────────────────────────────────────────────────────
 
     @PostMapping("/delete")
     @ResponseBody

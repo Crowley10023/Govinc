@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <title>Capability–Domain Mapping</title>
+    <meta charset="UTF-8">
+    <meta name="_csrf" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:content="${_csrf.headerName}">
+    <th:block th:replace="~{navigation :: navHead}"></th:block>
+    <style>
+        .mapping-filter-bar {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            margin-bottom: 1.2rem;
+            flex-wrap: wrap;
+        }
+        .mapping-filter-bar label {
+            font-weight: 600;
+            font-size: 0.9em;
+            color: var(--text-secondary, #555);
+        }
+        .mapping-filter-bar select {
+            min-width: 200px;
+        }
+        .cap-chips-cell {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+            align-items: center;
+            min-width: 180px;
+        }
+        .cap-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            border-radius: 999px;
+            padding: 0.18em 0.5em 0.18em 0.75em;
+            background: #e8f2fb;
+            border: 1px solid #a8c9e8;
+            color: #1a5a7a;
+            font-size: 0.83em;
+            white-space: nowrap;
+        }
+        .cap-chip-remove {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #777;
+            font-size: 1em;
+            line-height: 1;
+            padding: 0 2px;
+            border-radius: 50%;
+            transition: color 0.15s, background 0.15s;
+        }
+        .cap-chip-remove:hover {
+            color: #c0392b;
+            background: #fce8e6;
+        }
+        .add-cap-select {
+            font-size: 0.85em;
+            padding: 0.2em 0.5em;
+            border-radius: 6px;
+            border: 1px solid #bbb;
+            cursor: pointer;
+            min-width: 160px;
+        }
+        .domain-row.hidden-by-filter {
+            display: none;
+        }
+        .mapping-status-bar {
+            position: fixed;
+            bottom: 1.2rem;
+            right: 1.5rem;
+            display: none;
+            align-items: center;
+            gap: 0.5rem;
+            background: #fff;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 0.4em 1em;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+            font-size: 0.9em;
+            z-index: 9999;
+        }
+        .mapping-status-bar.success { border-color: #27ae60; color: #27ae60; }
+        .mapping-status-bar.error   { border-color: #c0392b; color: #c0392b; }
+    </style>
+</head>
+<body>
+<div th:replace="~{navigation :: mainNav}"></div>
+<div class="container">
+    <div class="flex-row justify-between align-center mb-md">
+        <div>
+            <h1 class="page-title">Capability–Domain Mapping</h1>
+            <p class="text-muted">Manage which security control domains are mapped to each security capability.</p>
+        </div>
+        <a href="/security-capability/list" class="btn-secondary">&#8592; Back to Capabilities</a>
+    </div>
+
+    <!-- Filter bar -->
+    <div class="mapping-filter-bar">
+        <label for="catalogFilter">Filter by Security Catalog:</label>
+        <select id="catalogFilter" onchange="applyFilter()">
+            <option value="">All Catalogs</option>
+            <option th:each="cat : ${allCatalogs}"
+                    th:value="${cat.id}"
+                    th:text="${cat.name}"></option>
+        </select>
+        <span id="filter-count" class="text-muted" style="font-size:0.85em;"></span>
+    </div>
+
+    <!-- No domains state -->
+    <div th:if="${#lists.isEmpty(allDomains)}" class="no-results">
+        <p>No security control domains have been defined yet.</p>
+        <a href="/security-control-domain/edit">Create the first domain</a>
+    </div>
+
+    <!-- Mapping table -->
+    <table th:if="${not #lists.isEmpty(allDomains)}" class="table" id="mappingTable">
+        <thead>
+            <tr>
+                <th style="width:20%">Domain</th>
+                <th style="width:6%" class="text-center">Controls</th>
+                <th style="width:46%">Mapped Capabilities</th>
+                <th style="width:28%">Add Capability</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="domain : ${allDomains}"
+                class="domain-row"
+                th:attr="data-domain-id=${domain.id}, data-catalog-ids=${domainCatalogIds[domain.id] ?: ''}">
+                <td>
+                    <span class="fw-semibold" th:text="${domain.name}"></span>
+                    <div th:if="${domain.description}" class="text-muted" style="font-size:0.8em;" th:text="${domain.description}"></div>
+                </td>
+                <td class="text-center" th:text="${#sets.size(domain.securityControls)}"></td>
+                <td>
+                    <div class="cap-chips-cell" th:id="'chips-' + ${domain.id}">
+                        <th:block th:each="cap : ${domainCapabilities[domain.id]}">
+                            <span class="cap-chip"
+                                  th:attr="data-cap-id=${cap.id}, data-domain-id=${domain.id}">
+                                <span class="cap-chip-name" th:text="${cap.name}"></span>
+                                <button type="button" class="cap-chip-remove"
+                                        title="Remove mapping"
+                                        onclick="removeMapping(this)">&#215;</button>
+                            </span>
+                        </th:block>
+                        <span th:if="${#lists.isEmpty(domainCapabilities[domain.id])}"
+                              class="text-muted" style="font-size:0.82em;">No capabilities mapped</span>
+                    </div>
+                </td>
+                <td>
+                    <select class="add-cap-select"
+                            th:id="'add-sel-' + ${domain.id}"
+                            th:attr="data-domain-id=${domain.id}"
+                            onchange="addMappingFromSelect(this)">
+                        <option value="">+ Add capability&hellip;</option>
+                        <option th:each="cap : ${allCapabilities}"
+                                th:value="${cap.id}"
+                                th:text="${cap.name}"></option>
+                    </select>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Status bar -->
+<div id="mappingStatusBar" class="mapping-status-bar">
+    <span id="mappingStatusMsg"></span>
+</div>
+
+<script th:inline="javascript">
+    const csrfToken  = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+    const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+
+    // ── On load: disable already-mapped options in each select ──────────────
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('.domain-row').forEach(row => {
+            syncSelectOptions(row.getAttribute('data-domain-id'));
+        });
+        updateFilterCount();
+    });
+
+    function syncSelectOptions(domainId) {
+        const chipsEl = document.getElementById('chips-' + domainId);
+        const sel     = document.getElementById('add-sel-' + domainId);
+        if (!chipsEl || !sel) return;
+        const mappedIds = new Set(
+            [...chipsEl.querySelectorAll('.cap-chip')].map(c => c.getAttribute('data-cap-id'))
+        );
+        [...sel.options].forEach(opt => {
+            if (opt.value) opt.disabled = mappedIds.has(opt.value);
+        });
+    }
+
+    // ── Catalog filter ───────────────────────────────────────────────────────
+    function applyFilter() {
+        const selected = document.getElementById('catalogFilter').value;
+        document.querySelectorAll('.domain-row').forEach(row => {
+            if (!selected) {
+                row.classList.remove('hidden-by-filter');
+            } else {
+                const ids = (row.getAttribute('data-catalog-ids') || '').split(',').filter(Boolean);
+                if (ids.includes(selected)) {
+                    row.classList.remove('hidden-by-filter');
+                } else {
+                    row.classList.add('hidden-by-filter');
+                }
+            }
+        });
+        updateFilterCount();
+    }
+
+    function updateFilterCount() {
+        const total   = document.querySelectorAll('.domain-row').length;
+        const visible = document.querySelectorAll('.domain-row:not(.hidden-by-filter)').length;
+        const el = document.getElementById('filter-count');
+        if (el) el.textContent = (visible < total) ? ('Showing ' + visible + ' of ' + total + ' domains') : '';
+    }
+
+    // ── Add mapping ──────────────────────────────────────────────────────────
+    function addMappingFromSelect(sel) {
+        const domainId     = sel.getAttribute('data-domain-id');
+        const capabilityId = sel.value;
+        if (!capabilityId) return;
+        const capName = sel.options[sel.selectedIndex].text;
+        sel.value = ''; // reset
+
+        postMapping('/security-capability/mapping/add', capabilityId, domainId, () => {
+            // Add chip to DOM
+            const chipsEl = document.getElementById('chips-' + domainId);
+            // Remove "No capabilities mapped" placeholder if present
+            chipsEl.querySelectorAll('span.text-muted').forEach(s => s.remove());
+            const chip = document.createElement('span');
+            chip.className = 'cap-chip';
+            chip.setAttribute('data-cap-id', capabilityId);
+            chip.setAttribute('data-domain-id', domainId);
+            chip.innerHTML =
+                '<span class="cap-chip-name">' + escHtml(capName) + '</span>' +
+                '<button type="button" class="cap-chip-remove" title="Remove mapping" onclick="removeMapping(this)">&#215;</button>';
+            chipsEl.appendChild(chip);
+            syncSelectOptions(domainId);
+            showStatus('Mapping added.', 'success');
+        });
+    }
+
+    // ── Remove mapping ───────────────────────────────────────────────────────
+    function removeMapping(btn) {
+        const chip        = btn.closest('.cap-chip');
+        const capabilityId = chip.getAttribute('data-cap-id');
+        const domainId    = chip.getAttribute('data-domain-id');
+
+        postMapping('/security-capability/mapping/remove', capabilityId, domainId, () => {
+            const chipsEl = document.getElementById('chips-' + domainId);
+            chip.remove();
+            // Re-add "No capabilities mapped" if now empty
+            if (!chipsEl.querySelector('.cap-chip')) {
+                const placeholder = document.createElement('span');
+                placeholder.className = 'text-muted';
+                placeholder.style.fontSize = '0.82em';
+                placeholder.textContent = 'No capabilities mapped';
+                chipsEl.appendChild(placeholder);
+            }
+            syncSelectOptions(domainId);
+            showStatus('Mapping removed.', 'success');
+        });
+    }
+
+    // ── Shared AJAX helper ───────────────────────────────────────────────────
+    function postMapping(url, capabilityId, domainId, onSuccess) {
+        const body = 'capabilityId=' + encodeURIComponent(capabilityId) +
+                     '&domainId='    + encodeURIComponent(domainId);
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                [csrfHeader]: csrfToken
+            },
+            body: body
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                onSuccess();
+            } else {
+                showStatus((data.title || 'Error') + ': ' + (data.message || 'Operation failed.'), 'error');
+            }
+        })
+        .catch(() => showStatus('Network error. Please try again.', 'error'));
+    }
+
+    // ── Status bar ───────────────────────────────────────────────────────────
+    let statusTimer = null;
+    function showStatus(msg, type) {
+        const bar = document.getElementById('mappingStatusBar');
+        document.getElementById('mappingStatusMsg').textContent = msg;
+        bar.className = 'mapping-status-bar ' + type;
+        bar.style.display = 'flex';
+        if (statusTimer) clearTimeout(statusTimer);
+        statusTimer = setTimeout(() => { bar.style.display = 'none'; }, 2800);
+    }
+
+    function escHtml(str) {
+        return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+</script>
+</body>
+</html>

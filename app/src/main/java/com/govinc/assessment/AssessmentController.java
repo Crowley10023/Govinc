@@ -37,12 +37,15 @@ import org.springframework.util.MultiValueMap;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/assessment")
 public class AssessmentController {
+    private static final DateTimeFormatter FRIENDLY_DATE_FORMATTER = DateTimeFormatter.ofPattern("dd MMM yyyy");
+
     @Autowired
     private AssessmentRepository assessmentRepository;
     @Autowired
@@ -386,6 +389,65 @@ public class AssessmentController {
         return closest;
     }
 
+    private static class OrgServiceInheritance {
+        private final MaturityAnswer answer;
+        private final int percent;
+        private final String orgServiceName;
+        private final String comment;
+
+        private OrgServiceInheritance(MaturityAnswer answer, int percent, String orgServiceName, String comment) {
+            this.answer = answer;
+            this.percent = percent;
+            this.orgServiceName = orgServiceName;
+            this.comment = comment;
+        }
+    }
+
+    private Map<Long, OrgServiceInheritance> collectOrgServiceInheritance(Assessment assessment) {
+        Map<Long, OrgServiceInheritance> inheritanceByControl = new HashMap<>();
+        if (assessment == null || assessment.getOrgServices() == null || assessment.getOrgServices().isEmpty()) {
+            return inheritanceByControl;
+        }
+        if (assessment.getSecurityCatalog() == null || assessment.getSecurityCatalog().getMaturityModel() == null) {
+            return inheritanceByControl;
+        }
+
+        List<Long> orgServiceIds = assessment.getOrgServices().stream()
+                .map(OrgService::getId)
+                .filter(Objects::nonNull)
+                .toList();
+        if (orgServiceIds.isEmpty()) {
+            return inheritanceByControl;
+        }
+
+        List<OrgServiceAssessment> allAssessments = orgServiceAssessmentRepository.findByOrgServiceIdIn(orgServiceIds);
+        for (OrgServiceAssessment osa : allAssessments) {
+            if (osa.getControls() == null || osa.getControls().isEmpty()) {
+                continue;
+            }
+            String orgServiceName = osa.getOrgService() != null ? osa.getOrgService().getName() : null;
+            for (OrgServiceAssessmentControl osac : osa.getControls()) {
+                if (!osac.isApplicable() || osac.getPercent() < 0 || osac.getSecurityControl() == null
+                        || osac.getSecurityControl().getId() == null) {
+                    continue;
+                }
+                Long ctrlId = osac.getSecurityControl().getId();
+                if (inheritanceByControl.containsKey(ctrlId)) {
+                    continue;
+                }
+                MaturityAnswer closest = findClosestMaturityAnswer(
+                        assessment.getSecurityCatalog().getMaturityModel(),
+                        osac.getPercent());
+                if (closest == null) {
+                    continue;
+                }
+                inheritanceByControl.put(ctrlId,
+                        new OrgServiceInheritance(closest, osac.getPercent(), orgServiceName, osac.getComment()));
+            }
+        }
+        return inheritanceByControl;
+    }
+
     @GetMapping("/{id}")
     public String getAssessmentById(@PathVariable Long id, Model model) {
         // Authorization check
@@ -443,38 +505,7 @@ public class AssessmentController {
             Map<Long, Boolean> controlAnswerIsOverridden = new HashMap<>();
             List<AssessmentControlAnswer> answers = new ArrayList<>();
 
-            // Prepare Org Service answers for controls
-            Map<Long, OrgServiceInfo> bestOrgServiceAnswer = new HashMap<>();
-            if (assessment.getOrgServices() != null) {
-                for (OrgService orgService : assessment.getOrgServices()) {
-                    List<OrgServiceAssessment> osaList = orgServiceAssessmentRepository
-                            .findByOrgServiceId(orgService.getId());
-                    if (osaList != null) {
-                        for (OrgServiceAssessment osa : osaList) {
-                            if (osa.getControls() != null) {
-                                System.out.println(" maturity answers (1a):  " + osa.getControls().size());
-                                for (OrgServiceAssessmentControl osac : osa.getControls()) {
-                                    if (osac.isApplicable() && osac.getSecurityControl() != null) {
-                                        Long ctrlId = osac.getSecurityControl().getId();
-                                        // Prefer first found inherited answer; if multiple org services answer for the
-                                        // same control, keep first
-                                        if (!bestOrgServiceAnswer.containsKey(ctrlId)) {
-                                            MaturityAnswer closest = findClosestMaturityAnswer(
-                                                    assessment.getSecurityCatalog().getMaturityModel(),
-                                                    osac.getPercent());
-                                            if (closest != null) {
-                                                bestOrgServiceAnswer.put(ctrlId,
-                                                        new OrgServiceInfo(closest, orgService.getName()));
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            System.out.println(" maturity answers (2):  " + assessment.getSecurityCatalog().getMaturityModel().getMaturityAnswers().size());
+            Map<Long, OrgServiceInheritance> inheritedByControl = collectOrgServiceInheritance(assessment);
 
             // Main logic: iterate all controls, set answer with orgService inherited
             // PRECEDENCE
@@ -486,26 +517,11 @@ public class AssessmentController {
             // Gather comments as well - including org service comments
             Map<Long, String> controlComments = new HashMap<>();
             Map<Long, String> orgServiceControlComments = new HashMap<>();
-            
-            // Pre-populate org service comments if any org services are assigned
-            if (assessment.getOrgServices() != null) {
-                for (OrgService orgService : assessment.getOrgServices()) {
-                    List<OrgServiceAssessment> osaList = orgServiceAssessmentRepository
-                            .findByOrgServiceId(orgService.getId());
-                    if (osaList != null) {
-                        for (OrgServiceAssessment osa : osaList) {
-                            if (osa.getControls() != null) {
-                                for (OrgServiceAssessmentControl osac : osa.getControls()) {
-                                    if (osac.isApplicable() && osac.getSecurityControl() != null && osac.getPercent() >= 0) {
-                                        Long ctrlId = osac.getSecurityControl().getId();
-                                        if (osac.getComment() != null && !osac.getComment().isEmpty() && !orgServiceControlComments.containsKey(ctrlId)) {
-                                            orgServiceControlComments.put(ctrlId, osac.getComment());
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+
+            for (Map.Entry<Long, OrgServiceInheritance> entry : inheritedByControl.entrySet()) {
+                String comment = entry.getValue().comment;
+                if (comment != null && !comment.isEmpty()) {
+                    orgServiceControlComments.put(entry.getKey(), comment);
                 }
             }
 
@@ -527,45 +543,34 @@ public class AssessmentController {
                         controlComments.put(ctrlId, aca.getComment());
                     }
                     // If this control has an org service answer that was overridden, keep the org service name visible
-                    if (bestOrgServiceAnswer.containsKey(ctrlId)) {
-                        controlTakenOverOrgServiceName.put(ctrlId, bestOrgServiceAnswer.get(ctrlId).orgServiceName);
+                    if (inheritedByControl.containsKey(ctrlId)) {
+                        controlTakenOverOrgServiceName.put(ctrlId, inheritedByControl.get(ctrlId).orgServiceName);
                     }
-                } else if (bestOrgServiceAnswer.containsKey(ctrlId)) {
-                    OrgServiceInfo inh = bestOrgServiceAnswer.get(ctrlId);
+                } else if (inheritedByControl.containsKey(ctrlId)) {
+                    OrgServiceInheritance inh = inheritedByControl.get(ctrlId);
                     controlAnswers.put(ctrlId, inh.answer.getAnswer());
                     controlAnswerIsTakenOver.put(ctrlId, Boolean.TRUE);
                     controlTakenOverOrgServiceName.put(ctrlId, inh.orgServiceName);
                     controlAnswerIsOverridden.put(ctrlId, Boolean.FALSE);
 
-                    int inheritedPercent = -1;
-                    if (assessment.getOrgServices() != null) {
-                        for (OrgService orgService : assessment.getOrgServices()) {
-                            List<OrgServiceAssessment> osaList = orgServiceAssessmentRepository
-                                    .findByOrgServiceId(orgService.getId());
-                            if (osaList != null) {
-                                for (OrgServiceAssessment osa : osaList) {
-                                    if (osa.getControls() != null) {
-                                        for (OrgServiceAssessmentControl osac : osa.getControls()) {
-                                            if (osac.isApplicable() && osac.getSecurityControl() != null
-                                                    && osac.getSecurityControl().getId().equals(ctrlId)) {
-                                                inheritedPercent = osac.getPercent();
-                                                MaturityAnswer closest = findClosestMaturityAnswer(
-                                                        assessment.getSecurityCatalog().getMaturityModel(),
-                                                        inheritedPercent);
-                                                if (closest != null) {
-                                                    AssessmentControlAnswer aca = new AssessmentControlAnswer(control,
-                                                            closest);
-                                                    aca = assessmentControlAnswerRepository.save(aca);
-                                                    detailsAnswers.add(aca);
-                                                    answersPersisted = true;
-                                                    localControlAnswers.put(ctrlId, aca);
-                                                }
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
+                    if (details != null) {
+                        AssessmentControlAnswer existing = localControlAnswers.get(ctrlId);
+                        if (existing != null) {
+                            Long existingAnswerId = existing.getMaturityAnswer() != null
+                                    ? existing.getMaturityAnswer().getId()
+                                    : null;
+                            Long inheritedAnswerId = inh.answer.getId();
+                            if (!Objects.equals(existingAnswerId, inheritedAnswerId)) {
+                                existing.setMaturityAnswer(inh.answer);
+                                detailsAnswers.add(existing);
+                                answersPersisted = true;
                             }
+                        } else {
+                            AssessmentControlAnswer aca = new AssessmentControlAnswer(control, inh.answer);
+                            aca = assessmentControlAnswerRepository.save(aca);
+                            detailsAnswers.add(aca);
+                            answersPersisted = true;
+                            localControlAnswers.put(ctrlId, aca);
                         }
                     }
                     // If inherited, try to fetch the comment from local (user) answer if exists, else use org service comment
@@ -658,6 +663,10 @@ public class AssessmentController {
             model.addAttribute("orgServices", assessment.getOrgServices());
             // Pass details object to template for completedDate access
             model.addAttribute("details", details);
+                model.addAttribute("creationDateDisplay", formatFriendlyDate(assessment.getCreationDate()));
+                model.addAttribute("closeDateDisplay", formatFriendlyDate(assessment.getCloseDate()));
+                model.addAttribute("completedDateDisplay",
+                    details != null ? formatFriendlyDate(details.getCompletedDate()) : "");
 
             // Pass authorization info for UI restrictions
             Role currentRole = authorizationService.getCurrentUserRole();
@@ -739,6 +748,10 @@ public class AssessmentController {
             this.orgServiceName = orgServiceName;
         }
 
+    }
+
+    private String formatFriendlyDate(LocalDate date) {
+        return date != null ? date.format(FRIENDLY_DATE_FORMATTER) : "";
     }
 
     // Save/update answer for a single control (AJAX POST from UI)
@@ -1271,50 +1284,18 @@ public class AssessmentController {
         Assessment assessment = assessmentOpt.get();
         Map<String, Object> state = new HashMap<>();
         
-        // Find org service answer for this control
-        String orgServiceName = null;
-        Long orgServiceAnswerId = null;
-        String orgServiceComment = null;
-        
-        if (assessment.getOrgServices() != null) {
-            for (OrgService orgService : assessment.getOrgServices()) {
-                List<OrgServiceAssessment> osaList = orgServiceAssessmentRepository
-                        .findByOrgServiceId(orgService.getId());
-                if (osaList != null) {
-                    for (OrgServiceAssessment osa : osaList) {
-                        if (osa.getControls() != null) {
-                            for (OrgServiceAssessmentControl osac : osa.getControls()) {
-                                if (osac.isApplicable() && osac.getSecurityControl() != null 
-                                    && osac.getSecurityControl().getId().equals(controlId) && osac.getPercent() >= 0) {
-                                    // Found org service answer for this control
-                                    orgServiceName = orgService.getName();
-                                    orgServiceComment = osac.getComment();
-                                    MaturityAnswer closest = findClosestMaturityAnswer(
-                                            assessment.getSecurityCatalog().getMaturityModel(),
-                                            osac.getPercent());
-                                    if (closest != null) {
-                                        orgServiceAnswerId = closest.getId();
-                                    }
-                                    break;
-                                }
-                            }
-                            if (orgServiceName != null) break;
-                        }
-                    }
-                    if (orgServiceName != null) break;
-                }
-            }
-        }
+        // Find org service answer for this control with a single pre-aggregated pass
+        OrgServiceInheritance inherited = collectOrgServiceInheritance(assessment).get(controlId);
         
         state.put("controlId", controlId);
-        if (orgServiceName != null) {
-            state.put("orgServiceName", orgServiceName);
+        if (inherited != null && inherited.orgServiceName != null) {
+            state.put("orgServiceName", inherited.orgServiceName);
         }
-        if (orgServiceAnswerId != null) {
-            state.put("orgServiceAnswerId", orgServiceAnswerId);
+        if (inherited != null && inherited.answer != null && inherited.answer.getId() != null) {
+            state.put("orgServiceAnswerId", inherited.answer.getId());
         }
-        if (orgServiceComment != null) {
-            state.put("orgServiceComment", orgServiceComment);
+        if (inherited != null && inherited.comment != null) {
+            state.put("orgServiceComment", inherited.comment);
         }
         
         return state;
