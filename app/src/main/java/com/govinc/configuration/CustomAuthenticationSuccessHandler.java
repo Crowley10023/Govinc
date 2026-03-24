@@ -63,22 +63,6 @@ public class CustomAuthenticationSuccessHandler implements AuthenticationSuccess
 
         if (authentication.getPrincipal() instanceof OidcUser oidcUser) {
             logger.info("[OAUTH2-FLOW] OidcUser detected");
-
-            // Dump every claim received from the identity provider for diagnostics
-            System.out.println("[USER-CLAIMS] ===== Raw OIDC claims from identity provider =====");
-            oidcUser.getClaims().forEach((key, value) ->
-                System.out.println("[USER-CLAIMS]   " + key + " = " + value
-                    + "  (" + (value != null ? value.getClass().getSimpleName() : "null") + ")"));
-            System.out.println("[USER-CLAIMS]   --- Convenience accessors ---");
-            System.out.println("[USER-CLAIMS]   getEmail()             = " + oidcUser.getEmail());
-            System.out.println("[USER-CLAIMS]   getGivenName()         = " + oidcUser.getGivenName());
-            System.out.println("[USER-CLAIMS]   getFamilyName()        = " + oidcUser.getFamilyName());
-            System.out.println("[USER-CLAIMS]   getFullName()          = " + oidcUser.getFullName());
-            System.out.println("[USER-CLAIMS]   getPreferredUsername() = " + oidcUser.getPreferredUsername());
-            System.out.println("[USER-CLAIMS]   getSubject()           = " + oidcUser.getSubject());
-            System.out.println("[USER-CLAIMS]   getNickName()          = " + oidcUser.getNickName());
-            System.out.println("[USER-CLAIMS] =====================================================");
-
             email = oidcUser.getEmail();
             // Extract first/last name from standard OIDC claims (given_name / family_name)
             firstName = oidcUser.getGivenName();
