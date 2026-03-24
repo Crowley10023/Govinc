@@ -101,6 +101,23 @@ esc_sql() {
   printf "%s" "$1" | sed "s/'/''/g"
 }
 
+# Reassign all FK references from $1 (deleted id) to $2 (kept id), then delete.
+reassign_and_delete() {
+  local del_id="$1"
+  local keep_id="$2"
+  echo "  Reassigning references: user id=${del_id} -> id=${keep_id}..."
+  # assessment_users many-to-many join table: add keep_id where missing, then remove del_id
+  run_sql "INSERT IGNORE INTO assessment_users (assessment_id, user_id) SELECT assessment_id, ${keep_id} FROM assessment_users WHERE user_id=${del_id};"
+  run_sql "DELETE FROM assessment_users WHERE user_id=${del_id};"
+  # assessments.created_by_id
+  run_sql "UPDATE assessments SET created_by_id=${keep_id} WHERE created_by_id=${del_id};"
+  # org_unit.leader_id
+  run_sql "UPDATE org_unit SET leader_id=${keep_id} WHERE leader_id=${del_id};"
+  # now safe to delete
+  run_sql "DELETE FROM \`user\` WHERE id=${del_id};"
+  echo "  Deleted user id=${del_id} (references moved to id=${keep_id})"
+}
+
 # ── 1. Check for duplicate users ─────────────────────────────────────────────
 
 echo "=== Checking for duplicate users ==="
@@ -113,25 +130,45 @@ if [ -z "$DUP_EMAILS" ]; then
 else
   echo "Duplicate e-mail addresses detected:"
   echo ""
+
+  # Pass 1: show all duplicate groups
   while IFS= read -r email <&3; do
     [ -z "$email" ] && continue
     ESC_EMAIL="$(esc_sql "$email")"
     echo "--- Duplicate entries for: $email ---"
     run_sql_table "SELECT id, first_name, last_name, email, role FROM \`user\` WHERE email='${ESC_EMAIL}';"
     echo ""
+  done 3<<< "$DUP_EMAILS"
 
+  # Pass 2: ask for deletions
+  while IFS= read -r email <&3; do
+    [ -z "$email" ] && continue
+    ESC_EMAIL="$(esc_sql "$email")"
     IDS="$(run_sql "SELECT id FROM \`user\` WHERE email='${ESC_EMAIL}';" | tr '\n' ' ' | sed 's/ $//')"
-    echo "Available IDs: $IDS"
+    echo "Duplicate e-mail: $email"
+    echo "Available IDs:    $IDS"
     read -r -p "IDs to DELETE (space-separated, or ENTER to skip): " TO_DELETE
     if [ -z "$TO_DELETE" ]; then
       echo "Skipped."
     else
+      # Determine the ID to keep (first ID not in the delete list)
+      KEEP_ID=""
+      for cid in $IDS; do
+        MATCHED=0
+        for did in $TO_DELETE; do [ "$cid" = "$did" ] && MATCHED=1 && break; done
+        [ "$MATCHED" -eq 0 ] && KEEP_ID="$cid" && break
+      done
+      if [ -z "$KEEP_ID" ]; then
+        echo "WARNING: All IDs selected for deletion — keeping the first one to avoid data loss."
+        KEEP_ID="$(echo "$IDS" | awk '{print $1}')"
+      fi
+      echo "Keeping user id=${KEEP_ID}."
       for del_id in $TO_DELETE; do
+        [ "$del_id" = "$KEEP_ID" ] && echo "  ID ${del_id} is the kept entry — skipped." && continue
         if [[ "$IDS" =~ (^| )$del_id( |$) ]] && [[ "$del_id" =~ ^[0-9]+$ ]]; then
-          run_sql "DELETE FROM \`user\` WHERE id=${del_id};"
-          echo "Deleted user id=${del_id}"
+          reassign_and_delete "$del_id" "$KEEP_ID"
         else
-          echo "ID ${del_id} not in duplicate list — skipped for safety."
+          echo "  ID ${del_id} not in duplicate list — skipped for safety."
         fi
       done
     fi
@@ -146,6 +183,8 @@ DUP_NAMES="$(run_sql "SELECT CONCAT(TRIM(first_name), ' ', TRIM(last_name)) AS f
 if [ -n "$DUP_NAMES" ]; then
   echo "Duplicate full names detected:"
   echo ""
+
+  # Pass 1: show all duplicate groups
   while IFS= read -r full_name <&3; do
     [ -z "$full_name" ] && continue
     fn_part="${full_name%% *}"
@@ -154,23 +193,45 @@ if [ -n "$DUP_NAMES" ]; then
     ESC_FN="$(esc_sql "$fn_part")"
     ESC_LN="$(esc_sql "$ln_part")"
     WHERE_NAME="TRIM(first_name)='${ESC_FN}' AND TRIM(last_name)='${ESC_LN}'"
-
     echo "--- Duplicate entries for: $full_name ---"
     run_sql_table "SELECT id, first_name, last_name, email, role FROM \`user\` WHERE ${WHERE_NAME};"
     echo ""
+  done 3<<< "$DUP_NAMES"
 
+  # Pass 2: ask for deletions
+  while IFS= read -r full_name <&3; do
+    [ -z "$full_name" ] && continue
+    fn_part="${full_name%% *}"
+    ln_part="${full_name#* }"
+    [ "$ln_part" = "$fn_part" ] && ln_part=""
+    ESC_FN="$(esc_sql "$fn_part")"
+    ESC_LN="$(esc_sql "$ln_part")"
+    WHERE_NAME="TRIM(first_name)='${ESC_FN}' AND TRIM(last_name)='${ESC_LN}'"
     IDS="$(run_sql "SELECT id FROM \`user\` WHERE ${WHERE_NAME};" | tr '\n' ' ' | sed 's/ $//')"
-    echo "Available IDs: $IDS"
+    echo "Duplicate name: $full_name"
+    echo "Available IDs:  $IDS"
     read -r -p "IDs to DELETE (space-separated, or ENTER to skip): " TO_DELETE
     if [ -z "$TO_DELETE" ]; then
       echo "Skipped."
     else
+      # Determine the ID to keep (first ID not in the delete list)
+      KEEP_ID=""
+      for cid in $IDS; do
+        MATCHED=0
+        for did in $TO_DELETE; do [ "$cid" = "$did" ] && MATCHED=1 && break; done
+        [ "$MATCHED" -eq 0 ] && KEEP_ID="$cid" && break
+      done
+      if [ -z "$KEEP_ID" ]; then
+        echo "WARNING: All IDs selected for deletion — keeping the first one to avoid data loss."
+        KEEP_ID="$(echo "$IDS" | awk '{print $1}')"
+      fi
+      echo "Keeping user id=${KEEP_ID}."
       for del_id in $TO_DELETE; do
+        [ "$del_id" = "$KEEP_ID" ] && echo "  ID ${del_id} is the kept entry — skipped." && continue
         if [[ "$IDS" =~ (^| )$del_id( |$) ]] && [[ "$del_id" =~ ^[0-9]+$ ]]; then
-          run_sql "DELETE FROM \`user\` WHERE id=${del_id};"
-          echo "Deleted user id=${del_id}"
+          reassign_and_delete "$del_id" "$KEEP_ID"
         else
-          echo "ID ${del_id} not in duplicate list — skipped for safety."
+          echo "  ID ${del_id} not in duplicate list — skipped for safety."
         fi
       done
     fi
