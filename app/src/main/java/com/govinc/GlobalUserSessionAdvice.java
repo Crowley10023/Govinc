@@ -23,6 +23,12 @@ public class GlobalUserSessionAdvice {
                 !(authentication.getPrincipal() instanceof String principal && principal.equals("anonymousUser"))) {
                 Object principal = authentication.getPrincipal();
                 if (principal instanceof OidcUser oidcUser) {
+                    String givenName = oidcUser.getGivenName();
+                    String familyName = oidcUser.getFamilyName();
+                    if (givenName != null || familyName != null) {
+                        if (givenName != null && familyName != null) return givenName + " " + familyName;
+                        return givenName != null ? givenName : familyName;
+                    }
                     if (oidcUser.getFullName() != null) return oidcUser.getFullName();
                     if (oidcUser.getPreferredUsername() != null) return oidcUser.getPreferredUsername();
                     if (oidcUser.getEmail() != null) return oidcUser.getEmail();
