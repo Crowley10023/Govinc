@@ -1,98 +1,231 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# make-admin.sh - Promote a user to ADMIN role in the database
-# Usage: ./scripts/make-admin.sh <username_or_email>
+# make-admin.sh - Promote a database user to ADMIN role and check for duplicates.
+# Reads database connection settings from app/src/main/resources/application.properties.
 #
-# The script will read .build-setup.local (if present in repo root) for DB settings
-# The .build-setup.local created by build-setup.sh uses variables:
-#   DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
-# Environment variables override file values.
+# Usage:
+#   ./scripts/make-admin.sh
+#   ./scripts/make-admin.sh <email_or_full_name>
 
-# Allow overriding the build config filename via env
-BUILD_CONFIG_FILE="${BUILD_CONFIG_FILE:-.build-setup.local}"
+IDENTITY="${1:-}"
 
-# Defaults (fallback)
-DB_HOST=${DB_HOST:-govinc}
-DB_PORT=${DB_PORT:-3306}
-DB_NAME=${DB_NAME:-govinc}
-DB_USER=${DB_USER:-govinc}
-# build-setup writes DB_PASSWORD; some scripts use DB_PASS. Support both.
-DB_PASSWORD=${DB_PASSWORD:-}
-DB_PASS=${DB_PASS:-}
+# ── Locate application.properties ────────────────────────────────────────────
 
-# If build config file exists, source it and ensure both DB_PASSWORD and DB_PASS are populated
-if [ -f "$BUILD_CONFIG_FILE" ]; then
-  # shellcheck source=.build-setup.local
-  # disable SC1091 for dynamic file
-  # shellcheck disable=SC1091
-  source "$BUILD_CONFIG_FILE"
-  echo "Loaded DB settings from $BUILD_CONFIG_FILE"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROPS_FILE="$REPO_ROOT/app/src/main/resources/application.properties"
 
-  # If file provided DB_PASSWORD and DB_PASS is unset, set DB_PASS
-  if [ -n "${DB_PASSWORD:-}" ] && [ -z "${DB_PASS:-}" ]; then
-    DB_PASS="$DB_PASSWORD"
-  fi
-  # If DB_PASS is set (env or file) and DB_PASSWORD is unset, set DB_PASSWORD
-  if [ -n "${DB_PASS:-}" ] && [ -z "${DB_PASSWORD:-}" ]; then
-    DB_PASSWORD="$DB_PASS"
-  fi
-fi
-
-# Apply defaults if still unset
-DB_HOST=${DB_HOST:-govinc}
-DB_PORT=${DB_PORT:-3306}
-DB_NAME=${DB_NAME:-govinc}
-DB_USER=${DB_USER:-govinc}
-DB_PASS=${DB_PASS:-xxxxx}
-DB_PASSWORD=${DB_PASSWORD:-$DB_PASS}
-
-IDENT=${1:-}
-
-if [ -z "$IDENT" ]; then
-  echo "Usage: $0 <username_or_email>"
+if [ ! -f "$PROPS_FILE" ]; then
+  echo "ERROR: Cannot find application.properties at: $PROPS_FILE" >&2
   exit 1
 fi
 
-# Escape single quotes for SQL
-ESC_IDENT=$(printf "%s" "$IDENT" | sed "s/'/''/g")
+# ── Parse a key from application.properties ──────────────────────────────────
 
-# Decide whether input is an email
-if echo "$IDENT" | grep -q "@"; then
+get_prop() {
+  local key="$1"
+  grep -E "^\s*${key}\s*=" "$PROPS_FILE" | head -1 | sed "s/^\s*${key}\s*=\s*//" | sed 's/[[:space:]]*$//'
+}
+
+# ── Read connection settings ──────────────────────────────────────────────────
+
+JDBC_URL="$(get_prop 'spring\.datasource\.url')"
+DB_USER="$(get_prop 'spring\.datasource\.username')"
+DB_PASS="$(get_prop 'spring\.datasource\.password')"
+
+if [ -z "$JDBC_URL" ]; then
+  echo "ERROR: spring.datasource.url not found in application.properties" >&2
+  exit 1
+fi
+
+# Parse jdbc:mariadb://host:port/dbname  (or jdbc:mysql://...)
+if [[ "$JDBC_URL" =~ jdbc:[^:]+://([^:/]+):([0-9]+)/([^?;]+) ]]; then
+  DB_HOST="${BASH_REMATCH[1]}"
+  DB_PORT="${BASH_REMATCH[2]}"
+  DB_NAME="${BASH_REMATCH[3]}"
+elif [[ "$JDBC_URL" =~ jdbc:[^:]+://([^:/]+)/([^?;]+) ]]; then
+  DB_HOST="${BASH_REMATCH[1]}"
+  DB_PORT="3306"
+  DB_NAME="${BASH_REMATCH[2]}"
+else
+  echo "ERROR: Cannot parse JDBC URL: $JDBC_URL" >&2
+  exit 1
+fi
+
+echo ""
+echo "Database : ${DB_USER}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+echo "(settings read from application.properties)"
+echo ""
+
+# ── Verify mysql/mariadb client ───────────────────────────────────────────────
+
+MYSQL_CMD=""
+for candidate in mysql mariadb; do
+  if command -v "$candidate" &>/dev/null; then
+    MYSQL_CMD="$candidate"
+    break
+  fi
+done
+
+if [ -z "$MYSQL_CMD" ]; then
+  echo "ERROR: mysql / mariadb client not found. Install mysql-client or mariadb-client." >&2
+  exit 1
+fi
+
+# ── Temp credentials file (avoids password on process list) ──────────────────
+
+TEMP_CFG="$(mktemp -t mysql_cfg_XXXXXX.cnf)"
+chmod 600 "$TEMP_CFG"
+cat > "$TEMP_CFG" <<EOF
+[client]
+user=${DB_USER}
+password=${DB_PASS}
+host=${DB_HOST}
+port=${DB_PORT}
+EOF
+
+trap 'rm -f "$TEMP_CFG"' EXIT INT TERM
+
+# ── Helper functions ──────────────────────────────────────────────────────────
+
+run_sql() {
+  "$MYSQL_CMD" --defaults-extra-file="$TEMP_CFG" --batch --silent "$DB_NAME" -e "$1"
+}
+
+run_sql_table() {
+  "$MYSQL_CMD" --defaults-extra-file="$TEMP_CFG" "$DB_NAME" -e "$1"
+}
+
+esc_sql() {
+  printf "%s" "$1" | sed "s/'/''/g"
+}
+
+# ── 1. Check for duplicate users ─────────────────────────────────────────────
+
+echo "=== Checking for duplicate users ==="
+echo ""
+
+DUP_EMAILS="$(run_sql "SELECT email FROM \`user\` WHERE email IS NOT NULL AND email <> '' GROUP BY email HAVING COUNT(*) > 1;")"
+
+if [ -z "$DUP_EMAILS" ]; then
+  echo "No duplicate e-mail addresses found."
+else
+  echo "Duplicate e-mail addresses detected:"
+  echo ""
+  while IFS= read -r email; do
+    [ -z "$email" ] && continue
+    ESC_EMAIL="$(esc_sql "$email")"
+    echo "--- Duplicate entries for: $email ---"
+    run_sql_table "SELECT id, first_name, last_name, email, role FROM \`user\` WHERE email='${ESC_EMAIL}';"
+    echo ""
+
+    IDS="$(run_sql "SELECT id FROM \`user\` WHERE email='${ESC_EMAIL}';" | tr '\n' ' ' | sed 's/ $//')"
+    echo "Available IDs: $IDS"
+    read -r -p "IDs to DELETE (space-separated, or ENTER to skip): " TO_DELETE
+    if [ -z "$TO_DELETE" ]; then
+      echo "Skipped."
+    else
+      for del_id in $TO_DELETE; do
+        if [[ "$IDS" =~ (^| )$del_id( |$) ]] && [[ "$del_id" =~ ^[0-9]+$ ]]; then
+          run_sql "DELETE FROM \`user\` WHERE id=${del_id};"
+          echo "Deleted user id=${del_id}"
+        else
+          echo "ID ${del_id} not in duplicate list — skipped for safety."
+        fi
+      done
+    fi
+    echo ""
+  done <<< "$DUP_EMAILS"
+fi
+
+# ── Also check for duplicate full names ──────────────────────────────────────
+
+DUP_NAMES="$(run_sql "SELECT CONCAT(TRIM(first_name), ' ', TRIM(last_name)) AS full_name FROM \`user\` GROUP BY TRIM(first_name), TRIM(last_name) HAVING COUNT(*) > 1;")"
+
+if [ -n "$DUP_NAMES" ]; then
+  echo "Duplicate full names detected:"
+  echo ""
+  while IFS= read -r full_name; do
+    [ -z "$full_name" ] && continue
+    fn_part="${full_name%% *}"
+    ln_part="${full_name#* }"
+    [ "$ln_part" = "$fn_part" ] && ln_part=""
+    ESC_FN="$(esc_sql "$fn_part")"
+    ESC_LN="$(esc_sql "$ln_part")"
+    WHERE_NAME="TRIM(first_name)='${ESC_FN}' AND TRIM(last_name)='${ESC_LN}'"
+
+    echo "--- Duplicate entries for: $full_name ---"
+    run_sql_table "SELECT id, first_name, last_name, email, role FROM \`user\` WHERE ${WHERE_NAME};"
+    echo ""
+
+    IDS="$(run_sql "SELECT id FROM \`user\` WHERE ${WHERE_NAME};" | tr '\n' ' ' | sed 's/ $//')"
+    echo "Available IDs: $IDS"
+    read -r -p "IDs to DELETE (space-separated, or ENTER to skip): " TO_DELETE
+    if [ -z "$TO_DELETE" ]; then
+      echo "Skipped."
+    else
+      for del_id in $TO_DELETE; do
+        if [[ "$IDS" =~ (^| )$del_id( |$) ]] && [[ "$del_id" =~ ^[0-9]+$ ]]; then
+          run_sql "DELETE FROM \`user\` WHERE id=${del_id};"
+          echo "Deleted user id=${del_id}"
+        else
+          echo "ID ${del_id} not in duplicate list — skipped for safety."
+        fi
+      done
+    fi
+    echo ""
+  done <<< "$DUP_NAMES"
+fi
+
+# ── 2. Promote a user to ADMIN ────────────────────────────────────────────────
+
+echo "=== Promote user to ADMIN ==="
+echo ""
+
+if [ -z "$IDENTITY" ]; then
+  echo "Current users in the database:"
+  run_sql_table "SELECT id, first_name, last_name, email, role FROM \`user\` ORDER BY id;"
+  echo ""
+  read -r -p "Enter e-mail address or full name to promote (or ENTER to skip): " IDENTITY
+fi
+
+if [ -z "$IDENTITY" ]; then
+  echo "No user specified — skipping promotion."
+  exit 0
+fi
+
+ESC_IDENT="$(esc_sql "$IDENTITY")"
+
+if echo "$IDENTITY" | grep -q "@"; then
   WHERE="email='${ESC_IDENT}'"
 else
-  WHERE="name='${ESC_IDENT}'"
+  FN_PART="${IDENTITY%% *}"
+  LN_PART="${IDENTITY#* }"
+  [ "$LN_PART" = "$IDENTITY" ] && LN_PART=""
+  ESC_FN="$(esc_sql "$FN_PART")"
+  ESC_LN="$(esc_sql "$LN_PART")"
+  WHERE="TRIM(first_name)='${ESC_FN}' AND TRIM(last_name)='${ESC_LN}'"
 fi
 
-# Warn and require confirmation
-echo "This will set role='ADMIN' for rows in table \`user\` where $WHERE on database ${DB_USER}@${DB_HOST}:${DB_PORT}/${DB_NAME}."
-read -r -p "Are you sure you want to continue? [y/N] " confirm
-if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+PREVIEW="$(run_sql_table "SELECT id, first_name, last_name, email, role FROM \`user\` WHERE ${WHERE};")"
+
+if [ -z "$PREVIEW" ]; then
+  echo "No user found matching: $IDENTITY"
+  exit 1
+fi
+
+echo "User(s) to be promoted:"
+echo "$PREVIEW"
+echo ""
+read -r -p "Set role to ADMIN for the above user(s)? [y/N] " confirm
+if [[ "$confirm" =~ ^[Yy]$ ]]; then
+  run_sql "UPDATE \`user\` SET role='ADMIN' WHERE ${WHERE};"
+  echo ""
+  echo "Updated:"
+  run_sql_table "SELECT id, first_name, last_name, email, role FROM \`user\` WHERE ${WHERE};"
+  echo ""
+  echo "Done."
+else
   echo "Aborted."
-  exit 1
 fi
-
-# Ensure mysql client exists
-if ! command -v mysql &> /dev/null; then
-  echo "Error: mysql client not found. Install mysql-client or mariadb-client to use this script."
-  exit 1
-fi
-
-# Create a temporary MySQL client config to avoid exposing password on the process list
-temp_cfg=$(mktemp -t mysql_cfg_XXXXXX.cnf)
-cat > "$temp_cfg" <<EOF
-[client]
-user=$DB_USER
-password=$DB_PASS
-host=$DB_HOST
-port=$DB_PORT
-EOF
-chmod 600 "$temp_cfg"
-
-# Ensure the config is removed on exit
-trap 'rm -f "$temp_cfg"' EXIT INT TERM
-
-# Run update and then show the affected row(s)
-mysql --defaults-extra-file="$temp_cfg" "$DB_NAME" -e "UPDATE \`user\` SET role='ADMIN' WHERE $WHERE; SELECT id, name, email, role FROM \`user\` WHERE $WHERE;"
-
-echo "Done."
