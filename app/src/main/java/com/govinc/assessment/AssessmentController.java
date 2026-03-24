@@ -275,6 +275,10 @@ public class AssessmentController {
         
         for (Assessment assessment : assessments) {
             if (authorizationService.canAccessAssessment(assessment.getId())) {
+                if (assessment.getCreationDate() == null) {
+                    assessment.setCreationDate(LocalDate.now());
+                    assessmentRepository.save(assessment);
+                }
                 filtered.add(assessment);
             }
         }

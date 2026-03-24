@@ -100,9 +100,6 @@ public class Assessment {
     // -------------------------------
 
     public LocalDate getCreationDate() {
-        if (creationDate == null) {
-            return LocalDate.now();
-        }
         return creationDate;
     }
 
