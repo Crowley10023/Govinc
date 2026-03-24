@@ -1,6 +1,7 @@
 package com.govinc;
 
 import com.govinc.authorization.AuthorizationService;
+import com.govinc.user.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -14,6 +15,9 @@ public class GlobalUserSessionAdvice {
     
     @Autowired
     private AuthorizationService authorizationService;
+
+    @Autowired
+    private UserRepository userRepository;
     
     @ModelAttribute("userName")
     public String addUserNameToModel() {
@@ -22,20 +26,23 @@ public class GlobalUserSessionAdvice {
             if (authentication != null && authentication.isAuthenticated() &&
                 !(authentication.getPrincipal() instanceof String principal && principal.equals("anonymousUser"))) {
                 Object principal = authentication.getPrincipal();
+                String email = null;
                 if (principal instanceof OidcUser oidcUser) {
-                    String givenName = oidcUser.getGivenName();
-                    String familyName = oidcUser.getFamilyName();
-                    if (givenName != null || familyName != null) {
-                        if (givenName != null && familyName != null) return givenName + " " + familyName;
-                        return givenName != null ? givenName : familyName;
-                    }
-                    if (oidcUser.getFullName() != null) return oidcUser.getFullName();
-                    if (oidcUser.getPreferredUsername() != null) return oidcUser.getPreferredUsername();
+                    email = oidcUser.getEmail();
+                } else if (principal instanceof UserDetails userDetails) {
+                    email = userDetails.getUsername() + "@local";
+                } else if (principal instanceof String str) {
+                    email = str + "@local";
+                }
+                if (email != null) {
+                    var user = userRepository.findByEmail(email);
+                    if (user.isPresent()) return user.get().getName();
+                }
+                // Fallback: no DB record yet (e.g. first login before handler completes)
+                if (principal instanceof OidcUser oidcUser) {
                     if (oidcUser.getEmail() != null) return oidcUser.getEmail();
                 } else if (principal instanceof UserDetails userDetails) {
                     return userDetails.getUsername();
-                } else if (principal instanceof String str) {
-                    return str;
                 }
             }
         } catch (Throwable t) {

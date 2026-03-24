@@ -114,8 +114,8 @@ public class AssessmentEmailRestController {
                     : (baseUrl.isBlank() ? "/assessment-direct/" : baseUrl.stripTrailing() + "/assessment-direct/") + directUrl;
         } else {
             assessmentLink = baseUrl.isBlank()
-                    ? "/assessmentdetails/details/" + id
-                    : baseUrl.stripTrailing() + "/assessmentdetails/details/" + id;
+                    ? "/assessment/" + id
+                    : baseUrl.stripTrailing() + "/assessment/" + id;
         }
 
         String assessmentName = assessment.getName() != null ? assessment.getName() : "Assessment #" + id;

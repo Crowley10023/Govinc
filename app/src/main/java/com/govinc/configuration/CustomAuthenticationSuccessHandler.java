@@ -11,6 +11,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
+import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
+import org.springframework.security.web.savedrequest.RequestCache;
+import org.springframework.security.web.savedrequest.SavedRequest;
 import org.springframework.stereotype.Component;
 
 import jakarta.servlet.ServletException;
@@ -149,8 +152,12 @@ public class CustomAuthenticationSuccessHandler implements AuthenticationSuccess
             logger.error("[OAUTH2-FLOW] Failed to resolve email from authentication");
         }
         
-        logger.info("[OAUTH2-FLOW] Redirecting to /");
-        // Continue with default behavior
-        response.sendRedirect("/");
+        logger.info("[OAUTH2-FLOW] Redirecting after login");
+        // Redirect to the originally requested URL if one was saved before login, otherwise go to landing
+        RequestCache requestCache = new HttpSessionRequestCache();
+        SavedRequest savedRequest = requestCache.getRequest(request, response);
+        String targetUrl = (savedRequest != null) ? savedRequest.getRedirectUrl() : "/";
+        logger.info("[OAUTH2-FLOW] Target URL after login: {}", targetUrl);
+        response.sendRedirect(targetUrl);
     }
 }
