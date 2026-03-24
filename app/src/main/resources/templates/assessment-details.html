@@ -401,6 +401,8 @@
             <a th:if="${!isAssessor}" id="word-report-btn" th:href="@{'/assessment/' + ${assessment.id} + '/word-report'}" class="btn-action">Create Report (Word)</a>
             <a th:if="${!isAssessor}" th:href="@{'/assessment/' + ${assessment.id} + '/excel'}" class="btn-action">Export to Excel</a>
             <button th:if="${isAdminOrISM and assessment.isOpen}" id="create-url-btn" type="button" class="btn-action">Create URL</button>
+            <button th:if="${isAdminOrISM}" id="send-email-btn" type="button" class="btn-action"
+                    onclick="openEmailModal()">&#9993; Send E-Mail</button>
 
             <!-- Create URL Modal -->
             <div id="create-url-modal" class="modal-bg">
@@ -586,6 +588,83 @@
                     </div>
                     <div class="modal-btn-row">
                         <button type="button" id="answering-guide-close-btn" class="btn-cancel" onclick="closeAnsweringGuideModal()">Close</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Send E-Mail Modal -->
+            <div class="modal-bg" id="email-modal-bg">
+                <div class="modal-popup" style="width:min(900px,94vw);display:flex;flex-direction:column;max-height:90vh;">
+                    <h3 style="flex-shrink:0;margin-bottom:0.6em;">&#9993; Send E-Mail</h3>
+
+                    <!-- Two-column body -->
+                    <div style="display:grid;grid-template-columns:260px 1fr;gap:1em;flex:1;min-height:0;overflow:hidden;">
+
+                        <!-- LEFT: recipients + link type + AI generate -->
+                        <div style="display:flex;flex-direction:column;gap:0.6em;min-height:0;">
+                            <div class="form-group" style="flex:1;display:flex;flex-direction:column;min-height:0;">
+                                <label style="margin-bottom:2px;">Recipients</label>
+                                <select id="email-recipients" multiple
+                                        style="flex:1;min-height:80px;max-height:140px;border:1px solid #ccc;border-radius:4px;padding:4px;font-size:0.88em;">
+                                    <option th:each="user : ${assessment.users}"
+                                            th:value="${user.id}"
+                                            th:text="${user.name + ' (' + (user.email != null ? user.email : 'no e-mail') + ')'}">
+                                    </option>
+                                </select>
+                                <span class="help-text text-sm" style="margin-top:2px;">Ctrl / Cmd for multiple.</span>
+                            </div>
+
+                            <div class="form-group" style="flex-shrink:0;">
+                                <label style="margin-bottom:4px;">Link to include</label>
+                                <label style="display:flex;align-items:center;gap:6px;font-weight:normal;cursor:pointer;margin-bottom:2px;">
+                                    <input type="radio" name="emailLinkType" value="internal" id="email-link-internal" checked />
+                                    Internal (assessment details)
+                                </label>
+                                <label style="display:flex;align-items:center;gap:6px;font-weight:normal;cursor:pointer;">
+                                    <input type="radio" name="emailLinkType" value="external" id="email-link-external"
+                                           th:disabled="${!isAdminOrISM}" />
+                                    External URL
+                                    <span th:if="${assessment.assessmentUrls != null}" class="text-muted text-sm" style="white-space:nowrap;">(exists)</span>
+                                    <span th:unless="${assessment.assessmentUrls != null}" class="text-muted text-sm" style="white-space:nowrap;">(will be created)</span>
+                                </label>
+                            </div>
+
+                            <div class="form-group" style="flex-shrink:0;">
+                                <label style="margin-bottom:4px;">Generate with AI</label>
+                                <div style="display:flex;flex-direction:column;gap:4px;">
+                                    <button type="button" class="btn-action" style="width:100%;" onclick="generateEmailContent('assessment')"
+                                            id="email-gen-assessment-btn">For Assessment</button>
+                                    <button type="button" class="btn-action" style="width:100%;" onclick="generateEmailContent('checking')"
+                                            id="email-gen-checking-btn">For Checking</button>
+                                    <span id="email-gen-status" class="text-muted text-sm"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- RIGHT: subject + body -->
+                        <div style="display:flex;flex-direction:column;gap:0.6em;min-height:0;">
+                            <div class="form-group" style="flex-shrink:0;">
+                                <label for="email-subject" style="margin-bottom:2px;">Subject</label>
+                                <input type="text" id="email-subject" class="form-control"
+                                       placeholder="E-mail subject" style="width:100%;box-sizing:border-box;" />
+                            </div>
+                            <div class="form-group" style="flex:1;display:flex;flex-direction:column;min-height:0;">
+                                <label for="email-body" style="margin-bottom:2px;">Message</label>
+                                <textarea id="email-body" class="form-control"
+                                          placeholder="E-mail body..."
+                                          style="flex:1;min-height:200px;width:100%;box-sizing:border-box;resize:vertical;"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Footer: status + buttons -->
+                    <div style="flex-shrink:0;margin-top:0.6em;">
+                        <div id="email-modal-error" style="color:#c00;font-size:0.9em;min-height:1.2em;"></div>
+                        <div id="email-modal-success" style="color:green;font-weight:600;display:none;"></div>
+                        <div class="modal-btn-row" style="margin-top:0.4em;">
+                            <button type="button" id="email-send-btn" class="btn-action" onclick="sendAssessmentEmail()">Send</button>
+                            <button type="button" class="btn-cancel" onclick="closeEmailModal()">Cancel</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1007,6 +1086,114 @@
             .catch(function() {
                 statusEl.textContent = 'Error saving';
                 checkbox.checked = !checkbox.checked;
+            });
+        }
+
+        // ---- E-Mail Modal ----
+        function openEmailModal() {
+            document.getElementById('email-modal-bg').style.display = 'flex';
+            document.getElementById('email-modal-error').textContent = '';
+            document.getElementById('email-modal-success').style.display = 'none';
+        }
+
+        function closeEmailModal() {
+            document.getElementById('email-modal-bg').style.display = 'none';
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var emailModalBg = document.getElementById('email-modal-bg');
+            if (emailModalBg) {
+                emailModalBg.addEventListener('mousedown', function(e) {
+                    if (e.target === this) closeEmailModal();
+                });
+            }
+        });
+
+        function generateEmailContent(purpose) {
+            var csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+            var csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+            var statusEl = document.getElementById('email-gen-status');
+            var genBtn1 = document.getElementById('email-gen-assessment-btn');
+            var genBtn2 = document.getElementById('email-gen-checking-btn');
+
+            statusEl.textContent = 'Generating...';
+            genBtn1.disabled = true;
+            genBtn2.disabled = true;
+
+            var recipientSelect = document.getElementById('email-recipients');
+            var selectedIds = Array.from(recipientSelect.selectedOptions).map(function(o) { return parseInt(o.value); });
+
+            var linkTypeEl = document.querySelector('input[name="emailLinkType"]:checked');
+            var linkType = linkTypeEl ? linkTypeEl.value : 'internal';
+
+            fetch('/assessment/' + window.assessmentId + '/email/generate', {
+                method: 'POST',
+                headers: { [csrfHeader]: csrfToken, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ purpose: purpose, baseUrl: window.location.origin, recipientUserIds: selectedIds, linkType: linkType })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                genBtn1.disabled = false;
+                genBtn2.disabled = false;
+                statusEl.textContent = '';
+                if (data.subject) document.getElementById('email-subject').value = data.subject;
+                if (data.body)    document.getElementById('email-body').value = data.body;
+                if (data.error) {
+                    statusEl.textContent = 'Error: ' + data.error;
+                }
+            })
+            .catch(function(err) {
+                genBtn1.disabled = false;
+                genBtn2.disabled = false;
+                statusEl.textContent = 'Request failed.';
+            });
+        }
+
+        function sendAssessmentEmail() {
+            var csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+            var csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+
+            var recipientSelect = document.getElementById('email-recipients');
+            var selectedIds = Array.from(recipientSelect.selectedOptions).map(function(o) { return parseInt(o.value); });
+
+            var subject = document.getElementById('email-subject').value.trim();
+            var body    = document.getElementById('email-body').value.trim();
+            var errorEl   = document.getElementById('email-modal-error');
+            var successEl = document.getElementById('email-modal-success');
+            var sendBtn   = document.getElementById('email-send-btn');
+
+            errorEl.textContent = '';
+            successEl.style.display = 'none';
+
+            if (selectedIds.length === 0) { errorEl.textContent = 'Please select at least one recipient.'; return; }
+            if (!subject)                  { errorEl.textContent = 'Subject must not be empty.'; return; }
+            if (!body)                     { errorEl.textContent = 'Message body must not be empty.'; return; }
+
+            sendBtn.disabled = true;
+            sendBtn.textContent = 'Sending...';
+
+            fetch('/assessment/' + window.assessmentId + '/email/send', {
+                method: 'POST',
+                headers: { [csrfHeader]: csrfToken, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ recipientUserIds: selectedIds, subject: subject, body: body })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                sendBtn.disabled = false;
+                sendBtn.textContent = 'Send';
+                if (data.success) {
+                    successEl.textContent = data.message || 'E-mail sent successfully.';
+                    successEl.style.display = 'block';
+                    errorEl.textContent = '';
+                    setTimeout(function() { closeEmailModal(); }, 2500);
+                } else {
+                    errorEl.textContent = data.error || 'Unknown error while sending.';
+                }
+            })
+            .catch(function(err) {
+                sendBtn.disabled = false;
+                sendBtn.textContent = 'Send';
+                errorEl.textContent = 'Request failed: ' + err;
             });
         }
     </script>

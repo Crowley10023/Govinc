@@ -42,6 +42,9 @@ dependencies {
 
     // JFreeChart for generating charts to embed in reports
     implementation("org.jfree:jfreechart:1.5.4")
+
+    // JavaMail support for email sending
+    implementation("org.springframework.boot:spring-boot-starter-mail")
 }
 
 application {
