@@ -64,22 +64,43 @@ public class CustomAuthenticationSuccessHandler implements AuthenticationSuccess
         if (authentication.getPrincipal() instanceof OidcUser oidcUser) {
             logger.info("[OAUTH2-FLOW] OidcUser detected");
             email = oidcUser.getEmail();
-            // Extract first/last name from standard OIDC claims (given_name / family_name)
+            // 1st choice: standard OIDC individual name claims (Keycloak always provides these)
             firstName = oidcUser.getGivenName();
             lastName = oidcUser.getFamilyName();
-            // Fall back: split preferred_username when name claims are absent
+
+            // 2nd choice: Azure AD reliably sets the 'name' claim (display name) even when
+            // given_name / family_name are not individually populated in the directory.
+            // Also handles any provider that sends only a combined display name.
+            if (firstName == null || lastName == null) {
+                String fullName = oidcUser.getFullName(); // maps to the 'name' claim
+                if (fullName != null && !fullName.trim().isEmpty()) {
+                    String trimmed = fullName.trim();
+                    int lastSpace = trimmed.lastIndexOf(' ');
+                    if (lastSpace > 0) {
+                        if (firstName == null) firstName = trimmed.substring(0, lastSpace);
+                        if (lastName == null)  lastName  = trimmed.substring(lastSpace + 1);
+                    } else {
+                        // Single-word display name — treat it as first name only
+                        if (firstName == null) firstName = trimmed;
+                    }
+                }
+            }
+
+            // 3rd choice: split preferred_username on '.' (e.g. john.doe → John / Doe)
             if (firstName == null) {
                 String pref = oidcUser.getPreferredUsername();
                 if (pref != null && pref.contains(".")) {
-                    String[] parts = pref.split("\\.", 2);
-                    firstName = parts[0];
-                    if (lastName == null) lastName = parts[1];
+                    int dot = pref.indexOf('.');
+                    firstName = pref.substring(0, dot);
+                    if (lastName == null) lastName = pref.substring(dot + 1);
                 } else {
                     firstName = pref != null ? pref : email;
                 }
             }
+
             if (lastName == null) lastName = "";
-            logger.info("[OAUTH2-FLOW] OidcUser claims: email={}, givenName={}, familyName={}", email, firstName, lastName);
+            logger.info("[OAUTH2-FLOW] OidcUser claims: email={}, givenName={}, familyName={}, fullName={}",
+                email, firstName, lastName, oidcUser.getFullName());
         } else if (authentication.getPrincipal() instanceof UserDetails userDetails) {
             logger.info("[OAUTH2-FLOW] UserDetails detected (form login)");
             String username = userDetails.getUsername();

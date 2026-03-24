@@ -118,7 +118,58 @@ reassign_and_delete() {
   echo "  Deleted user id=${del_id} (references moved to id=${keep_id})"
 }
 
-# ── 1. Check for duplicate users ─────────────────────────────────────────────
+# ── 1. Derive missing names from e-mail ──────────────────────────────────────
+
+echo "=== Checking for users with missing first/last name ==="
+echo ""
+
+# Fetch all users where both first_name and last_name are blank/null but email exists
+NAMELESS="$(run_sql "SELECT id, email FROM \`user\` WHERE (first_name IS NULL OR TRIM(first_name) = '') AND (last_name IS NULL OR TRIM(last_name) = '') AND email IS NOT NULL AND email <> '';")"
+
+if [ -z "$NAMELESS" ]; then
+  echo "No users with missing names found."
+else
+  echo "Users with no first/last name (will derive from e-mail):"
+  echo ""
+  # Show them first
+  run_sql_table "SELECT id, first_name, last_name, email, role FROM \`user\` WHERE (first_name IS NULL OR TRIM(first_name) = '') AND (last_name IS NULL OR TRIM(last_name) = '') AND email IS NOT NULL AND email <> '';"
+  echo ""
+
+  while IFS=$'\t' read -r uid uemail <&3; do
+    [ -z "$uid" ] && continue
+
+    # Derive name from the local part of the email (before @)
+    local_part="${uemail%%@*}"
+    # Replace dots, underscores, hyphens, plus signs with spaces, then title-case
+    derived="$(echo "$local_part" | sed 's/[._+\-]/ /g')"
+    # Split into first/last: everything before first space = first name, rest = last name
+    derived_fn="$(echo "$derived" | awk '{print $1}')"
+    derived_ln="$(echo "$derived" | awk '{$1=""; sub(/^ /, ""); print}')"
+
+    # Title-case each word
+    derived_fn="$(echo "$derived_fn" | awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) tolower(substr($i,2)); print}')"
+    derived_ln="$(echo "$derived_ln" | awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) tolower(substr($i,2)); print}')"
+
+    ESC_FN="$(esc_sql "$derived_fn")"
+    ESC_LN="$(esc_sql "$derived_ln")"
+
+    echo "User id=${uid}, email=${uemail}"
+    echo "  => Derived name: \"${derived_fn}\" \"${derived_ln}\""
+    read -r -p "  Apply this name? [Y/n]: " yn
+    yn="${yn:-Y}"
+    if [[ "$yn" =~ ^[Yy]$ ]]; then
+      run_sql "UPDATE \`user\` SET first_name='${ESC_FN}', last_name='${ESC_LN}' WHERE id=${uid};"
+      echo "  Updated user id=${uid}."
+    else
+      echo "  Skipped."
+    fi
+    echo ""
+  done 3<<< "$NAMELESS"
+fi
+
+echo ""
+
+# ── 2. Check for duplicate users ─────────────────────────────────────────────
 
 echo "=== Checking for duplicate users ==="
 echo ""
@@ -239,7 +290,7 @@ if [ -n "$DUP_NAMES" ]; then
   done 3<<< "$DUP_NAMES"
 fi
 
-# ── 2. Promote a user to ADMIN ────────────────────────────────────────────────
+# ── 3. Promote a user to ADMIN ────────────────────────────────────────────────
 
 echo "=== Promote user to ADMIN ==="
 echo ""
