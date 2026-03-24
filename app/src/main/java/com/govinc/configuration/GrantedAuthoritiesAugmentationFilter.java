@@ -1,7 +1,5 @@
 package com.govinc.configuration;
 
-import com.govinc.user.User;
-import com.govinc.user.UserRepository;
 import com.govinc.user.Role;
 import com.govinc.authorization.AuthorizationService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,7 +20,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Filter that augments the Authorities on the Authentication based on the application's User role in DB.
@@ -31,9 +28,6 @@ import java.util.Optional;
  */
 @Component
 public class GrantedAuthoritiesAugmentationFilter extends OncePerRequestFilter {
-
-    @Autowired
-    private UserRepository userRepository;
 
     @Autowired
     private AuthorizationService authorizationService;
@@ -51,17 +45,6 @@ public class GrantedAuthoritiesAugmentationFilter extends OncePerRequestFilter {
                         role = authorizationService.getRoleFromAuthentication(auth);
                     }
                 } catch (Throwable ignored) {
-                }
-
-                // Fallback: try to lookup user by auth.getName()
-                if (role == null) {
-                    String username = auth.getName();
-                    if (username != null) {
-                        Optional<User> userOpt = userRepository.findByName(username);
-                        if (userOpt.isPresent()) {
-                            role = userOpt.get().getRole();
-                        }
-                    }
                 }
 
                 if (role != null) {

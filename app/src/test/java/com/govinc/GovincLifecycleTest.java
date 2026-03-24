@@ -104,8 +104,8 @@ class GovincLifecycleTest {
     void setUp() {
         // Ensure the "admin" user exists in DB so AuthorizationService.getCurrentUser() resolves it
         writeInTx(() -> {
-            if (userRepository.findByName("admin").isEmpty()) {
-                User adminUser = new User("admin", "admin@example.com");
+            if (userRepository.findByEmail("admin@example.com").isEmpty()) {
+                User adminUser = new User("admin", "", "admin@example.com");
                 adminUser.setRole(Role.ADMIN);
                 userRepository.save(adminUser);
             }
@@ -238,7 +238,7 @@ class GovincLifecycleTest {
         if (assessor.isPresent()) {
             assessorUserId = assessor.get().getId();
         } else {
-            User a = new User("assessorL", "assessorL@test.com");
+            User a = new User("assessorL", "", "assessorL@test.com");
             a.setRole(Role.ASSESSOR);
             assessorUserId = userRepository.save(a).getId();
         }

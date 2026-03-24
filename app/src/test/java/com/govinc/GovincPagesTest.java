@@ -96,8 +96,8 @@ class GovincPagesTest {
     @BeforeAll
     void setUp() {
         // Self-seeding: ensure admin exists for AuthorizationService DB lookups.
-        if (userRepository.findByName("admin").isEmpty()) {
-            User admin = new User("admin", "admin@example.com");
+        if (userRepository.findByEmail("admin@example.com").isEmpty()) {
+            User admin = new User("admin", "", "admin@example.com");
             admin.setRole(Role.ADMIN);
             userRepository.save(admin);
         }
@@ -410,7 +410,7 @@ class GovincPagesTest {
     void users_updatePost_acceptsForm() throws Exception {
         mockMvc.perform(post("/users/update/{id}", userId)
                         .with(csrf())
-                        .param("name", "admin")
+                        .param("firstName", "admin")
                         .param("email", "admin@example.com")
                         .param("role", "ADMIN"))
                 .andExpect(result -> assertThat(result.getResponse().getStatus()).isBetween(200, 399));
@@ -424,7 +424,7 @@ class GovincPagesTest {
         // Create a throwaway user and delete them
         mockMvc.perform(post("/users")
                         .with(csrf())
-                        .param("name", "throwaway_page_user")
+                        .param("firstName", "throwaway_page_user")
                         .param("email", "throwaway_page@test.com")
                         .param("password", "pass123")
                         .param("role", "ORGANISATION_TEAM_LEADER"))

@@ -92,8 +92,8 @@ class SecurityCapabilityAndReportTest {
 
     @BeforeAll
     void setUp() {
-        if (userRepository.findByName("admin").isEmpty()) {
-            User admin = new User("admin", "admin@example.com");
+        if (userRepository.findByEmail("admin@example.com").isEmpty()) {
+            User admin = new User("admin", "", "admin@example.com");
             admin.setRole(Role.ADMIN);
             userRepository.save(admin);
         }

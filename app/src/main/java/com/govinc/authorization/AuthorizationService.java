@@ -8,6 +8,7 @@ import com.govinc.user.Role;
 import com.govinc.user.User;
 import com.govinc.user.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -37,6 +38,9 @@ public class AuthorizationService {
     
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private Environment environment;
     
     @Autowired
     private AssessmentRepository assessmentRepository;
@@ -73,36 +77,16 @@ public class AuthorizationService {
             return null;
         }
         
-        String username = null;
-        
-        // Handle OIDC/OAuth2 users (Keycloak, Azure, etc.)
-        if (auth.getPrincipal() instanceof org.springframework.security.oauth2.core.oidc.user.OidcUser oidcUser) {
-            // Try preferred_username first (Keycloak), then email, then sub (Azure)
-            username = oidcUser.getPreferredUsername();
-            if (username == null) {
-                username = oidcUser.getEmail();
-            }
-            if (username == null) {
-                String sub = (String) oidcUser.getClaims().get("sub");
-                if (sub != null) {
-                    username = sub;
-                }
-            }
-            logger.fine("OAuth2 user resolved: " + username);
-        } else {
-            // Handle form-based authentication
-            username = auth.getName();
-        }
-        
-        if (username == null) {
-            logger.warning("Could not resolve username from authentication principal");
+        String email = resolveEmailFromAuth(auth);
+        if (email == null) {
+            logger.warning("Could not resolve email from authentication principal");
             cacheUser(null);
             return null;
         }
         
-        Optional<User> userOpt = userRepository.findByName(username);
+        Optional<User> userOpt = userRepository.findByEmail(email);
         if (userOpt.isEmpty()) {
-            logger.warning("User " + username + " authenticated but not found in database");
+            logger.warning("User with email " + email + " authenticated but not found in database");
         }
         User result = userOpt.orElse(null);
         cacheUser(result);
@@ -143,37 +127,44 @@ public class AuthorizationService {
             } catch (Exception ignored) {}
         }
 
-        String username = null;
-        if (auth.getPrincipal() instanceof org.springframework.security.oauth2.core.oidc.user.OidcUser oidcUser) {
-            username = oidcUser.getPreferredUsername();
-            if (username == null) username = oidcUser.getEmail();
-            if (username == null) {
-                Object sub = oidcUser.getClaims().get("sub");
-                if (sub != null) username = sub.toString();
-            }
-        } else if (auth.getPrincipal() instanceof org.springframework.security.core.userdetails.UserDetails ud) {
-            username = ud.getUsername();
-        } else if (auth.getPrincipal() instanceof String str) {
-            username = str;
+        String email = resolveEmailFromAuth(auth);
+        if (email == null) {
+            cacheRole(null);
+            return null;
         }
 
-        if (username == null) return null;
-
-        java.util.Optional<User> userOpt = userRepository.findByName(username);
+        java.util.Optional<User> userOpt = userRepository.findByEmail(email);
         if (userOpt.isEmpty()) {
-            logger.fine("Authenticated principal '" + username + "' not found in DB when resolving role");
+            logger.fine("User with email '" + email + "' not found in DB when resolving role");
             cacheRole(null);
             return null;
         }
         User user = userOpt.get();
-        Role role;
-        if (user.getName() != null && user.getName().equalsIgnoreCase("admin")) {
-            role = Role.ADMIN;
-        } else {
-            role = user.getRole();
-        }
+        Role role = user.getRole();
         cacheRole(role);
         return role;
+    }
+
+    /**
+     * Resolves the user's email address from the authentication principal.
+     * For OIDC users, reads the email claim directly.
+     * For form-login users, maps the Spring Security username to the configured email address.
+     */
+    private String resolveEmailFromAuth(Authentication auth) {
+        if (auth == null) return null;
+        if (auth.getPrincipal() instanceof org.springframework.security.oauth2.core.oidc.user.OidcUser oidcUser) {
+            return oidcUser.getEmail();
+        } else if (auth.getPrincipal() instanceof org.springframework.security.core.userdetails.UserDetails ud) {
+            String username = ud.getUsername();
+            String entry = environment.getProperty("users." + username);
+            if (entry != null && entry.contains(",")) {
+                return entry.split(",", 2)[1].trim();
+            }
+            return username + "@local";
+        } else if (auth.getPrincipal() instanceof String str && !"anonymousUser".equals(str)) {
+            return str + "@local";
+        }
+        return null;
     }
 
     private void cacheRole(Role role) {

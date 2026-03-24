@@ -109,8 +109,8 @@ class GovincIntegrationTest {
     void setUp() {
         // Idempotent: only create admin if not already present (shared Spring context may
         // have another test class create it first).
-        if (userRepository.findByName("admin").isEmpty()) {
-            User admin = new User("admin", "admin@example.com");
+        if (userRepository.findByEmail("admin@example.com").isEmpty()) {
+            User admin = new User("admin", "", "admin@example.com");
             admin.setRole(Role.ADMIN);
             userRepository.save(admin);
         }
@@ -520,7 +520,7 @@ class GovincIntegrationTest {
     @WithMockUser(username = "admin", roles = {"ADMIN"})
     void user_adminExistsInDb() throws Exception {
         // Admin was pre-created in @BeforeAll for authorization checks
-        Optional<User> admin = userRepository.findByName("admin");
+        Optional<User> admin = userRepository.findByEmail("admin@example.com");
         assertThat(admin).isPresent();
         assertThat(admin.get().getRole()).isEqualTo(Role.ADMIN);
         assertThat(admin.get().getEmail()).isEqualTo("admin@example.com");
@@ -532,12 +532,12 @@ class GovincIntegrationTest {
     void user_createISMUser() throws Exception {
         mockMvc.perform(post("/users")
                         .with(csrf())
-                        .param("name", "ism_user")
+                        .param("firstName", "ism_user")
                         .param("email", "ism@example.com")
                         .param("role", "INFORMATION_SECURITY_MANAGER"))
                 .andExpect(status().is3xxRedirection());
 
-        Optional<User> ism = userRepository.findByName("ism_user");
+        Optional<User> ism = userRepository.findByEmail("ism@example.com");
         assertThat(ism).isPresent();
         assertThat(ism.get().getRole()).isEqualTo(Role.INFORMATION_SECURITY_MANAGER);
     }
@@ -548,12 +548,12 @@ class GovincIntegrationTest {
     void user_createTeamLeader() throws Exception {
         mockMvc.perform(post("/users")
                         .with(csrf())
-                        .param("name", "team_leader")
+                        .param("firstName", "team_leader")
                         .param("email", "leader@example.com")
                         .param("role", "ORGANISATION_TEAM_LEADER"))
                 .andExpect(status().is3xxRedirection());
 
-        Optional<User> leader = userRepository.findByName("team_leader");
+        Optional<User> leader = userRepository.findByEmail("leader@example.com");
         assertThat(leader).isPresent();
         assertThat(leader.get().getRole()).isEqualTo(Role.ORGANISATION_TEAM_LEADER);
     }
@@ -572,7 +572,7 @@ class GovincIntegrationTest {
             String role = d[0].startsWith("assessor") ? "ASSESSOR" : "ASSESSMENT_DELEGATE";
             mockMvc.perform(post("/users")
                             .with(csrf())
-                            .param("name", d[0])
+                            .param("firstName", d[0])
                             .param("email", d[1])
                             .param("role", role))
                     .andExpect(status().is3xxRedirection());
@@ -602,7 +602,7 @@ class GovincIntegrationTest {
     @Order(537)
     @WithMockUser(username = "admin", roles = {"ADMIN"})
     void user_editForm() throws Exception {
-        User admin = userRepository.findByName("admin").orElseThrow();
+        User admin = userRepository.findByEmail("admin@example.com").orElseThrow();
         mockMvc.perform(get("/users/edit/" + admin.getId()))
                 .andExpect(status().isOk());
     }
@@ -611,15 +611,15 @@ class GovincIntegrationTest {
     @Order(538)
     @WithMockUser(username = "admin", roles = {"ADMIN"})
     void user_updateExisting() throws Exception {
-        User delegate = userRepository.findByName("delegate1").orElseThrow();
+        User delegate = userRepository.findByEmail("delegate1@example.com").orElseThrow();
         mockMvc.perform(post("/users/update/" + delegate.getId())
                         .with(csrf())
-                        .param("name", "delegate1")
+                        .param("firstName", "delegate1")
                         .param("email", "delegate1_updated@example.com")
                         .param("role", "ASSESSMENT_DELEGATE"))
                 .andExpect(status().is3xxRedirection());
 
-        User updated = userRepository.findByName("delegate1").orElseThrow();
+        User updated = userRepository.findByEmail("delegate1_updated@example.com").orElseThrow();
         assertThat(updated.getEmail()).isEqualTo("delegate1_updated@example.com");
     }
 
@@ -865,11 +865,11 @@ class GovincIntegrationTest {
     @Order(940)
     @WithMockUser(username = "admin", roles = {"ADMIN"})
     void dataIntegrity_userRolesCorrect() throws Exception {
-        assertThat(userRepository.findByName("admin").orElseThrow().getRole()).isEqualTo(Role.ADMIN);
-        assertThat(userRepository.findByName("ism_user").orElseThrow().getRole()).isEqualTo(Role.INFORMATION_SECURITY_MANAGER);
-        assertThat(userRepository.findByName("team_leader").orElseThrow().getRole()).isEqualTo(Role.ORGANISATION_TEAM_LEADER);
-        assertThat(userRepository.findByName("delegate1").orElseThrow().getRole()).isEqualTo(Role.ASSESSMENT_DELEGATE);
-        assertThat(userRepository.findByName("assessor1").orElseThrow().getRole()).isEqualTo(Role.ASSESSOR);
+        assertThat(userRepository.findByEmail("admin@example.com").orElseThrow().getRole()).isEqualTo(Role.ADMIN);
+        assertThat(userRepository.findByEmail("ism@example.com").orElseThrow().getRole()).isEqualTo(Role.INFORMATION_SECURITY_MANAGER);
+        assertThat(userRepository.findByEmail("leader@example.com").orElseThrow().getRole()).isEqualTo(Role.ORGANISATION_TEAM_LEADER);
+        assertThat(userRepository.findByEmail("delegate1_updated@example.com").orElseThrow().getRole()).isEqualTo(Role.ASSESSMENT_DELEGATE);
+        assertThat(userRepository.findByEmail("assessor1@example.com").orElseThrow().getRole()).isEqualTo(Role.ASSESSOR);
     }
 
     @Test

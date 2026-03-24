@@ -28,17 +28,26 @@
                 <div class="form-section">
                     <div class="form-section-title">Basic Information</div>
 
-                    <!-- Name Field -->
+                    <!-- First Name Field -->
                     <div class="form-group required">
-                        <label for="name">
-                            Name
+                        <label for="firstName">
+                            First Name
                             <span class="required">*</span>
                         </label>
                         <input type="text" 
-                               id="name" 
-                               th:field="*{name}" 
-                               placeholder="Enter full name"
+                               id="firstName" 
+                               th:field="*{firstName}" 
+                               placeholder="Enter first name"
                                required>
+                    </div>
+
+                    <!-- Last Name Field -->
+                    <div class="form-group">
+                        <label for="lastName">Last Name</label>
+                        <input type="text" 
+                               id="lastName" 
+                               th:field="*{lastName}" 
+                               placeholder="Enter last name">
                     </div>
 
                     <!-- Email Field -->

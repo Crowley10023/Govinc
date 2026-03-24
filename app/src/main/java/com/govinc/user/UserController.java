@@ -104,8 +104,8 @@ public class UserController {
         if (!authorizationService.isAdmin()) {
             throw new UnauthorizedException("You do not have permission to create users.");
         }
-        // Ensure "admin" user always has ADMIN role
-        if ("admin".equalsIgnoreCase(user.getName())) {
+        // Ensure the local admin account always retains the ADMIN role
+        if (user.getEmail() != null && "admin@example.com".equalsIgnoreCase(user.getEmail())) {
             user.setRole(Role.ADMIN);
         }
         
@@ -160,8 +160,8 @@ public class UserController {
         // Get the current authenticated user
         User currentUser = authorizationService.getCurrentUser();
 
-        // Ensure "admin" user always has ADMIN role
-        if ("admin".equalsIgnoreCase(user.getName())) {
+        // Ensure the local admin account always retains the ADMIN role
+        if (user.getEmail() != null && "admin@example.com".equalsIgnoreCase(user.getEmail())) {
             user.setRole(Role.ADMIN);
         }
 
@@ -297,16 +297,21 @@ public class UserController {
             return result;
         }
         result.put("name", authentication.getName());
-        // Try to extract email (for OIDC providers)
+        // Try to extract email and name fields (for OIDC providers)
         if (authentication.getPrincipal() instanceof org.springframework.security.oauth2.core.oidc.user.OidcUser oidcUser) {
-            String email = oidcUser.getEmail();
-            result.put("email", email);
+            result.put("email", oidcUser.getEmail());
+            result.put("firstName", oidcUser.getGivenName());
+            result.put("lastName", oidcUser.getFamilyName());
         } else if (authentication.getPrincipal() instanceof org.springframework.security.core.userdetails.User user) {
             // Plain local user
             result.put("email", authentication.getName() + "@local");
+            result.put("firstName", authentication.getName());
+            result.put("lastName", null);
         } else {
             // Last resort: generic principal
             result.put("email", null);
+            result.put("firstName", null);
+            result.put("lastName", null);
         }
         return result;
     }

@@ -104,8 +104,8 @@ class GovincOrganizationApiTest {
         // Self-seeding: ensure admin exists for AuthorizationService DB lookups.
         // Do NOT assume GovincIntegrationTest has run first — class execution order
         // is not guaranteed between test runs.
-        if (userRepository.findByName("admin").isEmpty()) {
-            User admin = new User("admin", "admin@example.com");
+        if (userRepository.findByEmail("admin@example.com").isEmpty()) {
+            User admin = new User("admin", "", "admin@example.com");
             admin.setRole(Role.ADMIN);
             userRepository.save(admin);
         }

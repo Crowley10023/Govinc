@@ -19,7 +19,8 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String name;
+    private String firstName;
+    private String lastName;
     private String email;
     
     @Enumerated(EnumType.STRING)
@@ -31,8 +32,9 @@ public class User {
 
     public User() {}
 
-    public User(String name, String email) {
-        this.name = name;
+    public User(String firstName, String lastName, String email) {
+        this.firstName = firstName;
+        this.lastName = lastName;
         this.email = email;
         this.role = Role.ASSESSMENT_DELEGATE;
     }
@@ -45,12 +47,30 @@ public class User {
         this.id = id;
     }
 
+    /**
+     * Returns the display name (firstName + lastName).
+     * Used by templates via ${user.name} and JSON serialization for backward compatibility.
+     */
     public String getName() {
-        return name;
+        String fn = firstName != null ? firstName.trim() : "";
+        String ln = lastName != null ? lastName.trim() : "";
+        return ln.isEmpty() ? fn : (fn + " " + ln).trim();
     }
 
-    public void setName(String name) {
-        this.name = name;
+    public String getFirstName() {
+        return firstName;
+    }
+
+    public void setFirstName(String firstName) {
+        this.firstName = firstName;
+    }
+
+    public String getLastName() {
+        return lastName;
+    }
+
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
     }
 
     public String getEmail() {
