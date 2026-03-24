@@ -77,8 +77,8 @@ public class CustomAuthenticationSuccessHandler implements AuthenticationSuccess
                     String trimmed = fullName.trim();
                     int lastSpace = trimmed.lastIndexOf(' ');
                     if (lastSpace > 0) {
-                        if (firstName == null) firstName = trimmed.substring(0, lastSpace);
-                        if (lastName == null)  lastName  = trimmed.substring(lastSpace + 1);
+                        if (firstName == null) firstName = trimmed.substring(lastSpace + 1);
+                        if (lastName == null)  lastName  = trimmed.substring(0, lastSpace);
                     } else {
                         // Single-word display name — treat it as first name only
                         if (firstName == null) firstName = trimmed;
