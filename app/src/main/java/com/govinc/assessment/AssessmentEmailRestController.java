@@ -121,12 +121,17 @@ public class AssessmentEmailRestController {
         String assessmentName = assessment.getName() != null ? assessment.getName() : "Assessment #" + id;
         String catalogName = assessment.getSecurityCatalog() != null ? assessment.getSecurityCatalog().getName() : "";
 
+        // Pre-build the HTML hyperlink so the AI embeds it consistently
+        String linkLabel = "checking".equalsIgnoreCase(purpose) ? "View Assessment Results" : "Access the Assessment";
+        String htmlLink = "<a href=\"" + assessmentLink + "\">" + linkLabel + "</a>";
+
         // Build greeting/salutation lines
         String recipientLine = recipientNames.isEmpty()
                 ? ""
                 : "Recipient name(s): " + String.join(", ", recipientNames) + "\n";
         String senderLine = senderName != null ? "Sender name: " + senderName + "\n" : "";
-        String personalisationNote = "Use the recipient's given name in the salutation and sign off with the sender's name.\n";
+        String personalisationNote = "Use the recipient's given name in the salutation and sign off with the sender's name.\n" +
+                                     "The body must be valid HTML (use <p>, <br>, etc.). Include the assessment link exactly as this HTML anchor: " + htmlLink + "\n";
 
         String prompt;
         if ("checking".equalsIgnoreCase(purpose)) {
@@ -135,11 +140,10 @@ public class AssessmentEmailRestController {
                      recipientLine + senderLine +
                      "Assessment name: " + assessmentName + "\n" +
                      (catalogName.isBlank() ? "" : "Security catalog: " + catalogName + "\n") +
-                     "Assessment link: " + assessmentLink + "\n\n" +
-                     personalisationNote +
+                     "\n" + personalisationNote +
                      "The e-mail should:\n" +
                      "- Thank the recipient for their involvement\n" +
-                     "- Invite them to review the assessment results via the provided link\n" +
+                     "- Invite them to review the assessment results via the provided HTML link\n" +
                      "- Ask them to verify correctness and provide feedback if needed\n" +
                      "- Be polite and professional\n\n" +
                      "Return ONLY a JSON object with two keys: \"subject\" and \"body\". No markdown, no code fences.";
@@ -148,11 +152,10 @@ public class AssessmentEmailRestController {
                      recipientLine + senderLine +
                      "Assessment name: " + assessmentName + "\n" +
                      (catalogName.isBlank() ? "" : "Security catalog: " + catalogName + "\n") +
-                     "Assessment link: " + assessmentLink + "\n\n" +
-                     personalisationNote +
+                     "\n" + personalisationNote +
                      "The e-mail should:\n" +
                      "- Explain the purpose of the assessment briefly\n" +
-                     "- Ask the recipient to complete their part of the assessment via the provided link\n" +
+                     "- Ask the recipient to complete their part of the assessment via the provided HTML link\n" +
                      "- Mention the importance of timely completion\n" +
                      "- Be polite and professional\n\n" +
                      "Return ONLY a JSON object with two keys: \"subject\" and \"body\". No markdown, no code fences.";
