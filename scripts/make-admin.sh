@@ -113,7 +113,7 @@ if [ -z "$DUP_EMAILS" ]; then
 else
   echo "Duplicate e-mail addresses detected:"
   echo ""
-  while IFS= read -r email; do
+  while IFS= read -r email <&3; do
     [ -z "$email" ] && continue
     ESC_EMAIL="$(esc_sql "$email")"
     echo "--- Duplicate entries for: $email ---"
@@ -136,7 +136,7 @@ else
       done
     fi
     echo ""
-  done <<< "$DUP_EMAILS"
+  done 3<<< "$DUP_EMAILS"
 fi
 
 # ── Also check for duplicate full names ──────────────────────────────────────
@@ -146,7 +146,7 @@ DUP_NAMES="$(run_sql "SELECT CONCAT(TRIM(first_name), ' ', TRIM(last_name)) AS f
 if [ -n "$DUP_NAMES" ]; then
   echo "Duplicate full names detected:"
   echo ""
-  while IFS= read -r full_name; do
+  while IFS= read -r full_name <&3; do
     [ -z "$full_name" ] && continue
     fn_part="${full_name%% *}"
     ln_part="${full_name#* }"
@@ -175,7 +175,7 @@ if [ -n "$DUP_NAMES" ]; then
       done
     fi
     echo ""
-  done <<< "$DUP_NAMES"
+  done 3<<< "$DUP_NAMES"
 fi
 
 # ── 2. Promote a user to ADMIN ────────────────────────────────────────────────
