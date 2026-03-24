@@ -4,12 +4,15 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>User List</title>
     <th:block th:replace="~{navigation :: navHead}"></th:block>
+    <meta name="_csrf" th:content="${_csrf.token}" />
+    <meta name="_csrf_header" th:content="${_csrf.headerName}" />
 </head>
 <body>
 <div th:replace="~{navigation :: mainNav}"></div>
 <div class="container">
     <h1>User List</h1>
     <a href="/users/new" class="btn-action">Add User</a>
+    <button type="button" class="btn-action" onclick="openAzureImportModal()" style="margin-left:0.5em;">&#9729; Import from Azure AD</button>
     
     <div th:if="${#lists.isEmpty(users)}" class="empty-state">
         <p>No users found.</p>
@@ -43,6 +46,51 @@
                 </tr>
             </tbody>
         </table>
+    </div>
+</div>
+
+<!-- ===== Azure AD Import Modal ===== -->
+<div id="azureImportModal" class="modal-bg" style="display:none;" role="dialog" aria-modal="true">
+    <div class="modal-popup" style="width:min(720px,96vw);display:flex;flex-direction:column;max-height:88vh;">
+        <h3 style="flex-shrink:0;margin-bottom:0.7em;">&#9729; Import Users from Azure AD</h3>
+
+        <!-- Search bar -->
+        <div style="display:flex;gap:0.5em;flex-shrink:0;margin-bottom:0.8em;">
+            <input type="text" id="azureSearchQuery" class="form-control"
+                   placeholder="Search by name or e-mail…"
+                   style="flex:1;"
+                   onkeydown="if(event.key==='Enter') searchAzureUsers()" />
+            <button type="button" class="btn-action" id="azureSearchBtn" onclick="searchAzureUsers()">Search</button>
+        </div>
+
+        <!-- Status / error -->
+        <div id="azureSearchStatus" style="font-size:0.9em;color:#555;min-height:1.2em;flex-shrink:0;"></div>
+
+        <!-- Results table (scrollable) -->
+        <div style="flex:1;overflow-y:auto;min-height:0;margin-top:0.4em;">
+            <table id="azureResultsTable" class="table" style="display:none;width:100%;">
+                <thead>
+                    <tr>
+                        <th style="width:2em;"><input type="checkbox" id="azureSelectAll" onchange="toggleSelectAll(this)" title="Select all" /></th>
+                        <th>Display Name</th>
+                        <th>E-Mail / UPN</th>
+                        <th>First Name</th>
+                        <th>Last Name</th>
+                    </tr>
+                </thead>
+                <tbody id="azureResultsBody"></tbody>
+            </table>
+            <div id="azureNoResults" style="display:none;color:#888;padding:0.5em 0;">No users found.</div>
+        </div>
+
+        <!-- Footer -->
+        <div style="flex-shrink:0;margin-top:0.8em;">
+            <div id="azureImportStatus" style="font-size:0.9em;min-height:1.2em;"></div>
+            <div class="modal-btn-row" style="margin-top:0.4em;">
+                <button type="button" class="btn-action" id="azureImportBtn" onclick="importSelectedUsers()" disabled>Import Selected</button>
+                <button type="button" class="btn-cancel" onclick="closeAzureImportModal()">Close</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -152,6 +200,156 @@
             closeDeleteModal();
         }
     });
+
+    // ── Azure AD Import ──────────────────────────────────────────────────────
+
+    let azureSearchResults = [];
+
+    function openAzureImportModal() {
+        document.getElementById('azureImportModal').style.display = 'flex';
+        document.getElementById('azureSearchQuery').focus();
+    }
+
+    function closeAzureImportModal() {
+        document.getElementById('azureImportModal').style.display = 'none';
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        var azureBg = document.getElementById('azureImportModal');
+        if (azureBg) {
+            azureBg.addEventListener('mousedown', function (e) {
+                if (e.target === this) closeAzureImportModal();
+            });
+        }
+    });
+
+    function getCsrf() {
+        return {
+            token:  document.querySelector('meta[name="_csrf"]')        ? document.querySelector('meta[name="_csrf"]').content        : '',
+            header: document.querySelector('meta[name="_csrf_header"]') ? document.querySelector('meta[name="_csrf_header"]').content : 'X-CSRF-TOKEN'
+        };
+    }
+
+    function searchAzureUsers() {
+        var query = document.getElementById('azureSearchQuery').value.trim();
+        if (!query) { document.getElementById('azureSearchStatus').textContent = 'Please enter a search term.'; return; }
+
+        var searchBtn = document.getElementById('azureSearchBtn');
+        var statusEl  = document.getElementById('azureSearchStatus');
+        searchBtn.disabled = true;
+        statusEl.textContent = 'Searching…';
+        document.getElementById('azureResultsTable').style.display = 'none';
+        document.getElementById('azureNoResults').style.display = 'none';
+        document.getElementById('azureImportBtn').disabled = true;
+        document.getElementById('azureImportStatus').textContent = '';
+
+        var csrf = getCsrf();
+        fetch('/users/azure/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', [csrf.header]: csrf.token },
+            body: JSON.stringify({ query: query })
+        })
+        .then(r => r.json())
+        .then(data => {
+            searchBtn.disabled = false;
+            if (data.error) {
+                statusEl.style.color = '#c00';
+                statusEl.textContent = data.error;
+                return;
+            }
+            azureSearchResults = data.results || [];
+            statusEl.style.color = '#555';
+            statusEl.textContent = azureSearchResults.length + ' result(s) found.';
+            renderAzureResults(azureSearchResults);
+        })
+        .catch(err => {
+            searchBtn.disabled = false;
+            statusEl.style.color = '#c00';
+            statusEl.textContent = 'Request failed: ' + err;
+        });
+    }
+
+    function renderAzureResults(results) {
+        var tbody = document.getElementById('azureResultsBody');
+        tbody.innerHTML = '';
+        document.getElementById('azureSelectAll').checked = false;
+
+        if (!results || results.length === 0) {
+            document.getElementById('azureNoResults').style.display = 'block';
+            document.getElementById('azureResultsTable').style.display = 'none';
+            return;
+        }
+
+        document.getElementById('azureNoResults').style.display = 'none';
+        document.getElementById('azureResultsTable').style.display = '';
+
+        results.forEach(function (u, idx) {
+            var displayMail = u.mail || u.userPrincipalName || '—';
+            var row = document.createElement('tr');
+            row.innerHTML =
+                '<td><input type="checkbox" class="azure-user-cb" data-idx="' + idx + '" onchange="updateImportBtn()" /></td>' +
+                '<td>' + esc(u.displayName) + '</td>' +
+                '<td>' + esc(displayMail) + '</td>' +
+                '<td>' + esc(u.givenName) + '</td>' +
+                '<td>' + esc(u.surname) + '</td>';
+            tbody.appendChild(row);
+        });
+    }
+
+    function toggleSelectAll(cb) {
+        document.querySelectorAll('.azure-user-cb').forEach(function (el) { el.checked = cb.checked; });
+        updateImportBtn();
+    }
+
+    function updateImportBtn() {
+        var any = Array.from(document.querySelectorAll('.azure-user-cb')).some(el => el.checked);
+        document.getElementById('azureImportBtn').disabled = !any;
+    }
+
+    function importSelectedUsers() {
+        var selected = Array.from(document.querySelectorAll('.azure-user-cb:checked'))
+            .map(el => azureSearchResults[parseInt(el.getAttribute('data-idx'))]);
+
+        if (selected.length === 0) return;
+
+        var importBtn = document.getElementById('azureImportBtn');
+        var statusEl  = document.getElementById('azureImportStatus');
+        importBtn.disabled = true;
+        statusEl.style.color = '#555';
+        statusEl.textContent = 'Importing…';
+
+        var csrf = getCsrf();
+        fetch('/users/azure/import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', [csrf.header]: csrf.token },
+            body: JSON.stringify(selected)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                statusEl.style.color = '#c00';
+                statusEl.textContent = data.error;
+                importBtn.disabled = false;
+                return;
+            }
+            statusEl.style.color = 'green';
+            var msg = data.imported + ' user(s) imported';
+            if (data.skipped > 0) msg += ', ' + data.skipped + ' skipped (already exist)';
+            statusEl.textContent = msg + '.';
+            // Reload after a short delay so the user list refreshes
+            setTimeout(function () { window.location.reload(); }, 1800);
+        })
+        .catch(err => {
+            importBtn.disabled = false;
+            statusEl.style.color = '#c00';
+            statusEl.textContent = 'Request failed: ' + err;
+        });
+    }
+
+    function esc(str) {
+        if (!str) return '';
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
 </script>
 </body>
 </html>
