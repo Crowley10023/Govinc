@@ -21,7 +21,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 
 @Controller
@@ -53,10 +52,9 @@ public class LandingController {
             List<Assessment> filtered = new ArrayList<>();
             for (Assessment a : all) {
                 try {
-                    if (a.getId() != null && (
-                            authorizationService.canAccessAssessment(a.getId())
-                                    || authorizationService.canAccessAssessmentThroughLeadership(a.getId())
-                    )) {
+                    // Pass the Assessment object directly — avoids a redundant findById per item.
+                    // canAccessAssessment already includes leadership checks internally.
+                    if (a.getId() != null && authorizationService.canAccessAssessment(a)) {
                         filtered.add(a);
                     }
                 } catch (Exception e) {
@@ -65,6 +63,31 @@ public class LandingController {
             }
             // Sort by creationDate (new field) descending, with nulls last
             filtered.sort(Comparator.comparing(Assessment::getCreationDate, Comparator.nullsLast(Comparator.reverseOrder())));
+
+            // --- Batch pre-loads to avoid N+1 queries ---
+            // 1. Load all AssessmentDetails for filtered assessments in one query
+            List<Long> filteredIds = new ArrayList<>();
+            for (Assessment a : filtered) filteredIds.add(a.getId());
+            Map<Long, AssessmentDetails> detailsById = assessmentDetailsService.findAllByAssessmentIds(filteredIds);
+
+            // 2. Collect all org service IDs across filtered assessments, load in one query
+            List<Long> allOrgServiceIds = new ArrayList<>();
+            for (Assessment a : filtered) {
+                if (a.getOrgServices() != null) {
+                    for (com.govinc.organization.OrgService os : a.getOrgServices()) {
+                        allOrgServiceIds.add(os.getId());
+                    }
+                }
+            }
+            Map<Long, List<OrgServiceAssessment>> osaByOrgServiceId = new HashMap<>();
+            if (!allOrgServiceIds.isEmpty()) {
+                List<OrgServiceAssessment> allOsa = orgServiceAssessmentRepository.findByOrgServiceIdIn(allOrgServiceIds);
+                for (OrgServiceAssessment osa : allOsa) {
+                    if (osa.getOrgService() != null && osa.getOrgService().getId() != null) {
+                        osaByOrgServiceId.computeIfAbsent(osa.getOrgService().getId(), k -> new ArrayList<>()).add(osa);
+                    }
+                }
+            }
 
             // Prepare maps for completion and team leader display
             Map<Long, Integer> assessmentTotalControls = new HashMap<>();
@@ -80,22 +103,20 @@ public class LandingController {
                 }
                 int answered = 0;
                 try {
-                    // Collect directly-answered control IDs from assessment details
+                    // Collect directly-answered control IDs from pre-loaded assessment details
                     Set<Long> answeredIds = new HashSet<>();
-                    Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(a.getId());
-                    if (detailsOpt.isPresent() && detailsOpt.get().getControlAnswers() != null) {
-                        for (com.govinc.assessment.AssessmentControlAnswer aca : detailsOpt.get().getControlAnswers()) {
+                    AssessmentDetails details = detailsById.get(aid);
+                    if (details != null && details.getControlAnswers() != null) {
+                        for (com.govinc.assessment.AssessmentControlAnswer aca : details.getControlAnswers()) {
                             if (aca != null && aca.getSecurityControl() != null && aca.getSecurityControl().getId() != null) {
                                 answeredIds.add(aca.getSecurityControl().getId());
                             }
                         }
                     }
-                    // Also count controls that are "taken over" by org services (applicable=true)
-                    // even if the detail page hasn't been visited yet and they aren't persisted yet.
+                    // Also count controls taken over by org services — use pre-loaded map
                     if (a.getOrgServices() != null && !a.getOrgServices().isEmpty()) {
                         for (com.govinc.organization.OrgService orgService : a.getOrgServices()) {
-                            List<OrgServiceAssessment> osaList = orgServiceAssessmentRepository
-                                    .findByOrgServiceId(orgService.getId());
+                            List<OrgServiceAssessment> osaList = osaByOrgServiceId.get(orgService.getId());
                             if (osaList != null) {
                                 for (OrgServiceAssessment osa : osaList) {
                                     if (osa.getControls() != null) {

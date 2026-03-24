@@ -43,6 +43,10 @@ public class AuthorizationService {
     
     @Autowired
     private OrgUnitService orgUnitService;
+
+    /** Request-scoped cache — eliminates repeated DB lookups within a single HTTP request. */
+    @Autowired(required = false)
+    private AuthorizationRequestCache requestCache;
     
     /**
      * Get the currently authenticated user from Spring Security context.
@@ -52,8 +56,20 @@ public class AuthorizationService {
      * For form-based authentication, uses the standard username.
      */
     public User getCurrentUser() {
+        // Check request-scoped cache first to avoid repeated DB lookups within one HTTP request
+        if (requestCache != null) {
+            try {
+                if (requestCache.isUserResolved()) {
+                    return requestCache.getCachedUser();
+                }
+            } catch (Exception ignored) {
+                // Outside of request scope (e.g., scheduled tasks) — fall through to normal lookup
+            }
+        }
+
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getPrincipal())) {
+            cacheUser(null);
             return null;
         }
         
@@ -72,7 +88,7 @@ public class AuthorizationService {
                     username = sub;
                 }
             }
-            logger.info("OAuth2 user resolved: " + username);
+            logger.fine("OAuth2 user resolved: " + username);
         } else {
             // Handle form-based authentication
             username = auth.getName();
@@ -80,6 +96,7 @@ public class AuthorizationService {
         
         if (username == null) {
             logger.warning("Could not resolve username from authentication principal");
+            cacheUser(null);
             return null;
         }
         
@@ -87,7 +104,15 @@ public class AuthorizationService {
         if (userOpt.isEmpty()) {
             logger.warning("User " + username + " authenticated but not found in database");
         }
-        return userOpt.orElse(null);
+        User result = userOpt.orElse(null);
+        cacheUser(result);
+        return result;
+    }
+
+    private void cacheUser(User user) {
+        if (requestCache != null) {
+            try { requestCache.setUser(user); } catch (Exception ignored) {}
+        }
     }
     
     /**
@@ -109,6 +134,15 @@ public class AuthorizationService {
             return null;
         }
 
+        // Check request-scoped cache first
+        if (requestCache != null) {
+            try {
+                if (requestCache.isRoleResolved()) {
+                    return requestCache.getCachedRole();
+                }
+            } catch (Exception ignored) {}
+        }
+
         String username = null;
         if (auth.getPrincipal() instanceof org.springframework.security.oauth2.core.oidc.user.OidcUser oidcUser) {
             username = oidcUser.getPreferredUsername();
@@ -128,13 +162,24 @@ public class AuthorizationService {
         java.util.Optional<User> userOpt = userRepository.findByName(username);
         if (userOpt.isEmpty()) {
             logger.fine("Authenticated principal '" + username + "' not found in DB when resolving role");
+            cacheRole(null);
             return null;
         }
         User user = userOpt.get();
+        Role role;
         if (user.getName() != null && user.getName().equalsIgnoreCase("admin")) {
-            return Role.ADMIN;
+            role = Role.ADMIN;
+        } else {
+            role = user.getRole();
         }
-        return user.getRole();
+        cacheRole(role);
+        return role;
+    }
+
+    private void cacheRole(Role role) {
+        if (requestCache != null) {
+            try { requestCache.setRole(role); } catch (Exception ignored) {}
+        }
     }
     
     /**
@@ -269,6 +314,25 @@ public class AuthorizationService {
             return assignedUsers.contains(user);
         }
         
+        return false;
+    }
+
+    /**
+     * Overload for callers that already hold the Assessment object, avoids an extra DB fetch.
+     */
+    public boolean canAccessAssessment(Assessment assessment) {
+        if (assessment == null) return false;
+        User user = getCurrentUser();
+        if (user == null) return false;
+
+        Role role = user.getRole();
+        if (role == Role.ADMIN || role == Role.INFORMATION_SECURITY_MANAGER) return true;
+        if (canAccessAssessmentThroughLeadership(user, assessment)) return true;
+
+        if (role == Role.ASSESSMENT_DELEGATE || role == Role.ASSESSOR) {
+            Set<User> assignedUsers = assessment.getUsers();
+            return assignedUsers != null && assignedUsers.contains(user);
+        }
         return false;
     }
 

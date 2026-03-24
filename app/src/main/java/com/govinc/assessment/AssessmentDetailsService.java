@@ -7,7 +7,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -20,6 +19,28 @@ public class AssessmentDetailsService {
 
     public List<AssessmentDetails> findAll() {
         return repository.findAll();
+    }
+
+    /**
+     * Batch-fetch AssessmentDetails for a list of assessment IDs.
+     * Returns a map of assessmentId → AssessmentDetails. Single DB query replaces N individual lookups.
+     */
+    public Map<Long, AssessmentDetails> findAllByAssessmentIds(List<Long> assessmentIds) {
+        if (assessmentIds == null || assessmentIds.isEmpty()) {
+            return new HashMap<>();
+        }
+        List<AssessmentDetails> details = repository.findAllByAssessmentIds(assessmentIds);
+        Map<Long, AssessmentDetails> result = new HashMap<>();
+        for (AssessmentDetails ad : details) {
+            if (ad.getAssessments() != null) {
+                for (Assessment a : ad.getAssessments()) {
+                    if (a.getId() != null) {
+                        result.put(a.getId(), ad);
+                    }
+                }
+            }
+        }
+        return result;
     }
 
     /**
