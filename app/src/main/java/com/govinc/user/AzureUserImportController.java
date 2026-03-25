@@ -111,6 +111,51 @@ public class AzureUserImportController {
         return ResponseEntity.ok(result);
     }
 
+    // ── Resolve-or-create (used by email recipient picker) ───────────────────
+    /**
+     * Given a list of Azure AD user maps (as returned by /search), ensures every
+     * user exists in the local DB (creates with ASSESSOR role if not) and returns
+     * the DB id, display name and email for each — ready for the email send flow.
+     */
+    @PostMapping("/resolve")
+    public ResponseEntity<Map<String, Object>> resolveUsers(@RequestBody List<Map<String, String>> users) {
+        if (!authorizationService.isAdmin()) throw new UnauthorizedException("Admin required");
+
+        List<Map<String, Object>> resolved = new ArrayList<>();
+
+        for (Map<String, String> u : users) {
+            String emailRaw = u.getOrDefault("mail", "").trim().toLowerCase();
+            if (emailRaw.isBlank()) emailRaw = u.getOrDefault("userPrincipalName", "").trim().toLowerCase();
+            if (emailRaw.isBlank()) continue;
+            final String email = emailRaw;
+
+            String gn = u.getOrDefault("givenName", "");
+            String sn = u.getOrDefault("surname",   "");
+            if (gn.isBlank() && sn.isBlank()) {
+                String display = u.getOrDefault("displayName", "");
+                int sp = display.lastIndexOf(' ');
+                if (sp > 0) { gn = display.substring(0, sp); sn = display.substring(sp + 1); }
+                else         { gn = display; }
+            }
+            final String givenName = gn;
+            final String surname   = sn;
+
+            User dbUser = userRepository.findByEmail(email).orElseGet(() -> {
+                User nu = new User(givenName, surname, email);
+                nu.setRole(Role.ASSESSOR);
+                return userRepository.save(nu);
+            });
+
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("id",   dbUser.getId());
+            entry.put("name", dbUser.getName());
+            entry.put("email", dbUser.getEmail());
+            resolved.add(entry);
+        }
+
+        return ResponseEntity.ok(Map.of("resolved", resolved));
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /** Obtains an access token for https://graph.microsoft.com via the client-credentials flow. */

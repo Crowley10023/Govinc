@@ -1,5 +1,7 @@
 package com.govinc.organization;
 
+import com.govinc.authorization.AuthorizationService;
+import com.govinc.authorization.UnauthorizedException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -15,12 +17,18 @@ public class OrgServiceAssessmentController {
     private final OrgServiceAssessmentService assessmentService;
 
     @Autowired
+    private AuthorizationService authorizationService;
+
+    @Autowired
     public OrgServiceAssessmentController(OrgServiceAssessmentService assessmentService) {
         this.assessmentService = assessmentService;
     }
 
     @GetMapping("/edit/{orgServiceId}")
     public String editAssessment(@PathVariable Long orgServiceId, Model model) {
+        if (!authorizationService.canAccessOrganization()) {
+            throw new UnauthorizedException("You do not have permission to access org service assessments.");
+        }
         OrgServiceAssessment assessment = assessmentService.findOrCreateAssessment(orgServiceId);
         List<OrgServiceAssessmentControl> controls = assessmentService.getAllControlsForAssessment(assessment);
         long applicableCount = controls.stream().filter(OrgServiceAssessmentControl::isApplicable).count();
@@ -38,6 +46,12 @@ public class OrgServiceAssessmentController {
                                                             @RequestParam Long controlId,
                                                             @RequestParam Boolean applicable,
                                                             @RequestParam Integer percent) {
+        if (!authorizationService.canAccessOrganization()) {
+            Map<String, Object> forbidden = new HashMap<>();
+            forbidden.put("success", false);
+            forbidden.put("message", "You do not have permission to modify org service assessments.");
+            return ResponseEntity.status(403).body(forbidden);
+        }
         Map<String, Object> response = new HashMap<>();
         try {
             OrgServiceAssessment assessment = assessmentService.getAssessment(id)
@@ -81,6 +95,12 @@ public class OrgServiceAssessmentController {
     @PutMapping("/save-control-comment")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> saveControlComment(@RequestBody Map<String, Object> body) {
+        if (!authorizationService.canAccessOrganization()) {
+            Map<String, Object> forbidden = new HashMap<>();
+            forbidden.put("success", false);
+            forbidden.put("message", "You do not have permission to modify org service assessments.");
+            return ResponseEntity.status(403).body(forbidden);
+        }
         Map<String, Object> response = new HashMap<>();
         try {
             Long id = Long.parseLong(body.get("id").toString());

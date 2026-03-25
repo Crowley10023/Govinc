@@ -170,6 +170,9 @@ public class AssessmentController {
             @RequestParam(value = "predecessorId", required = false) Long predecessorId,
             @RequestParam(value = "complianceCheckId", required = false) Long complianceCheckId,
             @RequestParam(value = "guideVisibleInDirect", defaultValue = "false") boolean guideVisibleInDirect) {
+        if (!authorizationService.canCreateAssessment()) {
+            throw new UnauthorizedException("You do not have permission to create assessments.");
+        }
         SecurityCatalog catalog = securityCatalogService.findById(catalogId).orElse(null);
         if (catalog == null) {
             return "redirect:/assessment/list";
@@ -292,6 +295,9 @@ public class AssessmentController {
     // Add this mapping to serve assessment-step-controls.html as per your flow
     @GetMapping("/{id}/controls")
     public String assessmentStepControls(@PathVariable Long id, Model model) {
+        if (!authorizationService.canAccessAssessment(id)) {
+            throw new UnauthorizedException("You do not have permission to access this assessment.");
+        }
         Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
         if (assessmentOpt.isEmpty()) {
             return "assessment-not-found";
@@ -330,7 +336,9 @@ public class AssessmentController {
     // POST handler for controls - saves answers and redirects to details page
     @PostMapping("/{id}/controls")
     public String handleAssessmentControls(@PathVariable Long id, @RequestParam MultiValueMap<String, String> params) {
-        
+        if (!authorizationService.canAnswerAssessment(id)) {
+            throw new UnauthorizedException("You do not have permission to modify this assessment.");
+        }
         // Find details or create new
         Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
         AssessmentDetails details;

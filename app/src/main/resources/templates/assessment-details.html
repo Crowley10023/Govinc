@@ -618,7 +618,11 @@
                                             th:text="${user.name + ' (' + (user.email != null ? user.email : 'no e-mail') + ')'}">
                                     </option>
                                 </select>
-                                <span class="help-text text-sm" style="margin-top:2px;">Ctrl / Cmd for multiple.</span>
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px;">
+                                    <span class="help-text text-sm">Ctrl / Cmd for multiple.</span>
+                                    <button type="button" class="btn-action" style="font-size:0.78em;padding:2px 7px;"
+                                            onclick="openCorpDirModal()">&#9729; Corporate Directory</button>
+                                </div>
                             </div>
 
                             <div class="form-group" style="flex-shrink:0;">
@@ -674,6 +678,45 @@
                 </div>
             </div>
         </section>
+    </div>
+
+    <!-- Corporate Directory sub-modal (used from Send E-Mail dialog) -->
+    <div class="modal-bg" id="corp-dir-modal-bg" style="display:none;z-index:1100;">
+        <div class="modal-popup" style="width:min(680px,96vw);display:flex;flex-direction:column;max-height:82vh;">
+            <h3 style="flex-shrink:0;margin-bottom:0.7em;">&#9729; Select from Corporate Directory</h3>
+
+            <div style="display:flex;gap:0.5em;flex-shrink:0;margin-bottom:0.6em;">
+                <input type="text" id="corp-dir-query" class="form-control"
+                       placeholder="Search by name or e-mail&hellip;"
+                       style="flex:1;"
+                       onkeydown="if(event.key==='Enter') corpDirSearch()" />
+                <button type="button" class="btn-action" id="corp-dir-search-btn" onclick="corpDirSearch()">Search</button>
+            </div>
+
+            <div id="corp-dir-status" style="font-size:0.88em;color:#555;min-height:1.1em;flex-shrink:0;"></div>
+
+            <div style="flex:1;overflow-y:auto;min-height:0;margin-top:0.4em;">
+                <table id="corp-dir-table" class="table" style="display:none;width:100%;">
+                    <thead>
+                        <tr>
+                            <th style="width:2em;"><input type="checkbox" id="corp-dir-select-all" onchange="corpDirToggleAll(this)" title="Select all" /></th>
+                            <th>Name</th>
+                            <th>E-Mail</th>
+                        </tr>
+                    </thead>
+                    <tbody id="corp-dir-body"></tbody>
+                </table>
+                <div id="corp-dir-no-results" style="display:none;color:#888;padding:0.4em 0;">No users found.</div>
+            </div>
+
+            <div style="flex-shrink:0;margin-top:0.7em;">
+                <div id="corp-dir-import-status" style="font-size:0.88em;min-height:1.1em;"></div>
+                <div class="modal-btn-row" style="margin-top:0.4em;">
+                    <button type="button" class="btn-action" id="corp-dir-add-btn" onclick="corpDirAddSelected()" disabled>Add to Recipients</button>
+                    <button type="button" class="btn-cancel" onclick="closeCorpDirModal()">Cancel</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- External JavaScript Files -->
@@ -1118,6 +1161,167 @@
 
         function closeEmailModal() {
             document.getElementById('email-modal-bg').style.display = 'none';
+        }
+
+        // ---- Corporate Directory sub-modal ----
+        var corpDirResults = [];
+
+        function openCorpDirModal() {
+            document.getElementById('corp-dir-modal-bg').style.display = 'flex';
+            document.getElementById('corp-dir-query').value = '';
+            document.getElementById('corp-dir-status').textContent = '';
+            document.getElementById('corp-dir-import-status').textContent = '';
+            document.getElementById('corp-dir-table').style.display = 'none';
+            document.getElementById('corp-dir-no-results').style.display = 'none';
+            document.getElementById('corp-dir-add-btn').disabled = true;
+            document.getElementById('corp-dir-select-all').checked = false;
+            document.getElementById('corp-dir-body').innerHTML = '';
+            corpDirResults = [];
+            setTimeout(function() { document.getElementById('corp-dir-query').focus(); }, 50);
+        }
+
+        function closeCorpDirModal() {
+            document.getElementById('corp-dir-modal-bg').style.display = 'none';
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var bg = document.getElementById('corp-dir-modal-bg');
+            if (bg) bg.addEventListener('mousedown', function(e) { if (e.target === this) closeCorpDirModal(); });
+        });
+
+        function corpDirSearch() {
+            var query = document.getElementById('corp-dir-query').value.trim();
+            if (!query) { document.getElementById('corp-dir-status').textContent = 'Please enter a search term.'; return; }
+
+            var csrfToken  = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+            var csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+            var statusEl   = document.getElementById('corp-dir-status');
+            var searchBtn  = document.getElementById('corp-dir-search-btn');
+
+            searchBtn.disabled = true;
+            statusEl.style.color = '#555';
+            statusEl.textContent = 'Searching…';
+            document.getElementById('corp-dir-table').style.display = 'none';
+            document.getElementById('corp-dir-no-results').style.display = 'none';
+            document.getElementById('corp-dir-add-btn').disabled = true;
+            document.getElementById('corp-dir-import-status').textContent = '';
+
+            fetch('/users/azure/search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', [csrfHeader]: csrfToken },
+                body: JSON.stringify({ query: query })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                searchBtn.disabled = false;
+                if (data.error) {
+                    statusEl.style.color = '#c00';
+                    statusEl.textContent = data.error;
+                    return;
+                }
+                corpDirResults = data.results || [];
+                statusEl.style.color = '#555';
+                statusEl.textContent = corpDirResults.length + ' result(s) found.';
+                corpDirRender(corpDirResults);
+            })
+            .catch(function(err) {
+                searchBtn.disabled = false;
+                statusEl.style.color = '#c00';
+                statusEl.textContent = 'Request failed: ' + err;
+            });
+        }
+
+        function corpDirRender(results) {
+            var tbody = document.getElementById('corp-dir-body');
+            tbody.innerHTML = '';
+            document.getElementById('corp-dir-select-all').checked = false;
+            if (!results || results.length === 0) {
+                document.getElementById('corp-dir-no-results').style.display = 'block';
+                document.getElementById('corp-dir-table').style.display = 'none';
+                return;
+            }
+            document.getElementById('corp-dir-no-results').style.display = 'none';
+            document.getElementById('corp-dir-table').style.display = '';
+            results.forEach(function(u, idx) {
+                var mail = u.mail || u.userPrincipalName || '—';
+                var row = document.createElement('tr');
+                row.innerHTML =
+                    '<td><input type="checkbox" class="corp-dir-cb" data-idx="' + idx + '" onchange="corpDirUpdateBtn()" /></td>' +
+                    '<td>' + corpDirEsc(u.displayName) + '</td>' +
+                    '<td>' + corpDirEsc(mail) + '</td>';
+                tbody.appendChild(row);
+            });
+        }
+
+        function corpDirToggleAll(cb) {
+            document.querySelectorAll('.corp-dir-cb').forEach(function(el) { el.checked = cb.checked; });
+            corpDirUpdateBtn();
+        }
+
+        function corpDirUpdateBtn() {
+            var any = Array.from(document.querySelectorAll('.corp-dir-cb')).some(function(el) { return el.checked; });
+            document.getElementById('corp-dir-add-btn').disabled = !any;
+        }
+
+        function corpDirAddSelected() {
+            var selected = Array.from(document.querySelectorAll('.corp-dir-cb:checked'))
+                .map(function(el) { return corpDirResults[parseInt(el.getAttribute('data-idx'))]; });
+            if (selected.length === 0) return;
+
+            var csrfToken  = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+            var csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+            var addBtn     = document.getElementById('corp-dir-add-btn');
+            var importStatusEl = document.getElementById('corp-dir-import-status');
+
+            addBtn.disabled = true;
+            importStatusEl.style.color = '#555';
+            importStatusEl.textContent = 'Resolving users…';
+
+            fetch('/users/azure/resolve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', [csrfHeader]: csrfToken },
+                body: JSON.stringify(selected)
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.error) {
+                    importStatusEl.style.color = '#c00';
+                    importStatusEl.textContent = data.error;
+                    addBtn.disabled = false;
+                    return;
+                }
+                var recipients = data.resolved || [];
+                var select = document.getElementById('email-recipients');
+                var added = 0;
+                recipients.forEach(function(u) {
+                    // Add option if not already present
+                    var existing = Array.from(select.options).find(function(o) { return parseInt(o.value) === u.id; });
+                    if (!existing) {
+                        var opt = document.createElement('option');
+                        opt.value = u.id;
+                        opt.textContent = u.name + ' (' + u.email + ')';
+                        select.appendChild(opt);
+                        added++;
+                    }
+                    // Auto-select
+                    Array.from(select.options).forEach(function(o) {
+                        if (parseInt(o.value) === u.id) o.selected = true;
+                    });
+                });
+                importStatusEl.style.color = 'green';
+                importStatusEl.textContent = recipients.length + ' user(s) added to recipients.';
+                setTimeout(function() { closeCorpDirModal(); }, 1000);
+            })
+            .catch(function(err) {
+                addBtn.disabled = false;
+                importStatusEl.style.color = '#c00';
+                importStatusEl.textContent = 'Request failed: ' + err;
+            });
+        }
+
+        function corpDirEsc(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
         }
 
         document.addEventListener('DOMContentLoaded', function() {

@@ -269,8 +269,8 @@ public class UserController {
     @GetMapping("/api")
     @ResponseBody
     public List<User> apiGetAllUsers() {
-        // Authorization check: only ADMIN can view users
-        if (!authorizationService.isAdmin()) {
+        // Authorization check: ADMIN and ISM can view users
+        if (!authorizationService.isInformationSecurityManager()) {
             throw new UnauthorizedException("You do not have permission to view users.");
         }
         return userRepository.findAll();
@@ -280,8 +280,8 @@ public class UserController {
     @GetMapping("/api/orgUnits")
     @ResponseBody
     public List<OrgUnit> apiGetOrgUnits() {
-        // Authorization check: only ADMIN can access
-        if (!authorizationService.isAdmin()) {
+        // Authorization check: ADMIN and ISM can access
+        if (!authorizationService.isInformationSecurityManager()) {
             throw new UnauthorizedException("You do not have permission to access org units.");
         }
         return orgUnitService.getAllOrgUnits();
