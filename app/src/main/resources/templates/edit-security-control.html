@@ -60,6 +60,45 @@
                 </div>
             </div>
 
+            <!-- Version Management Section (shown when editing existing control) -->
+            <div class="version-management-section" th:if="${securityControl.id != null}">
+                <div class="version-mgmt-top">
+                    <div class="version-mgmt-field">
+                        <label>Version</label>
+                        <span class="badge" th:text="${securityControl.version != null ? securityControl.version : '1.0'}"></span>
+                    </div>
+                    <div class="version-mgmt-field">
+                        <label>Bump</label>
+                        <div class="flex-row gap-md">
+                            <label class="user-check-item">
+                                <input type="radio" name="versionBump" value="minor" checked>
+                                Minor (1.0 &rarr; 1.1)
+                            </label>
+                            <label class="user-check-item">
+                                <input type="radio" name="versionBump" value="major">
+                                Major (1.1 &rarr; 2.0)
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group" th:if="${requiresVersionManagement}">
+                    <label for="projectId">Governance Project *</label>
+                    <select name="projectId" id="projectId" th:required="${requiresVersionManagement}">
+                        <option value="">-- Select Project (Track Changes enabled) --</option>
+                        <option th:each="p : ${trackingProjects}" th:value="${p.id}" th:text="${p.name}"></option>
+                    </select>
+                    <p class="text-muted text-sm">Belongs to a version-managed catalog. Changes must be assigned to a project.</p>
+                </div>
+                <div class="form-group" th:if="${!requiresVersionManagement}">
+                    <label for="projectId">Governance Project (optional)</label>
+                    <select name="projectId" id="projectId">
+                        <option value="">-- No project --</option>
+                        <option th:each="p : ${trackingProjects}" th:value="${p.id}" th:text="${p.name}"></option>
+                    </select>
+                </div>
+            </div>
+
             <!-- Action Buttons -->
             <div class="form-actions">
                 <button type="submit" class="btn-submit">Save Control</button>

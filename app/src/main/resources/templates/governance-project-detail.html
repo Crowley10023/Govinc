@@ -13,15 +13,22 @@
 <div class="container">
     <h1 th:text="'Project: ' + ${project.name}"></h1>
 
-    <div class="card" style="padding:1.5em;margin-bottom:1.5em;">
-        <div style="display:flex;gap:2em;flex-wrap:wrap;">
+    <div class="card project-info-card">
+        <div class="flex-row flex-wrap gap-lg">
             <div><strong>Owner:</strong> <span th:text="${project.owner != null ? project.owner.name : '-'}"></span></div>
             <div><strong>Created:</strong> <span th:text="${project.createdDate != null ? #temporals.format(project.createdDate, 'yyyy-MM-dd') : '-'}"></span></div>
             <div><strong>Tasks:</strong> <span th:text="${project.taskCount}"></span> (<span th:text="${project.completedTaskCount}"></span> done)</div>
+            <div><strong>Track Changes:</strong>
+                <span th:if="${project.trackChanges}" class="badge badge-info">Yes</span>
+                <span th:if="${!project.trackChanges}" class="text-muted">No</span>
+            </div>
         </div>
-        <div th:if="${project.description != null}" style="margin-top:0.8em;">
+        <div th:if="${project.description != null}" class="mt-sm">
             <strong>Description:</strong>
             <p th:text="${project.description}"></p>
+        </div>
+        <div th:if="${project.trackChanges}" class="mt-sm">
+            <button type="button" class="btn-action btn-sm" onclick="openChangesModal()">View Changes</button>
         </div>
     </div>
 
@@ -38,7 +45,7 @@
             </tr>
         </thead>
         <tbody>
-            <tr th:each="task : ${project.tasks}" th:data-task-id="${task.id}">
+            <tr th:each="task : ${project.tasks}" th:data-task-id="${task.id}" th:id="'task-' + ${task.id}">
                 <td th:text="${task.title}"></td>
                 <td>
                     <span class="task-status-badge"
@@ -48,7 +55,7 @@
                 <td th:text="${task.assignedUser != null ? task.assignedUser.name : '-'}"></td>
                 <td>
                     <a th:if="${task.securityControl != null}" class="link"
-                       th:href="@{/security-control/edit(id=${task.securityControl.id})}"
+                       th:href="@{/security-control/edit(id=${task.securityControl.id},returnUrl=${'/governance/projects/' + project.id + '#task-' + task.id})}"
                        th:text="${task.securityControl.name}"></a>
                     <span th:if="${task.securityControl == null}">-</span>
                 </td>
@@ -214,6 +221,118 @@
             if (r.ok) { window.location.reload(); } else { alert('Failed to delete task'); }
         });
     }
+
+    function openChangesModal() {
+        document.getElementById('changesContent').innerHTML = '<p class="text-muted">Loading...</p>';
+        document.getElementById('changesModal').style.display = 'flex';
+        var projectId = document.getElementById('currentProjectId').value;
+
+        fetch('/governance/projects/' + projectId + '/changes')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data || data.length === 0) {
+                document.getElementById('changesContent').innerHTML = '<p class="text-muted">No changes tracked yet.</p>';
+                return;
+            }
+            var html = '<div class="changes-toolbar"><button type="button" class="btn-sm btn-action" onclick="toggleAllChanges(true)">Expand All</button> ';
+            html += '<button type="button" class="btn-sm btn-cancel" onclick="toggleAllChanges(false)">Collapse All</button></div>';
+            html += '<div class="changes-list">';
+            for (var i = 0; i < data.length; i++) {
+                var c = data[i];
+                html += '<div class="change-item">';
+                html += '<div class="change-header" onclick="toggleChangeDetail(this)">';
+                html += '<span class="change-toggle">&#9654;</span> ';
+                html += '<strong>' + escapeHtml(c.controlName) + '</strong>';
+                html += ' <span class="version-badge">' + escapeHtml(c.fromVersion) + '</span>';
+                html += ' &#8594; <span class="version-badge">' + escapeHtml(c.toVersion) + '</span>';
+                if (c.changedAt) {
+                    html += ' <span class="text-muted text-sm">' + c.changedAt.substring(0, 19).replace('T', ' ') + '</span>';
+                }
+                if (c.changedBy) {
+                    html += ' <span class="text-muted text-sm">by ' + escapeHtml(c.changedBy) + '</span>';
+                }
+                html += '</div>';
+                html += '<div class="change-detail d-none">';
+                if (c.previousData) {
+                    html += '<div class="change-comparison">';
+                    html += '<div class="change-col"><h4>Previous (v' + escapeHtml(c.fromVersion) + ')</h4>';
+                    html += '<div><strong>Name:</strong> ' + escapeHtml(c.previousData.name || '') + '</div>';
+                    html += '<div><strong>Reference:</strong> ' + escapeHtml(c.previousData.reference || '-') + '</div>';
+                    html += '<div><strong>Domain:</strong> ' + escapeHtml(c.previousData.domain || '-') + '</div>';
+                    html += '<div><strong>Tags:</strong> ' + escapeHtml(c.previousData.tag || '-') + '</div>';
+                    html += '<div><strong>Detail:</strong> ' + escapeHtml((c.previousData.detail || '').substring(0, 300)) + '</div>';
+                    html += '</div>';
+                    html += '<div class="change-col"><h4>Current (v' + escapeHtml(c.toVersion) + ')</h4>';
+                    if (c.currentData) {
+                        html += '<div><strong>Name:</strong> ' + escapeHtml(c.currentData.name || '') + '</div>';
+                        html += '<div><strong>Reference:</strong> ' + escapeHtml(c.currentData.reference || '-') + '</div>';
+                        html += '<div><strong>Domain:</strong> ' + escapeHtml(c.currentData.domain || '-') + '</div>';
+                        html += '<div><strong>Tags:</strong> ' + escapeHtml(c.currentData.tag || '-') + '</div>';
+                        html += '<div><strong>Detail:</strong> ' + escapeHtml((c.currentData.detail || '').substring(0, 300)) + '</div>';
+                    }
+                    html += '</div>';
+                    html += '</div>';
+                }
+                html += '</div>';
+                html += '</div>';
+            }
+            html += '</div>';
+            document.getElementById('changesContent').innerHTML = html;
+        })
+        .catch(function() {
+            document.getElementById('changesContent').innerHTML = '<p class="text-muted">Failed to load changes.</p>';
+        });
+    }
+
+    function closeChangesModal() {
+        document.getElementById('changesModal').style.display = 'none';
+    }
+
+    function toggleChangeDetail(header) {
+        var detail = header.nextElementSibling;
+        var toggle = header.querySelector('.change-toggle');
+        if (detail.classList.contains('d-none')) {
+            detail.classList.remove('d-none');
+            toggle.innerHTML = '&#9660;';
+        } else {
+            detail.classList.add('d-none');
+            toggle.innerHTML = '&#9654;';
+        }
+    }
+
+    function toggleAllChanges(expand) {
+        var details = document.querySelectorAll('.change-detail');
+        var toggles = document.querySelectorAll('.change-toggle');
+        for (var i = 0; i < details.length; i++) {
+            if (expand) {
+                details[i].classList.remove('d-none');
+                if (toggles[i]) toggles[i].innerHTML = '&#9660;';
+            } else {
+                details[i].classList.add('d-none');
+                if (toggles[i]) toggles[i].innerHTML = '&#9654;';
+            }
+        }
+    }
+
+    function escapeHtml(text) {
+        var div = document.createElement('div');
+        div.appendChild(document.createTextNode(text));
+        return div.innerHTML;
+    }
 </script>
+
+<!-- Changes Modal -->
+<div id="changesModal" class="modal-bg">
+    <div class="modal-popup modal-popup-lg">
+        <h3>Security Control Changes</h3>
+        <div id="changesContent" class="changes-container">
+            <p class="text-muted">Loading...</p>
+        </div>
+        <div class="modal-btn-row">
+            <button type="button" class="btn-cancel" onclick="closeChangesModal()">Close</button>
+        </div>
+    </div>
+</div>
+
 </body>
 </html>

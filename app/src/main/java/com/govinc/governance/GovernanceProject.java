@@ -33,6 +33,9 @@ public class GovernanceProject {
     @JoinColumn(name = "created_by_id")
     private User createdBy;
 
+    @Column(nullable = false)
+    private boolean trackChanges = false;
+
     public GovernanceProject() {
         this.createdDate = LocalDate.now();
     }
@@ -58,6 +61,9 @@ public class GovernanceProject {
 
     public User getCreatedBy() { return createdBy; }
     public void setCreatedBy(User createdBy) { this.createdBy = createdBy; }
+
+    public boolean isTrackChanges() { return trackChanges; }
+    public void setTrackChanges(boolean trackChanges) { this.trackChanges = trackChanges; }
 
     public int getTaskCount() { return tasks != null ? tasks.size() : 0; }
 

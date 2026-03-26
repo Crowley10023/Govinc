@@ -23,6 +23,7 @@
                 <th>Name</th>
                 <th>Owner</th>
                 <th>Description</th>
+                <th>Track Changes</th>
                 <th>Tasks</th>
                 <th>Progress</th>
                 <th>Created</th>
@@ -36,14 +37,25 @@
                 </td>
                 <td th:text="${project.owner != null ? project.owner.name : '-'}"></td>
                 <td th:text="${project.description != null ? (#strings.length(project.description) > 80 ? #strings.substring(project.description, 0, 80) + '...' : project.description) : '-'}"></td>
+                <td>
+                    <span th:if="${project.trackChanges}" class="badge badge-info">Yes</span>
+                    <span th:if="${!project.trackChanges}" class="text-muted">No</span>
+                </td>
                 <td th:text="${project.taskCount}"></td>
                 <td>
                     <span th:if="${project.taskCount > 0}" th:text="${project.completedTaskCount} + '/' + ${project.taskCount}"></span>
                     <span th:if="${project.taskCount == 0}">-</span>
                 </td>
                 <td th:text="${project.createdDate != null ? #temporals.format(project.createdDate, 'yyyy-MM-dd') : '-'}"></td>
-                <td>
+                <td class="nowrap">
                     <a th:href="@{/governance/projects/{id}(id=${project.id})}" class="btn-edit btn-sm">View</a>
+                    <button type="button" class="btn-sm btn-action"
+                            th:data-id="${project.id}"
+                            th:data-name="${project.name}"
+                            th:data-description="${project.description}"
+                            th:data-owner-id="${project.owner != null ? project.owner.id : ''}"
+                            th:data-track-changes="${project.trackChanges}"
+                            onclick="openEditProjectModal(this)">Edit</button>
                     <button type="button" class="btn-danger btn-sm" th:data-id="${project.id}" onclick="deleteProject(this)">Delete</button>
                 </td>
             </tr>
@@ -55,26 +67,60 @@
 </div>
 
 <!-- Create Project Modal -->
-<div id="createProjectModal" class="modal-bg" style="display:none;">
-    <div class="modal-popup-confirmation" style="max-width:450px;">
+<div id="createProjectModal" class="modal-bg">
+    <div class="modal-popup">
         <h3>Create Project</h3>
-        <div style="display:flex;flex-direction:column;gap:10px;">
+        <div class="modal-form">
             <label>Name *
-                <input type="text" id="newProjectName" style="width:100%;box-sizing:border-box;">
+                <input type="text" id="newProjectName">
             </label>
             <label>Description
-                <textarea id="newProjectDescription" rows="3" style="width:100%;box-sizing:border-box;"></textarea>
+                <textarea id="newProjectDescription" rows="3"></textarea>
             </label>
             <label>Owner
-                <select id="newProjectOwner" style="width:100%;">
+                <select id="newProjectOwner">
                     <option value="">-- Select Owner --</option>
                     <option th:each="u : ${users}" th:value="${u.id}" th:text="${u.name}"></option>
                 </select>
             </label>
+            <label class="checkbox-label">
+                <input type="checkbox" id="newProjectTrackChanges">
+                Track Changes
+            </label>
         </div>
-        <div class="modal-btn-row" style="margin-top:1em;">
+        <div class="modal-btn-row">
             <button type="button" class="btn-cancel" onclick="closeCreateProjectModal()">Cancel</button>
             <button type="button" class="btn-action" onclick="submitCreateProject()">Create</button>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Project Modal -->
+<div id="editProjectModal" class="modal-bg">
+    <div class="modal-popup">
+        <h3>Edit Project</h3>
+        <input type="hidden" id="editProjectId">
+        <div class="modal-form">
+            <label>Name *
+                <input type="text" id="editProjectName">
+            </label>
+            <label>Description
+                <textarea id="editProjectDescription" rows="3"></textarea>
+            </label>
+            <label>Owner
+                <select id="editProjectOwner">
+                    <option value="">-- Select Owner --</option>
+                    <option th:each="u : ${users}" th:value="${u.id}" th:text="${u.name}"></option>
+                </select>
+            </label>
+            <label class="checkbox-label">
+                <input type="checkbox" id="editProjectTrackChanges">
+                Track Changes
+            </label>
+        </div>
+        <div class="modal-btn-row">
+            <button type="button" class="btn-cancel" onclick="closeEditProjectModal()">Cancel</button>
+            <button type="button" class="btn-action" onclick="submitEditProject()">Save</button>
         </div>
     </div>
 </div>
@@ -84,6 +130,10 @@
     var csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
 
     function openCreateProjectModal() {
+        document.getElementById('newProjectName').value = '';
+        document.getElementById('newProjectDescription').value = '';
+        document.getElementById('newProjectOwner').value = '';
+        document.getElementById('newProjectTrackChanges').checked = false;
         document.getElementById('createProjectModal').style.display = 'flex';
     }
     function closeCreateProjectModal() {
@@ -97,7 +147,8 @@
         var payload = {
             name: name,
             description: document.getElementById('newProjectDescription').value.trim() || null,
-            ownerId: document.getElementById('newProjectOwner').value || null
+            ownerId: document.getElementById('newProjectOwner').value || null,
+            trackChanges: document.getElementById('newProjectTrackChanges').checked
         };
 
         var headers = { 'Content-Type': 'application/json' };
@@ -109,6 +160,42 @@
         }).then(function(r) {
             if (r.ok) { window.location.reload(); }
             else { alert('Failed to create project'); }
+        });
+    }
+
+    function openEditProjectModal(btn) {
+        document.getElementById('editProjectId').value = btn.getAttribute('data-id');
+        document.getElementById('editProjectName').value = btn.getAttribute('data-name') || '';
+        document.getElementById('editProjectDescription').value = btn.getAttribute('data-description') || '';
+        document.getElementById('editProjectOwner').value = btn.getAttribute('data-owner-id') || '';
+        document.getElementById('editProjectTrackChanges').checked = btn.getAttribute('data-track-changes') === 'true';
+        document.getElementById('editProjectModal').style.display = 'flex';
+    }
+    function closeEditProjectModal() {
+        document.getElementById('editProjectModal').style.display = 'none';
+    }
+
+    function submitEditProject() {
+        var id = document.getElementById('editProjectId').value;
+        var name = document.getElementById('editProjectName').value.trim();
+        if (!name) { alert('Name is required'); return; }
+
+        var payload = {
+            name: name,
+            description: document.getElementById('editProjectDescription').value.trim() || null,
+            ownerId: document.getElementById('editProjectOwner').value || null,
+            trackChanges: document.getElementById('editProjectTrackChanges').checked
+        };
+
+        var headers = { 'Content-Type': 'application/json' };
+        headers[csrfHeader] = csrfToken;
+
+        fetch('/governance/projects/' + id, {
+            method: 'PUT', headers: headers,
+            body: JSON.stringify(payload)
+        }).then(function(r) {
+            if (r.ok) { window.location.reload(); }
+            else { alert('Failed to update project'); }
         });
     }
 

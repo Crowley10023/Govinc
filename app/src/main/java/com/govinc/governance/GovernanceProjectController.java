@@ -11,7 +11,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.Optional;
+import java.util.ArrayList;
 
 @Controller
 @RequestMapping("/governance/projects")
@@ -25,6 +27,9 @@ public class GovernanceProjectController {
 
     @Autowired
     private AuthorizationService authorizationService;
+
+    @Autowired
+    private SecurityControlChangeTrackingRepository changeTrackingRepository;
 
     @GetMapping("")
     public String listProjects(Model model) {
@@ -55,6 +60,12 @@ public class GovernanceProjectController {
         Long ownerId = payload.get("ownerId") != null ? Long.valueOf(payload.get("ownerId").toString()) : null;
 
         GovernanceProject project = projectService.createProject(name, description, ownerId, currentUser);
+
+        if (payload.containsKey("trackChanges")) {
+            project.setTrackChanges(Boolean.TRUE.equals(payload.get("trackChanges")));
+            projectService.save(project);
+        }
+
         return ResponseEntity.ok(Map.of("id", project.getId(), "status", "created"));
     }
 
@@ -73,6 +84,9 @@ public class GovernanceProjectController {
             Long oid = payload.get("ownerId") != null ? Long.valueOf(payload.get("ownerId").toString()) : null;
             project.setOwner(oid != null ? userRepository.findById(oid).orElse(null) : null);
         }
+        if (payload.containsKey("trackChanges")) {
+            project.setTrackChanges(Boolean.TRUE.equals(payload.get("trackChanges")));
+        }
 
         projectService.save(project);
         return ResponseEntity.ok(Map.of("status", "updated"));
@@ -83,5 +97,48 @@ public class GovernanceProjectController {
     public ResponseEntity<?> deleteProject(@PathVariable Long id) {
         projectService.delete(id);
         return ResponseEntity.ok(Map.of("status", "deleted"));
+    }
+
+    @GetMapping("/{id}/changes")
+    @ResponseBody
+    public ResponseEntity<?> getProjectChanges(@PathVariable Long id) {
+        Optional<GovernanceProject> projectOpt = projectService.findById(id);
+        if (projectOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        List<SecurityControlChangeTracking> changes = changeTrackingRepository
+            .findByGovernanceProjectIdOrderByChangedAtDesc(id);
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (SecurityControlChangeTracking ct : changes) {
+            Map<String, Object> entry = new HashMap<>();
+            entry.put("id", ct.getId());
+            entry.put("controlName", ct.getSecurityControl().getName());
+            entry.put("controlId", ct.getSecurityControl().getId());
+            entry.put("fromVersion", ct.getFromVersion());
+            entry.put("toVersion", ct.getToVersion());
+            entry.put("changedAt", ct.getChangedAt() != null ? ct.getChangedAt().toString() : null);
+            entry.put("changedBy", ct.getChangedBy() != null ? ct.getChangedBy().getName() : null);
+            // Include historic data for expand/collapse detail
+            var prev = ct.getPreviousVersion();
+            if (prev != null) {
+                Map<String, Object> prevData = new HashMap<>();
+                prevData.put("name", prev.getName());
+                prevData.put("detail", prev.getDetail());
+                prevData.put("reference", prev.getReference());
+                prevData.put("tag", prev.getTag());
+                prevData.put("domain", prev.getSecurityControlDomain() != null ? prev.getSecurityControlDomain().getName() : null);
+                entry.put("previousData", prevData);
+            }
+            // Current control data
+            Map<String, Object> currentData = new HashMap<>();
+            currentData.put("name", ct.getSecurityControl().getName());
+            currentData.put("detail", ct.getSecurityControl().getDetail());
+            currentData.put("reference", ct.getSecurityControl().getReference());
+            currentData.put("tag", ct.getSecurityControl().getTag());
+            currentData.put("domain", ct.getSecurityControl().getSecurityControlDomain() != null ? ct.getSecurityControl().getSecurityControlDomain().getName() : null);
+            entry.put("currentData", currentData);
+            result.add(entry);
+        }
+        return ResponseEntity.ok(result);
     }
 }

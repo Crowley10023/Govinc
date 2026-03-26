@@ -368,7 +368,7 @@ network segmentation","SC-7","Network"</div>
                 <h2 class="m-0 text-24 text-main">Edit Security Control</h2>
                 <span class="close m-0 no-float" onclick="closeEditModal()">&times;</span>
             </div>
-            <div id="editFormContainer" class="flex-auto scroll-y p-30">
+            <div id="editFormContainer" class="flex-auto scroll-y">
                 <!-- Form will be loaded via AJAX -->
             </div>
         </div>
@@ -383,6 +383,7 @@ network segmentation","SC-7","Network"</div>
                 <th class="sortable-th" data-col="3">Reference<span class="sort-arrow"></span></th>
                 <th class="sortable-th" data-col="4">Tag<span class="sort-arrow"></span></th>
                 <th class="sortable-th" data-col="5">Domain<span class="sort-arrow"></span></th>
+                <th>Version</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -394,9 +395,11 @@ network segmentation","SC-7","Network"</div>
                 <td th:text="${control.reference}"></td>
                 <td th:text="${control.tag}"></td>
                 <td th:text="${control.securityControlDomain != null ? control.securityControlDomain.name : ''}"></td>
+                <td><span class="badge" th:text="${control.version != null ? control.version : '1.0'}"></span></td>
                 <td>
                     <div class="action-buttons">
                         <button class="btn-edit" type="button" style="min-width:72px;" th:data-id="${control.id}" onclick="openEditModal(this)">Edit</button>
+                        <button class="btn-sm btn-action" type="button" th:data-id="${control.id}" th:data-name="${control.name}" onclick="openHistoryModal(this)">History</button>
                         <button class="btn-danger" type="button" style="min-width:72px;" th:data-id="${control.id}" th:data-name="${control.name}" onclick="openDeleteModalFromBtn(this)">Delete</button>
                     </div>
                 </td>
@@ -405,6 +408,86 @@ network segmentation","SC-7","Network"</div>
     </table>
     <a href="/" class="back-link">Back to main</a>
 </div>
+
+<!-- Version History Modal -->
+<div id="historyModal" class="modal-bg">
+    <div class="modal-popup modal-popup-lg">
+        <h3 id="historyModalTitle">Version History</h3>
+        <div id="historyContent" class="version-history-tree">
+            <p class="text-muted">Loading...</p>
+        </div>
+        <div class="modal-btn-row">
+            <button type="button" class="btn-cancel" onclick="closeHistoryModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    var csrfToken = document.querySelector('meta[name="_csrf"]').content;
+    var csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+
+    function openHistoryModal(btn) {
+        var controlId = btn.getAttribute('data-id');
+        var controlName = btn.getAttribute('data-name');
+        document.getElementById('historyModalTitle').textContent = 'Version History: ' + controlName;
+        document.getElementById('historyContent').innerHTML = '<p class="text-muted">Loading...</p>';
+        document.getElementById('historyModal').style.display = 'flex';
+
+        fetch('/security-control/history?id=' + controlId)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data || data.length === 0) {
+                document.getElementById('historyContent').innerHTML = '<p class="text-muted">No version history available.</p>';
+                return;
+            }
+            var html = '<div class="version-tree">';
+            for (var i = 0; i < data.length; i++) {
+                var v = data[i];
+                var isCurrent = v.isCurrent;
+                var nodeClass = isCurrent ? 'version-node version-node-current' : 'version-node';
+                html += '<div class="' + nodeClass + '">';
+                html += '<div class="version-node-header">';
+                html += '<span class="version-badge">' + (v.version || '?') + '</span>';
+                if (isCurrent) {
+                    html += ' <span class="badge badge-success">Current</span>';
+                }
+                html += ' <strong>' + escapeHtml(v.name || '') + '</strong>';
+                if (v.changedAt) {
+                    html += ' <span class="text-muted text-sm">' + v.changedAt.substring(0, 19).replace('T', ' ') + '</span>';
+                }
+                if (v.changedBy) {
+                    html += ' <span class="text-muted text-sm">by ' + escapeHtml(v.changedBy) + '</span>';
+                }
+                html += '</div>';
+                html += '<div class="version-node-detail">';
+                if (v.reference) html += '<div><strong>Reference:</strong> ' + escapeHtml(v.reference) + '</div>';
+                if (v.domain) html += '<div><strong>Domain:</strong> ' + escapeHtml(v.domain) + '</div>';
+                if (v.tag) html += '<div><strong>Tags:</strong> ' + escapeHtml(v.tag) + '</div>';
+                if (v.detail) html += '<div class="version-detail-text">' + escapeHtml(v.detail).substring(0, 300) + (v.detail.length > 300 ? '...' : '') + '</div>';
+                html += '</div>';
+                html += '</div>';
+                if (i < data.length - 1) {
+                    html += '<div class="version-connector"></div>';
+                }
+            }
+            html += '</div>';
+            document.getElementById('historyContent').innerHTML = html;
+        })
+        .catch(function() {
+            document.getElementById('historyContent').innerHTML = '<p class="text-muted">Failed to load history.</p>';
+        });
+    }
+
+    function closeHistoryModal() {
+        document.getElementById('historyModal').style.display = 'none';
+    }
+
+    function escapeHtml(text) {
+        var div = document.createElement('div');
+        div.appendChild(document.createTextNode(text));
+        return div.innerHTML;
+    }
+</script>
 
 <script>
     // Scroll position preservation
@@ -542,12 +625,15 @@ network segmentation","SC-7","Network"</div>
                     wrapper.innerHTML = editorForm.innerHTML;
                     container.appendChild(wrapper);
 
-                    document.getElementById('editControlModal').style.display = 'block';
+                    document.getElementById('editControlModal').style.display = 'flex';
                     
-                    // Re-attach cancel button click handler
+                    // Re-attach cancel button click handler (prevent default navigation)
                     const cancelBtn = container.querySelector('.btn-cancel');
                     if (cancelBtn) {
-                        cancelBtn.addEventListener('click', closeEditModal);
+                        cancelBtn.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            closeEditModal();
+                        });
                     }
                     
                     // Handle form submission
@@ -641,6 +727,7 @@ network segmentation","SC-7","Network"</div>
         })
             .then(response => {
                 if (response.ok) {
+                    saveFilterState();
                     showAlert('Security control updated successfully!', 'success');
                     setTimeout(() => {
                         window.location.reload();
@@ -653,6 +740,14 @@ network segmentation","SC-7","Network"</div>
                 console.error('Error:', error);
                 alert('Error saving security control');
             });
+    }
+
+    function saveFilterState() {
+        sessionStorage.setItem('sc_filter_title', filterTitle.value);
+        sessionStorage.setItem('sc_filter_desc', filterDescription.value);
+        sessionStorage.setItem('sc_filter_tag', filterTag.value);
+        sessionStorage.setItem('sc_filter_catalog', filterCatalog.value);
+        sessionStorage.setItem('sc_filter_domain', filterDomain.value);
     }
 
     function showAlert(message, type) {
@@ -697,6 +792,12 @@ network segmentation","SC-7","Network"</div>
                     option.textContent = `${catalog.name}${catalog.revision ? ' (' + catalog.revision + ')' : ''}`;
                     filterCatalog.appendChild(option);
                 });
+                const savedCatalog = sessionStorage.getItem('sc_filter_catalog');
+                if (savedCatalog !== null) {
+                    filterCatalog.value = savedCatalog;
+                    sessionStorage.removeItem('sc_filter_catalog');
+                }
+                applyFilters();
             })
             .catch(error => {
                 console.error('Error loading catalogs:', error);
@@ -775,6 +876,17 @@ network segmentation","SC-7","Network"</div>
     // Ensure domain filter is populated after page load
     window.addEventListener('load', function() {
         populateDomainFilter();
+        const savedTitle = sessionStorage.getItem('sc_filter_title');
+        const savedDesc = sessionStorage.getItem('sc_filter_desc');
+        const savedTag = sessionStorage.getItem('sc_filter_tag');
+        const savedDomain = sessionStorage.getItem('sc_filter_domain');
+        if (savedTitle !== null) { filterTitle.value = savedTitle; sessionStorage.removeItem('sc_filter_title'); }
+        if (savedDesc !== null) { filterDescription.value = savedDesc; sessionStorage.removeItem('sc_filter_desc'); }
+        if (savedTag !== null) { filterTag.value = savedTag; sessionStorage.removeItem('sc_filter_tag'); }
+        if (savedDomain !== null) { filterDomain.value = savedDomain; sessionStorage.removeItem('sc_filter_domain'); }
+        if (savedTitle !== null || savedDesc !== null || savedTag !== null || savedDomain !== null) {
+            applyFilters();
+        }
     });
 
     // Close modals when clicking outside
@@ -810,7 +922,7 @@ network segmentation","SC-7","Network"</div>
             if (deleteModal.style.display === 'flex') {
                 closeDeleteModal();
             }
-            if (editModal.style.display === 'block') {
+            if (editModal.style.display === 'flex') {
                 closeEditModal();
             }
             if (importModal.style.display === 'block') {

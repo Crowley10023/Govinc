@@ -4770,8 +4770,18 @@ body::before {
 .modal-content-wide {
     display: flex;
     flex-direction: column;
-    max-width: 1600px;
-    max-height: 90vh;
+    max-width: 780px;
+    width: min(780px, 95vw);
+    max-height: 88vh;
+    padding: 16px 20px;
+}
+
+/* Center the edit-security-control modal */
+#editControlModal {
+    justify-content: center;
+    align-items: flex-start;
+    padding-top: 40px;
+    box-sizing: border-box;
 }
 
 /* =========================================================
@@ -6266,7 +6276,7 @@ body::before {
 }
 
 .form-group textarea {
-    min-height: 100px;
+    min-height: 80px;
     resize: vertical;
 }
 
@@ -6318,7 +6328,7 @@ body::before {
 .form-actions {
     display: flex;
     gap: 10px;
-    margin: 25px 0 20px 0;
+    margin: 14px 0 8px 0;
     flex-shrink: 0;
 }
 
@@ -11463,4 +11473,47 @@ a.back-link:hover {
 .deviation-project-fieldset legend { font-weight: 600; padding: 0 0.4em; }
 .d-none { display: none !important; }
 .mb-sm { margin-bottom: 0.5em; }
+.mt-sm { margin-top: 0.5em; }
+.gap-lg { gap: 2em; }
+
+/* === Version Management === */
+.badge-info { background: var(--info-blue, #3498db); color: #fff; padding: 0.15em 0.5em; border-radius: 4px; font-size: 0.82em; }
+.badge-success { background: var(--success-green, #27ae60); color: #fff; padding: 0.15em 0.5em; border-radius: 4px; font-size: 0.82em; }
+.version-badge { display: inline-block; background: var(--background-light, #f0f0f0); border: 1px solid var(--border-color, #ccc); padding: 0.1em 0.5em; border-radius: 4px; font-weight: 600; font-size: 0.88em; font-family: monospace; }
+.version-management-section { border: 1px solid var(--border-color, #ddd); border-radius: 6px; padding: 0.5em 0.9em; margin-top: 0.6em; margin-bottom: 0.5em; background: var(--background-light, #fafafa); }
+.version-mgmt-top { display: flex; gap: 2em; align-items: flex-end; flex-wrap: wrap; margin-bottom: 0.5em; }
+.version-mgmt-field { display: flex; flex-direction: column; gap: 3px; }
+.version-mgmt-field > label { font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; color: #555; }
+.checkbox-label { display: flex; align-items: center; gap: 0.5em; cursor: pointer; }
+.text-sm { font-size: 0.85em; }
+
+/* Version History Tree */
+.version-history-tree { max-height: 60vh; overflow-y: auto; padding: 0.5em; }
+.version-tree { display: flex; flex-direction: column; }
+.version-node { border: 1px solid var(--border-color, #ddd); border-radius: 6px; padding: 0.8em 1em; background: #fff; }
+.version-node-current { border-color: var(--info-blue, #3498db); border-width: 2px; }
+.version-node-header { display: flex; align-items: center; gap: 0.5em; flex-wrap: wrap; }
+.version-node-detail { margin-top: 0.5em; font-size: 0.9em; color: var(--gray-555, #555); }
+.version-detail-text { margin-top: 0.3em; font-style: italic; white-space: pre-wrap; }
+.version-connector { display: flex; justify-content: center; padding: 0.3em 0; }
+.version-connector::after { content: "│"; font-size: 1.2em; color: var(--gray-777, #999); }
+
+/* Modal large variant */
+.modal-popup-lg { max-width: 800px; width: 90%; }
+
+/* Changes Tracking UI */
+.changes-container { max-height: 60vh; overflow-y: auto; }
+.changes-toolbar { margin-bottom: 0.8em; display: flex; gap: 0.5em; }
+.changes-list { display: flex; flex-direction: column; gap: 0.5em; }
+.change-item { border: 1px solid var(--border-color, #ddd); border-radius: 6px; overflow: hidden; }
+.change-header { padding: 0.7em 1em; cursor: pointer; display: flex; align-items: center; gap: 0.5em; flex-wrap: wrap; background: var(--background-light, #fafafa); }
+.change-header:hover { background: var(--hover-bg, #f0f0f0); }
+.change-toggle { font-size: 0.7em; color: var(--gray-777, #999); min-width: 1em; text-align: center; }
+.change-detail { padding: 0.8em 1em; border-top: 1px solid var(--border-color, #eee); }
+.change-comparison { display: flex; gap: 1.5em; flex-wrap: wrap; }
+.change-col { flex: 1; min-width: 250px; }
+.change-col h4 { margin: 0 0 0.5em 0; font-size: 0.95em; }
+
+/* Project Info Card */
+.project-info-card { padding: 1.5em; margin-bottom: 1.5em; }
 

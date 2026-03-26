@@ -13,7 +13,15 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
+import java.util.stream.Collectors;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.ResponseEntity;
+
+import com.govinc.authorization.AuthorizationService;
+import com.govinc.governance.GovernanceProjectRepository;
+import com.govinc.governance.GovernanceProject;
+import com.govinc.user.User;
 
 @Controller
 @RequestMapping("/security-control")
@@ -29,6 +37,12 @@ public class SecurityControlController {
 
     @Autowired
     private com.govinc.organization.OrgServiceAssessmentService orgServiceAssessmentService;
+
+    @Autowired
+    private AuthorizationService authorizationService;
+
+    @Autowired
+    private GovernanceProjectRepository governanceProjectRepository;
 
     @GetMapping("/list")
     public String listSecurityControls(Model model) {
@@ -156,7 +170,9 @@ public class SecurityControlController {
     }
 
     @GetMapping("/edit")
-    public String editSecurityControl(@RequestParam(required = false) Long id, Model model) {
+    public String editSecurityControl(@RequestParam(required = false) Long id,
+                                      @RequestParam(value = "returnUrl", required = false) String returnUrl,
+                                      Model model) {
         SecurityControl control = id != null ? service.findById(id).orElse(new SecurityControl())
                 : new SecurityControl();
         model.addAttribute("securityControl", control);
@@ -175,11 +191,30 @@ public class SecurityControlController {
                 .toList();
         model.addAttribute("existingTags", existingTags);
 
+        // Determine if this control belongs to any version-managed catalog
+        boolean requiresVersionManagement = false;
+        if (control.getId() != null) {
+            requiresVersionManagement = control.getSecurityCatalogs().stream()
+                .anyMatch(SecurityCatalog::isVersionManaged);
+        }
+        model.addAttribute("requiresVersionManagement", requiresVersionManagement);
+
+        // Provide projects with track-changes enabled for the dropdown
+        List<GovernanceProject> trackingProjects = governanceProjectRepository.findAll().stream()
+            .filter(GovernanceProject::isTrackChanges)
+            .collect(Collectors.toList());
+        model.addAttribute("trackingProjects", trackingProjects);
+        model.addAttribute("returnUrl", returnUrl);
+
         return "security-control-editor";
     }
 
     @PostMapping("/edit")
-    public String saveSecurityControl(@ModelAttribute SecurityControl control) {
+    public String saveSecurityControl(
+            @ModelAttribute SecurityControl control,
+            @RequestParam(value = "versionBump", required = false) String versionBump,
+            @RequestParam(value = "projectId", required = false) Long projectId,
+            @RequestParam(value = "returnUrl", required = false) String returnUrl) {
         if (control.getSecurityControlDomain() != null && control.getSecurityControlDomain().getId() != null) {
             SecurityControlDomain domain = securityControlDomainService
                     .findById(control.getSecurityControlDomain().getId()).orElse(null);
@@ -187,8 +222,87 @@ public class SecurityControlController {
         } else {
             control.setSecurityControlDomain(null);
         }
-        service.save(control);
-        return "redirect:/security-control/list";
+
+        // Determine if this control needs versioning
+        boolean needsVersioning = false;
+        if (control.getId() != null) {
+            SecurityControl existing = service.findById(control.getId()).orElse(null);
+            if (existing != null) {
+                needsVersioning = existing.getSecurityCatalogs().stream()
+                    .anyMatch(SecurityCatalog::isVersionManaged);
+            }
+        }
+
+        if (needsVersioning && versionBump != null && !versionBump.isEmpty()) {
+            User currentUser = authorizationService.getCurrentUser();
+            service.saveWithVersioning(control, versionBump, projectId, currentUser);
+        } else if (control.getId() != null && versionBump != null && !versionBump.isEmpty()) {
+            // Non-version-managed but user chose to version anyway
+            User currentUser = authorizationService.getCurrentUser();
+            service.saveWithVersioning(control, versionBump, projectId, currentUser);
+        } else {
+            service.save(control);
+        }
+        String redirect = (returnUrl != null && !returnUrl.isBlank()
+                && returnUrl.startsWith("/") && !returnUrl.startsWith("//") && !returnUrl.contains("://"))
+                ? returnUrl : "/security-control/list";
+        return "redirect:" + redirect;
+    }
+
+    @GetMapping("/history")
+    @ResponseBody
+    public ResponseEntity<?> getControlHistory(@RequestParam Long id) {
+        var control = service.findById(id);
+        if (control.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        var history = service.getVersionHistory(id);
+        List<Map<String, Object>> result = new java.util.ArrayList<>();
+
+        // Current version first
+        SecurityControl current = control.get();
+        Map<String, Object> currentEntry = new HashMap<>();
+        currentEntry.put("version", current.getVersion() != null ? current.getVersion() : "1.0");
+        currentEntry.put("name", current.getName());
+        currentEntry.put("detail", current.getDetail());
+        currentEntry.put("reference", current.getReference());
+        currentEntry.put("tag", current.getTag());
+        currentEntry.put("domain", current.getSecurityControlDomain() != null ? current.getSecurityControlDomain().getName() : null);
+        currentEntry.put("isCurrent", true);
+        currentEntry.put("changedAt", null);
+        currentEntry.put("changedBy", null);
+        result.add(currentEntry);
+
+        for (HistoricSecurityControl h : history) {
+            Map<String, Object> entry = new HashMap<>();
+            entry.put("id", h.getId());
+            entry.put("version", h.getVersion());
+            entry.put("name", h.getName());
+            entry.put("detail", h.getDetail());
+            entry.put("reference", h.getReference());
+            entry.put("tag", h.getTag());
+            entry.put("domain", h.getSecurityControlDomain() != null ? h.getSecurityControlDomain().getName() : null);
+            entry.put("isCurrent", false);
+            entry.put("changedAt", h.getChangedAt() != null ? h.getChangedAt().toString() : null);
+            entry.put("changedBy", h.getChangedBy() != null ? h.getChangedBy().getName() : null);
+            result.add(entry);
+        }
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/validate-version-managed")
+    @ResponseBody
+    public ResponseEntity<?> validateVersionManaged(@RequestParam Long id) {
+        var controlOpt = service.findById(id);
+        if (controlOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        SecurityControl control = controlOpt.get();
+        boolean requiresVersionManagement = control.getSecurityCatalogs().stream()
+            .anyMatch(SecurityCatalog::isVersionManaged);
+        Map<String, Object> result = new HashMap<>();
+        result.put("requiresVersionManagement", requiresVersionManagement);
+        return ResponseEntity.ok(result);
     }
 
     @PostMapping("/delete")

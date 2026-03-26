@@ -222,6 +222,7 @@
                 <tr th:each="catalog : ${catalogs}">
                     <td>
                         <strong th:text="${catalog.name}"></strong>
+                        <span th:if="${catalog.versionManaged}" class="badge badge-info" title="Version Managed">VM</span>
                     </td>
                     <td th:text="${catalog.description}" class="truncate-250"></td>
                     <td>

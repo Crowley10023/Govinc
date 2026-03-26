@@ -27,6 +27,9 @@ public class SecurityCatalog {
     @Column(length = 100000)
     private String reportInstructions;
 
+    @Column(nullable = false)
+    private boolean versionManaged = false;
+
     @ManyToMany
     @JoinTable(
         name = "security_catalog_controls",
@@ -70,6 +73,12 @@ public class SecurityCatalog {
     }
     public void setReportInstructions(String reportInstructions) {
         this.reportInstructions = reportInstructions;
+    }
+    public boolean isVersionManaged() {
+        return versionManaged;
+    }
+    public void setVersionManaged(boolean versionManaged) {
+        this.versionManaged = versionManaged;
     }
     /**
      * Returns security controls sorted by name.

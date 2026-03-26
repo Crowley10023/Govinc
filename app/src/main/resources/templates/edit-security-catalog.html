@@ -47,6 +47,14 @@
                     <label for="reportInstructions">Report Instructions</label>
                     <textarea th:field="*{reportInstructions}" id="reportInstructions" placeholder="Enter detailed report instructions..."></textarea>
                 </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" th:field="*{versionManaged}" id="versionManaged" />
+                        Version Managed
+                    </label>
+                    <p class="text-muted text-sm">When enabled, editing security controls in this catalog requires a governance project with change tracking.</p>
+                </div>
             </div>
 
             <!-- Right Column: Security Controls -->

@@ -19,6 +19,7 @@ public class SecurityControl {
     private String detail;
     private String reference;
     private String tag;
+    private String version = "1.0";
 
     @ManyToMany(mappedBy = "securityControls")
     private Set<SecurityCatalog> securityCatalogs = new HashSet<>();
@@ -74,6 +75,13 @@ public class SecurityControl {
 
     public void setTag(String tag) {
         this.tag = tag;
+    }
+
+    public String getVersion() {
+        return version;
+    }
+    public void setVersion(String version) {
+        this.version = version;
     }
     
     public Set<SecurityCatalog> getSecurityCatalogs() {
