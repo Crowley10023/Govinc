@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <meta charset="UTF-8">
+    <meta name="_csrf" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:content="${_csrf.headerName}">
+    <title>Project Detail - Governance</title>
+    <th:block th:replace="~{navigation :: navHead}"></th:block>
+</head>
+<body>
+<div th:replace="~{navigation :: mainNav}"></div>
+<div class="container">
+    <h1 th:text="'Project: ' + ${project.name}"></h1>
+
+    <div class="card" style="padding:1.5em;margin-bottom:1.5em;">
+        <div style="display:flex;gap:2em;flex-wrap:wrap;">
+            <div><strong>Owner:</strong> <span th:text="${project.owner != null ? project.owner.name : '-'}"></span></div>
+            <div><strong>Created:</strong> <span th:text="${project.createdDate != null ? #temporals.format(project.createdDate, 'yyyy-MM-dd') : '-'}"></span></div>
+            <div><strong>Tasks:</strong> <span th:text="${project.taskCount}"></span> (<span th:text="${project.completedTaskCount}"></span> done)</div>
+        </div>
+        <div th:if="${project.description != null}" style="margin-top:0.8em;">
+            <strong>Description:</strong>
+            <p th:text="${project.description}"></p>
+        </div>
+    </div>
+
+    <h2>Tasks in this Project</h2>
+    <table class="table card">
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Status</th>
+                <th>Assigned To</th>
+                <th>Security Control</th>
+                <th>Due Date</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="task : ${project.tasks}" th:data-task-id="${task.id}">
+                <td th:text="${task.title}"></td>
+                <td>
+                    <span class="task-status-badge"
+                          th:classappend="${task.status.name() == 'DONE' ? 'status-done' : (task.status.name() == 'IN_PROGRESS' ? 'status-inprogress' : (task.status.name() == 'READY_FOR_APPROVAL' ? 'status-approval' : 'status-identified'))}"
+                          th:text="${task.status.displayName}"></span>
+                </td>
+                <td th:text="${task.assignedUser != null ? task.assignedUser.name : '-'}"></td>
+                <td>
+                    <a th:if="${task.securityControl != null}" class="link"
+                       th:href="@{/security-control/edit(id=${task.securityControl.id})}"
+                       th:text="${task.securityControl.name}"></a>
+                    <span th:if="${task.securityControl == null}">-</span>
+                </td>
+                <td th:text="${task.dueDate != null ? #temporals.format(task.dueDate, 'yyyy-MM-dd') : '-'}"></td>
+                <td class="nowrap">
+                    <select class="tiny status-select" th:data-task-id="${task.id}" onchange="updateTaskStatus(this)">
+                        <option th:each="s : ${statuses}" th:value="${s.name()}" th:text="${s.displayName}" th:selected="${s == task.status}"></option>
+                    </select>
+                    <button type="button" class="btn-sm btn-action"
+                            th:data-task-id="${task.id}"
+                            th:data-title="${task.title}"
+                            th:data-description="${task.description}"
+                            th:data-status="${task.status.name()}"
+                            th:data-user-id="${task.assignedUser != null ? task.assignedUser.id : ''}"
+                            th:data-project-id="${project.id}"
+                            th:data-due-date="${task.dueDate != null ? #temporals.format(task.dueDate, 'yyyy-MM-dd') : ''}"
+                            onclick="openEditTaskModal(this)">Edit</button>
+                    <button type="button" class="btn-sm btn-danger"
+                            th:data-task-id="${task.id}"
+                            onclick="deleteTask(this)">Delete</button>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <div th:if="${project.tasks == null or #lists.isEmpty(project.tasks)}" class="empty-state">
+        <p>No tasks in this project yet.</p>
+    </div>
+
+    <input type="hidden" id="currentProjectId" th:value="${project.id}">
+
+    <div class="general-button-bar">
+        <a href="/governance/projects" class="btn-cancel">Back to Projects</a>
+    </div>
+</div>
+
+<!-- Edit Task Modal -->
+<div id="editTaskModal" class="modal-bg">
+    <div class="modal-popup">
+        <h3>Edit Task</h3>
+        <input type="hidden" id="editTaskId">
+        <div class="modal-form">
+            <label>Title *
+                <input type="text" id="editTaskTitle">
+            </label>
+            <label>Description
+                <textarea id="editTaskDescription" rows="3"></textarea>
+            </label>
+            <label>Status
+                <div class="status-pill-group">
+                    <button type="button" class="status-pill pill-identified" data-status="IDENTIFIED" onclick="selectStatusPill(this)">Identified</button>
+                    <button type="button" class="status-pill pill-inprogress" data-status="IN_PROGRESS" onclick="selectStatusPill(this)">In Progress</button>
+                    <button type="button" class="status-pill pill-approval" data-status="READY_FOR_APPROVAL" onclick="selectStatusPill(this)">Ready for Approval</button>
+                    <button type="button" class="status-pill pill-done" data-status="DONE" onclick="selectStatusPill(this)">Done</button>
+                </div>
+                <input type="hidden" id="editTaskStatus">
+            </label>
+            <label>Assigned To
+                <select id="editTaskUser">
+                    <option value="">-- Select User --</option>
+                    <option th:each="u : ${users}" th:value="${u.id}" th:text="${u.name}"></option>
+                </select>
+            </label>
+            <label>Due Date
+                <input type="date" id="editTaskDueDate">
+            </label>
+        </div>
+        <div class="modal-btn-row">
+            <button type="button" class="btn-cancel" onclick="closeEditTaskModal()">Cancel</button>
+            <button type="button" class="btn-action" onclick="submitEditTask()">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="deleteTaskModal" class="modal-bg">
+    <div class="modal-popup-confirmation">
+        <h3>Delete Task</h3>
+        <p>Are you sure you want to delete this task? This action cannot be undone.</p>
+        <input type="hidden" id="deleteTaskId">
+        <div class="modal-btn-row">
+            <button type="button" class="btn-cancel" onclick="closeDeleteTaskModal()">Cancel</button>
+            <button type="button" class="btn-danger" onclick="confirmDeleteTask()">Delete</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    var csrfToken = document.querySelector('meta[name="_csrf"]').content;
+    var csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+
+    function updateTaskStatus(sel) {
+        var taskId = sel.getAttribute('data-task-id');
+        var headers = { 'Content-Type': 'application/json' };
+        headers[csrfHeader] = csrfToken;
+        fetch('/governance/tasks/' + taskId + '/status', {
+            method: 'PUT', headers: headers,
+            body: JSON.stringify({ status: sel.value })
+        }).then(function(r) {
+            if (r.ok) { window.location.reload(); }
+            else { alert('Failed to update status'); }
+        });
+    }
+
+    function selectStatusPill(btn) {
+        var group = btn.closest('.status-pill-group');
+        group.querySelectorAll('.status-pill').forEach(function(p) { p.classList.remove('pill-active'); });
+        btn.classList.add('pill-active');
+        document.getElementById('editTaskStatus').value = btn.getAttribute('data-status');
+    }
+
+    function openEditTaskModal(btn) {
+        document.getElementById('editTaskId').value = btn.getAttribute('data-task-id');
+        document.getElementById('editTaskTitle').value = btn.getAttribute('data-title') || '';
+        document.getElementById('editTaskDescription').value = btn.getAttribute('data-description') || '';
+        var currentStatus = btn.getAttribute('data-status') || '';
+        document.getElementById('editTaskStatus').value = currentStatus;
+        document.querySelectorAll('#editTaskModal .status-pill').forEach(function(p) {
+            p.classList.toggle('pill-active', p.getAttribute('data-status') === currentStatus);
+        });
+        document.getElementById('editTaskUser').value = btn.getAttribute('data-user-id') || '';
+        document.getElementById('editTaskDueDate').value = btn.getAttribute('data-due-date') || '';
+        document.getElementById('editTaskModal').style.display = 'flex';
+    }
+    function closeEditTaskModal() {
+        document.getElementById('editTaskModal').style.display = 'none';
+    }
+    function submitEditTask() {
+        var taskId = document.getElementById('editTaskId').value;
+        var title = document.getElementById('editTaskTitle').value.trim();
+        if (!title) { alert('Title is required'); return; }
+        var projectId = document.getElementById('currentProjectId').value;
+        var payload = {
+            title: title,
+            description: document.getElementById('editTaskDescription').value.trim() || null,
+            status: document.getElementById('editTaskStatus').value,
+            assignedUserId: document.getElementById('editTaskUser').value || null,
+            projectId: projectId || null,
+            dueDate: document.getElementById('editTaskDueDate').value || null
+        };
+        var headers = { 'Content-Type': 'application/json' };
+        headers[csrfHeader] = csrfToken;
+        fetch('/governance/tasks/' + taskId, {
+            method: 'PUT', headers: headers, body: JSON.stringify(payload)
+        }).then(function(r) {
+            if (r.ok) { window.location.reload(); } else { alert('Failed to save task'); }
+        });
+    }
+
+    function deleteTask(btn) {
+        document.getElementById('deleteTaskId').value = btn.getAttribute('data-task-id');
+        document.getElementById('deleteTaskModal').style.display = 'flex';
+    }
+    function closeDeleteTaskModal() {
+        document.getElementById('deleteTaskModal').style.display = 'none';
+    }
+    function confirmDeleteTask() {
+        var taskId = document.getElementById('deleteTaskId').value;
+        var headers = {};
+        headers[csrfHeader] = csrfToken;
+        fetch('/governance/tasks/' + taskId, {
+            method: 'DELETE', headers: headers
+        }).then(function(r) {
+            if (r.ok) { window.location.reload(); } else { alert('Failed to delete task'); }
+        });
+    }
+</script>
+</body>
+</html>

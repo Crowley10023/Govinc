@@ -125,7 +125,8 @@ public class SecurityConfig {
                     "/orgservices/**",
                     "/orgunits/**",
                     "/users/**",
-                    "/statistics/**"
+                    "/statistics/**",
+                    "/governance/**"
                 ).hasAnyRole("ADMIN", "INFORMATION_SECURITY_MANAGER")
                 // All other requests require authentication; fine-grained checks are performed in controllers
                 .anyRequest().authenticated())

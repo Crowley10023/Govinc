@@ -24,6 +24,7 @@ import com.govinc.entity.OrganisationDetailsRepository;
 import com.govinc.util.OpenAIUtil;
 import com.govinc.authorization.AuthorizationService;
 import com.govinc.authorization.UnauthorizedException;
+import com.govinc.governance.GovernanceProjectRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -97,6 +98,9 @@ public class AssessmentController {
 
     @Autowired
     private ComplianceService complianceService;
+
+    @Autowired
+    private GovernanceProjectRepository governanceProjectRepository;
 
     @GetMapping("/create")
     public String showCreateAssessmentForm(Model model) {
@@ -688,6 +692,10 @@ public class AssessmentController {
             model.addAttribute("isAssessor", currentRole == Role.ASSESSOR);
             model.addAttribute("canManageAssessors", canManageAssessors);
 
+            // Pass governance projects for task creation and all users for interviewee modal
+            model.addAttribute("governanceProjects", governanceProjectRepository.findAll());
+            model.addAttribute("allUsers", userRepository.findAll());
+
             // Compliance check score calculation
             if (assessment.getComplianceCheck() != null && details != null) {
                 ComplianceCheck cc = assessment.getComplianceCheck();
@@ -1131,6 +1139,29 @@ public class AssessmentController {
         assessment.setUsers(users);
         assessment = assessmentRepository.save(assessment);
         return new ArrayList<>(users);
+    }
+
+    // --- Assign Interviewees to Assessment via API ---
+    @PutMapping("/{id}/interviewees")
+    @ResponseBody
+    public List<Map<String, Object>> updateAssessmentInterviewees(@PathVariable Long id, @RequestBody List<Long> userIds) {
+        if (!authorizationService.canModifyAssessment(id)) {
+            throw new UnauthorizedException("You do not have permission to update assessment interviewees.");
+        }
+        Optional<Assessment> opt = assessmentRepository.findById(id);
+        if (opt.isEmpty())
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.NOT_FOUND);
+        Assessment assessment = opt.get();
+        Set<User> interviewees = userIds.stream()
+                .map(uid -> userRepository.findById(uid).orElse(null))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        assessment.setInterviewees(interviewees);
+        assessmentRepository.save(assessment);
+        return interviewees.stream()
+                .map(u -> { Map<String, Object> m = new java.util.LinkedHashMap<>(); m.put("id", u.getId()); m.put("name", u.getName()); return m; })
+                .collect(Collectors.toList());
     }
 
     // Delegate workflow: fetch only assessor users for assignment modal

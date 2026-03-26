@@ -591,4 +591,13 @@ public class AuthorizationService {
         Role role = getCurrentUserRole();
         return role == Role.ADMIN || role == Role.INFORMATION_SECURITY_MANAGER;
     }
+
+    /**
+     * Check if user can access governance features (deviation analysis, projects, tasks).
+     * ADMIN and INFORMATION_SECURITY_MANAGER can access.
+     */
+    public boolean canAccessGovernance() {
+        Role role = getCurrentUserRole();
+        return role == Role.ADMIN || role == Role.INFORMATION_SECURITY_MANAGER;
+    }
 }

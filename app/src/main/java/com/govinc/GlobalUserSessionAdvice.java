@@ -149,6 +149,15 @@ public class GlobalUserSessionAdvice {
         }
     }
 
+    @ModelAttribute("canAccessGovernance")
+    public boolean canAccessGovernance() {
+        try {
+            return authorizationService != null && authorizationService.canAccessGovernance();
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
     /**
      * Add current user's role (display name) to the model for templates.
      */

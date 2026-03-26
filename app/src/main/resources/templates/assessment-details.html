@@ -186,6 +186,18 @@
                                 </div>
                             </td>
                         </tr>
+                        <tr>
+                            <th>Interviewees</th>
+                            <td id="assessment-interviewees-cell">
+                                <div class="detail-inline-edit">
+                                    <div th:if="${assessment.interviewees != null && !assessment.interviewees.isEmpty()}" class="pill-list">
+                                        <span th:each="user : ${assessment.interviewees}" class="user-pill" th:text="${user.name}"></span>
+                                    </div>
+                                    <span th:if="${assessment.interviewees == null || assessment.interviewees.isEmpty()}" class="text-muted">None</span>
+                                    <button th:if="${isAdminOrISM}" type="button" class="btn-action" onclick="openIntervieweeModal()">Assign</button>
+                                </div>
+                            </td>
+                        </tr>
                     </table>
                     
                     <h2>Summary of Answers</h2>
@@ -316,6 +328,12 @@
                                         <td class="ctrl-name-col">
                                             <div class="ctrl-desc-wrap">
                                                 <span th:text="${ctrl.name}"></span>
+                                                <button th:if="${isAdminOrISM}" type="button"
+                                                        class="btn-sm ctrl-task-btn"
+                                                        title="Create governance task for this control"
+                                                        th:data-control-id="${ctrl.id}"
+                                                        th:data-control-name="${ctrl.name}"
+                                                        onclick="openCtrlTaskModal(this)">&#128203;</button>
                                                 <div>
                                                     <div th:utext="${#strings.escapeXml(ctrl.detail) ?: 'No detail'}"></div>
                                                 </div>
@@ -1419,6 +1437,136 @@
                 sendBtn.disabled = false;
                 sendBtn.textContent = 'Send';
                 errorEl.textContent = 'Request failed: ' + err;
+            });
+        }
+    </script>
+
+    <!-- ISM Create Task for Control Modal -->
+    <div id="ctrlTaskModal" class="modal-bg">
+        <div class="modal-popup">
+            <h3>Create Task for Control</h3>
+            <input type="hidden" id="ctrlTaskControlId">
+            <div class="modal-form">
+                <label>Control
+                    <input type="text" id="ctrlTaskControlName" readonly>
+                </label>
+                <label>Task Title *
+                    <input type="text" id="ctrlTaskTitle">
+                </label>
+                <label>Description
+                    <textarea id="ctrlTaskDescription" rows="3"></textarea>
+                </label>
+                <label>Project <small>(required)</small>
+                    <select id="ctrlTaskProject">
+                        <option value="">-- Select Project --</option>
+                        <option th:each="p : ${governanceProjects}" th:value="${p.id}" th:text="${p.name}"></option>
+                    </select>
+                </label>
+                <label>Assign To
+                    <select id="ctrlTaskUser">
+                        <option value="">-- Select User --</option>
+                        <option th:each="u : ${allUsers}" th:value="${u.id}" th:text="${u.name}"></option>
+                    </select>
+                </label>
+                <label>Due Date
+                    <input type="date" id="ctrlTaskDueDate">
+                </label>
+            </div>
+            <div class="modal-btn-row">
+                <button type="button" class="btn-cancel" onclick="closeCtrlTaskModal()">Cancel</button>
+                <button type="button" class="btn-action" onclick="submitCtrlTask()">Create Task</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Assign Interviewees Modal -->
+    <div id="intervieweeModal" class="modal-bg">
+        <div class="modal-popup">
+            <h3>Assign Interviewees</h3>
+            <p class="text-muted">Select users to assign as interviewees for this assessment:</p>
+            <div class="user-check-list">
+                <label th:each="u : ${allUsers}" class="user-check-item">
+                    <input type="checkbox" class="interviewee-cb"
+                           th:value="${u.id}"
+                           th:checked="${assessment.interviewees != null && assessment.interviewees.contains(u)}">
+                    <span th:text="${u.name}"></span>
+                </label>
+            </div>
+            <div class="modal-btn-row">
+                <button type="button" class="btn-cancel" onclick="closeIntervieweeModal()">Cancel</button>
+                <button type="button" class="btn-action" onclick="submitInterviewees()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openCtrlTaskModal(btn) {
+            document.getElementById('ctrlTaskControlId').value = btn.getAttribute('data-control-id');
+            document.getElementById('ctrlTaskControlName').value = btn.getAttribute('data-control-name') || '';
+            document.getElementById('ctrlTaskTitle').value = '';
+            document.getElementById('ctrlTaskDescription').value = '';
+            document.getElementById('ctrlTaskProject').value = '';
+            document.getElementById('ctrlTaskUser').value = '';
+            document.getElementById('ctrlTaskDueDate').value = '';
+            document.getElementById('ctrlTaskModal').style.display = 'flex';
+        }
+        function closeCtrlTaskModal() {
+            document.getElementById('ctrlTaskModal').style.display = 'none';
+        }
+        function submitCtrlTask() {
+            var title = document.getElementById('ctrlTaskTitle').value.trim();
+            var projectId = document.getElementById('ctrlTaskProject').value;
+            if (!title) { showCtrlTaskError('Task title is required'); return; }
+            if (!projectId) { showCtrlTaskError('A project must be selected'); return; }
+            var csrfToken = document.querySelector('meta[name="_csrf"]').content;
+            var csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+            var payload = {
+                title: title,
+                description: document.getElementById('ctrlTaskDescription').value.trim() || null,
+                projectId: projectId,
+                assignedUserId: document.getElementById('ctrlTaskUser').value || null,
+                securityControlId: document.getElementById('ctrlTaskControlId').value || null,
+                dueDate: document.getElementById('ctrlTaskDueDate').value || null
+            };
+            var headers = { 'Content-Type': 'application/json' };
+            headers[csrfHeader] = csrfToken;
+            fetch('/governance/tasks/create', {
+                method: 'POST', headers: headers, body: JSON.stringify(payload)
+            }).then(function(r) {
+                if (r.ok) { closeCtrlTaskModal(); }
+                else { showCtrlTaskError('Failed to create task'); }
+            });
+        }
+        function showCtrlTaskError(msg) {
+            var err = document.getElementById('ctrlTaskError');
+            if (!err) {
+                err = document.createElement('p');
+                err.id = 'ctrlTaskError';
+                err.className = 'text-danger';
+                document.getElementById('ctrlTaskModal').querySelector('.modal-btn-row').before(err);
+            }
+            err.textContent = msg;
+        }
+
+        function openIntervieweeModal() {
+            document.getElementById('intervieweeModal').style.display = 'flex';
+        }
+        function closeIntervieweeModal() {
+            document.getElementById('intervieweeModal').style.display = 'none';
+        }
+        function submitInterviewees() {
+            var ids = Array.from(document.querySelectorAll('.interviewee-cb:checked')).map(function(cb) {
+                return parseInt(cb.value);
+            });
+            var csrfToken = document.querySelector('meta[name="_csrf"]').content;
+            var csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+            var headers = { 'Content-Type': 'application/json' };
+            headers[csrfHeader] = csrfToken;
+            fetch('/assessment/' + window.assessmentId + '/interviewees', {
+                method: 'PUT', headers: headers, body: JSON.stringify(ids)
+            }).then(function(r) {
+                if (r.ok) { window.location.reload(); }
+                else { alert('Failed to save interviewees'); }
             });
         }
     </script>

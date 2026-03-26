@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <meta charset="UTF-8">
+    <meta name="_csrf" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:content="${_csrf.headerName}">
+    <title>Projects - Governance</title>
+    <th:block th:replace="~{navigation :: navHead}"></th:block>
+</head>
+<body>
+<div th:replace="~{navigation :: mainNav}"></div>
+<div class="container">
+    <h1>Governance Projects</h1>
+
+    <div class="mb-2em">
+        <button type="button" class="btn-action" onclick="openCreateProjectModal()">Create Project</button>
+    </div>
+
+    <table class="table card" id="projectsTable">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Owner</th>
+                <th>Description</th>
+                <th>Tasks</th>
+                <th>Progress</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="project : ${projects}">
+                <td>
+                    <a th:href="@{/governance/projects/{id}(id=${project.id})}" th:text="${project.name}" class="link"></a>
+                </td>
+                <td th:text="${project.owner != null ? project.owner.name : '-'}"></td>
+                <td th:text="${project.description != null ? (#strings.length(project.description) > 80 ? #strings.substring(project.description, 0, 80) + '...' : project.description) : '-'}"></td>
+                <td th:text="${project.taskCount}"></td>
+                <td>
+                    <span th:if="${project.taskCount > 0}" th:text="${project.completedTaskCount} + '/' + ${project.taskCount}"></span>
+                    <span th:if="${project.taskCount == 0}">-</span>
+                </td>
+                <td th:text="${project.createdDate != null ? #temporals.format(project.createdDate, 'yyyy-MM-dd') : '-'}"></td>
+                <td>
+                    <a th:href="@{/governance/projects/{id}(id=${project.id})}" class="btn-edit btn-sm">View</a>
+                    <button type="button" class="btn-danger btn-sm" th:data-id="${project.id}" onclick="deleteProject(this)">Delete</button>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <div th:if="${projects == null or #lists.isEmpty(projects)}" class="empty-state">
+        <p>No projects found. Create a project to get started.</p>
+    </div>
+</div>
+
+<!-- Create Project Modal -->
+<div id="createProjectModal" class="modal-bg" style="display:none;">
+    <div class="modal-popup-confirmation" style="max-width:450px;">
+        <h3>Create Project</h3>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+            <label>Name *
+                <input type="text" id="newProjectName" style="width:100%;box-sizing:border-box;">
+            </label>
+            <label>Description
+                <textarea id="newProjectDescription" rows="3" style="width:100%;box-sizing:border-box;"></textarea>
+            </label>
+            <label>Owner
+                <select id="newProjectOwner" style="width:100%;">
+                    <option value="">-- Select Owner --</option>
+                    <option th:each="u : ${users}" th:value="${u.id}" th:text="${u.name}"></option>
+                </select>
+            </label>
+        </div>
+        <div class="modal-btn-row" style="margin-top:1em;">
+            <button type="button" class="btn-cancel" onclick="closeCreateProjectModal()">Cancel</button>
+            <button type="button" class="btn-action" onclick="submitCreateProject()">Create</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    var csrfToken = document.querySelector('meta[name="_csrf"]').content;
+    var csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+
+    function openCreateProjectModal() {
+        document.getElementById('createProjectModal').style.display = 'flex';
+    }
+    function closeCreateProjectModal() {
+        document.getElementById('createProjectModal').style.display = 'none';
+    }
+
+    function submitCreateProject() {
+        var name = document.getElementById('newProjectName').value.trim();
+        if (!name) { alert('Name is required'); return; }
+
+        var payload = {
+            name: name,
+            description: document.getElementById('newProjectDescription').value.trim() || null,
+            ownerId: document.getElementById('newProjectOwner').value || null
+        };
+
+        var headers = { 'Content-Type': 'application/json' };
+        headers[csrfHeader] = csrfToken;
+
+        fetch('/governance/projects/create', {
+            method: 'POST', headers: headers,
+            body: JSON.stringify(payload)
+        }).then(function(r) {
+            if (r.ok) { window.location.reload(); }
+            else { alert('Failed to create project'); }
+        });
+    }
+
+    function deleteProject(btn) {
+        if (!confirm('Delete this project? Tasks linked to it will be unlinked.')) return;
+        var id = btn.getAttribute('data-id');
+        var headers = {};
+        headers[csrfHeader] = csrfToken;
+        fetch('/governance/projects/' + id, {
+            method: 'DELETE', headers: headers
+        }).then(function(r) {
+            if (r.ok) { window.location.reload(); }
+            else { alert('Failed to delete project'); }
+        });
+    }
+</script>
+</body>
+</html>

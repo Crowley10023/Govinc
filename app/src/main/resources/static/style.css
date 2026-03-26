@@ -3447,7 +3447,7 @@ body::before {
    ========================================================= */
 .landing-container {
     max-width: 100%;
-    margin: 1.5em auto;
+    margin: 4.5em auto;
     padding: 0 1.5em 1.5em;
     display: grid;
     grid-template-columns: 3fr 1fr;
@@ -3493,7 +3493,7 @@ body::before {
     display: flex;
     flex-direction: column;
     height: 100%;
-    min-width: 0;
+    min-width: 35vw
 }
 
 .card-icon-row {
@@ -9625,6 +9625,35 @@ body {
     margin: 10px 0;
 }
 
+/* === Governance Task Status Badges === */
+.task-status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 0.82em;
+    font-weight: 600;
+    color: #fff;
+}
+.task-status-badge.status-identified {
+    background: #6c757d;
+}
+.task-status-badge.status-inprogress {
+    background: var(--primary-blue, #2274A5);
+}
+.task-status-badge.status-approval {
+    background: var(--accent-orange, #e07b00);
+}
+.task-status-badge.status-done {
+    background: var(--success-green, #33aa33);
+}
+.link {
+    color: var(--primary-blue, #2274A5);
+    text-decoration: none;
+}
+.link:hover {
+    text-decoration: underline;
+}
+
 .radio-option {
     margin: 8px 0;
     padding: 10px;
@@ -10375,7 +10404,7 @@ table tr.hidden {
     text-align: left;
     padding: .5rem;
     border-bottom: 1px solid #eee;
-    max-width: 15vw;
+    max-width: 16vw;
 }
 
 .recent-list {
@@ -11320,3 +11349,118 @@ a.back-link:hover {
     background: linear-gradient(90deg, #ef5350 0%, #b71c1c 100%);
     box-shadow: 0 0 8px rgba(200, 50, 50, 0.25) inset;
 }
+
+/* =========================================================
+   GOVERNANCE MODALS — modal-form, status pills, user-check-list
+   ========================================================= */
+.modal-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    text-align: left;
+}
+
+.modal-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-weight: 600;
+    font-size: 0.9em;
+    color: var(--text-main);
+}
+
+.modal-form input[type="text"],
+.modal-form input[type="date"],
+.modal-form select,
+.modal-form textarea {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.modal-form input[readonly] {
+    background: var(--background-light);
+    color: var(--gray-777);
+}
+
+.status-pill-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.15rem;
+}
+
+.status-pill {
+    padding: 0.3rem 0.9rem;
+    border-radius: 999px;
+    border: 3px solid transparent;
+    cursor: pointer;
+    font-size: 0.82em;
+    font-weight: 600;
+    color: #fff;
+    transition: filter 0.15s, border-color 0.15s;
+}
+
+.status-pill:hover {
+    filter: brightness(0.88);
+}
+
+.status-pill.pill-identified {
+    background: #6c757d;
+}
+
+.status-pill.pill-inprogress {
+    background: var(--primary-blue);
+}
+
+.status-pill.pill-approval {
+    background: var(--accent-orange);
+}
+
+.status-pill.pill-done {
+    background: var(--success-green);
+}
+
+.status-pill.pill-active {
+    border-color: var(--primary-blue-dark);
+    filter: brightness(0.85);
+}
+
+.user-check-list {
+    max-height: 260px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+}
+
+.user-check-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-size: 0.95em;
+}
+
+.ctrl-task-btn {
+    margin-left: 0.4rem;
+    vertical-align: middle;
+    font-size: 0.8em;
+}
+
+/* === Deviation Analysis === */
+.gap-table td { vertical-align: top; }
+.gap-score { font-weight: bold; }
+.gap-score.below { color: var(--error-red); }
+.gap-controls-list { font-size: 0.88em; color: var(--gray-777); margin: 0; padding-left: 1.2em; }
+.gap-recommendation { font-style: italic; }
+.deviation-filter-form { padding: 1.5em; margin-bottom: 1.5em; }
+.deviation-summary-bar { padding: 0.8em 1em; margin-bottom: 1em; display: flex; align-items: center; gap: 0.5em; background: var(--background-light); }
+.deviation-project-fieldset { border: 1px solid var(--border-color, #ddd); border-radius: 6px; padding: 0.8em 1em; }
+.deviation-project-fieldset legend { font-weight: 600; padding: 0 0.4em; }
+.d-none { display: none !important; }
+.mb-sm { margin-bottom: 0.5em; }
+

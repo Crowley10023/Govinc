@@ -1,25 +1,46 @@
-This file denotes major corner stones of the security architecture.
+This file denotes major cornerstones of the security architecture.
 
-1. Every access to backends must provide CSRF token
-2. Every backend entry point must check authentication and authorization
-3. The assessment direct form is allowed to be accessed without authorization and without authentication. it therefore provides a unique URL that is obfuscated.
+1. Every access to backends must provide a CSRF token.
+2. Every backend entry point must check authentication and authorization.
+3. The assessment direct form may be accessed without authentication or authorization; it therefore uses a unique, obfuscated URL.
+
 4. Roles in the system:
-    a) ADMIN: no restrictions in access
-    b) Information Security Manager: Everything is accessible except all items listed in navigation under "CONFIG".
-    c) Assessment Delegate: Is only allowed to see and edit assessments with himself as assigned user. Also is allowed to create new assessments.
-    d) special assignment Team Lead: A team lead is allowed to see and edit all assessments of his organisational unit and its children, as well as where he is assigned as user.
-       The team lead is typically assigned, when editing an organisational unit. team lead is not a standard role in the system and may not be assigned like the other roles. 
-       a team lead may lead multiple organisational units.
-    e) A Team Lead is allowed to see all assessments of his organisation units and their children
-    f) ASSESSOR: an assessor is soley able to see assessments where that person is named as "user".
-5. SecurityConfig.java defines what is accessible and what not. 
-6. The system allows three different authentication providers: Keycloak, Azure and local. Local typically spots only the user named ADMIN with the  role ADMIN
-7. Users generally may have one or more roles. valid combinations are:
+    a) ADMIN: unrestricted access to all functionality and data unless explicitly constrained by deployment policies.
+    b) Information Security Manager (ISM): has access to system functionality and data. By default ISM may access everything except items listed under the navigation section "CONFIG"; see exception for Deviation Management below.
+    c) Assessment Delegate: may view and edit assessments where they are the assigned user, and may create new assessments. Assessment Delegates may add users to the "users" list of assessments they already have access to (see item 10).
+    d) Team Lead (special assignment): a Team Lead may view and edit all assessments for their organisational unit and its child units, and any assessment where they are assigned as user. Team Lead is a special assignment and is not assigned like standard roles; a Team Lead may lead multiple organisational units.
+    e) ASSESSOR: may view assessments only where that person is named as the assessment "user".
+
+5. Access rules are implemented in SecurityConfig.java. That class defines which endpoints and resources are accessible to which roles.
+6. The system supports three authentication providers: Keycloak, Azure, and local. The local provider is typically used only for the ADMIN account in development environments.
+7. Users may have one or more roles. Valid combinations include:
     1. ADMIN and Team Lead
     2. Assessment Delegate and Team Lead
-    3. Information Security Manager and Team lead
-8. in Production environments, the local ADMIN user must not be active, only in development environments (see deployment)
-9. A user may be deleted when the user is not in "created by" in an assessment. if deleting a user that is part of "users" of an assessment, the user must be deleted as user 
-   in these assessments prior to deleting the user.
-10. Assessment delegates entitlements:
-    a) Assessment delegates are allowed to ADD users to the list of users of an assessment they are already allowed for. 
+    3. Information Security Manager and Team Lead
+8. In production environments the local ADMIN account must be disabled; it is allowed only in development environments (see deployment documentation).
+9. User deletion rules: a user may be deleted only when they are not referenced as the "created by" value on an assessment. If a user appears in an assessment's "users" list, they must be removed from those lists before the user can be deleted.
+
+10. Assessment Delegate entitlements:
+    a) Assessment Delegates may add users to the "users" list of assessments for which they already have access.
+
+11. Deviation Management (new functionality)
+    a) Purpose: Deviation Management records, tracks, reviews, and closes deviations (exceptions) discovered during assessments or operations. It supports creation, assignment, review, approval, mitigation tracking, and closure workflows.
+    b) Permissions:
+        - ADMIN: full access to Deviation Management (create, view, edit, assign, approve, close).
+        - Information Security Manager: full access to Deviation Management (create, view, edit, assign, approve, close).
+        - Team Lead: may view and act on deviations related to their organisational unit and its child units (view, comment, propose mitigation). Any additional write/approval rights for Team Lead must be explicitly granted.
+        - Assessment Delegate / Assessor: may view deviations related to assessments they have access to and may add comments or propose mitigation actions; creation rights may be granted as needed by policy.
+    c) Audit and logging: all actions in Deviation Management (create/modify/assign/approve/close) must be audited with user, timestamp, and before/after state recorded.
+    d) Security controls: Deviation Management endpoints must enforce CSRF protection, authentication, and authorization checks consistent with other backend entry points. Sensitive operations should require ISM or ADMIN privileges unless otherwise specified.
+
+12. Cross-cutting notes:
+    - Ensure terminology is consistent: use `Team Lead` (capitalized) and `Information Security Manager` (or ISM) throughout documentation and code.
+    - Validate that SecurityConfig.java includes route mappings and permission checks for the Deviation Management API endpoints.
+    - Update navigation and CONFIG documentation if Deviation Management appears under a restricted or configurable navigation item.
+
+13. Outstanding items / recommendations:
+    - Review navigation item "CONFIG" to confirm which functions are excluded for ISM and whether Deviation Management should be listed there.
+    - Run a global scan for duplicate role definitions or inconsistent capitalization in other documentation files.
+    - Add automated tests for Deviation Management authorization paths (ADMIN, ISM, Team Lead, Assessment Delegate).
+
+    

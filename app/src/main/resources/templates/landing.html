@@ -200,11 +200,30 @@
             <div class="card-header">
                 <div class="card-icon-row">
                     <div class="card-icon">✓</div>
-                    <h2>Tasks</h2>
+                    <h2>My Tasks</h2>
                 </div>
             </div>
             <div class="card-body">
-                <p class="coming-soon">Coming soon.</p>
+                <div th:if="${myTasks == null or #lists.isEmpty(myTasks)}" class="empty-state">
+                    <p>No tasks assigned to you.</p>
+                </div>
+                <ul class="assessment-list" th:if="${myTasks != null and !#lists.isEmpty(myTasks)}">
+                    <li th:each="task : ${myTasks}" class="assessment-item">
+                        <div class="assessment-link" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;">
+                            <div>
+                                <span class="assessment-title" th:text="${task.title}"></span>
+                                <div class="assessment-meta">
+                                    <span class="task-status-badge"
+                                          th:classappend="${task.status.name() == 'DONE' ? 'status-done' : (task.status.name() == 'IN_PROGRESS' ? 'status-inprogress' : (task.status.name() == 'READY_FOR_APPROVAL' ? 'status-approval' : 'status-identified'))}"
+                                          th:text="${task.status.displayName}"></span>
+                                    <span th:if="${task.project != null}" class="assessment-org" th:text="'Project: ' + ${task.project.name}"></span>
+                                    <span th:if="${task.dueDate != null}" class="assessment-date" th:text="'Due: ' + ${#temporals.format(task.dueDate, 'yyyy-MM-dd')}"></span>
+                                </div>
+                            </div>
+                            <a th:href="@{/governance/tasks}" class="btn-action btn-sm">View</a>
+                        </div>
+                    </li>
+                </ul>
             </div>
         </div>
     </div>

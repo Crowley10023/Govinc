@@ -80,6 +80,15 @@
           <a href="/capability-report/list" class="dropdown-menu-btn">Security Capabilities</a>
         </div>
       </div>
+      <!-- Governance: Visible to ADMIN and ISM -->
+      <div class="nav-entry dropdown" th:if="${canAccessGovernance}">
+        <button type="button" class="dropdown-button btn-nav shiny">Governance</button>
+        <div class="dropdown-content">
+          <a href="/governance/deviation-analysis" class="dropdown-menu-btn">Deviation Analysis</a>
+          <a href="/governance/projects" class="dropdown-menu-btn">Projects</a>
+          <a href="/governance/tasks" class="dropdown-menu-btn">Tasks</a>
+        </div>
+      </div>
       <!-- Statistics: Only visible to ADMIN and ISM -->
       <div class="nav-entry" th:if="${canAccessStatistics}">
         <a href="/statistics" class="entry-link btn-nav shiny">Statistics</a>

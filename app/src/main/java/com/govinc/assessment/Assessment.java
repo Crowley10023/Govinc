@@ -164,6 +164,21 @@ public class Assessment {
         this.users = users;
     }
 
+    // Interviewees: people interviewed during the assessment
+    @ManyToMany(cascade = { CascadeType.MERGE })
+    @JoinTable(name = "assessment_interviewees",
+               joinColumns = @JoinColumn(name = "assessment_id"),
+               inverseJoinColumns = @JoinColumn(name = "user_id"))
+    private Set<User> interviewees = new HashSet<>();
+
+    public Set<User> getInterviewees() {
+        return interviewees;
+    }
+
+    public void setInterviewees(Set<User> interviewees) {
+        this.interviewees = interviewees;
+    }
+
     // CREATED BY: single user reference
     @ManyToOne
     @JoinColumn(name = "created_by_id")

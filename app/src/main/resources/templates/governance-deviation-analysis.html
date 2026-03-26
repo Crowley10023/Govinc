@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <meta charset="UTF-8">
+    <meta name="_csrf" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:content="${_csrf.headerName}">
+    <title>Deviation Analysis - Governance</title>
+    <th:block th:replace="~{navigation :: navHead}"></th:block>
+</head>
+<body>
+<div th:replace="~{navigation :: mainNav}"></div>
+<div class="container">
+    <h1>Deviation Analysis</h1>
+
+    <!-- Selection Form -->
+    <form method="get" action="/governance/deviation-analysis" class="card deviation-filter-form">
+        <div class="flex-row flex-wrap gap-md align-center">
+            <div class="form-group">
+                <label for="orgUnitId">Org Unit</label>
+                <select name="orgUnitId" id="orgUnitId" required>
+                    <option value="">-- Select Org Unit --</option>
+                    <option th:each="ou : ${orgUnits}" th:value="${ou.id}" th:text="${ou.name}"
+                            th:selected="${selectedOrgUnitId != null and selectedOrgUnitId == ou.id}"></option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="catalogId">Security Catalog</label>
+                <select name="catalogId" id="catalogId" required>
+                    <option value="">-- Select Catalog --</option>
+                    <option th:each="cat : ${catalogs}" th:value="${cat.id}" th:text="${cat.name}"
+                            th:selected="${selectedCatalogId != null and selectedCatalogId == cat.id}"></option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="checkId">Compliance Check</label>
+                <select name="checkId" id="checkId" required>
+                    <option value="">-- Select Check --</option>
+                    <option th:each="cc : ${complianceChecks}" th:value="${cc.id}" th:text="${cc.name}"
+                            th:selected="${selectedCheckId != null and selectedCheckId == cc.id}"></option>
+                </select>
+            </div>
+            <div>
+                <button type="submit" class="btn-action">Analyze</button>
+            </div>
+        </div>
+    </form>
+
+    <!-- Results -->
+    <div th:if="${gaps != null}">
+        <div class="card deviation-summary-bar">
+            <strong>Analysis for:</strong>
+            <span th:text="${selectedOrgName}"></span> &mdash;
+            <span th:text="${selectedCatalogName}"></span> &mdash;
+            <span th:text="${selectedCheckName}"></span>
+            <span class="ml-auto" th:text="'Gaps found: ' + ${#lists.size(gaps)}"></span>
+        </div>
+
+        <div th:if="${#lists.isEmpty(gaps)}" class="empty-state mt-md">
+            <p class="text-success text-bold">&#10003; No deviations found. All controls meet the compliance threshold.</p>
+        </div>
+
+        <div th:if="${!#lists.isEmpty(gaps)}" class="general-button-bar">
+            <button type="button" class="btn-action" onclick="openCreateAllTasksModal()">&#128203; Create All Tasks</button>
+        </div>
+
+        <table th:if="${!#lists.isEmpty(gaps)}" class="table card gap-table">
+            <thead>
+                <tr>
+                    <th>Domain</th>
+                    <th>Related Controls</th>
+                    <th>Gap Indication</th>
+                    <th>Score</th>
+                    <th>Recommendation</th>
+                    <th>Task Proposal</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="gap, iter : ${gaps}"
+                    class="gap-data-row"
+                    th:data-task-title="${gap.taskProposal}"
+                    th:data-task-description="${gap.recommendation}"
+                    th:data-control-id="${gap.relatedControls != null and !#lists.isEmpty(gap.relatedControls) ? gap.relatedControls[0].id : ''}">
+                    <td th:text="${gap.domainName}"></td>
+                    <td>
+                        <ul class="gap-controls-list">
+                            <li th:each="ctrl : ${gap.relatedControls}" th:text="${ctrl.name}"></li>
+                        </ul>
+                    </td>
+                    <td th:text="${gap.gapIndication}"></td>
+                    <td>
+                        <span class="gap-score below" th:text="${gap.currentScore + '%'}"></span>
+                        <span class="text-muted"> / </span>
+                        <span th:text="${gap.requiredScore + '%'}"></span>
+                    </td>
+                    <td class="gap-recommendation" th:text="${gap.recommendation}"></td>
+                    <td th:text="${gap.taskProposal}"></td>
+                    <td>
+                        <button type="button" class="btn-action btn-sm"
+                                th:data-title="${gap.taskProposal}"
+                                th:data-description="${gap.recommendation}"
+                                th:data-control-id="${gap.relatedControls != null and !#lists.isEmpty(gap.relatedControls) ? gap.relatedControls[0].id : ''}"
+                                onclick="openTaskFromGap(this)">Create Task</button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Create Task from Gap Modal -->
+<div id="gapTaskModal" class="modal-bg">
+    <div class="modal-popup">
+        <h3>Create Task from Deviation</h3>
+        <div class="modal-form">
+            <label>Title
+                <input type="text" id="gapTaskTitle">
+            </label>
+            <label>Description
+                <textarea id="gapTaskDescription" rows="3"></textarea>
+            </label>
+            <input type="hidden" id="gapTaskControlId">
+            <label>Assign To
+                <select id="gapTaskUser">
+                    <option value="">-- Select User --</option>
+                    <option th:each="u : ${users}" th:value="${u.id}" th:text="${u.name}"></option>
+                </select>
+            </label>
+            <label>Project *
+                <select id="gapTaskProject">
+                    <option value="">-- Select Project --</option>
+                    <option th:each="p : ${projects}" th:value="${p.id}" th:text="${p.name}"></option>
+                </select>
+            </label>
+        </div>
+        <div class="modal-btn-row">
+            <button type="button" class="btn-cancel" onclick="closeGapTaskModal()">Cancel</button>
+            <button type="button" class="btn-action" onclick="submitGapTask()">Create Task</button>
+        </div>
+    </div>
+</div>
+
+<!-- Create All Tasks Modal -->
+<div id="createAllTasksModal" class="modal-bg">
+    <div class="modal-popup">
+        <h3>Create All Tasks</h3>
+        <p class="text-muted">All <span id="allTasksCount"></span> proposed tasks will be created and assigned to the selected project and user.</p>
+        <div class="modal-form">
+            <label>Assign All To
+                <select id="allTasksUser">
+                    <option value="">-- Select User --</option>
+                    <option th:each="u : ${users}" th:value="${u.id}" th:text="${u.name}"></option>
+                </select>
+            </label>
+            <fieldset class="deviation-project-fieldset">
+                <legend>Project</legend>
+                <div class="flex-row gap-md mb-sm">
+                    <label class="user-check-item">
+                        <input type="radio" name="allTasksProjectMode" value="existing" checked onchange="toggleProjectMode()">
+                        Use existing project
+                    </label>
+                    <label class="user-check-item">
+                        <input type="radio" name="allTasksProjectMode" value="new" onchange="toggleProjectMode()">
+                        Create new project
+                    </label>
+                </div>
+                <div id="allTasksExistingProjectRow">
+                    <select id="allTasksExistingProject">
+                        <option value="">-- Select Project --</option>
+                        <option th:each="p : ${projects}" th:value="${p.id}" th:text="${p.name}"></option>
+                    </select>
+                </div>
+                <div id="allTasksNewProjectRow" class="d-none">
+                    <input type="text" id="allTasksNewProjectName" placeholder="New project name">
+                </div>
+            </fieldset>
+        </div>
+        <div class="modal-btn-row">
+            <button type="button" class="btn-cancel" onclick="closeCreateAllTasksModal()">Cancel</button>
+            <button type="button" class="btn-action" onclick="submitCreateAllTasks()">Create All Tasks</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    var csrfToken = document.querySelector('meta[name="_csrf"]').content;
+    var csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+
+    function openTaskFromGap(btn) {
+        document.getElementById('gapTaskTitle').value = btn.getAttribute('data-title') || '';
+        document.getElementById('gapTaskDescription').value = btn.getAttribute('data-description') || '';
+        document.getElementById('gapTaskControlId').value = btn.getAttribute('data-control-id') || '';
+        document.getElementById('gapTaskModal').style.display = 'flex';
+    }
+    function closeGapTaskModal() {
+        document.getElementById('gapTaskModal').style.display = 'none';
+    }
+
+    function submitGapTask() {
+        var title = document.getElementById('gapTaskTitle').value.trim();
+        var projectId = document.getElementById('gapTaskProject').value;
+        if (!title) { alert('Title is required'); return; }
+        if (!projectId) { alert('Please select a project'); return; }
+
+        var payload = {
+            title: title,
+            description: document.getElementById('gapTaskDescription').value.trim() || null,
+            assignedUserId: document.getElementById('gapTaskUser').value || null,
+            projectId: projectId,
+            securityControlId: document.getElementById('gapTaskControlId').value || null
+        };
+        var headers = { 'Content-Type': 'application/json' };
+        headers[csrfHeader] = csrfToken;
+        fetch('/governance/deviation-analysis/create-task', {
+            method: 'POST', headers: headers, body: JSON.stringify(payload)
+        }).then(function(r) {
+            if (r.ok) { closeGapTaskModal(); }
+            else { alert('Failed to create task'); }
+        });
+    }
+
+    function openCreateAllTasksModal() {
+        var rows = document.querySelectorAll('.gap-data-row');
+        document.getElementById('allTasksCount').textContent = rows.length;
+        document.getElementById('allTasksUser').value = '';
+        document.getElementById('allTasksExistingProject').value = '';
+        document.getElementById('allTasksNewProjectName').value = '';
+        document.querySelector('input[name="allTasksProjectMode"][value="existing"]').checked = true;
+        toggleProjectMode();
+        document.getElementById('createAllTasksModal').style.display = 'flex';
+    }
+    function closeCreateAllTasksModal() {
+        document.getElementById('createAllTasksModal').style.display = 'none';
+    }
+    function toggleProjectMode() {
+        var mode = document.querySelector('input[name="allTasksProjectMode"]:checked').value;
+        document.getElementById('allTasksExistingProjectRow').classList.toggle('d-none', mode !== 'existing');
+        document.getElementById('allTasksNewProjectRow').classList.toggle('d-none', mode !== 'new');
+    }
+
+    function submitCreateAllTasks() {
+        var mode = document.querySelector('input[name="allTasksProjectMode"]:checked').value;
+        var projectId = mode === 'existing' ? document.getElementById('allTasksExistingProject').value : null;
+        var newProjectName = mode === 'new' ? document.getElementById('allTasksNewProjectName').value.trim() : null;
+
+        if (mode === 'existing' && !projectId) { alert('Please select a project'); return; }
+        if (mode === 'new' && !newProjectName) { alert('Please enter a project name'); return; }
+
+        var tasks = [];
+        document.querySelectorAll('.gap-data-row').forEach(function(row) {
+            var title = row.getAttribute('data-task-title');
+            if (title) {
+                tasks.push({
+                    title: title,
+                    description: row.getAttribute('data-task-description') || null,
+                    securityControlId: row.getAttribute('data-control-id') || null
+                });
+            }
+        });
+        if (tasks.length === 0) { alert('No tasks to create'); return; }
+
+        var payload = {
+            assignedUserId: document.getElementById('allTasksUser').value || null,
+            projectId: projectId || null,
+            newProjectName: newProjectName || null,
+            tasks: tasks
+        };
+        var headers = { 'Content-Type': 'application/json' };
+        headers[csrfHeader] = csrfToken;
+        fetch('/governance/deviation-analysis/create-all-tasks', {
+            method: 'POST', headers: headers, body: JSON.stringify(payload)
+        }).then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) { alert(data.error); return; }
+            closeCreateAllTasksModal();
+            var msg = data.created + ' task(s) created.';
+            if (data.projectId) { msg += ' View them in the project.'; }
+            alert(msg);
+        })
+        .catch(function() { alert('Failed to create tasks'); });
+    }
+</script>
+</body>
+</html>

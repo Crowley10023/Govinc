@@ -10,6 +10,8 @@ import com.govinc.assessment.AssessmentDetails;
 import com.govinc.organization.OrgServiceAssessment;
 import com.govinc.organization.OrgServiceAssessmentControl;
 import com.govinc.organization.OrgServiceAssessmentRepository;
+import com.govinc.governance.GovernanceTask;
+import com.govinc.governance.GovernanceTaskRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -43,6 +45,9 @@ public class LandingController {
 
     @Autowired
     private OrgServiceAssessmentRepository orgServiceAssessmentRepository;
+
+    @Autowired
+    private GovernanceTaskRepository governanceTaskRepository;
 
     @GetMapping("/")
     public String home(Model model) {
@@ -169,11 +174,25 @@ public class LandingController {
             model.addAttribute("filterUsers", userRepository.findAll());
             model.addAttribute("filterCatalogs", securityCatalogRepository.findAll());
 
+            // Load tasks assigned to current user
+            try {
+                com.govinc.user.User currentUser = authorizationService.getCurrentUser();
+                if (currentUser != null) {
+                    List<GovernanceTask> myTasks = governanceTaskRepository.findByAssignedUserId(currentUser.getId());
+                    model.addAttribute("myTasks", myTasks);
+                } else {
+                    model.addAttribute("myTasks", new ArrayList<>());
+                }
+            } catch (Exception taskEx) {
+                model.addAttribute("myTasks", new ArrayList<>());
+            }
+
         } catch (Exception ex) {
             // Protect landing page from failing; show empty dashboard if something goes wrong
             model.addAttribute("latestAssessments", new ArrayList<Assessment>());
             model.addAttribute("filterUsers", new ArrayList<>());
             model.addAttribute("filterCatalogs", new ArrayList<>());
+            model.addAttribute("myTasks", new ArrayList<>());
         }
         return "landing";
     }
