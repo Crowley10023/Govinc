@@ -362,13 +362,13 @@ network segmentation","SC-7","Network"</div>
     </div>
 
     <!-- Edit Modal -->
-    <div id="editControlModal" class="modal">
-        <div class="modal-content modal-content-wide">
+    <div id="editControlModal" class="modal-bg" style="display:none;">
+        <div class="modal-popup sc-edit-popup">
             <div class="modal-header-row">
-                <h2 class="m-0 text-24 text-main">Edit Security Control</h2>
-                <span class="close m-0 no-float" onclick="closeEditModal()">&times;</span>
+                <h3 class="m-0">Edit Security Control</h3>
+                <span class="modal-close-btn" onclick="closeEditModal()">&times;</span>
             </div>
-            <div id="editFormContainer" class="flex-auto scroll-y">
+            <div id="editFormContainer" class="sc-edit-body">
                 <!-- Form will be loaded via AJAX -->
             </div>
         </div>
@@ -595,7 +595,7 @@ network segmentation","SC-7","Network"</div>
                 // Extract form from the response
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
-                const editorForm = doc.querySelector('.editor-form');
+                const editorForm = doc.querySelector('.sc-edit-form-wrap');
                 
                 // Ensure any styles and stylesheets from the loaded edit page are applied
                 const headStyles = doc.querySelectorAll('style, link[rel="stylesheet"]');
@@ -618,12 +618,7 @@ network segmentation","SC-7","Network"</div>
                 if (editorForm) {
                     const container = document.getElementById('editFormContainer');
                     container.innerHTML = '';
-
-                    // Wrap the loaded form content so .security-control-editor styles apply in the popup
-                    const wrapper = document.createElement('div');
-                    wrapper.className = 'security-control-editor';
-                    wrapper.innerHTML = editorForm.innerHTML;
-                    container.appendChild(wrapper);
+                    container.appendChild(editorForm.cloneNode(true));
 
                     document.getElementById('editControlModal').style.display = 'flex';
                     

@@ -131,9 +131,15 @@ public class AnsweringGuideService {
             qandAMatrix.append(answers.get(i)).append("\n");
         }
         
+        // When there are more than 2 possible answers, exclude the highest-rated answer from
+        // the suggestions - the guide should never propose the maximum achievable rating.
+        List<Map<String, Object>> effectiveAnswers = maturityModelAnswers.size() > 2
+                ? maturityModelAnswers.subList(0, maturityModelAnswers.size() - 1)
+                : maturityModelAnswers;
+
         // Build list of available maturity answers for AI constraint
         StringBuilder maturityAnswersStr = new StringBuilder();
-        for (Map<String, Object> ma : maturityModelAnswers) {
+        for (Map<String, Object> ma : effectiveAnswers) {
             maturityAnswersStr.append("- ").append(ma.get("answer"))
                     .append(" (Rating: ").append(ma.get("rating")).append("%");
             if (ma.get("description") != null && !ma.get("description").toString().isEmpty()) {
@@ -150,7 +156,7 @@ public class AnsweringGuideService {
                 "Available Maturity Answers for this control (ordered from lowest to highest maturity):\n" +
                 maturityAnswersStr.toString() + "\n" +
                 "Selection rules:\n" +
-                "- If ALL answers are 'Yes' (100%), you MUST select the HIGHEST-rated maturity answer.\n" +
+                "- If ALL answers are 'Yes' (100%), you MUST select the HIGHEST-rated maturity answer from the list above.\n" +
                 "- If NO answers are 'Yes' (0%), you MUST select the LOWEST-rated maturity answer.\n" +
                 "- Otherwise, select the maturity answer whose rating percentage is closest to the yes percentage (" + yesPercentage + "%).\n" +
                 "- When in doubt between two answers, prefer the higher-rated one.\n\n" +
@@ -158,11 +164,11 @@ public class AnsweringGuideService {
         
         String aiResponse = openAIUtil.askAI(prompt).trim();
         
-        // Find the proposed answer in the maturity model answers
+        // Find the proposed answer in the effective answers
         Map<String, Object> proposedMaturityAnswer = null;
         
         // Try exact match first
-        for (Map<String, Object> ma : maturityModelAnswers) {
+        for (Map<String, Object> ma : effectiveAnswers) {
             if (aiResponse.equalsIgnoreCase(ma.get("answer").toString())) {
                 proposedMaturityAnswer = ma;
                 break;
@@ -171,7 +177,7 @@ public class AnsweringGuideService {
         
         // If no exact match, try partial match or default to first answer
         if (proposedMaturityAnswer == null) {
-            for (Map<String, Object> ma : maturityModelAnswers) {
+            for (Map<String, Object> ma : effectiveAnswers) {
                 if (ma.get("answer").toString().toLowerCase().contains(aiResponse.toLowerCase()) ||
                     aiResponse.toLowerCase().contains(ma.get("answer").toString().toLowerCase())) {
                     proposedMaturityAnswer = ma;
@@ -182,7 +188,7 @@ public class AnsweringGuideService {
         
         // Fallback to first answer (most conservative) if still no match
         if (proposedMaturityAnswer == null) {
-            proposedMaturityAnswer = maturityModelAnswers.get(0);
+            proposedMaturityAnswer = effectiveAnswers.get(0);
         }
         
         response.put("success", true);

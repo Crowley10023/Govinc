@@ -1,224 +1,244 @@
+﻿<div class="sc-edit-form-wrap">
+    <form th:action="@{/security-control/edit}" th:object="${securityControl}" method="post">
+        <input type="hidden" th:field="*{id}" />
+        <input type="hidden" name="returnUrl" id="returnUrlInput" th:value="${returnUrl}" />
 
-
-<div class="security-control-editor">
-    <div class="editor-header">
-        <h1>Edit Security Control</h1>
-    </div>
-
-    <div class="editor-form">
-        <form th:action="@{/security-control/edit}" th:object="${securityControl}" method="post">
-            <input type="hidden" th:field="*{id}" class="hidden-input" />
-
-            <div class="form-grid">
-                <!-- Name Field -->
-                <div class="form-group">
-                    <label for="name">Control Name</label>
-                    <input type="text" th:field="*{name}" id="name" placeholder="Enter security control name" required />
-                </div>
-
-                <!-- Reference Field -->
-                <div class="form-group">
-                    <label for="reference">Reference (Optional)</label>
-                    <input type="text" th:field="*{reference}" id="reference" placeholder="e.g., AC-2, IA-4" />
-                </div>
-
-                <!-- Tag Field -->
-                <div class="form-group">
-                    <label for="tag">Tags (Optional)</label>
-                    <input type="text" th:field="*{tag}" id="tag" placeholder="Selected tags will appear here..." />
-
-                    <!-- Existing Tags -->
-                    <div class="tag-suggestions" th:if="${existingTags != null and !existingTags.isEmpty()}">
-                        <label class="tag-suggestions-label">Available Tags</label>
-                        <div class="tag-suggestions-list" id="tag-selection">
-                            <button type="button" class="tag-pill"
-                                    th:each="t : ${existingTags}"
-                                    th:text="${t}"
-                                    th:attr="data-tag=${t}">
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Security Control Domain Field -->
-                <div class="form-group">
-                    <label for="securityControlDomain">Security Control Domain</label>
-                    <select th:field="*{securityControlDomain.id}" id="securityControlDomain">
-                        <option value="" disabled th:selected="${securityControl.securityControlDomain == null}">-- Select Domain --</option>
-                        <option th:each="domain : ${securityControlDomains}"
-                                th:value="${domain.id}"
-                                th:text="${domain.name}"
-                                th:selected="${securityControl.securityControlDomain != null and domain.id == securityControl.securityControlDomain.id}">
-                        </option>
-                    </select>
-                </div>
-
-                <!-- Description Field (Large, full width) -->
-                <div class="form-group description-group">
-                    <label for="detail">Description</label>
-                    <textarea th:field="*{detail}" id="detail" placeholder="Enter a detailed description of the security control..." required></textarea>
-                </div>
+        <!-- Row 1: Name -->
+        <div class="sc-row">
+            <div class="sc-field sc-field-full">
+                <label for="name">Control Name <span class="required-star">*</span></label>
+                <input type="text" th:field="*{name}" id="name" placeholder="Enter security control name" required />
             </div>
+        </div>
 
-            <!-- Version Management Section (shown when editing existing control) -->
-            <div class="version-management-section" th:if="${securityControl.id != null}">
-                <div class="version-mgmt-top">
-                    <div class="version-mgmt-field">
-                        <label>Version</label>
-                        <span class="badge" th:text="${securityControl.version != null ? securityControl.version : '1.0'}"></span>
-                    </div>
-                    <div class="version-mgmt-field">
-                        <label>Bump</label>
-                        <div class="flex-row gap-md">
-                            <label class="user-check-item">
-                                <input type="radio" name="versionBump" value="minor" checked>
-                                Minor (1.0 &rarr; 1.1)
-                            </label>
-                            <label class="user-check-item">
-                                <input type="radio" name="versionBump" value="major">
-                                Major (1.1 &rarr; 2.0)
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="form-group" th:if="${requiresVersionManagement}">
-                    <label for="projectId">Governance Project *</label>
-                    <select name="projectId" id="projectId" th:required="${requiresVersionManagement}">
-                        <option value="">-- Select Project (Track Changes enabled) --</option>
-                        <option th:each="p : ${trackingProjects}" th:value="${p.id}" th:text="${p.name}"></option>
-                    </select>
-                    <p class="text-muted text-sm">Belongs to a version-managed catalog. Changes must be assigned to a project.</p>
-                </div>
-                <div class="form-group" th:if="${!requiresVersionManagement}">
-                    <label for="projectId">Governance Project (optional)</label>
-                    <select name="projectId" id="projectId">
-                        <option value="">-- No project --</option>
-                        <option th:each="p : ${trackingProjects}" th:value="${p.id}" th:text="${p.name}"></option>
-                    </select>
-                </div>
+        <!-- Row 2: Description | Related Catalogs -->
+        <div class="sc-row sc-row-desc">
+            <div class="sc-field sc-field-desc">
+                <label for="detail">Description <span class="required-star">*</span></label>
+                <textarea th:field="*{detail}" id="detail"
+                    placeholder="Enter a detailed description of the security control..." required></textarea>
             </div>
-
-            <!-- Action Buttons -->
-            <div class="form-actions">
-                <button type="submit" class="btn-submit">Save Control</button>
-                <button type="button" class="btn-cancel" onclick="closeEditModal()">Cancel</button>
-            </div>
-
-            <!-- Info: Catalogs this control is part of -->
-            <div class="catalog-info" th:if="${securityControl.securityCatalogs != null and !securityControl.securityCatalogs.isEmpty()}">
-                <p>Part of security catalogs:</p>
-                <ul>
+            <div class="sc-field sc-field-catalogs"
+                th:if="${securityControl.securityCatalogs != null and !securityControl.securityCatalogs.isEmpty()}">
+                <label>Part of Catalogs</label>
+                <ul class="sc-catalog-list">
                     <li th:each="catalog : ${securityControl.securityCatalogs}"
-                        th:text="${catalog.name + (catalog.revision != null && !#strings.isEmpty(catalog.revision) ? ' (' + catalog.revision + ')' : '')}"></li>
+                        th:text="${catalog.name + (catalog.revision != null && !#strings.isEmpty(catalog.revision) ? ' (' + catalog.revision + ')' : '')}">
+                    </li>
                 </ul>
             </div>
-        </form>
-    </div>
+        </div>
+
+        <!-- Row 3: Version bump (editing existing) -->
+        <div class="sc-row" th:if="${securityControl.id != null}">
+            <div class="sc-field sc-field-version sc-field-full">
+                <label>Version</label>
+                <div class="sc-version-bump">
+                    <span class="badge sc-version-badge"
+                        th:text="${securityControl.version != null ? securityControl.version : '1.0'}"></span>
+                    <label class="user-check-item">
+                        <input type="radio" name="versionBump" value="minor" checked> Minor
+                    </label>
+                    <label class="user-check-item">
+                        <input type="radio" name="versionBump" value="major"> Major
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 4: Reference | Domain | Tags (when editing existing) -->
+        <div class="sc-row sc-row-meta" th:if="${securityControl.id != null}">
+            <div class="sc-field sc-field-ref">
+                <label for="reference">Reference</label>
+                <input type="text" th:field="*{reference}" id="reference" placeholder="e.g., AC-2, IA-4" />
+            </div>
+            <div class="sc-field sc-field-domain">
+                <label for="securityControlDomain">Domain</label>
+                <select th:field="*{securityControlDomain.id}" id="securityControlDomain">
+                    <option value="" disabled
+                        th:selected="${securityControl.securityControlDomain == null}">-- Select --</option>
+                    <option th:each="domain : ${securityControlDomains}"
+                        th:value="${domain.id}"
+                        th:text="${domain.name}"
+                        th:selected="${securityControl.securityControlDomain != null and domain.id == securityControl.securityControlDomain.id}">
+                    </option>
+                </select>
+            </div>
+            <div class="sc-field sc-field-tags">
+                <label for="tag">Tags</label>
+                <input type="text" th:field="*{tag}" id="tag" placeholder="Tags..." />
+                <div class="tag-suggestions" th:if="${existingTags != null and !existingTags.isEmpty()}">
+                    <div class="tag-suggestions-list" id="tag-selection">
+                        <button type="button" class="tag-pill" th:each="t : ${existingTags}"
+                            th:text="${t}" th:attr="data-tag=${t}"></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 3: Reference | Domain | Tags (creating new control) -->
+        <div class="sc-row sc-row-meta" th:if="${securityControl.id == null}">
+            <div class="sc-field sc-field-ref">
+                <label for="reference">Reference</label>
+                <input type="text" th:field="*{reference}" id="reference" placeholder="e.g., AC-2, IA-4" />
+            </div>
+            <div class="sc-field sc-field-domain">
+                <label for="securityControlDomain">Domain</label>
+                <select th:field="*{securityControlDomain.id}" id="securityControlDomain">
+                    <option value="" disabled
+                        th:selected="${securityControl.securityControlDomain == null}">-- Select --</option>
+                    <option th:each="domain : ${securityControlDomains}"
+                        th:value="${domain.id}"
+                        th:text="${domain.name}"
+                        th:selected="${securityControl.securityControlDomain != null and domain.id == securityControl.securityControlDomain.id}">
+                    </option>
+                </select>
+            </div>
+            <div class="sc-field sc-field-tags">
+                <label for="tag">Tags</label>
+                <input type="text" th:field="*{tag}" id="tag" placeholder="Tags..." />
+                <div class="tag-suggestions" th:if="${existingTags != null and !existingTags.isEmpty()}">
+                    <div class="tag-suggestions-list" id="tag-selection">
+                        <button type="button" class="tag-pill" th:each="t : ${existingTags}"
+                            th:text="${t}" th:attr="data-tag=${t}"></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 4: Governance Project (required – version-managed catalog) -->
+        <div class="sc-row" th:if="${requiresVersionManagement}">
+            <div class="sc-field sc-field-full">
+                <label for="projectId">Governance Project <span class="required-star">*</span></label>
+                <select name="projectId" id="projectId" required>
+                    <option value="">-- Select Project (Track Changes enabled) --</option>
+                    <option th:each="p : ${trackingProjects}" th:value="${p.id}" th:text="${p.name}"></option>
+                </select>
+                <span class="form-hint">Version-managed catalog — changes must be assigned to a project.</span>
+            </div>
+        </div>
+
+        <!-- Row 4b: Governance Project (optional – editing non-version-managed) -->
+        <div class="sc-row" th:if="${securityControl.id != null and !requiresVersionManagement}">
+            <div class="sc-field sc-field-full">
+                <label for="projectId">Governance Project</label>
+                <select name="projectId" id="projectId">
+                    <option value="">-- No project --</option>
+                    <option th:each="p : ${trackingProjects}" th:value="${p.id}" th:text="${p.name}"></option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Row 5: Buttons -->
+        <div class="sc-row sc-row-actions">
+            <button type="submit" class="btn-submit">Save</button>
+            <button type="button" class="btn-cancel" onclick="closeEditModal()">Cancel</button>
+        </div>
+    </form>
 </div>
 
 <script>
-function updateTagButtons() {
-    var tagInput = document.getElementById('tag');
-    var tagContainer = document.getElementById('tag-selection');
+    function updateTagButtons() {
+        var tagInput = document.getElementById('tag');
+        var tagContainer = document.getElementById('tag-selection');
 
-    if (!tagInput || !tagContainer) {
-        return;
-    }
+        if (!tagInput || !tagContainer) {
+            return;
+        }
 
-    var inputValue = tagInput.value;
-    var selectedTags = [];
+        var inputValue = tagInput.value;
+        var selectedTags = [];
 
-    if (inputValue && inputValue.trim().length > 0) {
-        var parts = inputValue.split(',');
-        for (var i = 0; i < parts.length; i++) {
-            var trimmed = parts[i].trim();
-            if (trimmed.length > 0) {
-                selectedTags.push(trimmed);
+        if (inputValue && inputValue.trim().length > 0) {
+            var parts = inputValue.split(',');
+            for (var i = 0; i < parts.length; i++) {
+                var trimmed = parts[i].trim();
+                if (trimmed.length > 0) {
+                    selectedTags.push(trimmed);
+                }
+            }
+        }
+
+        var buttons = tagContainer.querySelectorAll('.tag-pill');
+        for (var i = 0; i < buttons.length; i++) {
+            var button = buttons[i];
+            var buttonTag = button.getAttribute('data-tag');
+            var isActive = false;
+
+            for (var j = 0; j < selectedTags.length; j++) {
+                if (selectedTags[j] === buttonTag) {
+                    isActive = true;
+                    break;
+                }
+            }
+
+            if (isActive) {
+                button.classList.add('active');
+            } else {
+                button.classList.remove('active');
             }
         }
     }
 
-    var buttons = tagContainer.querySelectorAll('.tag-pill');
-    for (var i = 0; i < buttons.length; i++) {
-        var button = buttons[i];
-        var buttonTag = button.getAttribute('data-tag');
-        var isActive = false;
+    function handleTagClick(event) {
+        event.preventDefault();
+        event.stopPropagation();
 
-        for (var j = 0; j < selectedTags.length; j++) {
-            if (selectedTags[j] === buttonTag) {
-                isActive = true;
+        var tagInput = document.getElementById('tag');
+        var clickedButton = event.currentTarget;
+        var clickedTag = clickedButton.getAttribute('data-tag');
+
+        if (!tagInput || !clickedTag) {
+            return;
+        }
+
+        var inputValue = tagInput.value;
+        var selectedTags = [];
+        if (inputValue && inputValue.trim().length > 0) {
+            var parts = inputValue.split(',');
+            for (var i = 0; i < parts.length; i++) {
+                var trimmed = parts[i].trim();
+                if (trimmed.length > 0) {
+                    selectedTags.push(trimmed);
+                }
+            }
+        }
+
+        var found = false;
+        for (var i = 0; i < selectedTags.length; i++) {
+            if (selectedTags[i] === clickedTag) {
+                selectedTags.splice(i, 1);
+                found = true;
                 break;
             }
         }
 
-        if (isActive) {
-            button.classList.add('active');
-        } else {
-            button.classList.remove('active');
+        if (!found) {
+            selectedTags.push(clickedTag);
         }
-    }
-}
 
-function handleTagClick(event) {
-    event.preventDefault();
-    event.stopPropagation();
-
-    var tagInput = document.getElementById('tag');
-    var clickedButton = event.currentTarget;
-    var clickedTag = clickedButton.getAttribute('data-tag');
-
-    if (!tagInput || !clickedTag) {
-        return;
+        tagInput.value = selectedTags.length > 0 ? selectedTags.join(', ') : '';
+        updateTagButtons();
     }
 
-    var inputValue = tagInput.value;
-    var selectedTags = [];
-    if (inputValue && inputValue.trim().length > 0) {
-        var parts = inputValue.split(',');
-        for (var i = 0; i < parts.length; i++) {
-            var trimmed = parts[i].trim();
-            if (trimmed.length > 0) {
-                selectedTags.push(trimmed);
-            }
+    function initializeTagButtons() {
+        var tagContainer = document.getElementById('tag-selection');
+
+        if (!tagContainer) {
+            return;
+        }
+
+        updateTagButtons();
+
+        var buttons = tagContainer.querySelectorAll('.tag-pill');
+        for (var i = 0; i < buttons.length; i++) {
+            buttons[i].addEventListener('click', handleTagClick);
         }
     }
 
-    var found = false;
-    for (var i = 0; i < selectedTags.length; i++) {
-        if (selectedTags[i] === clickedTag) {
-            selectedTags.splice(i, 1);
-            found = true;
-            break;
-        }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeTagButtons);
+    } else {
+        initializeTagButtons();
     }
-
-    if (!found) {
-        selectedTags.push(clickedTag);
-    }
-
-    tagInput.value = selectedTags.length > 0 ? selectedTags.join(', ') : '';
-    updateTagButtons();
-}
-
-function initializeTagButtons() {
-    var tagContainer = document.getElementById('tag-selection');
-
-    if (!tagContainer) {
-        return;
-    }
-
-    updateTagButtons();
-
-    var buttons = tagContainer.querySelectorAll('.tag-pill');
-    for (var i = 0; i < buttons.length; i++) {
-        buttons[i].addEventListener('click', handleTagClick);
-    }
-}
-
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeTagButtons);
-} else {
-    initializeTagButtons();
-}
 </script>

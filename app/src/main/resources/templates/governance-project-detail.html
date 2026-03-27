@@ -45,7 +45,7 @@
             </tr>
         </thead>
         <tbody>
-            <tr th:each="task : ${project.tasks}" th:data-task-id="${task.id}" th:id="'task-' + ${task.id}">
+            <tr th:each="task : ${project.tasks}" th:data-task-id="${task.id}">
                 <td th:text="${task.title}"></td>
                 <td>
                     <span class="task-status-badge"
@@ -55,7 +55,7 @@
                 <td th:text="${task.assignedUser != null ? task.assignedUser.name : '-'}"></td>
                 <td>
                     <a th:if="${task.securityControl != null}" class="link"
-                       th:href="@{/security-control/edit(id=${task.securityControl.id},returnUrl=${'/governance/projects/' + project.id + '#task-' + task.id})}"
+                       th:href="@{/security-control/edit(id=${task.securityControl.id},returnUrl=${'/governance/projects/' + project.id})}"
                        th:text="${task.securityControl.name}"></a>
                     <span th:if="${task.securityControl == null}">-</span>
                 </td>
