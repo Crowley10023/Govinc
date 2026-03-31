@@ -7,6 +7,7 @@
     <meta name="_csrf_header" th:content="${_csrf.headerName}">
     <title>Org Unit Reporting</title>
     <script src="/webjars/chart.js/3.9.1/dist/chart.min.js"></script>
+    <script src="/org-unit-wizard.js"></script>
     <th:block th:replace="~{navigation :: navHead}"></th:block>
     <style>
         .reporting-card {
@@ -64,11 +65,13 @@
 
         <div class="reporting-card">
             <div class="reporting-selector">
-                <label for="org-unit-select">Organisation Unit:</label>
-                <select id="org-unit-select" class="form-control">
-                    <option value="">-- Select an org unit --</option>
-                    <option th:each="ou : ${orgUnits}" th:value="${ou.id}" th:text="${ou.name}">Org Unit</option>
-                </select>
+                <label>Organisation Unit:</label>
+                <input type="hidden" id="org-unit-id-hidden" />
+                <div style="display:flex;align-items:center;gap:0.5em;">
+                    <span id="org-unit-label" style="min-width:180px;padding:0.3em 0.6em;background:#f0f0f5;border-radius:4px;border:1px solid #ccc;"></span>
+                    <button type="button" class="btn-secondary btn-sm" id="chooseReportingOrgUnitBtn">Choose&hellip;</button>
+                    <button type="button" class="btn-cancel btn-sm" id="clearReportingOrgUnitBtn" style="display:none;" onclick="clearReportingOrgUnit()">&#10005;</button>
+                </div>
             </div>
             <div id="loading-indicator">Loading chart data...</div>
             <div id="chart-placeholder">Please select an organisation unit to display the charts.</div>
@@ -78,6 +81,17 @@
         </div>
 
         <div id="charts-container"></div>
+    </div>
+
+    <!-- Org Unit Wizard Modal -->
+    <div id="reportingOrgUnitModal" style="display:none;position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;">
+        <div class="ou-wizard-modal-inner" style="background:#fff;border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.18);">
+            <div class="ou-wizard-title" style="padding:1em 1.2em 0.5em;font-weight:700;font-size:1.1em;border-bottom:1px solid #e0e0e8;">Choose Org Unit</div>
+            <div id="reportingOrgUnitViewport" class="ou-wizard-viewport" style="padding:0.7em 1.2em;"></div>
+            <div class="ou-wizard-footer" style="padding:0.7em 1.2em;border-top:1px solid #e0e0e8;display:flex;justify-content:flex-end;gap:0.5em;">
+                <button type="button" class="btn-cancel" id="reportingOrgUnitCancelBtn">Cancel</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -91,8 +105,7 @@
                 .replace(/"/g, '&quot;');
         }
 
-        document.getElementById('org-unit-select').addEventListener('change', function () {
-            var orgUnitId = this.value;
+        function loadOrgUnitCharts(orgUnitId) {
 
             // Destroy previous charts
             catalogChartInstances.forEach(function (c) { try { c.destroy(); } catch(e) {} });
@@ -126,7 +139,7 @@
                     document.getElementById('no-data-msg').textContent = 'Error loading data. Please try again.';
                     document.getElementById('no-data-msg').style.display = 'block';
                 });
-        });
+        }
 
         function renderCatalogCharts(catalogs) {
             var container = document.getElementById('charts-container');
@@ -219,6 +232,30 @@
                 catalogChartInstances.push(instance);
             });
         }
+
+        function clearReportingOrgUnit() {
+            document.getElementById('org-unit-id-hidden').value = '';
+            document.getElementById('org-unit-label').textContent = '';
+            document.getElementById('clearReportingOrgUnitBtn').style.display = 'none';
+            loadOrgUnitCharts('');
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            createOrgUnitWizard({
+                modalId:        'reportingOrgUnitModal',
+                viewportId:     'reportingOrgUnitViewport',
+                openButtonId:   'chooseReportingOrgUnitBtn',
+                cancelButtonId: 'reportingOrgUnitCancelBtn',
+                closeOnSelect:  true,
+                selectedId:     function() { return document.getElementById('org-unit-id-hidden').value; },
+                onSelect: function(unit) {
+                    document.getElementById('org-unit-id-hidden').value = String(unit.id);
+                    document.getElementById('org-unit-label').textContent = unit.name;
+                    document.getElementById('clearReportingOrgUnitBtn').style.display = '';
+                    loadOrgUnitCharts(unit.id);
+                }
+            });
+        });
     </script>
 </body>
 </html>

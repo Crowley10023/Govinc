@@ -5,7 +5,9 @@
     <th:block th:replace="~{navigation :: navHead}"></th:block>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <meta charset="UTF-8">
-    <title>Compliance View</title>    <script src="/webjars/chart.js/3.9.1/dist/chart.min.js"></script>
+    <title>Compliance View</title>
+    <script src="/org-unit-wizard.js"></script>
+    <script src="/webjars/chart.js/3.9.1/dist/chart.min.js"></script>
     <script>
         var currentChart = null;
         var detailsDataCache = {};
@@ -185,12 +187,15 @@
         <h1>Compliance View</h1>
         <form method="get" action="/compliance/view" class="entity-edit-frame" style="display:flex;gap:2em;align-items:flex-end;flex-wrap:wrap;">
             <div>
-                <label for="orgUnitId">Org Unit:</label>
-                <select name="orgUnitId" id="orgUnitId">
-                    <option th:each="org : ${orgUnits}" th:value="${org.id}" th:text="${org.name}"
-                        th:selected="${org.id == selectedOrg?.id}">
-                    </option>
-                </select>
+                <label>Org Unit:</label>
+                <input type="hidden" id="orgUnitId" name="orgUnitId" th:value="${selectedOrg?.id}" />
+                <div style="display:flex;align-items:center;gap:0.5em;">
+                    <span id="orgUnitLabel" style="min-width:120px;padding:0.3em 0.6em;background:#f0f0f5;border-radius:4px;border:1px solid #ccc;"
+                          th:text="${selectedOrg != null ? selectedOrg.name : ''}"></span>
+                    <button type="button" class="btn-secondary btn-sm" id="chooseOrgUnitBtn">Choose&hellip;</button>
+                    <button type="button" class="btn-cancel btn-sm" id="clearOrgUnitBtn"
+                            th:style="${selectedOrg != null ? '' : 'display:none;'}" onclick="clearOrgUnit()">&#10005;</button>
+                </div>
             </div>
             <div>
                 <label for="checkId">Compliance Check:</label>
@@ -280,6 +285,46 @@
         </div>
 
     </div>
-</body>
 
+    <!-- Org Unit Wizard Modal -->
+    <div id="complianceOrgUnitModal" style="display:none;position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;">
+        <div class="ou-wizard-modal-inner" style="background:#fff;border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.18);">
+            <div class="ou-wizard-title" style="padding:1em 1.2em 0.5em;font-weight:700;font-size:1.1em;border-bottom:1px solid #e0e0e8;">Choose Org Unit</div>
+            <div id="complianceOrgUnitViewport" class="ou-wizard-viewport" style="padding:0.7em 1.2em;"></div>
+            <div class="ou-wizard-footer" style="padding:0.7em 1.2em;border-top:1px solid #e0e0e8;display:flex;justify-content:flex-end;gap:0.5em;">
+                <button type="button" class="btn-cancel" id="complianceOrgUnitCancelBtn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        var selectedOrgId = /*[[${selectedOrg?.id}]]*/ null;
+
+        (function() {
+            var clearBtn = document.getElementById('clearOrgUnitBtn');
+
+            window.clearOrgUnit = function() {
+                document.getElementById('orgUnitId').value = '';
+                document.getElementById('orgUnitLabel').textContent = '';
+                clearBtn.style.display = 'none';
+            };
+        })();
+
+        document.addEventListener('DOMContentLoaded', function() {
+            createOrgUnitWizard({
+                modalId:        'complianceOrgUnitModal',
+                viewportId:     'complianceOrgUnitViewport',
+                openButtonId:   'chooseOrgUnitBtn',
+                cancelButtonId: 'complianceOrgUnitCancelBtn',
+                closeOnSelect:  true,
+                selectedId:     function() { return document.getElementById('orgUnitId').value; },
+                onSelect: function(unit) {
+                    document.getElementById('orgUnitId').value = unit.id;
+                    document.getElementById('orgUnitLabel').textContent = unit.name;
+                    document.getElementById('clearOrgUnitBtn').style.display = '';
+                }
+            });
+        });
+    </script>
+</body>
 </html>

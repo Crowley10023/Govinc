@@ -180,11 +180,14 @@ public class LandingController {
                 if (currentUser != null) {
                     List<GovernanceTask> myTasks = governanceTaskRepository.findByAssignedUserId(currentUser.getId());
                     model.addAttribute("myTasks", myTasks);
+                    model.addAttribute("currentUserName", currentUser.getName());
                 } else {
                     model.addAttribute("myTasks", new ArrayList<>());
+                    model.addAttribute("currentUserName", "");
                 }
             } catch (Exception taskEx) {
                 model.addAttribute("myTasks", new ArrayList<>());
+                model.addAttribute("currentUserName", "");
             }
 
         } catch (Exception ex) {
@@ -193,6 +196,7 @@ public class LandingController {
             model.addAttribute("filterUsers", new ArrayList<>());
             model.addAttribute("filterCatalogs", new ArrayList<>());
             model.addAttribute("myTasks", new ArrayList<>());
+            model.addAttribute("currentUserName", "");
         }
         return "landing";
     }

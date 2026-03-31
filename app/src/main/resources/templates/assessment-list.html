@@ -98,7 +98,7 @@
                             orgUnitsCache = orgUnits;
                             // Show filter button only if user has accessible org units
                             if (orgUnits && orgUnits.length > 0) {
-                                document.getElementById('orgUnitFilterBtn').style.display = 'inline-block';
+                                document.getElementById('orgUnitFilterBtn').classList.remove('d-none');
                             }
 
                             if (orgUnitParam) {

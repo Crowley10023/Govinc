@@ -213,13 +213,14 @@ $(document).ready(function () {
             viewportId: 'orgunitWizardViewport',
             openButtonId: 'choose-orgunit-btn',
             cancelButtonId: 'orgunit-cancel-btn',
-            closeOnSelect: false,
+            closeOnSelect: true,
             selectedId: function () {
                 return hiddenInput.value || window.currentOrgUnitId || '';
             },
             onSelect: function (unit) {
                 hiddenInput.value = String(unit.id);
                 selectedLabel.textContent = unit.name;
+                document.getElementById('orgunit-form').submit();
             }
         });
     }

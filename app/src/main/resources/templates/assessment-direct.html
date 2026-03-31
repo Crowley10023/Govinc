@@ -183,26 +183,27 @@
         var CHECKMARK_SVG = '<svg width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" stroke="#22b573" stroke-width="2" fill="#fff"/><polyline points="6,12 10,16 16,7" stroke="#22b573" stroke-width="2.5" fill="none"/></svg>';
         function toggleDomain(header) {
             var controlsDiv = header.nextElementSibling;
-            if (controlsDiv.style.display === 'none' || controlsDiv.style.display === '') {
-                controlsDiv.style.display = 'block';
+            var isHidden = controlsDiv.classList.contains('d-none') || controlsDiv.style.display === 'none';
+            if (isHidden) {
+                controlsDiv.classList.remove('d-none');
+                controlsDiv.style.display = '';
             } else {
-                controlsDiv.style.display = 'none';
+                controlsDiv.classList.add('d-none');
             }
         }
         function toggleAssessmentDetails(header) {
             var body = header.nextElementSibling;
-            if (body.style.display === 'none' || body.style.display === '') {
-                body.style.display = 'block';
+            var isHidden = body.classList.contains('d-none') || body.style.display === 'none';
+            if (isHidden) {
+                body.classList.remove('d-none');
+                body.style.display = '';
             } else {
-                body.style.display = 'none';
+                body.classList.add('d-none');
             }
             var chevron = header.querySelector('.domain-chevron svg');
             if (chevron) {
-                if (body.style.display === 'block') {
-                    chevron.style.transform = 'rotate(180deg)';
-                } else {
-                    chevron.style.transform = '';
-                }
+                var nowVisible = !body.classList.contains('d-none') && body.style.display !== 'none';
+                chevron.style.transform = nowVisible ? 'rotate(180deg)' : '';
             }
         }
         
