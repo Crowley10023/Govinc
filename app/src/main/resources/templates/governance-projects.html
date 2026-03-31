@@ -20,7 +20,7 @@
     <table class="table card" id="projectsTable">
         <colgroup>
             <col style="width:15%">
-            <col style="width:10%">
+                <col style="width:12rem;"> 
             <col style="width:11%">
             <col style="width:20%">
             <col style="width:5%">
@@ -46,8 +46,7 @@
                     <a th:href="@{/governance/projects/{id}(id=${project.id})}" th:text="${project.name}" class="link"></a>
                 </td>
                 <td>
-                    <span class="tag-pill" th:text="${project.projectType.displayName}"></span>
-                    <div class="text-muted text-sm" th:text="${project.projectType.description}"></div>
+                    <span class="tag-pill type-pill" th:text="${project.projectType.displayName}"></span>
                 </td>
                 <td th:text="${project.owner != null ? project.owner.name : '-'}"></td>
                 <td th:text="${project.description != null ? (#strings.length(project.description) > 80 ? #strings.substring(project.description, 0, 80) + '...' : project.description) : '-'}"></td>
@@ -104,11 +103,13 @@
                 </select>
             </label>
             <div id="createTrackChangesRow" class="d-none">
-                <label class="checkbox-label">
-                    <input type="checkbox" id="createProjectTrackChanges">
-                    Track Changes
-                </label>
-                <span class="text-muted text-sm">Allows changes to Security Controls to be tracked with this project.</span>
+                <div class="track-changes-inline">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="createProjectTrackChanges">
+                        Track Changes
+                    </label>
+                    <span class="text-muted text-sm">Allows changes to Security Controls to be tracked with this project.</span>
+                </div>
             </div>
         </div>
         <div class="modal-btn-row">
@@ -146,11 +147,13 @@
                 </select>
             </label>
             <div id="editTrackChangesRow" class="d-none">
-                <label class="checkbox-label">
-                    <input type="checkbox" id="editProjectTrackChanges">
-                    Track Changes
-                </label>
-                <span class="text-muted text-sm">Allows changes to Security Controls to be tracked with this project.</span>
+                <div class="track-changes-inline">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="editProjectTrackChanges">
+                        Track Changes
+                    </label>
+                    <span class="text-muted text-sm">Allows changes to Security Controls to be tracked with this project.</span>
+                </div>
             </div>
         </div>
         <div class="modal-btn-row">
