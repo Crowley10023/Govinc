@@ -62,7 +62,10 @@
                 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1em;">
                     <div class="form-group">
                         <label for="fontFamily">Font Family (CSS)</label>
-                        <input type="text" th:field="*{fontFamily}" id="fontFamily" placeholder="Segoe UI, Arial, sans-serif">
+                        <div style="display:flex;gap:0.5em;align-items:center;">
+                            <input type="text" th:field="*{fontFamily}" id="fontFamily" placeholder="Segoe UI, Arial, sans-serif" style="flex:1;min-width:0;">
+                            <button type="button" id="openFontPickerBtn" class="btn-secondary btn-sm" style="white-space:nowrap;">Browse&hellip;</button>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="fontSizeNav">Nav Font Size</label>
@@ -250,6 +253,22 @@
             </div>
         </form>
 
+        <!-- Font Picker Modal -->
+        <div id="fontPickerModal" class="modal-bg" style="display:none">
+            <div class="modal-popup" style="max-width:600px;width:95vw;max-height:82vh;display:flex;flex-direction:column;">
+                <h3 style="margin-top:0;">Choose Font Family</h3>
+                <p style="font-size:0.87em;color:#666;margin:0 0 0.7em 0;">Click a font to preview, then Apply to use it.</p>
+                <div id="fontPickerList" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:0.35em;padding-right:0.3em;"></div>
+                <div style="margin-top:0.8em;padding:0.5em 0.6em;background:#f0f6fb;border-radius:6px;font-size:0.82em;color:#555;">
+                    Preview:&nbsp;<span id="fontPickerPreviewSpan" style="font-size:1.1em;color:var(--text-main);"></span>
+                </div>
+                <div class="modal-btn-row" style="margin-top:0.8em;">
+                    <button type="button" id="fontPickerCancelBtn" class="btn-cancel">Cancel</button>
+                    <button type="button" id="fontPickerApplyBtn" class="btn-action">Apply</button>
+                </div>
+            </div>
+        </div>
+
         <div class="info-panel-theme">
             <h4>&#127912; Propose Layout by AI</h4>
             <p class="text-sm" style="color:#555;margin-top:0">AI will suggest a matching color theme. If a logo is already uploaded it will be used automatically; you can also upload a different image to base the suggestion on.</p>
@@ -336,6 +355,80 @@
                         statusDiv.innerHTML = '<span style="color:#c22;">&#10007; Error: ' + err.message + '</span>';
                     });
             }
+        })();
+    </script>
+
+    <script>
+        // ── Font Picker ─────────────────────────────────────────────────
+        (function() {
+            var FONTS = [
+                { label: 'Segoe UI  (Windows default)',       value: 'Segoe UI, Arial, sans-serif' },
+                { label: 'Arial',                              value: 'Arial, Helvetica, sans-serif' },
+                { label: 'Helvetica Neue',                     value: '"Helvetica Neue", Helvetica, Arial, sans-serif' },
+                { label: 'Verdana',                            value: 'Verdana, Geneva, sans-serif' },
+                { label: 'Tahoma',                             value: 'Tahoma, Verdana, sans-serif' },
+                { label: 'Trebuchet MS',                       value: '"Trebuchet MS", Helvetica, sans-serif' },
+                { label: 'Roboto  (Android / Material)',       value: 'Roboto, "Helvetica Neue", Arial, sans-serif' },
+                { label: 'Inter',                              value: 'Inter, "Segoe UI", Arial, sans-serif' },
+                { label: 'Open Sans',                          value: '"Open Sans", Arial, sans-serif' },
+                { label: 'Lato',                               value: 'Lato, Arial, sans-serif' },
+                { label: 'Source Sans Pro',                    value: '"Source Sans Pro", Arial, sans-serif' },
+                { label: 'Georgia  (Serif)',                   value: 'Georgia, "Times New Roman", serif' },
+                { label: 'Palatino  (Serif)',                  value: '"Palatino Linotype", Palatino, serif' },
+                { label: 'Garamond  (Serif)',                  value: 'Garamond, Georgia, serif' },
+                { label: 'Times New Roman  (Serif)',           value: '"Times New Roman", Times, serif' },
+                { label: 'Consolas  (Monospace)',              value: 'Consolas, "Courier New", monospace' },
+                { label: 'Courier New  (Monospace)',           value: '"Courier New", Courier, monospace' },
+            ];
+
+            var PREVIEW_TEXT = 'The quick brown fox — 0123456789';
+            var selectedFont = null;
+
+            var inputEl    = document.getElementById('fontFamily');
+            var modal      = document.getElementById('fontPickerModal');
+            var listEl     = document.getElementById('fontPickerList');
+            var previewEl  = document.getElementById('fontPickerPreviewSpan');
+
+            document.getElementById('openFontPickerBtn').addEventListener('click', function() {
+                selectedFont = inputEl.value || null;
+                listEl.innerHTML = '';
+                FONTS.forEach(function(f) {
+                    var btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'font-picker-option' + (inputEl.value === f.value ? ' selected' : '');
+                    var nameSpan = document.createElement('span');
+                    nameSpan.className = 'font-picker-name';
+                    nameSpan.textContent = f.label;
+                    var prevSpan = document.createElement('span');
+                    prevSpan.className = 'font-picker-preview';
+                    prevSpan.style.fontFamily = f.value;
+                    prevSpan.textContent = PREVIEW_TEXT;
+                    btn.appendChild(nameSpan);
+                    btn.appendChild(prevSpan);
+                    btn.addEventListener('click', function() {
+                        listEl.querySelectorAll('.font-picker-option').forEach(function(b) { b.classList.remove('selected'); });
+                        this.classList.add('selected');
+                        selectedFont = f.value;
+                        previewEl.textContent = PREVIEW_TEXT;
+                        previewEl.style.fontFamily = f.value;
+                    });
+                    listEl.appendChild(btn);
+                });
+                previewEl.textContent = inputEl.value ? PREVIEW_TEXT : '';
+                previewEl.style.fontFamily = inputEl.value || '';
+                modal.style.display = 'flex';
+            });
+
+            document.getElementById('fontPickerCancelBtn').addEventListener('click', function() {
+                modal.style.display = 'none';
+            });
+            document.getElementById('fontPickerApplyBtn').addEventListener('click', function() {
+                if (selectedFont !== null) inputEl.value = selectedFont;
+                modal.style.display = 'none';
+            });
+            modal.addEventListener('click', function(e) {
+                if (e.target === this) this.style.display = 'none';
+            });
         })();
     </script>
 </body>

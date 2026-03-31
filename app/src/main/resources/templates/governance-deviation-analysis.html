@@ -212,9 +212,24 @@
     </div>
 </div>
 
+<!-- Analysis Loading Overlay -->
+<div id="analysisLoadingOverlay" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.38);align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:12px;padding:2em 2.8em;box-shadow:0 4px 24px rgba(0,0,0,0.18);display:flex;flex-direction:column;align-items:center;gap:0.9em;min-width:300px;">
+        <div class="analysis-spinner"></div>
+        <div style="font-size:1.08em;font-weight:600;color:var(--primary-blue);">Analyzing deviations&hellip;</div>
+        <div style="font-size:0.87em;color:#666;text-align:center;">This may take a moment depending on the<br>number of controls. Please wait.</div>
+    </div>
+</div>
+
 <script>
     var csrfToken = document.querySelector('meta[name="_csrf"]').content;
     var csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+
+    // Show loading overlay when analysis form is submitted
+    document.querySelector('.deviation-filter-form').addEventListener('submit', function() {
+        var overlay = document.getElementById('analysisLoadingOverlay');
+        overlay.style.display = 'flex';
+    });
 
     // --- Single Task from Gap ---
     function openTaskFromGap(btn) {

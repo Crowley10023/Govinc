@@ -17,15 +17,12 @@
             <!-- Filter Bar -->
             <div class="filter-card">
                 <div class="filter-inputs">
-                    <div>
-                        <button id="orgUnitFilterBtn" class="btn-secondary btn-sm d-none" type="button">Org Unit</button>
-                        <span id="activeOrgUnitFilter" class="badge d-none align-center">
-                            <span id="orgUnitFilterName"></span>
-                            <svg id="clearOrgUnitFilter" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16"
-                                height="16" class="clear-filter-icon">
-                                <circle cx="8" cy="8" r="8" fill="#ccc" />
-                                <path d="M5 5l6 6M11 5l-6 6" stroke="#333" stroke-width="2" stroke-linecap="round" />
-                            </svg>
+                    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:0.4em;">
+                        <button id="orgUnitFilterBtn" class="btn-secondary btn-sm d-none" type="button">Choose Org Unit&hellip;</button>
+                        <span id="activeOrgUnitFilter" class="active-filter-tag" style="display:none">
+                            <span class="active-filter-tag-label">Org Unit:</span>
+                            <span id="orgUnitFilterName" class="active-filter-tag-value"></span>
+                            <button type="button" id="clearOrgUnitFilter" class="active-filter-tag-remove" title="Remove filter">&#10005;</button>
                         </span>
                     </div>
                     <div>
@@ -38,15 +35,21 @@
                     </div>
                     <div>
                         <label for="filterAssCreator">Creator:</label>
-                        <input type="text" id="filterAssCreator" class="col-filter" data-col="2" placeholder="Filter creator…">
+                        <select id="filterAssCreator" class="col-filter" data-col="2">
+                            <option value="">All creators</option>
+                        </select>
                     </div>
                     <div>
                         <label for="filterAssStatus">Status:</label>
-                        <input type="text" id="filterAssStatus" class="col-filter" data-col="3" placeholder="Filter status…">
+                        <select id="filterAssStatus" class="col-filter" data-col="3">
+                            <option value="">All statuses</option>
+                        </select>
                     </div>
                     <div>
                         <label for="filterAssCatalog">Catalog:</label>
-                        <input type="text" id="filterAssCatalog" class="col-filter" data-col="4" placeholder="Filter catalog…">
+                        <select id="filterAssCatalog" class="col-filter" data-col="4">
+                            <option value="">All catalogs</option>
+                        </select>
                     </div>
                 </div>
             </div>
@@ -129,6 +132,7 @@
 
                     // Setup row click handlers
                     setupAssessmentRowHandlers();
+                    populateFilterSelects();
                 });
 
                 function setupAssessmentRowHandlers() {
@@ -403,9 +407,33 @@
                     }
                 });
 
+                function populateFilterSelects() {
+                    const rows = document.querySelectorAll('#assessmentTbody tr');
+                    const creators = new Set(), statuses = new Set(), catalogs = new Set();
+                    rows.forEach(function(row) {
+                        const c = row.children;
+                        if (c[2]) creators.add(c[2].textContent.trim());
+                        if (c[3]) statuses.add(c[3].textContent.trim());
+                        if (c[4]) catalogs.add(c[4].textContent.trim());
+                    });
+                    function fillSelect(id, values) {
+                        const sel = document.getElementById(id);
+                        if (!sel) return;
+                        Array.from(values).filter(v => v && v !== 'N/A').sort().forEach(function(v) {
+                            const opt = document.createElement('option');
+                            opt.value = v; opt.textContent = v;
+                            sel.appendChild(opt);
+                        });
+                    }
+                    fillSelect('filterAssCreator', creators);
+                    fillSelect('filterAssStatus', statuses);
+                    fillSelect('filterAssCatalog', catalogs);
+                }
+
                 // Column filter inputs
                 document.querySelectorAll('.col-filter').forEach(inp => {
                     inp.addEventListener('input', applyAllFilters);
+                    inp.addEventListener('change', applyAllFilters);
                     // Prevent row click when clicking filter inputs
                     inp.addEventListener('click', e => e.stopPropagation());
                 });

@@ -11513,3 +11513,99 @@ a.back-link:hover {
 }
 .mapping-status-bar.success { border-color: #27ae60; color: #27ae60; }
 .mapping-status-bar.error   { border-color: #c0392b; color: #c0392b; }
+
+/* =========================================================
+   ACTIVE FILTER TAG (dismissible chip in filter bars)
+   ========================================================= */
+.active-filter-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+    background: var(--primary-blue, #2274a5);
+    color: #fff;
+    border-radius: 999px;
+    padding: 0.18em 0.3em 0.18em 0.7em;
+    font-size: var(--font-size-body, 0.9em);
+    font-weight: 500;
+    white-space: nowrap;
+}
+.active-filter-tag-label {
+    opacity: 0.82;
+    font-size: 0.87em;
+    margin-right: 0.1em;
+}
+.active-filter-tag-value {
+    font-weight: 600;
+}
+.active-filter-tag-remove {
+    background: rgba(255,255,255,0.22);
+    border: none;
+    border-radius: 50%;
+    width: 1.35em;
+    height: 1.35em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #fff;
+    font-size: 0.8em;
+    margin-left: 0.15em;
+    padding: 0;
+    line-height: 1;
+    transition: background 0.15s;
+}
+.active-filter-tag-remove:hover {
+    background: rgba(255,255,255,0.44);
+}
+
+/* =========================================================
+   ANALYSIS LOADING OVERLAY (deviation analysis patience popup)
+   ========================================================= */
+.analysis-spinner {
+    width: 36px;
+    height: 36px;
+    border: 4px solid #d8eaf6;
+    border-top-color: var(--primary-blue, #2274a5);
+    border-radius: 50%;
+    animation: analysis-spin 0.75s linear infinite;
+    flex-shrink: 0;
+}
+@keyframes analysis-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* =========================================================
+   FONT PICKER MODAL
+   ========================================================= */
+.font-picker-option {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2em;
+    padding: 0.5em 0.8em;
+    border: 1px solid #dde8f0;
+    border-radius: 6px;
+    background: #f8fafc;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.12s, border-color 0.12s;
+    width: 100%;
+    box-sizing: border-box;
+}
+.font-picker-option:hover {
+    background: #e8f2fb;
+    border-color: var(--primary-blue, #2274a5);
+}
+.font-picker-option.selected {
+    background: #d0e8f8;
+    border-color: var(--primary-blue, #2274a5);
+    border-width: 2px;
+}
+.font-picker-name {
+    font-size: 0.78em;
+    color: var(--gray777, #666);
+    font-family: inherit !important;
+}
+.font-picker-preview {
+    font-size: 1.08em;
+    color: var(--text-main, #222);
+}
