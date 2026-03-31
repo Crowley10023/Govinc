@@ -222,27 +222,78 @@ public class AssessmentEmailRestController {
         // Resolve recipient e-mail addresses from provided user IDs
         @SuppressWarnings("unchecked")
         List<Object> rawIds = (List<Object>) payload.get("recipientUserIds");
-        if (rawIds == null || rawIds.isEmpty()) {
+        @SuppressWarnings("unchecked")
+        List<Map<String, String>> corpDirRecipients =
+                (List<Map<String, String>>) payload.getOrDefault("corpDirRecipients", List.of());
+
+        boolean hasExistingRecipients = rawIds != null && !rawIds.isEmpty();
+        boolean hasCorpDirRecipients  = corpDirRecipients != null && !corpDirRecipients.isEmpty();
+
+        if (!hasExistingRecipients && !hasCorpDirRecipients) {
             return ResponseEntity.badRequest().body(Map.of("error", "No recipients selected."));
         }
 
-        List<Long> userIds = rawIds.stream()
-                .map(o -> o instanceof Number n ? n.longValue() : Long.parseLong(String.valueOf(o)))
-                .collect(Collectors.toList());
+        List<Long> userIds = hasExistingRecipients
+                ? rawIds.stream()
+                        .map(o -> o instanceof Number n ? n.longValue() : Long.parseLong(String.valueOf(o)))
+                        .collect(Collectors.toList())
+                : List.of();
 
         // Only allow selecting users that are assigned to this assessment (security check)
         List<Long> assignedUserIds = assessment.getUsers().stream()
                 .map(User::getId)
                 .collect(Collectors.toList());
 
-        List<String> recipientEmails = userIds.stream()
+        List<String> recipientEmails = new java.util.ArrayList<>(userIds.stream()
                 .filter(assignedUserIds::contains)
                 .map(uid -> userRepository.findById(uid))
                 .filter(Optional::isPresent)
                 .map(Optional::get)
                 .map(User::getEmail)
                 .filter(e -> e != null && !e.isBlank())
-                .collect(Collectors.toList());
+                .collect(Collectors.toList()));
+
+        // Process corp-dir recipients: find or create user (preserving existing role),
+        // add to assessment users, and collect their e-mails for sending.
+        if (hasCorpDirRecipients) {
+            for (Map<String, String> cdUser : corpDirRecipients) {
+                String emailRaw = cdUser.getOrDefault("mail", "").trim();
+                if (emailRaw.isBlank()) emailRaw = cdUser.getOrDefault("userPrincipalName", "").trim();
+                if (emailRaw.isBlank() || !emailRaw.contains("@")) continue;
+                final String cdEmail = emailRaw.toLowerCase();
+
+                String gn = cdUser.getOrDefault("givenName", "").trim();
+                String sn = cdUser.getOrDefault("surname",   "").trim();
+                if (gn.isBlank() && sn.isBlank()) {
+                    String display = cdUser.getOrDefault("displayName", "").trim();
+                    int sp = display.lastIndexOf(' ');
+                    if (sp > 0) { gn = display.substring(0, sp); sn = display.substring(sp + 1); }
+                    else         { gn = display; }
+                }
+                final String givenName = gn;
+                final String surname   = sn;
+
+                // Find existing user or create new with ASSESSOR role; never overwrite an existing role
+                User cdDbUser = userRepository.findByEmail(cdEmail).orElseGet(() -> {
+                    User nu = new User(givenName, surname, cdEmail);
+                    nu.setRole(com.govinc.user.Role.ASSESSOR);
+                    return userRepository.save(nu);
+                });
+
+                // Add to assessment if not already present
+                boolean alreadyMember = assessment.getUsers().stream()
+                        .anyMatch(u -> u.getId().equals(cdDbUser.getId()));
+                if (!alreadyMember) {
+                    assessment.getUsers().add(cdDbUser);
+                }
+
+                if (cdDbUser.getEmail() != null && !cdDbUser.getEmail().isBlank()
+                        && !recipientEmails.contains(cdDbUser.getEmail())) {
+                    recipientEmails.add(cdDbUser.getEmail());
+                }
+            }
+            assessmentRepository.save(assessment);
+        }
 
         if (recipientEmails.isEmpty()) {
             return ResponseEntity.badRequest().body(
