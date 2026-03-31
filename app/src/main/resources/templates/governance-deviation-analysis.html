@@ -61,7 +61,7 @@
         </div>
 
         <div th:if="${!#lists.isEmpty(gaps)}" class="general-button-bar">
-            <button type="button" class="btn-action" onclick="openCreateAllTasksModal()">&#128203; Create All Tasks</button>
+            <button type="button" class="btn-action" onclick="openMakeProjectModal()">&#128203; Make a Project</button>
         </div>
 
         <table th:if="${!#lists.isEmpty(gaps)}" class="table card gap-table">
@@ -114,7 +114,7 @@
     <div class="modal-popup">
         <h3>Create Task from Deviation</h3>
         <div class="modal-form">
-            <label>Title
+            <label>Title <span class="required-hint">*</span>
                 <input type="text" id="gapTaskTitle">
             </label>
             <label>Description
@@ -127,12 +127,28 @@
                     <option th:each="u : ${users}" th:value="${u.id}" th:text="${u.name}"></option>
                 </select>
             </label>
-            <label>Project *
-                <select id="gapTaskProject">
-                    <option value="">-- Select Project --</option>
-                    <option th:each="p : ${projects}" th:value="${p.id}" th:text="${p.name}"></option>
-                </select>
-            </label>
+            <fieldset class="deviation-project-fieldset">
+                <legend>Project</legend>
+                <div class="flex-row gap-md mb-sm">
+                    <label class="user-check-item">
+                        <input type="radio" name="gapTaskProjectMode" value="existing" checked onchange="toggleGapTaskProjectMode()">
+                        Use existing Deviation project
+                    </label>
+                    <label class="user-check-item">
+                        <input type="radio" name="gapTaskProjectMode" value="new" onchange="toggleGapTaskProjectMode()">
+                        Create new Deviation project
+                    </label>
+                </div>
+                <div id="gapTaskExistingProjectRow">
+                    <select id="gapTaskProject">
+                        <option value="">-- Select Deviation Project --</option>
+                        <option th:each="p : ${projects}" th:value="${p.id}" th:text="${p.name}"></option>
+                    </select>
+                </div>
+                <div id="gapTaskNewProjectRow" class="d-none">
+                    <input type="text" id="gapTaskNewProjectName" placeholder="New Deviation project name">
+                </div>
+            </fieldset>
         </div>
         <div class="modal-btn-row">
             <button type="button" class="btn-cancel" onclick="closeGapTaskModal()">Cancel</button>
@@ -141,11 +157,11 @@
     </div>
 </div>
 
-<!-- Create All Tasks Modal -->
+<!-- Make a Project Modal -->
 <div id="createAllTasksModal" class="modal-bg">
     <div class="modal-popup">
-        <h3>Create All Tasks</h3>
-        <p class="text-muted">All <span id="allTasksCount"></span> proposed tasks will be created and assigned to the selected project and user.</p>
+        <h3>Make a Project</h3>
+        <p class="text-muted">All <span id="allTasksCount"></span> proposed tasks will be created and assigned to the selected Deviation project and user.</p>
         <div class="modal-form">
             <label>Assign All To
                 <select id="allTasksUser">
@@ -154,31 +170,31 @@
                 </select>
             </label>
             <fieldset class="deviation-project-fieldset">
-                <legend>Project</legend>
+                <legend>Deviation Project</legend>
                 <div class="flex-row gap-md mb-sm">
                     <label class="user-check-item">
                         <input type="radio" name="allTasksProjectMode" value="existing" checked onchange="toggleProjectMode()">
-                        Use existing project
+                        Use existing Deviation project
                     </label>
                     <label class="user-check-item">
                         <input type="radio" name="allTasksProjectMode" value="new" onchange="toggleProjectMode()">
-                        Create new project
+                        Create new Deviation project
                     </label>
                 </div>
                 <div id="allTasksExistingProjectRow">
                     <select id="allTasksExistingProject">
-                        <option value="">-- Select Project --</option>
+                        <option value="">-- Select Deviation Project --</option>
                         <option th:each="p : ${projects}" th:value="${p.id}" th:text="${p.name}"></option>
                     </select>
                 </div>
                 <div id="allTasksNewProjectRow" class="d-none">
-                    <input type="text" id="allTasksNewProjectName" placeholder="New project name">
+                    <input type="text" id="allTasksNewProjectName" placeholder="New Deviation project name">
                 </div>
             </fieldset>
         </div>
         <div class="modal-btn-row">
             <button type="button" class="btn-cancel" onclick="closeCreateAllTasksModal()">Cancel</button>
-            <button type="button" class="btn-action" onclick="submitCreateAllTasks()">Create All Tasks</button>
+            <button type="button" class="btn-action" onclick="submitCreateAllTasks()">Make Project</button>
         </div>
     </div>
 </div>
@@ -187,27 +203,43 @@
     var csrfToken = document.querySelector('meta[name="_csrf"]').content;
     var csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
 
+    // --- Single Task from Gap ---
     function openTaskFromGap(btn) {
         document.getElementById('gapTaskTitle').value = btn.getAttribute('data-title') || '';
         document.getElementById('gapTaskDescription').value = btn.getAttribute('data-description') || '';
         document.getElementById('gapTaskControlId').value = btn.getAttribute('data-control-id') || '';
+        document.getElementById('gapTaskProject').value = '';
+        document.getElementById('gapTaskNewProjectName').value = '';
+        document.querySelector('input[name="gapTaskProjectMode"][value="existing"]').checked = true;
+        toggleGapTaskProjectMode();
         document.getElementById('gapTaskModal').style.display = 'flex';
     }
     function closeGapTaskModal() {
         document.getElementById('gapTaskModal').style.display = 'none';
     }
+    function toggleGapTaskProjectMode() {
+        var mode = document.querySelector('input[name="gapTaskProjectMode"]:checked').value;
+        document.getElementById('gapTaskExistingProjectRow').classList.toggle('d-none', mode !== 'existing');
+        document.getElementById('gapTaskNewProjectRow').classList.toggle('d-none', mode !== 'new');
+    }
 
     function submitGapTask() {
         var title = document.getElementById('gapTaskTitle').value.trim();
-        var projectId = document.getElementById('gapTaskProject').value;
         if (!title) { alert('Title is required'); return; }
-        if (!projectId) { alert('Please select a project'); return; }
+
+        var mode = document.querySelector('input[name="gapTaskProjectMode"]:checked').value;
+        var projectId = mode === 'existing' ? document.getElementById('gapTaskProject').value : null;
+        var newProjectName = mode === 'new' ? document.getElementById('gapTaskNewProjectName').value.trim() : null;
+
+        if (mode === 'existing' && !projectId) { alert('Please select a project'); return; }
+        if (mode === 'new' && !newProjectName) { alert('Please enter a project name'); return; }
 
         var payload = {
             title: title,
             description: document.getElementById('gapTaskDescription').value.trim() || null,
             assignedUserId: document.getElementById('gapTaskUser').value || null,
-            projectId: projectId,
+            projectId: projectId || null,
+            newProjectName: newProjectName || null,
             securityControlId: document.getElementById('gapTaskControlId').value || null
         };
         var headers = { 'Content-Type': 'application/json' };
@@ -220,7 +252,8 @@
         });
     }
 
-    function openCreateAllTasksModal() {
+    // --- Make a Project (bulk) ---
+    function openMakeProjectModal() {
         var rows = document.querySelectorAll('.gap-data-row');
         document.getElementById('allTasksCount').textContent = rows.length;
         document.getElementById('allTasksUser').value = '';
@@ -274,12 +307,22 @@
         .then(function(data) {
             if (data.error) { alert(data.error); return; }
             closeCreateAllTasksModal();
-            var msg = data.created + ' task(s) created.';
+            var msg = data.created + ' task(s) created in Deviation project.';
             if (data.projectId) { msg += ' View them in the project.'; }
             alert(msg);
         })
         .catch(function() { alert('Failed to create tasks'); });
     }
+
+    // Close modals on backdrop click or Escape
+    document.querySelectorAll('.modal-bg').forEach(function(modal) {
+        modal.addEventListener('click', function(e) { if (e.target === this) this.style.display = 'none'; });
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.modal-bg').forEach(function(m) { m.style.display = 'none'; });
+        }
+    });
 </script>
 </body>
 </html>

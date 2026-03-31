@@ -110,11 +110,13 @@
                                 <input type="number" min="0" max="100" class="control-input control-percent"
                                     th:value="${control.percent}" required
                                     th:disabled="${control.answeredByAnotherAssessment}" />
-                                <select class="control-select control-answer d-none"
-                                    th:disabled="${control.answeredByAnotherAssessment}"></select>
-                                <button type="button" class="answering-guide-btn org-guide-btn" style="display:none;"
-                                    th:disabled="${control.answeredByAnotherAssessment}"
-                                    onclick="openOrgGuide(this)" title="Get AI-powered answering guide">💡 Guide</button>
+                                <div class="org-answer-row" style="display:none;align-items:center;gap:4px;">
+                                    <select class="control-select control-answer d-none"
+                                        th:disabled="${control.answeredByAnotherAssessment}"></select>
+                                    <button type="button" class="answering-guide-btn org-guide-btn" style="display:none;"
+                                        th:disabled="${control.answeredByAnotherAssessment}"
+                                        onclick="openOrgGuide(this)" title="Get AI-powered answering guide">💡</button>
+                                </div>
                             </td>
                             <td>
                                 <textarea class="control-comment"
@@ -242,16 +244,19 @@
         });
 
         function switchToInputMode() {
-            // Show all percent inputs and hide all answer selects and guide buttons
+            // Show all percent inputs, hide answer selects and guide buttons
             document.querySelectorAll('.control-row').forEach(row => {
                 const percentInput = row.querySelector('.control-percent');
                 const answerSelect = row.querySelector('.control-answer');
                 const guideBtn = row.querySelector('.org-guide-btn');
+                const answerRow = row.querySelector('.org-answer-row');
                 percentInput.style.display = 'block';
                 answerSelect.style.display = 'none';
+                answerSelect.classList.add('d-none');
                 answerSelect.value = '';
                 answerSelect.removeEventListener('change', handleAnswerChange);
                 if (guideBtn) guideBtn.style.display = 'none';
+                if (answerRow) answerRow.style.display = 'none';
             });
         }
 
@@ -287,12 +292,18 @@
                 }
 
                 percentInput.style.display = 'none';
+                answerSelect.classList.remove('d-none');
                 answerSelect.style.display = 'block';
                 answerSelect.addEventListener('change', handleAnswerChange);
 
-                // Show guide button when in answer mode
+                // Show answer row wrapper
+                const answerRow = row.querySelector('.org-answer-row');
+                if (answerRow) answerRow.style.display = 'flex';
+
+                // Show guide button only for editable and applicable rows
                 const guideBtn = row.querySelector('.org-guide-btn');
-                if (guideBtn && !guideBtn.disabled) guideBtn.style.display = 'inline-block';
+                const isApplicable = row.querySelector('.control-applicable').checked;
+                if (guideBtn && !guideBtn.disabled && isApplicable) guideBtn.style.display = 'inline-block';
             });
         }
 
@@ -503,6 +514,12 @@
                 // Update the field state
                 updatePercentFieldState(row);
 
+                // Update guide button visibility based on applicable state and current mode
+                const guideBtn = row.querySelector('.org-guide-btn');
+                if (guideBtn && !guideBtn.disabled && currentMaturityModel) {
+                    guideBtn.style.display = applicable ? 'inline-block' : 'none';
+                }
+
                 saveControlChange(controlId, applicable, percent);
                 applyFilters();
             });
@@ -574,6 +591,15 @@
             return d.innerHTML;
         }
 
+        // Build fetch headers including CSRF token (csrfToken/csrfHeader are declared in the main script block)
+        function _orgGuideFetchHeaders() {
+            var h = { 'Content-Type': 'application/json' };
+            if (typeof csrfToken !== 'undefined' && csrfToken && typeof csrfHeader !== 'undefined' && csrfHeader) {
+                h[csrfHeader] = csrfToken;
+            }
+            return h;
+        }
+
         function openOrgGuide(btn) {
             var row = btn.closest('.control-row');
             var controlId = row.getAttribute('data-control-id');
@@ -594,7 +620,7 @@
 
             fetch('/assessment/generate-answering-guide-questions', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: _orgGuideFetchHeaders(),
                 body: JSON.stringify({ controlId: controlId, controlName: controlName, controlDetail: controlDetail, securityCatalogId: 0 })
             })
             .then(function(r) { return r.json(); })
@@ -616,6 +642,7 @@
         }
 
         function renderOrgGuideQuestions(questions) {
+            var noModel = !currentMaturityModel;
             var html = '<div class="questions-container">';
             questions.forEach(function(q, i) {
                 html += '<div class="question-item">';
@@ -625,7 +652,10 @@
                 html += '<button type="button" class="question-pill" data-qi="' + i + '" data-val="No" onclick="selectOrgGuidePill(this)">No</button>';
                 html += '</div></div>';
             });
-            html += '<button type="button" class="guide-submit-answers-btn" onclick="submitOrgGuideAnswers()">Submit Answers</button>';
+            if (noModel) {
+                html += '<p style="color:#e07800;font-size:0.88em;margin:0.5em 0;">⚠ Select a maturity model to enable answer suggestions.</p>';
+            }
+            html += '<button type="button" class="guide-submit-answers-btn"' + (noModel ? ' disabled title="Select a maturity model first"' : '') + ' onclick="submitOrgGuideAnswers()">Submit Answers</button>';
             html += '</div>';
             var el = document.getElementById('org-guide-questions');
             el.innerHTML = html;
@@ -651,7 +681,7 @@
             if (!allAnswered) { alert('Please answer all questions before submitting.'); return; }
 
             if (!currentMaturityModel || !currentMaturityModel.maturityAnswers) {
-                alert('No maturity model selected.');
+                alert('Please select a maturity model to enable answer suggestions.');
                 return;
             }
             var maturityModelAnswers = currentMaturityModel.maturityAnswers.map(function(a) {
@@ -663,7 +693,7 @@
 
             fetch('/assessment/generate-answer-from-guide', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: _orgGuideFetchHeaders(),
                 body: JSON.stringify({
                     controlId: _orgGuideState.controlId,
                     securityCatalogId: 0,
@@ -679,6 +709,7 @@
                     _orgGuideState.proposedAnswer = resp.proposedAnswer;
                     document.getElementById('org-guide-questions').style.display = 'flex';
                     highlightOrgGuideAnswer(resp.proposedAnswer);
+                    showOrgGuideTakeoverBtn(resp.proposedAnswer);
                 } else {
                     alert('Error generating answer. Please try again.');
                     document.getElementById('org-guide-questions').style.display = 'flex';
@@ -691,20 +722,68 @@
             });
         }
 
+        // Inject the Apply / Retry row below the question list after AI proposes an answer
+        function showOrgGuideTakeoverBtn(proposedAnswer) {
+            var existing = document.getElementById('org-guide-takeover-row');
+            if (existing) existing.remove();
+            var container = document.querySelector('#org-guide-questions .questions-container');
+            if (!container) return;
+            var div = document.createElement('div');
+            div.id = 'org-guide-takeover-row';
+            div.style.cssText = 'margin-top:1em;display:flex;gap:0.5em;align-items:center;flex-wrap:wrap;border-top:1px solid #e0e0e0;padding-top:0.75em;';
+            div.innerHTML =
+                '<span style="font-size:0.9em;color:#333;">Suggested: <strong>' + escapeOrgGuideHtml(proposedAnswer) + '</strong></span>' +
+                '<button type="button" class="btn-primary" onclick="applyOrgGuideProposedAnswer()" style="font-size:0.85em;padding:4px 12px;">✔ Apply</button>' +
+                '<button type="button" class="btn-cancel" onclick="discardOrgGuideProposal()" style="font-size:0.85em;padding:4px 8px;">↩ Retry</button>';
+            container.appendChild(div);
+        }
+
+        // Apply the AI-proposed answer to the control row
+        function applyOrgGuideProposedAnswer() {
+            if (!_orgGuideState.proposedAnswer || !currentMaturityModel) return;
+            var match = (currentMaturityModel.maturityAnswers || []).find(function(a) {
+                return a.answer === _orgGuideState.proposedAnswer;
+            });
+            if (match) {
+                applyOrgGuideAnswer(match.rating, match.answer);
+            } else {
+                alert('Could not match proposed answer. Please apply manually from the right panel.');
+            }
+        }
+
+        // Clear the proposal and let the user re-answer
+        function discardOrgGuideProposal() {
+            _orgGuideState.proposedAnswer = null;
+            document.querySelectorAll('#org-guide-maturity-list .maturity-answer-card').forEach(function(c) {
+                c.classList.remove('maturity-answer-suggested');
+            });
+            var row = document.getElementById('org-guide-takeover-row');
+            if (row) row.remove();
+        }
+
         function highlightOrgGuideAnswer(proposedAnswer) {
+            var matched = null;
             document.querySelectorAll('#org-guide-maturity-list .maturity-answer-card').forEach(function(card) {
                 if (card.getAttribute('data-answer') === proposedAnswer) {
                     card.classList.add('maturity-answer-suggested');
+                    matched = card;
                 } else {
                     card.classList.remove('maturity-answer-suggested');
                 }
             });
+            if (matched) {
+                var list = document.getElementById('org-guide-maturity-list');
+                list.scrollTop = (matched.offsetTop || 0) - 30;
+            }
         }
 
         function populateOrgGuideMaturity() {
             var list = document.getElementById('org-guide-maturity-list');
             list.innerHTML = '';
-            if (!currentMaturityModel || !currentMaturityModel.maturityAnswers) return;
+            if (!currentMaturityModel || !currentMaturityModel.maturityAnswers) {
+                list.innerHTML = '<p style="color:#888;font-size:0.88em;padding:0.5em 0;">Select a maturity model to see available answers here.</p>';
+                return;
+            }
             currentMaturityModel.maturityAnswers.forEach(function(a) {
                 var card = document.createElement('div');
                 card.className = 'maturity-answer-card';
@@ -724,12 +803,12 @@
             if (!row) return;
             var answerSelect = row.querySelector('.control-answer');
             var percentInput = row.querySelector('.control-percent');
-            if (answerSelect) {
-                answerSelect.value = rating;
-                percentInput.value = rating;
-                var applicable = row.querySelector('.control-applicable').checked;
-                saveControlChange(controlId, applicable, rating);
-            }
+            var applicable = row.querySelector('.control-applicable').checked;
+            // Update percent input (always present)
+            if (percentInput) percentInput.value = String(rating);
+            // Update answer select when a maturity model is active
+            if (answerSelect && currentMaturityModel) answerSelect.value = String(rating);
+            saveControlChange(controlId, applicable, String(rating));
             closeOrgGuide();
         }
 

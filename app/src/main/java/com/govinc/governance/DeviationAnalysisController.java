@@ -56,7 +56,8 @@ public class DeviationAnalysisController {
         model.addAttribute("orgUnits", orgUnitService.getAllOrgUnits());
         model.addAttribute("catalogs", securityCatalogRepository.findAll());
         model.addAttribute("complianceChecks", complianceService.findAll());
-        model.addAttribute("projects", projectRepository.findAll());
+        // Only Deviation Management projects for the deviation analysis page
+        model.addAttribute("projects", projectRepository.findByProjectType(ProjectType.DEVIATION_MANAGEMENT));
         model.addAttribute("users", userRepository.findAll());
 
         if (orgUnitId != null && catalogId != null && checkId != null) {
@@ -91,6 +92,19 @@ public class DeviationAnalysisController {
         Long assignedUserId = payload.get("assignedUserId") != null ? Long.valueOf(payload.get("assignedUserId").toString()) : null;
         Long projectId = payload.get("projectId") != null ? Long.valueOf(payload.get("projectId").toString()) : null;
         Long securityControlId = payload.get("securityControlId") != null ? Long.valueOf(payload.get("securityControlId").toString()) : null;
+        String newProjectName = (String) payload.get("newProjectName");
+
+        // Create new Deviation project if requested
+        if (newProjectName != null && !newProjectName.isBlank()) {
+            GovernanceProject newProject = projectService.createProject(newProjectName.trim(), null, assignedUserId, currentUser);
+            newProject.setProjectType(ProjectType.DEVIATION_MANAGEMENT);
+            projectService.save(newProject);
+            projectId = newProject.getId();
+        }
+
+        if (projectId == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "A project is required"));
+        }
 
         GovernanceTask task = taskService.createTask(title, description, assignedUserId,
                 securityControlId, null, null, projectId, null, currentUser);
@@ -107,9 +121,11 @@ public class DeviationAnalysisController {
         String newProjectName = (String) payload.get("newProjectName");
         Long projectId = payload.get("projectId") != null ? Long.valueOf(payload.get("projectId").toString()) : null;
 
-        // Create new project if requested
+        // Create new project if requested - always set as DEVIATION_MANAGEMENT
         if (newProjectName != null && !newProjectName.isBlank()) {
             GovernanceProject newProject = projectService.createProject(newProjectName.trim(), null, assignedUserId, currentUser);
+            newProject.setProjectType(ProjectType.DEVIATION_MANAGEMENT);
+            projectService.save(newProject);
             projectId = newProject.getId();
         }
 

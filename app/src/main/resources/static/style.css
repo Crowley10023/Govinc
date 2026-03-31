@@ -2516,6 +2516,15 @@ body::before {
     cursor: not-allowed;
 }
 
+/* Compact icon-only guide button inside org answer row */
+.org-answer-row .org-guide-btn {
+    padding: 0.35em 0.55em;
+    font-size: 1.1em;
+    line-height: 1;
+    flex-shrink: 0;
+    border-radius: 5px;
+}
+
 .dropdown-row {
     flex: 1;
     min-width: 180px;
@@ -11725,3 +11734,75 @@ a.back-link:hover {
 /* Project Info Card */
 .project-info-card { padding: 1.5em; margin-bottom: 1.5em; }
 
+/* === Project Type Selection Cards === */
+.project-type-cards {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.25rem;
+}
+.project-type-card {
+    flex: 1;
+    min-width: 150px;
+    border: 2px solid var(--border, #ddd);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    background: var(--background-light, #fafafa);
+}
+.project-type-card:hover {
+    border-color: var(--primary-blue, #3498db);
+    background: rgba(25, 118, 210, 0.04);
+}
+.project-type-card.selected {
+    border-color: var(--primary-blue, #3498db);
+    background: rgba(25, 118, 210, 0.08);
+}
+.project-type-card-name {
+    font-weight: 700;
+    font-size: 0.95em;
+    margin-bottom: 0.25rem;
+    color: var(--text-main);
+}
+.project-type-card-desc {
+    font-size: 0.82em;
+    color: var(--gray-777, #777);
+    line-height: 1.4;
+}
+
+/* === Linked Assessments === */
+.linked-assessments-container {
+    max-height: 40vh;
+    overflow-y: auto;
+    margin-bottom: 1rem;
+}
+.linked-assessments-add-section {
+    border-top: 1px solid var(--border, #ddd);
+    padding-top: 1rem;
+    margin-top: 0.5rem;
+}
+.linked-assessments-add-section h4 {
+    margin: 0 0 0.25rem 0;
+    font-size: 0.95em;
+}
+
+/* Linked assessments two-column split */
+.linked-assessments-split {
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-start;
+    min-height: 200px;
+}
+.linked-assessments-split-left {
+    flex: 2;
+    min-width: 0;
+    overflow-y: auto;
+    max-height: 50vh;
+}
+.linked-assessments-split-right {
+    flex: 1;
+    min-width: 220px;
+    border-left: 1px solid var(--border, #ddd);
+    padding-left: 1.5rem;
+}

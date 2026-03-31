@@ -15,10 +15,14 @@
 
     <div class="card project-info-card">
         <div class="flex-row flex-wrap gap-lg">
+            <div>
+                <span class="tag-pill" th:text="${project.projectType.displayName}"></span>
+                <div class="text-muted text-sm" th:text="${project.projectType.description}"></div>
+            </div>
             <div><strong>Owner:</strong> <span th:text="${project.owner != null ? project.owner.name : '-'}"></span></div>
             <div><strong>Created:</strong> <span th:text="${project.createdDate != null ? #temporals.format(project.createdDate, 'yyyy-MM-dd') : '-'}"></span></div>
             <div><strong>Tasks:</strong> <span th:text="${project.taskCount}"></span> (<span th:text="${project.completedTaskCount}"></span> done)</div>
-            <div><strong>Track Changes:</strong>
+            <div th:if="${project.projectType.name() == 'CHANGE_MANAGEMENT'}"><strong>Track Changes:</strong>
                 <span th:if="${project.trackChanges}" class="badge badge-info">Yes</span>
                 <span th:if="${!project.trackChanges}" class="text-muted">No</span>
             </div>
@@ -27,8 +31,9 @@
             <strong>Description:</strong>
             <p th:text="${project.description}"></p>
         </div>
-        <div th:if="${project.trackChanges}" class="mt-sm">
-            <button type="button" class="btn-action btn-sm" onclick="openChangesModal()">View Changes</button>
+        <div class="flex-row gap-md mt-sm">
+            <button th:if="${project.trackChanges}" type="button" class="btn-action btn-sm" onclick="openChangesModal()">View Changes</button>
+            <button th:if="${project.projectType.name() == 'DEVIATION_MANAGEMENT'}" type="button" class="btn-action btn-sm" onclick="openLinkedAssessmentsModal()">Linked Assessments (<span th:text="${project.linkedAssessmentCount}"></span>)</button>
         </div>
     </div>
 
@@ -333,6 +338,160 @@
         </div>
     </div>
 </div>
+
+<!-- Linked Assessments Modal (Deviation Management only) -->
+<div id="linkedAssessmentsModal" class="modal-bg">
+    <div class="modal-popup modal-popup-lg">
+        <h3>Linked Assessments</h3>
+        <div class="linked-assessments-split">
+            <div class="linked-assessments-split-left">
+                <p class="text-muted text-sm">Assessments linked to this Deviation Management project for maturity tracking.</p>
+                <div id="linkedAssessmentsContent" class="linked-assessments-container">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
+            <div class="linked-assessments-split-right">
+                <h4 style="margin-top:0">Add Assessments</h4>
+                <p class="text-muted text-sm">Select an org unit and catalog to link the latest assessments from that org unit and its children.</p>
+                <div class="modal-form">
+                    <label>Org Unit
+                        <div class="flex-row gap-md align-center">
+                            <button type="button" id="openLinkOrgUnitModal" class="btn-action btn-sm">Select Org Unit</button>
+                            <span id="linkSelectedOrgUnitName" class="text-muted text-sm">None selected</span>
+                        </div>
+                    </label>
+                    <input type="hidden" id="linkOrgUnitId">
+                    <label>Security Catalog
+                        <select id="linkCatalogId">
+                            <option value="">-- Select Catalog --</option>
+                            <option th:each="cat : ${catalogs}" th:value="${cat.id}" th:text="${cat.name}"></option>
+                        </select>
+                    </label>
+                    <button type="button" class="btn-action" onclick="submitLinkAssessments()">Link Assessments</button>
+                </div>
+            </div>
+        </div>
+        <div class="modal-btn-row">
+            <button type="button" class="btn-cancel" onclick="closeLinkedAssessmentsModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Org Unit Wizard Modal for Linked Assessments -->
+<div id="linkOrgUnitWizardModal" class="modal-bg" aria-hidden="true">
+    <div class="modal-popup ou-wizard-modal-inner">
+        <div class="modal-header-row">
+            <h3 class="m-0">Choose Organizational Unit</h3>
+            <button type="button" id="closeLinkOrgUnitModal" class="btn-cancel">Close</button>
+        </div>
+        <div id="linkOrgUnitWizardViewport" class="ou-wizard-viewport"></div>
+    </div>
+</div>
+
+<script src="/org-unit-wizard.js"></script>
+<script>
+    (function() {
+        var projectId = document.getElementById('currentProjectId').value;
+
+        // --- Linked Assessments ---
+        window.openLinkedAssessmentsModal = function() {
+            document.getElementById('linkedAssessmentsModal').style.display = 'flex';
+            loadLinkedAssessments();
+        };
+        window.closeLinkedAssessmentsModal = function() {
+            document.getElementById('linkedAssessmentsModal').style.display = 'none';
+        };
+
+        function loadLinkedAssessments() {
+            var container = document.getElementById('linkedAssessmentsContent');
+            container.innerHTML = '<p class="text-muted">Loading...</p>';
+            fetch('/governance/projects/' + projectId + '/linked-assessments')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data || data.length === 0) {
+                        container.innerHTML = '<p class="text-muted">No assessments linked yet.</p>';
+                        return;
+                    }
+                    var html = '<table class="table"><thead><tr><th>Name</th><th>Org Unit</th><th>Catalog</th><th>Status</th><th>Created</th><th>Action</th></tr></thead><tbody>';
+                    for (var i = 0; i < data.length; i++) {
+                        var a = data[i];
+                        html += '<tr>';
+                        html += '<td>' + escapeHtml(a.name) + '</td>';
+                        html += '<td>' + escapeHtml(a.orgUnit) + '</td>';
+                        html += '<td>' + escapeHtml(a.catalog) + '</td>';
+                        html += '<td>' + escapeHtml(a.status) + '</td>';
+                        html += '<td>' + escapeHtml(a.creationDate) + '</td>';
+                        html += '<td><button type="button" class="btn-danger btn-sm" onclick="unlinkAssessment(' + a.id + ')">Remove</button></td>';
+                        html += '</tr>';
+                    }
+                    html += '</tbody></table>';
+                    container.innerHTML = html;
+                })
+                .catch(function() {
+                    container.innerHTML = '<p class="text-muted">Failed to load linked assessments.</p>';
+                });
+        }
+
+        window.unlinkAssessment = function(assessmentId) {
+            var headers = { 'Content-Type': 'application/json' };
+            headers[csrfHeader] = csrfToken;
+            fetch('/governance/projects/' + projectId + '/unlink-assessment', {
+                method: 'POST', headers: headers,
+                body: JSON.stringify({ assessmentId: assessmentId })
+            }).then(function(r) {
+                if (r.ok) { loadLinkedAssessments(); }
+                else { alert('Failed to remove assessment'); }
+            });
+        };
+
+        window.submitLinkAssessments = function() {
+            var orgUnitId = document.getElementById('linkOrgUnitId').value;
+            var catalogId = document.getElementById('linkCatalogId').value;
+            if (!orgUnitId) { alert('Please select an org unit'); return; }
+            if (!catalogId) { alert('Please select a catalog'); return; }
+
+            var headers = { 'Content-Type': 'application/json' };
+            headers[csrfHeader] = csrfToken;
+            fetch('/governance/projects/' + projectId + '/link-assessments', {
+                method: 'POST', headers: headers,
+                body: JSON.stringify({ orgUnitId: orgUnitId, catalogId: catalogId })
+            }).then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.error) { alert(data.error); return; }
+                loadLinkedAssessments();
+            })
+            .catch(function() { alert('Failed to link assessments'); });
+        };
+
+        // Org Unit Wizard for linking
+        if (window.createOrgUnitWizard) {
+            var hiddenInput = document.getElementById('linkOrgUnitId');
+            var selectedName = document.getElementById('linkSelectedOrgUnitName');
+            window.createOrgUnitWizard({
+                modalId: 'linkOrgUnitWizardModal',
+                viewportId: 'linkOrgUnitWizardViewport',
+                openButtonId: 'openLinkOrgUnitModal',
+                cancelButtonId: 'closeLinkOrgUnitModal',
+                closeOnSelect: true,
+                selectedId: function() { return hiddenInput.value || ''; },
+                onSelect: function(unit) {
+                    hiddenInput.value = String(unit.id);
+                    selectedName.textContent = unit.name;
+                }
+            });
+        }
+    })();
+
+    // Close modals on backdrop click or Escape
+    document.querySelectorAll('.modal-bg').forEach(function(modal) {
+        modal.addEventListener('click', function(e) { if (e.target === this) this.style.display = 'none'; });
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.modal-bg').forEach(function(m) { m.style.display = 'none'; });
+        }
+    });
+</script>
 
 </body>
 </html>

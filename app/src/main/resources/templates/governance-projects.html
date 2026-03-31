@@ -20,20 +20,20 @@
     <table class="table card" id="projectsTable">
         <colgroup>
             <col style="width:15%">
+            <col style="width:10%">
             <col style="width:11%">
-            <col style="width:24%">
-            <col style="width:8%">
+            <col style="width:20%">
             <col style="width:5%">
             <col style="width:7%">
             <col style="width:9%">
-            <col style="width:21%">
+            <col style="width:23%">
         </colgroup>
         <thead>
             <tr>
                 <th>Name</th>
+                <th></th>
                 <th>Owner</th>
                 <th>Description</th>
-                <th>Track Changes</th>
                 <th>Tasks</th>
                 <th>Progress</th>
                 <th>Created</th>
@@ -45,12 +45,12 @@
                 <td>
                     <a th:href="@{/governance/projects/{id}(id=${project.id})}" th:text="${project.name}" class="link"></a>
                 </td>
+                <td>
+                    <span class="tag-pill" th:text="${project.projectType.displayName}"></span>
+                    <div class="text-muted text-sm" th:text="${project.projectType.description}"></div>
+                </td>
                 <td th:text="${project.owner != null ? project.owner.name : '-'}"></td>
                 <td th:text="${project.description != null ? (#strings.length(project.description) > 80 ? #strings.substring(project.description, 0, 80) + '...' : project.description) : '-'}"></td>
-                <td>
-                    <span th:if="${project.trackChanges}" class="badge badge-info">Yes</span>
-                    <span th:if="${!project.trackChanges}" class="text-muted">No</span>
-                </td>
                 <td th:text="${project.taskCount}"></td>
                 <td>
                     <span th:if="${project.taskCount > 0}" th:text="${project.completedTaskCount} + '/' + ${project.taskCount}"></span>
@@ -64,6 +64,7 @@
                             th:data-name="${project.name}"
                             th:data-description="${project.description}"
                             th:data-owner-id="${project.owner != null ? project.owner.id : ''}"
+                            th:data-project-type="${project.projectType.name()}"
                             th:data-track-changes="${project.trackChanges}"
                             onclick="openEditProjectModal(this)">Edit</button>
                     <button type="button" class="btn-danger btn-sm" th:data-id="${project.id}" onclick="deleteProject(this)">Delete</button>
@@ -81,22 +82,34 @@
     <div class="modal-popup">
         <h3>Create Project</h3>
         <div class="modal-form">
-            <label>Name *
-                <input type="text" id="newProjectName">
+            <label>Project Type</label>
+            <div class="project-type-cards">
+                <div th:each="pt : ${projectTypes}" class="project-type-card"
+                     th:data-type="${pt.name()}" onclick="selectProjectType(this, 'create')">
+                    <div class="project-type-card-name" th:text="${pt.displayName}"></div>
+                    <div class="project-type-card-desc" th:text="${pt.description}"></div>
+                </div>
+            </div>
+            <input type="hidden" id="createProjectType" value="">
+            <label>Name
+                <input type="text" id="createProjectName">
             </label>
             <label>Description
-                <textarea id="newProjectDescription" rows="3"></textarea>
+                <textarea id="createProjectDescription" rows="3"></textarea>
             </label>
             <label>Owner
-                <select id="newProjectOwner">
+                <select id="createProjectOwner">
                     <option value="">-- Select Owner --</option>
                     <option th:each="u : ${users}" th:value="${u.id}" th:text="${u.name}"></option>
                 </select>
             </label>
-            <label class="checkbox-label">
-                <input type="checkbox" id="newProjectTrackChanges">
-                Track Changes
-            </label>
+            <div id="createTrackChangesRow" class="d-none">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="createProjectTrackChanges">
+                    Track Changes
+                </label>
+                <span class="text-muted text-sm">Allows changes to Security Controls to be tracked with this project.</span>
+            </div>
         </div>
         <div class="modal-btn-row">
             <button type="button" class="btn-cancel" onclick="closeCreateProjectModal()">Cancel</button>
@@ -111,7 +124,16 @@
         <h3>Edit Project</h3>
         <input type="hidden" id="editProjectId">
         <div class="modal-form">
-            <label>Name *
+            <label>Project Type</label>
+            <div class="project-type-cards">
+                <div th:each="pt : ${projectTypes}" class="project-type-card"
+                     th:data-type="${pt.name()}" onclick="selectProjectType(this, 'edit')">
+                    <div class="project-type-card-name" th:text="${pt.displayName}"></div>
+                    <div class="project-type-card-desc" th:text="${pt.description}"></div>
+                </div>
+            </div>
+            <input type="hidden" id="editProjectType" value="">
+            <label>Name
                 <input type="text" id="editProjectName">
             </label>
             <label>Description
@@ -123,10 +145,13 @@
                     <option th:each="u : ${users}" th:value="${u.id}" th:text="${u.name}"></option>
                 </select>
             </label>
-            <label class="checkbox-label">
-                <input type="checkbox" id="editProjectTrackChanges">
-                Track Changes
-            </label>
+            <div id="editTrackChangesRow" class="d-none">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="editProjectTrackChanges">
+                    Track Changes
+                </label>
+                <span class="text-muted text-sm">Allows changes to Security Controls to be tracked with this project.</span>
+            </div>
         </div>
         <div class="modal-btn-row">
             <button type="button" class="btn-cancel" onclick="closeEditProjectModal()">Cancel</button>
@@ -139,11 +164,35 @@
     var csrfToken = document.querySelector('meta[name="_csrf"]').content;
     var csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
 
+    function selectProjectType(card, mode) {
+        var parent = card.closest('.project-type-cards');
+        parent.querySelectorAll('.project-type-card').forEach(function(c) { c.classList.remove('selected'); });
+        card.classList.add('selected');
+        var type = card.getAttribute('data-type');
+        document.getElementById(mode + 'ProjectType').value = type;
+        updateProjectTypeFields(mode, type);
+    }
+
+    function updateProjectTypeFields(mode, type) {
+        var trackRow = document.getElementById(mode + 'TrackChangesRow');
+        if (type === 'CHANGE_MANAGEMENT') {
+            trackRow.classList.remove('d-none');
+        } else {
+            trackRow.classList.add('d-none');
+            document.getElementById(mode + 'ProjectTrackChanges').checked = false;
+        }
+    }
+
     function openCreateProjectModal() {
-        document.getElementById('newProjectName').value = '';
-        document.getElementById('newProjectDescription').value = '';
-        document.getElementById('newProjectOwner').value = '';
-        document.getElementById('newProjectTrackChanges').checked = false;
+        document.getElementById('createProjectName').value = '';
+        document.getElementById('createProjectDescription').value = '';
+        document.getElementById('createProjectOwner').value = '';
+        document.getElementById('createProjectTrackChanges').checked = false;
+        document.getElementById('createProjectType').value = 'OTHER';
+        document.querySelectorAll('#createProjectModal .project-type-card').forEach(function(c) {
+            c.classList.toggle('selected', c.getAttribute('data-type') === 'OTHER');
+        });
+        document.getElementById('createTrackChangesRow').classList.add('d-none');
         document.getElementById('createProjectModal').style.display = 'flex';
     }
     function closeCreateProjectModal() {
@@ -151,14 +200,17 @@
     }
 
     function submitCreateProject() {
-        var name = document.getElementById('newProjectName').value.trim();
+        var name = document.getElementById('createProjectName').value.trim();
+        var projectType = document.getElementById('createProjectType').value;
+        if (!projectType) { alert('Please select a project type'); return; }
         if (!name) { alert('Name is required'); return; }
 
         var payload = {
             name: name,
-            description: document.getElementById('newProjectDescription').value.trim() || null,
-            ownerId: document.getElementById('newProjectOwner').value || null,
-            trackChanges: document.getElementById('newProjectTrackChanges').checked
+            description: document.getElementById('createProjectDescription').value.trim() || null,
+            ownerId: document.getElementById('createProjectOwner').value || null,
+            projectType: projectType,
+            trackChanges: document.getElementById('createProjectTrackChanges').checked
         };
 
         var headers = { 'Content-Type': 'application/json' };
@@ -178,7 +230,14 @@
         document.getElementById('editProjectName').value = btn.getAttribute('data-name') || '';
         document.getElementById('editProjectDescription').value = btn.getAttribute('data-description') || '';
         document.getElementById('editProjectOwner').value = btn.getAttribute('data-owner-id') || '';
+        var projectType = btn.getAttribute('data-project-type') || 'OTHER';
+        document.getElementById('editProjectType').value = projectType;
         document.getElementById('editProjectTrackChanges').checked = btn.getAttribute('data-track-changes') === 'true';
+        // Highlight the selected type card
+        document.querySelectorAll('#editProjectModal .project-type-card').forEach(function(c) {
+            c.classList.toggle('selected', c.getAttribute('data-type') === projectType);
+        });
+        updateProjectTypeFields('edit', projectType);
         document.getElementById('editProjectModal').style.display = 'flex';
     }
     function closeEditProjectModal() {
@@ -188,12 +247,15 @@
     function submitEditProject() {
         var id = document.getElementById('editProjectId').value;
         var name = document.getElementById('editProjectName').value.trim();
+        var projectType = document.getElementById('editProjectType').value;
+        if (!projectType) { alert('Please select a project type'); return; }
         if (!name) { alert('Name is required'); return; }
 
         var payload = {
             name: name,
             description: document.getElementById('editProjectDescription').value.trim() || null,
             ownerId: document.getElementById('editProjectOwner').value || null,
+            projectType: projectType,
             trackChanges: document.getElementById('editProjectTrackChanges').checked
         };
 
@@ -221,6 +283,16 @@
             else { alert('Failed to delete project'); }
         });
     }
+
+    // Close modals on backdrop click or Escape
+    document.querySelectorAll('.modal-bg').forEach(function(modal) {
+        modal.addEventListener('click', function(e) { if (e.target === this) this.style.display = 'none'; });
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.modal-bg').forEach(function(m) { m.style.display = 'none'; });
+        }
+    });
 </script>
 </body>
 </html>
