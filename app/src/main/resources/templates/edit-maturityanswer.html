@@ -8,7 +8,7 @@
 <body>
     <div th:replace="~{navigation :: mainNav}"></div>
     <div class="container">
-        <h1>Edit Maturity Answer</h1>
+        <h1 class="page-title">Edit Maturity Answer</h1>
         <div style="max-width:500px;">
             <form th:action="@{'/maturityanswer/edit'}" method="post">
                 <input type="hidden" name="id" th:value="${maturityAnswer.id}" />

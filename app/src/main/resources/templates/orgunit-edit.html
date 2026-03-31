@@ -8,8 +8,8 @@
 </head>
 <body th:classappend="${(embed != null and embed) or (param.embed != null and #strings.equalsIgnoreCase(param.embed[0], 'true'))} ? 'embed-mode' : ''">
 <div th:unless="${(embed != null and embed) or (param.embed != null and #strings.equalsIgnoreCase(param.embed[0], 'true'))}" th:replace="~{navigation :: mainNav}"></div>
-<div class="container form-container">
-    <h1 th:text="${orgUnit.id != null} ? 'Edit Organization Unit' : 'Create Organization Unit'"></h1>
+<div class="container">
+    <h1 class="page-title" th:text="${orgUnit.id != null} ? 'Edit Organization Unit' : 'Create Organization Unit'"></h1>
 
             <form th:action="@{'/orgunits/save'}" method="post">
                 <input type="hidden" name="id" th:value="${orgUnit.id}"/>
@@ -76,11 +76,11 @@
 </div>
 
     <!-- Parent Org Unit Wizard Modal -->
-    <div class="ou-wizard-modal-inner" id="parentOrgUnitModal" style="display:none;position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;">
-        <div style="background:#fff;border-radius:10px;width:min(460px,96vw);max-height:80vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,0.18);">
-            <div class="ou-wizard-title" style="padding:1em 1.2em 0.5em;font-weight:700;font-size:1.1em;border-bottom:1px solid #e0e0e8;">Choose Parent Org Unit</div>
-            <div id="parentOrgUnitViewport" class="ou-wizard-viewport" style="flex:1;overflow-y:auto;padding:0.7em 1.2em;"></div>
-            <div class="ou-wizard-footer" style="padding:0.7em 1.2em;border-top:1px solid #e0e0e8;display:flex;justify-content:flex-end;gap:0.5em;">
+    <div class="modal-bg" id="parentOrgUnitModal">
+        <div class="modal-popup ou-wizard-modal-inner">
+            <div class="ou-wizard-title">Choose Parent Org Unit</div>
+            <div id="parentOrgUnitViewport" class="ou-wizard-viewport"></div>
+            <div class="ou-wizard-footer modal-btn-row">
                 <button type="button" class="btn-cancel" id="parentOrgUnitCancelBtn">Cancel</button>
             </div>
         </div>

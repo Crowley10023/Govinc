@@ -12,15 +12,14 @@
 <div th:replace="~{navigation :: mainNav}"></div>
 <div class="container">
     
-    <h1>Security Controls</h1>
+    <h1 class="page-title">Security Controls</h1>
     <div class="my-20">
         <button id="importBtn" class="import-button">Import Security Controls from CSV</button>
         <a href="/security-control/create" class="import-button primary">Create New Security Control</a>
     </div>
 
     <!-- Filter Bar -->
-    <div class="filter-bar">
-        <h3>🔍 Filter Security Controls</h3>
+    <div class="filter-card">
         <div class="filter-inputs">
             <div>
                 <label for="filterTitle">Title:</label>
@@ -70,7 +69,6 @@
     <!-- CSV Import Modal with 5-Step Wizard -->
     <div id="csvImportModal" class="modal">
         <div class="modal-content">
-            <span class="close">&times;</span>
             <h2>Import Security Controls from CSV - Wizard</h2>
             
             <!-- Step 1: File Selection -->
@@ -398,9 +396,9 @@ network segmentation","SC-7","Network"</div>
                 <td><span class="badge" th:text="${control.version != null ? control.version : '1.0'}"></span></td>
                 <td>
                     <div class="action-buttons">
-                        <button class="btn-edit" type="button" style="min-width:72px;" th:data-id="${control.id}" onclick="openEditModal(this)">Edit</button>
-                        <button class="btn-sm btn-action" type="button" th:data-id="${control.id}" th:data-name="${control.name}" onclick="openHistoryModal(this)">History</button>
-                        <button class="btn-danger" type="button" style="min-width:72px;" th:data-id="${control.id}" th:data-name="${control.name}" onclick="openDeleteModalFromBtn(this)">Delete</button>
+                        <button class="btn-edit" type="button" th:data-id="${control.id}" onclick="openEditModal(this)">Edit</button>
+                        <button class="btn-action" type="button" th:data-id="${control.id}" th:data-name="${control.name}" onclick="openHistoryModal(this)">History</button>
+                        <button class="btn-danger" type="button" th:data-id="${control.id}" th:data-name="${control.name}" onclick="openDeleteModalFromBtn(this)">Delete</button>
                     </div>
                 </td>
             </tr>

@@ -8,7 +8,7 @@
 <body>
 <div th:replace="~{navigation :: mainNav}"></div>
 <div class="container">
-    <h1>Organization Units</h1>
+    <h1 class="page-title">Organization Units</h1>
     <a th:href="@{'/orgunits/create'}" class="btn-action">Create New Org Unit</a>
     
     <div th:if="${#lists.isEmpty(orgUnits)}" class="empty-state">

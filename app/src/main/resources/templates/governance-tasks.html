@@ -11,26 +11,37 @@
 <body>
 <div th:replace="~{navigation :: mainNav}"></div>
 <div class="container">
-    <h1>Governance Tasks</h1>
+    <h1 class="page-title">Governance Tasks</h1>
 
     <div class="mb-2em">
         <button type="button" class="btn-action" onclick="openCreateTaskModal()">Create Task</button>
     </div>
 
-    <!-- Filter Row -->
-    <div class="filters flex-row flex-wrap gap-sm mb-md">
-        <select id="filterStatus" class="tiny" onchange="applyTaskFilters()">
-            <option value="">All Statuses</option>
-            <option th:each="s : ${statuses}" th:value="${s.name()}" th:text="${s.displayName}"></option>
-        </select>
-        <select id="filterUser" class="tiny" onchange="applyTaskFilters()">
-            <option value="">All Users</option>
-            <option th:each="u : ${users}" th:value="${u.id}" th:text="${u.name}"></option>
-        </select>
-        <select id="filterProject" class="tiny" onchange="applyTaskFilters()">
-            <option value="">All Projects</option>
-            <option th:each="p : ${projects}" th:value="${p.id}" th:text="${p.name}"></option>
-        </select>
+    <!-- Filter Bar -->
+    <div class="filter-card">
+        <div class="filter-inputs">
+            <div>
+                <label for="filterStatus">Status:</label>
+                <select id="filterStatus" onchange="applyTaskFilters()">
+                    <option value="">All Statuses</option>
+                    <option th:each="s : ${statuses}" th:value="${s.name()}" th:text="${s.displayName}"></option>
+                </select>
+            </div>
+            <div>
+                <label for="filterUser">Assigned To:</label>
+                <select id="filterUser" onchange="applyTaskFilters()">
+                    <option value="">All Users</option>
+                    <option th:each="u : ${users}" th:value="${u.id}" th:text="${u.name}"></option>
+                </select>
+            </div>
+            <div>
+                <label for="filterProject">Project:</label>
+                <select id="filterProject" onchange="applyTaskFilters()">
+                    <option value="">All Projects</option>
+                    <option th:each="p : ${projects}" th:value="${p.id}" th:text="${p.name}"></option>
+                </select>
+            </div>
+        </div>
     </div>
 
     <table class="table card" id="tasksTable">

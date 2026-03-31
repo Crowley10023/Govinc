@@ -9,14 +9,8 @@
 </head>
 <body>
 <div th:replace="~{navigation :: mainNav}"></div>
-<div class="main-scroll-container">
-    <div class="container">
-        <div class="user-form-container">
-            <!-- Header -->
-            <div class="form-header">
-                <h1 th:text="${user.id} != null ? 'Edit User' : 'Add User'"></h1>
-                <p class="subtitle" th:text="${user.id} != null ? 'Update user information and permissions' : 'Create a new user account'"></p>
-            </div>
+<div class="container">
+    <h1 class="page-title" th:text="${user.id} != null ? 'Edit User' : 'Add User'">Add/Edit User</h1>
 
             <!-- Form -->
             <form th:action="${user.id} != null ? @{'/users/update/' + ${user.id}} : @{/users}" 
@@ -125,8 +119,6 @@
                     </button>
                 </div>
             </form>
-        </div>
-    </div>
 </div>
 
 <script>

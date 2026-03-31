@@ -12,18 +12,43 @@
 <body>
     <div th:replace="~{navigation :: mainNav}"></div>
     <div class="container">
-        <h1>Assessments</h1>
+        <h1 class="page-title">Assessments</h1>
          <section>
-            <div class="filters">
-                <button id="orgUnitFilterBtn" class="btn-secondary d-none" type="button">Org Unit</button>
-                <span id="activeOrgUnitFilter" class="badge d-none align-center">
-                    <span id="orgUnitFilterName"></span>
-                    <svg id="clearOrgUnitFilter" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16"
-                        height="16" class="clear-filter-icon">
-                        <circle cx="8" cy="8" r="8" fill="#ccc" />
-                        <path d="M5 5l6 6M11 5l-6 6" stroke="#333" stroke-width="2" stroke-linecap="round" />
-                    </svg>
-                </span>
+            <!-- Filter Bar -->
+            <div class="filter-card">
+                <div class="filter-inputs">
+                    <div>
+                        <button id="orgUnitFilterBtn" class="btn-secondary btn-sm d-none" type="button">Org Unit</button>
+                        <span id="activeOrgUnitFilter" class="badge d-none align-center">
+                            <span id="orgUnitFilterName"></span>
+                            <svg id="clearOrgUnitFilter" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16"
+                                height="16" class="clear-filter-icon">
+                                <circle cx="8" cy="8" r="8" fill="#ccc" />
+                                <path d="M5 5l6 6M11 5l-6 6" stroke="#333" stroke-width="2" stroke-linecap="round" />
+                            </svg>
+                        </span>
+                    </div>
+                    <div>
+                        <label for="filterAssName">Name:</label>
+                        <input type="text" id="filterAssName" class="col-filter" data-col="0" placeholder="Filter name…">
+                    </div>
+                    <div>
+                        <label for="filterAssDate">Date:</label>
+                        <input type="text" id="filterAssDate" class="col-filter" data-col="1" placeholder="Filter date…">
+                    </div>
+                    <div>
+                        <label for="filterAssCreator">Creator:</label>
+                        <input type="text" id="filterAssCreator" class="col-filter" data-col="2" placeholder="Filter creator…">
+                    </div>
+                    <div>
+                        <label for="filterAssStatus">Status:</label>
+                        <input type="text" id="filterAssStatus" class="col-filter" data-col="3" placeholder="Filter status…">
+                    </div>
+                    <div>
+                        <label for="filterAssCatalog">Catalog:</label>
+                        <input type="text" id="filterAssCatalog" class="col-filter" data-col="4" placeholder="Filter catalog…">
+                    </div>
+                </div>
             </div>
             <table class="table card" id="assessmentTable">
                 <thead>
@@ -34,14 +59,6 @@
                         <th class="sortable-th" data-col="3">Status<span class="sort-arrow"></span></th>
                         <th class="sortable-th" data-col="4">Catalog<span class="sort-arrow"></span></th>
                         <th>Actions</th>
-                    </tr>
-                    <tr class="filter-row">
-                        <th><input type="text" class="col-filter" data-col="0" placeholder="Filter name…" style="width:100%;box-sizing:border-box;font-weight:normal;font-size:0.82em;padding:0.2em 0.4em;"></th>
-                        <th><input type="text" class="col-filter" data-col="1" placeholder="Filter date…" style="width:100%;box-sizing:border-box;font-weight:normal;font-size:0.82em;padding:0.2em 0.4em;"></th>
-                        <th><input type="text" class="col-filter" data-col="2" placeholder="Filter creator…" style="width:100%;box-sizing:border-box;font-weight:normal;font-size:0.82em;padding:0.2em 0.4em;"></th>
-                        <th><input type="text" class="col-filter" data-col="3" placeholder="Filter status…" style="width:100%;box-sizing:border-box;font-weight:normal;font-size:0.82em;padding:0.2em 0.4em;"></th>
-                        <th><input type="text" class="col-filter" data-col="4" placeholder="Filter catalog…" style="width:100%;box-sizing:border-box;font-weight:normal;font-size:0.82em;padding:0.2em 0.4em;"></th>
-                        <th></th>
                     </tr>
                 </thead>
                 <tbody id="assessmentTbody">
@@ -341,7 +358,7 @@
                     }
 
                     // Collect column filter values
-                    const colFilters = Array.from(document.querySelectorAll('#assessmentTable .col-filter'))
+                    const colFilters = Array.from(document.querySelectorAll('.col-filter'))
                         .map(inp => ({ col: parseInt(inp.getAttribute('data-col')), val: inp.value.trim().toLowerCase() }));
 
                     let rows = tbody.querySelectorAll('tr');
@@ -387,7 +404,7 @@
                 });
 
                 // Column filter inputs
-                document.querySelectorAll('#assessmentTable .col-filter').forEach(inp => {
+                document.querySelectorAll('.col-filter').forEach(inp => {
                     inp.addEventListener('input', applyAllFilters);
                     // Prevent row click when clicking filter inputs
                     inp.addEventListener('click', e => e.stopPropagation());

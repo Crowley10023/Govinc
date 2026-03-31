@@ -13,8 +13,8 @@
     <!-- Inline Status Message -->
     <div id="statusMessage"></div>
 
-    <div class="container ai-config-container">
-        <h1>AI Configuration</h1>
+    <div class="container">
+        <h1 class="page-title">AI Configuration</h1>
 
         <!-- Success/Error Messages -->
         <div th:if="${saved}" class="alert alert-success">
@@ -126,7 +126,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Create New AI Provider</h2>
-                <button type="button" class="modal-close" onclick="closeCreateProviderModal()">×</button>
+                <button type="button" class="modal-close" onclick="closeCreateProviderModal()">ï¿½</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
@@ -207,7 +207,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Edit AI Provider</h2>
-                <button type="button" class="modal-close" onclick="closeEditProviderModal()">×</button>
+                <button type="button" class="modal-close" onclick="closeEditProviderModal()">ï¿½</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
@@ -288,7 +288,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Delete Provider</h2>
-                <button type="button" class="modal-close" onclick="closeDeleteProviderModal()">×</button>
+                <button type="button" class="modal-close" onclick="closeDeleteProviderModal()">ï¿½</button>
             </div>
             <div class="modal-body">
                 <p id="deleteConfirmMessage" class="text-16 my-20"></p>

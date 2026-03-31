@@ -8,13 +8,11 @@
 
 <body>
   <div th:replace="~{navigation :: mainNav}"></div>
-  <div class="main-scroll-container">
-    <div class="container">
-      <div class="entity-edit-frame mt-2em mb-3em">
+  <div class="container">
         
         <!-- Header Section -->
         <div class="orgservice-header">
-          <h1 th:text="${orgService.id != null} ? 'Edit Org Service' : 'Create New Org Service'"></h1>
+          <h1 class="page-title" th:text="${orgService.id != null} ? 'Edit Org Service' : 'Create New Org Service'"></h1>
         </div>
 
         <!-- Main Form Card -->
@@ -93,8 +91,6 @@
 
         </form>
 
-      </div>
-    </div>
   </div>
 
 </body>

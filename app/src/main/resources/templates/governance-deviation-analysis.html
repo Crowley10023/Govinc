@@ -7,22 +7,24 @@
     <meta name="_csrf_header" th:content="${_csrf.headerName}">
     <title>Deviation Analysis - Governance</title>
     <th:block th:replace="~{navigation :: navHead}"></th:block>
+    <script src="/org-unit-wizard.js"></script>
 </head>
 <body>
 <div th:replace="~{navigation :: mainNav}"></div>
 <div class="container">
-    <h1>Deviation Analysis</h1>
+    <h1 class="page-title">Deviation Analysis</h1>
 
     <!-- Selection Form -->
     <form method="get" action="/governance/deviation-analysis" class="card deviation-filter-form">
         <div class="flex-row flex-wrap gap-md align-center">
             <div class="form-group">
-                <label for="orgUnitId">Org Unit</label>
-                <select name="orgUnitId" id="orgUnitId" required>
-                    <option value="">-- Select Org Unit --</option>
-                    <option th:each="ou : ${orgUnits}" th:value="${ou.id}" th:text="${ou.name}"
-                            th:selected="${selectedOrgUnitId != null and selectedOrgUnitId == ou.id}"></option>
-                </select>
+                <label>Org Unit</label>
+                <input type="hidden" id="orgUnitId" name="orgUnitId" th:value="${selectedOrgUnitId}">
+                <div class="flex-row gap-sm align-center">
+                    <span id="selectedOrgUnitName" class="text-muted">Select org unit</span>
+                    <button type="button" id="openOrgUnitPickerBtn" class="btn-secondary btn-sm">Choose&hellip;</button>
+                    <button type="button" id="clearOrgUnitPickerBtn" class="btn-cancel btn-sm" style="display:none">&#10005;</button>
+                </div>
             </div>
             <div class="form-group">
                 <label for="catalogId">Security Catalog</label>
@@ -199,6 +201,17 @@
     </div>
 </div>
 
+<!-- Org Unit Picker Modal -->
+<div class="modal-bg" id="orgUnitPickerModal">
+    <div class="modal-popup ou-wizard-modal-inner">
+        <div class="ou-wizard-title">Choose Org Unit</div>
+        <div id="orgUnitPickerViewport" class="ou-wizard-viewport"></div>
+        <div class="ou-wizard-footer modal-btn-row">
+            <button type="button" class="btn-cancel" id="orgUnitPickerCancelBtn">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <script>
     var csrfToken = document.querySelector('meta[name="_csrf"]').content;
     var csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
@@ -323,6 +336,47 @@
             document.querySelectorAll('.modal-bg').forEach(function(m) { m.style.display = 'none'; });
         }
     });
+
+    // --- Org Unit Chooser ---
+    createOrgUnitWizard({
+        modalId:        'orgUnitPickerModal',
+        viewportId:     'orgUnitPickerViewport',
+        openButtonId:   'openOrgUnitPickerBtn',
+        cancelButtonId: 'orgUnitPickerCancelBtn',
+        closeOnSelect:  true,
+        selectedId:     function() { return document.getElementById('orgUnitId').value || null; },
+        onSelect: function(unit) {
+            document.getElementById('orgUnitId').value = unit.id;
+            document.getElementById('selectedOrgUnitName').textContent = unit.name;
+            document.getElementById('selectedOrgUnitName').classList.remove('text-muted');
+            document.getElementById('clearOrgUnitPickerBtn').style.display = '';
+        }
+    });
+
+    document.getElementById('clearOrgUnitPickerBtn').addEventListener('click', function() {
+        document.getElementById('orgUnitId').value = '';
+        document.getElementById('selectedOrgUnitName').textContent = 'Select org unit';
+        document.getElementById('selectedOrgUnitName').classList.add('text-muted');
+        this.style.display = 'none';
+    });
+
+    // Pre-populate org unit display name if already selected (page loaded with param)
+    (function() {
+        var input = document.getElementById('orgUnitId');
+        var selectedId = input && input.value;
+        if (selectedId) {
+            fetch('/assessmentdetails/orgunits')
+                .then(function(r) { return r.json(); })
+                .then(function(units) {
+                    var found = units.find(function(u) { return String(u.id) === String(selectedId); });
+                    if (found) {
+                        document.getElementById('selectedOrgUnitName').textContent = found.name;
+                        document.getElementById('selectedOrgUnitName').classList.remove('text-muted');
+                        document.getElementById('clearOrgUnitPickerBtn').style.display = '';
+                    }
+                });
+        }
+    })();
 </script>
 </body>
 </html>

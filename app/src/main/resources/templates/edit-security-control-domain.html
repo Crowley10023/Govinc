@@ -8,9 +8,8 @@
 <body>
 <div th:replace="~{navigation :: mainNav}"></div>
 <div class="container">
-    <h1 th:text="${domain.id != null} ? 'Edit Security Control Domain' : 'Create Security Control Domain'"></h1>
-    <div class="entity-edit-frame">
-        <form th:action="@{/security-control-domain/edit}" th:object="${domain}" method="post">
+    <h1 class="page-title" th:text="${domain.id != null} ? 'Edit Security Control Domain' : 'Create Security Control Domain'"></h1>
+    <form th:action="@{/security-control-domain/edit}" th:object="${domain}" method="post">
             <input type="hidden" th:field="*{id}" />
             <div class="form-group">
                 <label for="name">Name</label>
@@ -25,7 +24,6 @@
                 <a th:href="@{/security-control-domain/list}" class="btn-cancel">Cancel</a>
             </div>
         </form>
-    </div>
 </div>
 </body>
 </html>

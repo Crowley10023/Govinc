@@ -9,58 +9,11 @@
     <script src="/webjars/chart.js/3.9.1/dist/chart.min.js"></script>
     <script src="/org-unit-wizard.js"></script>
     <th:block th:replace="~{navigation :: navHead}"></th:block>
-    <style>
-        .reporting-card {
-            background: #fff;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            padding: 1.5rem 2rem;
-            margin-bottom: 1.5rem;
-        }
-        .reporting-selector {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-        .reporting-selector label {
-            font-weight: 600;
-            white-space: nowrap;
-        }
-        .reporting-selector select {
-            min-width: 220px;
-        }
-        .chart-wrapper {
-            position: relative;
-            width: 100%;
-            height: 260px;
-        }
-        #loading-indicator {
-            display: none;
-            color: #555;
-            margin-top: 0.5rem;
-        }
-        #chart-placeholder {
-            color: #888;
-            font-style: italic;
-            margin-top: 0.5rem;
-        }
-        .catalog-chart-title {
-            font-size: 1.1rem;
-            font-weight: 600;
-            margin-bottom: 0.75rem;
-        }
-        .coverage-note {
-            font-size: 0.85rem;
-            color: #666;
-            margin-top: 0.5rem;
-        }
-    </style>
 </head>
 <body>
     <div th:replace="~{navigation :: mainNav}"></div>
     <div class="container">
-        <h1>Org Unit Reporting</h1>
+        <h1 class="page-title">Org Unit Reporting</h1>
         <p class="text-muted">Select an organisation unit to view the maturity development and answer coverage per security catalog, across all assessments in chronological order.</p>
 
         <div class="reporting-card">

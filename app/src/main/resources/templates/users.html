@@ -10,9 +10,11 @@
 <body>
 <div th:replace="~{navigation :: mainNav}"></div>
 <div class="container">
-    <h1>User List</h1>
-    <a href="/users/new" class="btn-action">Add User</a>
-    <button type="button" class="btn-action" onclick="openAzureImportModal()" style="margin-left:0.5em;">&#9729; Import from Azure AD</button>
+    <h1 class="page-title">User List</h1>
+    <div class="flex-row gap-sm mb-md">
+        <a href="/users/new" class="btn-action">Add User</a>
+        <button type="button" class="btn-action" onclick="openAzureImportModal()">&#9729; Import from Azure AD</button>
+    </div>
     
     <div th:if="${#lists.isEmpty(users)}" class="empty-state">
         <p>No users found.</p>

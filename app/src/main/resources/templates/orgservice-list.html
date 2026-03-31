@@ -41,7 +41,7 @@
 <div th:replace="~{navigation :: mainNav}"></div>
 <div class="container">
     <div class="orgservice-header">
-        <h1>Org Services</h1>
+        <h1 class="page-title">Org Services</h1>
         <a th:href="@{'/orgservices/create'}" class="btn-action">+ Create New Org Service</a>
     </div>
 
@@ -64,7 +64,7 @@
                     </span>
                     <span th:if="${orgService.orgUnits.isEmpty()}" class="text-muted">—</span>
                 </td>
-                <td>
+                <td class="td-actions">
                     <a th:href="@{'/orgservices/edit/' + ${orgService.id}}" class="btn-edit">Edit</a>
                     <a th:href="@{|/orgservice-assessment/edit/${orgService.id}|}" class="btn-action">Assess</a>
                     <button type="button" class="btn-danger"

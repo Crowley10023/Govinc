@@ -48,9 +48,11 @@
                         <option th:each="c : ${filterCatalogs}" th:value="${c.name}" th:text="${c.name}"></option>
                     </select>
 
-                    <button id="filter-apply" class="btn-action btn-sm">Apply</button>
-                    <button id="filter-mine" class="btn-secondary btn-sm" title="Show only my assessments">Mine</button>
-                    <button id="filter-clear" class="btn-cancel btn-sm">Clear</button>
+                    <div class="flex-row gap-sm">
+                        <button id="filter-apply" class="btn-action btn-sm">Apply</button>
+                        <button id="filter-mine" class="btn-secondary btn-sm" title="Show only my assessments">Mine</button>
+                        <button id="filter-clear" class="btn-cancel btn-sm">Clear</button>
+                    </div>
                 </div>
 
                 <div th:if="${latestAssessments != null and #lists.isEmpty(latestAssessments)}" class="empty-state">

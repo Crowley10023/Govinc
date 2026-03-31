@@ -53,7 +53,7 @@ Layout, UI & UX Rules
 
 4. COMPONENT CLASSES (defined in style.css)
    Layout:       .container, .page-title, .secondary-nav, .general-button-bar
-   Tables:       .table (auto header gradient, hover, padding)
+   Tables:       .table (auto header gradient, hover, padding), .td-actions (prevents action column wrapping)
    Forms:        .entity-edit-frame, .form-group, .form-row, .form-error
    Buttons:      .btn-action, btn-submit, btn-edit, btn-cancel, .btn-secondary, .btn-nav, .btn-danger,                 
    Cards:        .landing-card, .card-header, .card-body, .card-icon
@@ -62,7 +62,9 @@ Layout, UI & UX Rules
                  .dropdown-button, .dropdown-menu-btn, .meta-chip, .meta-label, .meta-value
    Assessment:   .control-actions-flex-row, .answering-guide-row, .dropdown-row,
                  .override-slider-row, .takenOver-row, .testarea-row
-   Filter bar:   .controls-filter-bar, .sticky-filter-bar, .filter-item, .filter-select
+   Filter bar:   .filter-bar (inline flex-wrap, for simple keyword filters above tables),
+                 .filter-card + .filter-inputs (labeled multi-field filter panel, column-layout labels + inputs),
+                 .controls-filter-bar, .sticky-filter-bar, .filter-item, .filter-select
    Progress:     .progress-bar-bg, .progress-bar-fill, .progress-popup
    Tags:         .tag-pill, .tag-suggestions
    Utilities:    .d-none, .d-flex, .d-inline, .d-inline-block,
@@ -75,6 +77,11 @@ Layout, UI & UX Rules
                  .w-full, .w-auto, .cursor-pointer,
                  .inline-form, .no-results
 
+   Navigation dropdown items: Use class .dropdown-menu-btn on <a> tags inside .dropdown-content.
+   CSS in style.css targets .dropdown-content a.dropdown-menu-btn with a flat white/blue style
+   (background:#f6faff, border:#eeeeee, color:var(--primary-blue), font-size:var(--font-size-nav)).
+   Dropdown expands on hover via .dropdown:hover .dropdown-content { display:flex; } (CSS-only, no JS needed).
+
 5. DESIGN PRINCIPLES
    - Responsive: desktop-first, mobile basically enabled
    - Consistent spacing: use gap/padding utility classes, not ad-hoc px values
@@ -82,7 +89,7 @@ Layout, UI & UX Rules
    - Gradients for header, nav, buttons, table headers — subtle, not overwhelming
    - Modals/popups: use .modal-bg + .modal-popup pattern, dismiss via backdrop click + Escape
    - Tables: always use .table class
-   - standards in theme-css.html: all colors, spacing, font declarations & sizes
+   - IMPORTANT: standards in theme-css.html: all colors, spacing, font declarations & sizes
    - Fonts: four types: Navigation, Headline, Buttons/active elements, standards
    - LayoutConfig allows persisting values for theme-css.html
    - IMPORTANT: Unified look and feel based on central definitions

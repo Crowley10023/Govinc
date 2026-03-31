@@ -114,4 +114,19 @@
   </nav>
   <script src="/general.js"></script>
   <script src="/authorization.js"></script>
+  <script>
+    // Click-based dropdown toggle
+    document.querySelectorAll('.dropdown-button').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var content = this.parentElement.querySelector('.dropdown-content');
+        var isOpen = content.classList.contains('open');
+        document.querySelectorAll('.dropdown-content.open').forEach(function(d) { d.classList.remove('open'); });
+        if (!isOpen) content.classList.add('open');
+      });
+    });
+    document.addEventListener('click', function() {
+      document.querySelectorAll('.dropdown-content.open').forEach(function(d) { d.classList.remove('open'); });
+    });
+  </script>
 </div>

@@ -201,6 +201,25 @@
     </div>
 
     <div th:if="${not catalogs.isEmpty()}">
+
+        <!-- Filter Bar -->
+        <div class="filter-card">
+            <div class="filter-inputs">
+                <div>
+                    <label for="filterCatalogName">Name:</label>
+                    <input type="text" id="filterCatalogName" class="col-filter" data-col="0" placeholder="Filter name…">
+                </div>
+                <div>
+                    <label for="filterCatalogDesc">Description:</label>
+                    <input type="text" id="filterCatalogDesc" class="col-filter" data-col="1" placeholder="Filter description…">
+                </div>
+                <div>
+                    <label for="filterCatalogRev">Revision:</label>
+                    <input type="text" id="filterCatalogRev" class="col-filter" data-col="2" placeholder="Filter revision…">
+                </div>
+            </div>
+        </div>
+
         <table class="table card" id="catalogsTable">
             <thead>
                 <tr>
@@ -209,13 +228,6 @@
                     <th class="sortable-th" data-col="2">Revision<span class="sort-arrow"></span></th>
                     <th>Security Controls</th>
                     <th>Actions</th>
-                </tr>
-                <tr class="filter-row">
-                    <th><input type="text" class="col-filter" data-col="0" placeholder="Filter name…" style="width:100%;box-sizing:border-box;font-weight:normal;font-size:0.82em;padding:0.2em 0.4em;"></th>
-                    <th><input type="text" class="col-filter" data-col="1" placeholder="Filter description…" style="width:100%;box-sizing:border-box;font-weight:normal;font-size:0.82em;padding:0.2em 0.4em;"></th>
-                    <th><input type="text" class="col-filter" data-col="2" placeholder="Filter revision…" style="width:100%;box-sizing:border-box;font-weight:normal;font-size:0.82em;padding:0.2em 0.4em;"></th>
-                    <th></th>
-                    <th></th>
                 </tr>
             </thead>
             <tbody>
@@ -299,7 +311,7 @@
 
 <script>
     // Column filter inputs
-    document.querySelectorAll('#catalogsTable .col-filter').forEach(function(inp) {
+    document.querySelectorAll('.col-filter').forEach(function(inp) {
         inp.addEventListener('input', function() {
             var val = this.value.trim().toLowerCase();
             var col = parseInt(this.getAttribute('data-col'));
