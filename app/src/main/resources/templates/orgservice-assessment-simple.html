@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <meta charset="UTF-8">
+    <meta name="_csrf" th:content="${_csrf.token}" />
+    <meta name="_csrf_header" th:content="${_csrf.headerName}" />
+    <title>Simple Assessment View</title>
+    <th:block th:replace="~{navigation :: navHead}"></th:block>
+    <style>
+        .simple-assessment-header { margin-bottom: 1.5em; }
+        .simple-assessment-header h2 { font-size: 1.1em; color: #555; font-weight: normal; margin: 0.2em 0; }
+        .simple-controls-table { width: 100%; border-collapse: collapse; }
+        .simple-controls-table th { background: #f5f6fa; font-weight: 600; padding: 0.6em 0.8em; text-align: left; border-bottom: 2px solid #d0d4e0; }
+        .simple-controls-table td { padding: 0.7em 0.8em; border-bottom: 1px solid #e8eaf0; vertical-align: top; }
+        .simple-controls-table tr:hover td { background: #fafbff; }
+        .control-name-simple { font-weight: 600; margin-bottom: 0.2em; }
+        .control-detail-simple { font-size: 0.88em; color: #555; }
+        .simple-answer-cell { width: 220px; }
+        .simple-comment-cell { min-width: 180px; }
+        .control-comment-simple { width: 100%; min-height: 52px; padding: 5px 7px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9em; resize: vertical; box-sizing: border-box; }
+        .control-percent-simple { width: 70px; padding: 4px 6px; border: 1px solid #ccc; border-radius: 4px; }
+        .control-answer-simple { width: 100%; padding: 4px 6px; border: 1px solid #ccc; border-radius: 4px; }
+        .org-answer-row-simple { display: flex; align-items: center; gap: 6px; }
+        .simple-filter-bar { display: flex; gap: 1em; flex-wrap: wrap; align-items: flex-end; margin-bottom: 1em; padding: 0.8em 1em; background: #f5f6fa; border-radius: 6px; }
+        .simple-filter-bar label { font-size: 0.88em; display: block; margin-bottom: 2px; color: #555; }
+        .simple-filter-bar input[type=search], .simple-filter-bar select { padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9em; }
+        .no-controls-msg { padding: 2em; text-align: center; color: #888; }
+    </style>
+</head>
+
+<body>
+    <div th:replace="~{navigation :: mainNav}"></div>
+    <div class="container">
+
+        <div class="simple-assessment-header assessment-header">
+            <h1 class="page-title">Org Service Assessment</h1>
+            <h2 th:text="${assessment.orgService.name}"></h2>
+            <p style="color:#888;font-size:0.88em;margin-top:0.2em;">Simple view &mdash; showing only applicable security controls</p>
+        </div>
+
+        <form id="assessmentForm">
+            <input type="hidden" name="id" th:value="${assessment.id}" />
+            <input type="hidden" name="orgServiceId" th:value="${assessment.orgService.id}" />
+            <input type="hidden" name="assessmentDate" th:value="${assessment.assessmentDate}" />
+
+            <!-- Filter / Model Bar -->
+            <div class="simple-filter-bar">
+                <div>
+                    <label for="filterText">Search</label>
+                    <input type="search" id="filterText" placeholder="Filter controls&hellip;" style="min-width:200px;" />
+                </div>
+                <div>
+                    <label for="maturityModelSelect">Maturity Model</label>
+                    <select id="maturityModelSelect" style="min-width:180px;">
+                        <option value="">-- Select a model --</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="noControls" class="no-controls-msg" th:classappend="${controls.size() > 0} ? 'd-none' : ''">
+                No applicable security controls found for this service.
+            </div>
+
+            <div class="form-table-wrapper" th:if="${not #lists.isEmpty(controls)}">
+                <table class="simple-controls-table">
+                    <thead>
+                        <tr>
+                            <th>Security Control</th>
+                            <th class="simple-answer-cell">Answer / Score</th>
+                            <th class="simple-comment-cell">Comment</th>
+                        </tr>
+                    </thead>
+                    <tbody id="controlsTableBody">
+                        <tr th:each="control : ${controls}"
+                            th:attr="data-control-id=${control.securityControl.id}"
+                            class="control-row">
+                            <td>
+                                <div class="control-name-simple" th:text="${control.securityControl.name}"></div>
+                                <div class="control-detail-simple" th:text="${control.securityControl.detail}"></div>
+                            </td>
+                            <td class="simple-answer-cell">
+                                <!-- Percent input (shown when no maturity model) -->
+                                <input type="number" min="0" max="100" class="control-percent-simple control-percent"
+                                    th:value="${control.percent}" />
+                                <!-- Answer select + AI guide button (shown when maturity model active) -->
+                                <div class="org-answer-row-simple" style="display:none;">
+                                    <select class="control-answer-simple control-answer d-none"></select>
+                                    <button type="button" class="answering-guide-btn org-guide-btn" style="display:none;"
+                                            onclick="openOrgGuide(this)" title="Get AI-powered answering guide">&#128161;</button>
+                                </div>
+                            </td>
+                            <td class="simple-comment-cell">
+                                <textarea class="control-comment-simple control-comment"
+                                    th:attr="data-control-id=${control.securityControl.id}"
+                                    placeholder="Add comment (optional)"
+                                    th:text="${control.comment}"></textarea>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </form>
+    </div>
+
+    <!-- Save Notification -->
+    <div id="saveNotification" class="save-notification">
+        <span class="checkmark">&#10003;</span>
+        <span class="notification-text">Changes saved successfully</span>
+    </div>
+
+    <!-- Answering Guide Modal -->
+    <div class="modal-bg" id="org-guide-modal-bg" style="display:none;">
+        <div class="modal-popup answering-guide-popup">
+            <div class="answering-guide-header">
+                <h3>Answering Guide</h3>
+                <button type="button" class="modal-close-btn" onclick="closeOrgGuide()">X</button>
+            </div>
+            <div class="answering-guide-body">
+                <div class="guide-left-panel">
+                    <div class="answering-guide-content">
+                        <div id="org-guide-control-name" class="guide-control-name"></div>
+                        <div id="org-guide-loading" class="guide-loading guide-loading-initial">
+                            <div class="loading-spinner"></div>
+                            <p>Generating questions from AI...</p>
+                        </div>
+                        <div id="org-guide-questions" class="guide-questions"></div>
+                        <div id="org-guide-generating" class="guide-loading guide-loading-submit" style="display:none;">
+                            <div class="loading-spinner"></div>
+                            <p>Generating answer from AI...</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="guide-right-panel">
+                    <h4 class="guide-right-panel-title">Maturity Answers</h4>
+                    <div id="org-guide-maturity-list" class="guide-maturity-answers-list"></div>
+                </div>
+            </div>
+            <div class="modal-btn-row">
+                <button type="button" class="btn-cancel" onclick="closeOrgGuide()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var assessmentId   = document.querySelector('input[name="id"]').value;
+        var orgServiceId   = document.querySelector('input[name="orgServiceId"]').value;
+        var assessmentDate = document.querySelector('input[name="assessmentDate"]').value;
+
+        var csrfToken  = '';
+        var csrfHeader = '';
+        var csrfMetaEl = document.querySelector('meta[name="_csrf"]');
+        var csrfHeaderEl = document.querySelector('meta[name="_csrf_header"]');
+        if (csrfMetaEl) { csrfToken = csrfMetaEl.getAttribute('content'); csrfHeader = csrfHeaderEl ? csrfHeaderEl.getAttribute('content') : 'X-CSRF-TOKEN'; }
+
+        var currentMaturityModel = null;
+        var maturityModels = [];
+
+        // ---- Maturity model loading ----
+        function loadMaturityModels() {
+            fetch('/maturitymodel/api/all')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    maturityModels = data;
+                    var sel = document.getElementById('maturityModelSelect');
+                    maturityModels.forEach(function(m) {
+                        var opt = document.createElement('option');
+                        opt.value = m.id;
+                        opt.textContent = m.name;
+                        sel.appendChild(opt);
+                    });
+                })
+                .catch(function(e) { console.error('Error loading maturity models:', e); });
+        }
+
+        document.getElementById('maturityModelSelect').addEventListener('change', function() {
+            var modelId = this.value;
+            if (!modelId) { currentMaturityModel = null; switchToInputMode(); }
+            else {
+                currentMaturityModel = maturityModels.find(function(m) { return m.id == modelId; });
+                switchToAnswerMode(currentMaturityModel);
+            }
+        });
+
+        function switchToInputMode() {
+            document.querySelectorAll('.control-row').forEach(function(row) {
+                var pct = row.querySelector('.control-percent');
+                var sel = row.querySelector('.control-answer');
+                var btn = row.querySelector('.org-guide-btn');
+                var ansRow = row.querySelector('.org-answer-row-simple');
+                pct.style.display = 'block';
+                sel.style.display = 'none'; sel.classList.add('d-none'); sel.value = '';
+                if (btn) btn.style.display = 'none';
+                if (ansRow) ansRow.style.display = 'none';
+            });
+        }
+
+        function switchToAnswerMode(model) {
+            document.querySelectorAll('.control-row').forEach(function(row) {
+                var pct = row.querySelector('.control-percent');
+                var sel = row.querySelector('.control-answer');
+                var btn = row.querySelector('.org-guide-btn');
+                var ansRow = row.querySelector('.org-answer-row-simple');
+
+                sel.innerHTML = '';
+                var defOpt = document.createElement('option');
+                defOpt.value = ''; defOpt.textContent = '-- Select an answer --';
+                sel.appendChild(defOpt);
+
+                if (model.maturityAnswers && Array.isArray(model.maturityAnswers)) {
+                    var sorted = model.maturityAnswers.slice().sort(function(a, b) { return (a.rating || 0) - (b.rating || 0); });
+                    sorted.forEach(function(ans) {
+                        var opt = document.createElement('option');
+                        opt.value = ans.rating;
+                        opt.textContent = ans.answer;
+                        sel.appendChild(opt);
+                    });
+                }
+
+                var curPct = pct.value;
+                if (curPct && curPct !== '0') sel.value = curPct;
+
+                pct.style.display = 'none';
+                sel.classList.remove('d-none'); sel.style.display = 'block';
+                sel.removeEventListener('change', handleAnswerChange);
+                sel.addEventListener('change', handleAnswerChange);
+
+                if (ansRow) ansRow.style.display = 'flex';
+                if (btn && !btn.disabled) btn.style.display = 'inline-block';
+            });
+        }
+
+        function handleAnswerChange(e) {
+            var row = e.target.closest('.control-row');
+            var controlId = row.getAttribute('data-control-id');
+            var percentValue = e.target.value;
+            row.querySelector('.control-percent').value = percentValue;
+            saveControlChange(controlId, true, percentValue);
+        }
+
+        // ---- Filter ----
+        document.getElementById('filterText').addEventListener('input', function() {
+            var q = this.value.toLowerCase();
+            var visible = 0;
+            document.querySelectorAll('.control-row').forEach(function(row) {
+                var name = (row.querySelector('.control-name-simple') || {}).textContent || '';
+                var detail = (row.querySelector('.control-detail-simple') || {}).textContent || '';
+                var show = !q || name.toLowerCase().indexOf(q) !== -1 || detail.toLowerCase().indexOf(q) !== -1;
+                row.style.display = show ? '' : 'none';
+                if (show) visible++;
+            });
+            document.getElementById('noControls').style.display = visible === 0 ? 'block' : 'none';
+        });
+
+        // ---- Save ----
+        var saveNotification = document.getElementById('saveNotification');
+
+        function showSaveNotification(isSuccess) {
+            saveNotification.classList.remove('hide', 'error');
+            var txt = saveNotification.querySelector('.notification-text');
+            if (!isSuccess) { saveNotification.classList.add('error'); txt.textContent = 'Failed to save changes'; }
+            else { txt.textContent = 'Changes saved successfully'; }
+            saveNotification.classList.add('show');
+            setTimeout(function() {
+                saveNotification.classList.add('hide');
+                setTimeout(function() { saveNotification.classList.remove('show', 'hide'); }, 300);
+            }, 2500);
+        }
+
+        function saveControlChange(controlId, applicable, percent) {
+            var fd = new FormData();
+            fd.append('id', assessmentId);
+            fd.append('orgServiceId', orgServiceId);
+            fd.append('assessmentDate', assessmentDate);
+            fd.append('controlId', controlId);
+            fd.append('applicable', applicable);
+            fd.append('percent', percent);
+            var hdrs = {};
+            if (csrfToken) hdrs[csrfHeader] = csrfToken;
+            fetch('/orgservice-assessment/save-control', { method: 'POST', body: fd, headers: hdrs })
+                .then(function(r) { return r.json(); })
+                .then(function(d) { showSaveNotification(d.success); })
+                .catch(function() { showSaveNotification(false); });
+        }
+
+        function saveControlComment(controlId, comment) {
+            var hdrs = { 'Content-Type': 'application/json' };
+            if (csrfToken) hdrs[csrfHeader] = csrfToken;
+            fetch('/orgservice-assessment/save-control-comment', {
+                method: 'PUT',
+                body: JSON.stringify({ id: assessmentId, controlId: controlId, comment: comment }),
+                headers: hdrs
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(d) { showSaveNotification(d.success); })
+            .catch(function() { showSaveNotification(false); });
+        }
+
+        // Percent input change
+        document.querySelectorAll('.control-percent').forEach(function(inp) {
+            inp.addEventListener('change', function() {
+                var row = this.closest('.control-row');
+                var controlId = row.getAttribute('data-control-id');
+                saveControlChange(controlId, true, this.value);
+            });
+        });
+
+        // Comment debounce
+        var debounceTimers = {};
+        document.querySelectorAll('.control-comment').forEach(function(ta) {
+            ta.addEventListener('input', function() {
+                var controlId = this.getAttribute('data-control-id');
+                if (debounceTimers[controlId]) clearTimeout(debounceTimers[controlId]);
+                var val = this.value;
+                this.style.background = '#fffbe8';
+                debounceTimers[controlId] = setTimeout(function() { saveControlComment(controlId, val); }, 650);
+            });
+        });
+
+        loadMaturityModels();
+    </script>
+
+    <script>
+        // =================== Answering Guide (same logic as orgservice-assessment.html) ===================
+        var _orgGuideState = { controlId: null, questions: [], proposedAnswer: null };
+
+        function escapeOrgGuideHtml(str) {
+            var d = document.createElement('div');
+            d.appendChild(document.createTextNode(str || ''));
+            return d.innerHTML;
+        }
+
+        function _orgGuideFetchHeaders() {
+            var h = { 'Content-Type': 'application/json' };
+            if (csrfToken && csrfHeader) h[csrfHeader] = csrfToken;
+            return h;
+        }
+
+        function openOrgGuide(btn) {
+            var row = btn.closest('.control-row');
+            var controlId = row.getAttribute('data-control-id');
+            var controlName = (row.querySelector('.control-name-simple') || {}).textContent || '';
+            var controlDetail = (row.querySelector('.control-detail-simple') || {}).textContent || '';
+
+            _orgGuideState = { controlId: controlId, questions: [], proposedAnswer: null };
+
+            document.getElementById('org-guide-control-name').innerHTML =
+                '<h4>' + escapeOrgGuideHtml(controlName) + '</h4><p>' + escapeOrgGuideHtml(controlDetail) + '</p>';
+            document.getElementById('org-guide-questions').innerHTML = '';
+            document.getElementById('org-guide-questions').style.display = '';
+            document.getElementById('org-guide-generating').style.display = 'none';
+            document.getElementById('org-guide-loading').style.display = 'flex';
+            document.getElementById('org-guide-modal-bg').style.display = 'flex';
+
+            populateOrgGuideMaturity();
+
+            fetch('/assessment/generate-answering-guide-questions', {
+                method: 'POST',
+                headers: _orgGuideFetchHeaders(),
+                body: JSON.stringify({ controlId: controlId, controlName: controlName, controlDetail: controlDetail, securityCatalogId: 0 })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(resp) {
+                document.getElementById('org-guide-loading').style.display = 'none';
+                if (resp && resp.questions && Array.isArray(resp.questions)) {
+                    _orgGuideState.questions = resp.questions;
+                    renderOrgGuideQuestions(resp.questions);
+                } else {
+                    document.getElementById('org-guide-questions').innerHTML = '<p style="color:red;">' + escapeOrgGuideHtml(resp.message || 'Could not load questions.') + '</p>';
+                    document.getElementById('org-guide-questions').style.display = 'block';
+                }
+            })
+            .catch(function() {
+                document.getElementById('org-guide-loading').style.display = 'none';
+                document.getElementById('org-guide-questions').innerHTML = '<p style="color:red;">Error generating questions. Please try again.</p>';
+                document.getElementById('org-guide-questions').style.display = 'block';
+            });
+        }
+
+        function renderOrgGuideQuestions(questions) {
+            var noModel = !currentMaturityModel;
+            var html = '<div class="questions-container">';
+            questions.forEach(function(q, i) {
+                html += '<div class="question-item">';
+                html += '<div class="question-label">' + (i + 1) + '. ' + escapeOrgGuideHtml(q) + '</div>';
+                html += '<div class="question-answer-options">';
+                html += '<button type="button" class="question-pill" data-qi="' + i + '" data-val="Yes" onclick="selectOrgGuidePill(this)">Yes</button>';
+                html += '<button type="button" class="question-pill" data-qi="' + i + '" data-val="No" onclick="selectOrgGuidePill(this)">No</button>';
+                html += '</div></div>';
+            });
+            if (noModel) {
+                html += '<p style="color:#e07800;font-size:0.88em;margin:0.5em 0;">&#9888; Select a maturity model to enable answer suggestions.</p>';
+            }
+            html += '<button type="button" class="guide-submit-answers-btn"' + (noModel ? ' disabled title="Select a maturity model first"' : '') + ' onclick="submitOrgGuideAnswers()">Submit Answers</button>';
+            html += '</div>';
+            var el = document.getElementById('org-guide-questions');
+            el.innerHTML = html;
+            el.style.display = 'flex';
+        }
+
+        function selectOrgGuidePill(btn) {
+            var qi = btn.getAttribute('data-qi');
+            document.querySelectorAll('#org-guide-questions .question-pill[data-qi="' + qi + '"]').forEach(function(p) { p.classList.remove('question-pill-selected'); });
+            btn.classList.add('question-pill-selected');
+        }
+
+        function submitOrgGuideAnswers() {
+            var answers = [];
+            var allAnswered = true;
+            for (var i = 0; i < _orgGuideState.questions.length; i++) {
+                var sel = document.querySelector('#org-guide-questions .question-pill[data-qi="' + i + '"].question-pill-selected');
+                if (!sel) { allAnswered = false; break; }
+                answers.push(sel.getAttribute('data-val'));
+            }
+            if (!allAnswered) { alert('Please answer all questions before submitting.'); return; }
+            if (!currentMaturityModel || !currentMaturityModel.maturityAnswers) {
+                alert('Please select a maturity model to enable answer suggestions.'); return;
+            }
+            var maturityModelAnswers = currentMaturityModel.maturityAnswers.map(function(a) {
+                return { id: a.id, answer: a.answer, rating: a.rating, description: a.description || '' };
+            });
+            document.getElementById('org-guide-questions').style.display = 'none';
+            document.getElementById('org-guide-generating').style.display = 'flex';
+
+            fetch('/assessment/generate-answer-from-guide', {
+                method: 'POST',
+                headers: _orgGuideFetchHeaders(),
+                body: JSON.stringify({
+                    controlId: _orgGuideState.controlId,
+                    securityCatalogId: 0,
+                    questions: _orgGuideState.questions,
+                    answers: answers,
+                    maturityModelAnswers: maturityModelAnswers
+                })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(resp) {
+                document.getElementById('org-guide-generating').style.display = 'none';
+                if (resp && resp.proposedAnswer) {
+                    _orgGuideState.proposedAnswer = resp.proposedAnswer;
+                    document.getElementById('org-guide-questions').style.display = 'flex';
+                    highlightOrgGuideAnswer(resp.proposedAnswer);
+                    showOrgGuideTakeoverBtn(resp.proposedAnswer);
+                } else {
+                    alert('Error generating answer. Please try again.');
+                    document.getElementById('org-guide-questions').style.display = 'flex';
+                }
+            })
+            .catch(function() {
+                document.getElementById('org-guide-generating').style.display = 'none';
+                document.getElementById('org-guide-questions').style.display = 'flex';
+                alert('Error generating answer. Please try again.');
+            });
+        }
+
+        function showOrgGuideTakeoverBtn(proposedAnswer) {
+            var existing = document.getElementById('org-guide-takeover-row');
+            if (existing) existing.remove();
+            var container = document.querySelector('#org-guide-questions .questions-container');
+            if (!container) return;
+            var div = document.createElement('div');
+            div.id = 'org-guide-takeover-row';
+            div.style.cssText = 'margin-top:1em;display:flex;gap:0.5em;align-items:center;flex-wrap:wrap;border-top:1px solid #e0e0e0;padding-top:0.75em;';
+            div.innerHTML =
+                '<span style="font-size:0.9em;color:#333;">Suggested: <strong>' + escapeOrgGuideHtml(proposedAnswer) + '</strong></span>' +
+                '<button type="button" class="btn-primary" onclick="applyOrgGuideProposedAnswer()" style="font-size:0.85em;padding:4px 12px;">&#10004; Apply</button>' +
+                '<button type="button" class="btn-cancel" onclick="discardOrgGuideProposal()" style="font-size:0.85em;padding:4px 8px;">&#8617; Retry</button>';
+            container.appendChild(div);
+        }
+
+        function applyOrgGuideProposedAnswer() {
+            if (!_orgGuideState.proposedAnswer || !currentMaturityModel) return;
+            var match = (currentMaturityModel.maturityAnswers || []).find(function(a) { return a.answer === _orgGuideState.proposedAnswer; });
+            if (match) { applyOrgGuideAnswer(match.rating, match.answer); }
+            else { alert('Could not match proposed answer. Please apply manually from the right panel.'); }
+        }
+
+        function discardOrgGuideProposal() {
+            _orgGuideState.proposedAnswer = null;
+            document.querySelectorAll('#org-guide-maturity-list .maturity-answer-card').forEach(function(c) { c.classList.remove('maturity-answer-suggested'); });
+            var row = document.getElementById('org-guide-takeover-row');
+            if (row) row.remove();
+        }
+
+        function highlightOrgGuideAnswer(proposedAnswer) {
+            var matched = null;
+            document.querySelectorAll('#org-guide-maturity-list .maturity-answer-card').forEach(function(card) {
+                if (card.getAttribute('data-answer') === proposedAnswer) { card.classList.add('maturity-answer-suggested'); matched = card; }
+                else { card.classList.remove('maturity-answer-suggested'); }
+            });
+            if (matched) { var list = document.getElementById('org-guide-maturity-list'); list.scrollTop = (matched.offsetTop || 0) - 30; }
+        }
+
+        function populateOrgGuideMaturity() {
+            var list = document.getElementById('org-guide-maturity-list');
+            list.innerHTML = '';
+            if (!currentMaturityModel || !currentMaturityModel.maturityAnswers) {
+                list.innerHTML = '<p style="color:#888;font-size:0.88em;padding:0.5em 0;">Select a maturity model to see available answers here.</p>';
+                return;
+            }
+            currentMaturityModel.maturityAnswers.forEach(function(a) {
+                var card = document.createElement('div');
+                card.className = 'maturity-answer-card';
+                card.setAttribute('data-answer', a.answer || '');
+                card.innerHTML = '<span class="maturity-answer-name">' + escapeOrgGuideHtml(a.answer || '') + '</span>';
+                card.addEventListener('click', function() { applyOrgGuideAnswer(a.rating, a.answer); });
+                list.appendChild(card);
+            });
+        }
+
+        function applyOrgGuideAnswer(rating, answerText) {
+            var controlId = _orgGuideState.controlId;
+            if (!controlId) return;
+            var row = document.querySelector('.control-row[data-control-id="' + controlId + '"]');
+            if (!row) return;
+            var answerSelect = row.querySelector('.control-answer');
+            var percentInput = row.querySelector('.control-percent');
+            if (percentInput) percentInput.value = String(rating);
+            if (answerSelect && currentMaturityModel) answerSelect.value = String(rating);
+            saveControlChange(controlId, true, String(rating));
+            closeOrgGuide();
+        }
+
+        function closeOrgGuide() {
+            document.getElementById('org-guide-modal-bg').style.display = 'none';
+            _orgGuideState = { controlId: null, questions: [], proposedAnswer: null };
+            document.getElementById('org-guide-loading').style.display = 'flex';
+            document.getElementById('org-guide-questions').innerHTML = '';
+            document.getElementById('org-guide-questions').style.display = '';
+            document.getElementById('org-guide-generating').style.display = 'none';
+            document.getElementById('org-guide-maturity-list').innerHTML = '';
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var bg = document.getElementById('org-guide-modal-bg');
+            if (bg) bg.addEventListener('mousedown', function(e) { if (e.target === this) closeOrgGuide(); });
+        });
+    </script>
+</body>
+
+</html>

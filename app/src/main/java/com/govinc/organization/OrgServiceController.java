@@ -1,10 +1,13 @@
 package com.govinc.organization;
 
+import com.govinc.user.User;
+import com.govinc.user.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -24,6 +27,8 @@ public class OrgServiceController {
     private OrgServiceService orgServiceService;
     @Autowired
     private OrgUnitService orgUnitService;
+    @Autowired
+    private UserRepository userRepository;
 
     @GetMapping({"/list", "/list.html"})
     public String listOrgServicesView(Model model) {
@@ -37,6 +42,7 @@ public class OrgServiceController {
         OrgService orgService = new OrgService();
         model.addAttribute("orgService", orgService);
         model.addAttribute("allOrgUnits", orgUnitService.getAllOrgUnits());
+        model.addAttribute("allUsers", userRepository.findAll());
         return "orgservice-edit";
     }
 
@@ -49,11 +55,15 @@ public class OrgServiceController {
         OrgService orgService = orgServiceOpt.get();
         model.addAttribute("orgService", orgService);
         model.addAttribute("allOrgUnits", orgUnitService.getAllOrgUnits());
+        model.addAttribute("allUsers", userRepository.findAll());
         return "orgservice-edit";
     }
 
     @PostMapping("/save")
-    public String saveOrgService(@ModelAttribute OrgService orgService, @RequestParam(value="orgUnitIds", required=false) List<Long> orgUnitIds) {
+    public String saveOrgService(
+            @ModelAttribute OrgService orgService,
+            @RequestParam(value="orgUnitIds", required=false) List<Long> orgUnitIds,
+            @RequestParam(value="responsiblePersonIds", required=false) List<Long> responsiblePersonIds) {
         if (orgUnitIds != null) {
             Set<OrgUnit> selectedOrgUnits = orgUnitService.getAllOrgUnits().stream()
                 .filter(ou -> orgUnitIds.contains(ou.getId()))
@@ -61,6 +71,12 @@ public class OrgServiceController {
             orgService.setOrgUnits(selectedOrgUnits);
         } else {
             orgService.setOrgUnits(null);
+        }
+        if (responsiblePersonIds != null && !responsiblePersonIds.isEmpty()) {
+            Set<User> persons = new HashSet<>(userRepository.findAllById(responsiblePersonIds));
+            orgService.setResponsiblePersons(persons);
+        } else {
+            orgService.setResponsiblePersons(new HashSet<>());
         }
         orgServiceService.saveOrgService(orgService);
         return "redirect:/orgservices/list";

@@ -14,11 +14,22 @@
     <div th:replace="~{navigation :: mainNav}"></div>
     <div class="container">
         <div class="assessment-header">
-            <h1 class="page-title">Org Service Assessment</h1>
-            <h2 th:text="${assessment.orgService.name}"></h2>
-            <div class="info-message">
-                <strong>Number of applicable maturity answers:</strong> <span class="stat-number"
-                    th:text="${applicableCount}"></span>
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:0.5em;">
+                <div>
+                    <h1 class="page-title">Org Service Assessment</h1>
+                    <h2 th:text="${assessment.orgService.name}"></h2>
+                    <div class="info-message">
+                        <strong>Number of applicable maturity answers:</strong> <span class="stat-number"
+                            th:text="${applicableCount}"></span>
+                    </div>
+                </div>
+                <div style="flex-shrink:0;padding-top:0.3em;">
+                    <button type="button" class="btn-action" onclick="copySimpleViewUrl()"
+                            title="Copy Simple View URL to clipboard"
+                            style="display:inline-flex;align-items:center;gap:6px;font-size:0.88em;">
+                        &#128279; Copy Simple View Link
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -145,6 +156,15 @@
         <span class="checkmark">✓</span>
         <span class="notification-text">Changes saved successfully</span>
     </div>
+
+    <!-- Copy Toast -->
+    <div id="copyToast" style="display:none;position:fixed;bottom:2em;left:50%;transform:translateX(-50%);background:#2563eb;color:#fff;padding:0.6em 1.4em;border-radius:24px;font-size:0.95em;box-shadow:0 4px 16px rgba(0,0,0,0.18);z-index:9999;align-items:center;gap:0.5em;"></div>
+    <style>
+        @keyframes copyToastIn  { from { opacity:0; transform:translateX(-50%) translateY(16px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+        @keyframes copyToastOut { from { opacity:1; } to { opacity:0; transform:translateX(-50%) translateY(8px); } }
+        .copy-toast-in  { animation: copyToastIn  0.28s ease forwards; }
+        .copy-toast-out { animation: copyToastOut 0.32s ease forwards; }
+    </style>
 
     <!-- Answering Guide Modal -->
     <div class="modal-bg" id="org-guide-modal-bg" style="display:none;">
@@ -580,6 +600,48 @@
         clearFiltersBtn.addEventListener('click', clearFilters);
         filterCatalogSelect.addEventListener('change', applyFilters);
         loadSecurityCatalogs();
+
+        function copySimpleViewUrl() {
+            var url = window.location.origin + '/orgservice-assessment/simple/' + orgServiceId;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(url).then(function() {
+                    showCopyToast('Link copied to clipboard!');
+                }).catch(function() {
+                    fallbackCopyUrl(url);
+                });
+            } else {
+                fallbackCopyUrl(url);
+            }
+        }
+
+        function fallbackCopyUrl(url) {
+            var ta = document.createElement('textarea');
+            ta.value = url;
+            ta.style.cssText = 'position:fixed;top:-999px;left:-999px;';
+            document.body.appendChild(ta);
+            ta.select();
+            try {
+                document.execCommand('copy');
+                showCopyToast('Link copied to clipboard!');
+            } catch (e) {
+                showCopyToast('Could not copy: ' + url, true);
+            }
+            document.body.removeChild(ta);
+        }
+
+        function showCopyToast(msg, isError) {
+            var toast = document.getElementById('copyToast');
+            toast.textContent = msg;
+            toast.style.background = isError ? '#c0392b' : '#2563eb';
+            toast.style.display = 'flex';
+            toast.classList.remove('copy-toast-out');
+            toast.classList.add('copy-toast-in');
+            setTimeout(function() {
+                toast.classList.remove('copy-toast-in');
+                toast.classList.add('copy-toast-out');
+                setTimeout(function() { toast.style.display = 'none'; }, 350);
+            }, 2200);
+        }
     </script>
 
     <script>

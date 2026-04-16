@@ -2,6 +2,7 @@ package com.govinc.organization;
 
 import com.govinc.authorization.AuthorizationService;
 import com.govinc.authorization.UnauthorizedException;
+import com.govinc.user.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -20,8 +21,25 @@ public class OrgServiceAssessmentController {
     private AuthorizationService authorizationService;
 
     @Autowired
+    private OrgServiceRepository orgServiceRepository;
+
+    @Autowired
     public OrgServiceAssessmentController(OrgServiceAssessmentService assessmentService) {
         this.assessmentService = assessmentService;
+    }
+
+    /** Returns true if the current user is a responsible person on this org service. */
+    private boolean isResponsiblePerson(Long orgServiceId) {
+        User currentUser = authorizationService.getCurrentUser();
+        if (currentUser == null) return false;
+        return orgServiceRepository.findById(orgServiceId)
+                .map(svc -> svc.getResponsiblePersons() != null &&
+                        svc.getResponsiblePersons().stream().anyMatch(u -> u.getId().equals(currentUser.getId())))
+                .orElse(false);
+    }
+
+    private boolean canAccessAssessmentFor(Long orgServiceId) {
+        return authorizationService.canAccessOrganization() || isResponsiblePerson(orgServiceId);
     }
 
     @GetMapping("/edit/{orgServiceId}")
@@ -38,6 +56,21 @@ public class OrgServiceAssessmentController {
         return "orgservice-assessment";
     }
 
+    @GetMapping("/simple/{orgServiceId}")
+    public String simpleView(@PathVariable Long orgServiceId, Model model) {
+        if (!canAccessAssessmentFor(orgServiceId)) {
+            throw new UnauthorizedException("You do not have permission to access this org service assessment.");
+        }
+        OrgServiceAssessment assessment = assessmentService.findOrCreateAssessment(orgServiceId);
+        List<OrgServiceAssessmentControl> allControls = assessmentService.getAllControlsForAssessment(assessment);
+        List<OrgServiceAssessmentControl> applicableControls = allControls.stream()
+                .filter(OrgServiceAssessmentControl::isApplicable)
+                .collect(java.util.stream.Collectors.toList());
+        model.addAttribute("assessment", assessment);
+        model.addAttribute("controls", applicableControls);
+        return "orgservice-assessment-simple";
+    }
+
     @PostMapping("/save-control")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> saveControl(@RequestParam Long id,
@@ -46,7 +79,7 @@ public class OrgServiceAssessmentController {
                                                             @RequestParam Long controlId,
                                                             @RequestParam Boolean applicable,
                                                             @RequestParam Integer percent) {
-        if (!authorizationService.canAccessOrganization()) {
+        if (!canAccessAssessmentFor(orgServiceId)) {
             Map<String, Object> forbidden = new HashMap<>();
             forbidden.put("success", false);
             forbidden.put("message", "You do not have permission to modify org service assessments.");
@@ -95,12 +128,6 @@ public class OrgServiceAssessmentController {
     @PutMapping("/save-control-comment")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> saveControlComment(@RequestBody Map<String, Object> body) {
-        if (!authorizationService.canAccessOrganization()) {
-            Map<String, Object> forbidden = new HashMap<>();
-            forbidden.put("success", false);
-            forbidden.put("message", "You do not have permission to modify org service assessments.");
-            return ResponseEntity.status(403).body(forbidden);
-        }
         Map<String, Object> response = new HashMap<>();
         try {
             Long id = Long.parseLong(body.get("id").toString());
@@ -109,6 +136,13 @@ public class OrgServiceAssessmentController {
             
             OrgServiceAssessment assessment = assessmentService.getAssessment(id)
                     .orElseThrow(() -> new RuntimeException("Assessment not found"));
+
+            Long svcId = assessment.getOrgService().getId();
+            if (!canAccessAssessmentFor(svcId)) {
+                response.put("success", false);
+                response.put("message", "You do not have permission to modify org service assessments.");
+                return ResponseEntity.status(403).body(response);
+            }
             
             // Find and update the specific control
             List<OrgServiceAssessmentControl> controls = assessment.getControls();

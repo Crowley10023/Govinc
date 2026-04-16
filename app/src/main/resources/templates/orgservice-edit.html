@@ -4,7 +4,26 @@
 <head>
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <title th:text="${orgService.id != null} ? 'Edit Org Service' : 'Create Org Service'">Edit Org Service</title>
-    <th:block th:replace="~{navigation :: navHead}"></th:block></head>
+  <meta th:if="${_csrf != null}" name="_csrf" th:content="${_csrf.token}">
+  <meta th:if="${_csrf != null}" name="_csrf_header" th:content="${_csrf.headerName}">
+    <th:block th:replace="~{navigation :: navHead}"></th:block>
+  <style>
+    .responsible-persons-list { display: flex; flex-wrap: wrap; gap: 0.4em; margin-bottom: 0.5em; min-height: 2em; }
+    .resp-person-chip {
+      display: inline-flex; align-items: center; gap: 0.3em;
+      background: #e8f0fe; border: 1px solid #b3c6f7; border-radius: 999px;
+      padding: 2px 10px 2px 12px; font-size: 0.88em; white-space: nowrap;
+    }
+    .resp-person-chip .remove-btn {
+      background: none; border: none; cursor: pointer; color: #555;
+      font-size: 1em; padding: 0; line-height: 1; margin-left: 2px;
+    }
+    .resp-person-chip .remove-btn:hover { color: #c00; }
+    .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,0.4); display:none; align-items:center; justify-content:center; z-index:900; }
+    .modal-popup { background:#fff; border-radius:8px; padding:1.5em; width:min(560px,96vw); max-height:82vh; display:flex; flex-direction:column; box-shadow:0 4px 24px rgba(0,0,0,0.18); }
+    .modal-btn-row { display:flex; gap:0.5em; flex-wrap:wrap; }
+  </style>
+</head>
 
 <body>
   <div th:replace="~{navigation :: mainNav}"></div>
@@ -16,7 +35,7 @@
         </div>
 
         <!-- Main Form Card -->
-        <form th:action="@{'/orgservices/save'}" method="post" class="form-card">
+        <form th:action="@{'/orgservices/save'}" method="post" class="form-card" id="orgServiceForm">
           <input type="hidden" name="id" th:value="${orgService.id}" />
           
           <!-- Form Fields Container -->
@@ -77,6 +96,28 @@
               <p class="form-hint">Hold Ctrl (or Cmd) to select multiple units</p>
             </div>
 
+            <!-- Responsible Persons Section -->
+            <div class="form-group">
+              <label class="form-label">
+                <span class="label-text">Responsible Persons</span>
+              </label>
+              <div class="responsible-persons-list" id="responsiblePersonsList">
+                <span th:each="person : ${orgService.responsiblePersons}"
+                      class="resp-person-chip"
+                      th:data-id="${person.id}"
+                      th:data-name="${person.name}">
+                  <span th:text="${person.name}"></span>
+                  <button type="button" class="remove-btn" title="Remove" onclick="removeResponsiblePerson(this)">&#215;</button>
+                  <input type="hidden" name="responsiblePersonIds" th:value="${person.id}" />
+                </span>
+              </div>
+              <div style="display:flex;gap:0.5em;flex-wrap:wrap;margin-top:0.3em;">
+                <button type="button" class="btn-action" style="font-size:0.85em;padding:4px 12px;" onclick="openPersonPickerModal('local')">&#43; Add Person</button>
+                <button type="button" class="btn-action" style="font-size:0.85em;padding:4px 12px;" onclick="openPersonPickerModal('corp')">&#9729; Corp. Directory</button>
+              </div>
+              <p class="form-hint">Responsible persons can view the Org Service Assessment Simple View.</p>
+            </div>
+
           </div>
 
           <!-- Action Buttons -->
@@ -92,6 +133,228 @@
         </form>
 
   </div>
+
+  <!-- Person Picker Modal -->
+  <div class="modal-bg" id="personPickerModalBg">
+    <div class="modal-popup">
+      <h3 style="flex-shrink:0;margin-bottom:0.8em;">Add Responsible Person</h3>
+
+      <!-- Tab buttons -->
+      <div style="display:flex;gap:0.5em;margin-bottom:0.8em;flex-shrink:0;">
+        <button type="button" id="tabLocalBtn" class="btn-action" onclick="switchPersonTab('local')">Local Users</button>
+        <button type="button" id="tabCorpBtn" class="btn-action" style="background:#6c757d;" onclick="switchPersonTab('corp')">&#9729; Corp. Directory</button>
+      </div>
+
+      <!-- Local users tab -->
+      <div id="tabLocalPanel" style="flex:1;overflow-y:auto;min-height:0;">
+        <input type="text" id="localUserSearch" class="form-control" placeholder="Filter by name or e-mail&hellip;" oninput="filterLocalUsers()" style="margin-bottom:0.5em;" />
+        <table class="table" style="width:100%;">
+          <thead><tr><th>Name</th><th>E-Mail</th><th></th></tr></thead>
+          <tbody id="localUsersTbody">
+            <tr th:each="u : ${allUsers}"
+                class="local-user-row"
+                th:data-id="${u.id}"
+                th:data-name="${u.name}"
+                th:data-email="${u.email != null ? u.email : ''}">
+              <td th:text="${u.name}"></td>
+              <td th:text="${u.email}"></td>
+              <td><button type="button" class="btn-action btn-sm" onclick="pickLocalUser(this)">Add</button></td>
+            </tr>
+          </tbody>
+        </table>
+        <p id="localUsersEmpty" style="display:none;color:#888;">No users found.</p>
+      </div>
+
+      <!-- Corp directory tab -->
+      <div id="tabCorpPanel" style="display:none;flex:1;overflow-y:auto;min-height:0;">
+        <div style="display:flex;gap:0.5em;margin-bottom:0.5em;">
+          <input type="text" id="corpDirQuery" class="form-control" placeholder="Search by name or e-mail&hellip;"
+                 onkeydown="if(event.key==='Enter') searchCorpDirForPerson()" style="flex:1;" />
+          <button type="button" class="btn-action" id="corpDirSearchBtn" onclick="searchCorpDirForPerson()">Search</button>
+        </div>
+        <div id="corpDirPersonStatus" style="font-size:0.88em;color:#555;min-height:1.1em;margin-bottom:0.4em;"></div>
+        <table id="corpDirPersonTable" class="table" style="display:none;width:100%;">
+          <thead><tr><th>Name</th><th>E-Mail</th><th></th></tr></thead>
+          <tbody id="corpDirPersonTbody"></tbody>
+        </table>
+        <p id="corpDirPersonEmpty" style="display:none;color:#888;">No users found.</p>
+      </div>
+
+      <div style="flex-shrink:0;margin-top:0.8em;" class="modal-btn-row">
+        <button type="button" class="btn-cancel" onclick="closePersonPickerModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script th:inline="javascript">
+    // Track currently selected person IDs to prevent duplicates
+    function getSelectedPersonIds() {
+      return Array.from(document.querySelectorAll('#responsiblePersonsList .resp-person-chip'))
+        .map(function(chip) { return chip.getAttribute('data-id'); });
+    }
+
+    function addPersonChip(id, name) {
+      var idStr = String(id);
+      if (getSelectedPersonIds().indexOf(idStr) !== -1) return; // already added
+      var list = document.getElementById('responsiblePersonsList');
+      var chip = document.createElement('span');
+      chip.className = 'resp-person-chip';
+      chip.setAttribute('data-id', idStr);
+      chip.setAttribute('data-name', name);
+      chip.innerHTML =
+        '<span>' + escHtml(name) + '</span>' +
+        '<button type="button" class="remove-btn" title="Remove" onclick="removeResponsiblePerson(this)">&#215;</button>' +
+        '<input type="hidden" name="responsiblePersonIds" value="' + escHtml(idStr) + '" />';
+      list.appendChild(chip);
+    }
+
+    function removeResponsiblePerson(btn) {
+      btn.closest('.resp-person-chip').remove();
+    }
+
+    function escHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // --- Modal ---
+    function openPersonPickerModal(tab) {
+      document.getElementById('personPickerModalBg').style.display = 'flex';
+      switchPersonTab(tab || 'local');
+    }
+
+    function closePersonPickerModal() {
+      document.getElementById('personPickerModalBg').style.display = 'none';
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      var bg = document.getElementById('personPickerModalBg');
+      if (bg) bg.addEventListener('mousedown', function(e) { if (e.target === this) closePersonPickerModal(); });
+    });
+
+    function switchPersonTab(tab) {
+      var isLocal = tab === 'local';
+      document.getElementById('tabLocalPanel').style.display = isLocal ? '' : 'none';
+      document.getElementById('tabCorpPanel').style.display = isLocal ? 'none' : '';
+      document.getElementById('tabLocalBtn').style.background = isLocal ? '' : '#6c757d';
+      document.getElementById('tabCorpBtn').style.background = isLocal ? '#6c757d' : '';
+    }
+
+    // --- Local users ---
+    function filterLocalUsers() {
+      var q = document.getElementById('localUserSearch').value.toLowerCase();
+      var rows = document.querySelectorAll('#localUsersTbody .local-user-row');
+      var visible = 0;
+      rows.forEach(function(row) {
+        var name = (row.getAttribute('data-name') || '').toLowerCase();
+        var email = (row.getAttribute('data-email') || '').toLowerCase();
+        var show = !q || name.indexOf(q) !== -1 || email.indexOf(q) !== -1;
+        row.style.display = show ? '' : 'none';
+        if (show) visible++;
+      });
+      document.getElementById('localUsersEmpty').style.display = (visible === 0) ? '' : 'none';
+    }
+
+    function pickLocalUser(btn) {
+      var row = btn.closest('tr');
+      var id = row.getAttribute('data-id');
+      var name = row.getAttribute('data-name');
+      addPersonChip(id, name);
+      closePersonPickerModal();
+    }
+
+    // --- Corp Directory ---
+    function searchCorpDirForPerson() {
+      var query = document.getElementById('corpDirQuery').value.trim();
+      if (!query) { document.getElementById('corpDirPersonStatus').textContent = 'Please enter a search term.'; return; }
+      var csrfToken  = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+      var csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+      var statusEl   = document.getElementById('corpDirPersonStatus');
+      var searchBtn  = document.getElementById('corpDirSearchBtn');
+      searchBtn.disabled = true;
+      statusEl.style.color = '#555';
+      statusEl.textContent = 'Searching\u2026';
+      document.getElementById('corpDirPersonTable').style.display = 'none';
+      document.getElementById('corpDirPersonEmpty').style.display = 'none';
+      fetch('/users/azure/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', [csrfHeader]: csrfToken },
+        body: JSON.stringify({ query: query })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        searchBtn.disabled = false;
+        if (data.error) {
+          statusEl.style.color = '#c00';
+          statusEl.textContent = data.error;
+          return;
+        }
+        var results = data.results || [];
+        statusEl.style.color = '#555';
+        statusEl.textContent = results.length + ' result(s) found.';
+        renderCorpDirPersonResults(results);
+      })
+      .catch(function(err) {
+        searchBtn.disabled = false;
+        statusEl.style.color = '#c00';
+        statusEl.textContent = 'Request failed: ' + err;
+      });
+    }
+
+    function renderCorpDirPersonResults(results) {
+      var tbody = document.getElementById('corpDirPersonTbody');
+      tbody.innerHTML = '';
+      if (!results || results.length === 0) {
+        document.getElementById('corpDirPersonEmpty').style.display = '';
+        document.getElementById('corpDirPersonTable').style.display = 'none';
+        return;
+      }
+      document.getElementById('corpDirPersonEmpty').style.display = 'none';
+      document.getElementById('corpDirPersonTable').style.display = '';
+      results.forEach(function(u) {
+        var mail = u.mail || u.userPrincipalName || '';
+        var displayName = u.displayName || (u.givenName + ' ' + (u.surname || '')).trim() || mail;
+        var row = document.createElement('tr');
+        row.innerHTML =
+          '<td>' + escHtml(displayName) + '</td>' +
+          '<td>' + escHtml(mail) + '</td>' +
+          '<td><button type="button" class="btn-action btn-sm" onclick="pickCorpDirPerson(this)" ' +
+            'data-name="' + escHtml(displayName) + '" data-email="' + escHtml(mail) + '">Add</button></td>';
+        tbody.appendChild(row);
+      });
+    }
+
+    function pickCorpDirPerson(btn) {
+      var name = btn.getAttribute('data-name');
+      var email = btn.getAttribute('data-email');
+      var csrfToken  = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+      var csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+      btn.disabled = true;
+      btn.textContent = 'Adding\u2026';
+      // Use resolve endpoint: finds or creates the user and returns their local ID
+      fetch('/users/azure/resolve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', [csrfHeader]: csrfToken },
+        body: JSON.stringify([{ displayName: name, mail: email, givenName: '', surname: '' }])
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var resolved = data.resolved || [];
+        if (resolved.length > 0) {
+          addPersonChip(resolved[0].id, resolved[0].name || name);
+          closePersonPickerModal();
+        } else {
+          alert('Could not resolve user from corp directory.');
+          btn.disabled = false;
+          btn.textContent = 'Add';
+        }
+      })
+      .catch(function() {
+        alert('Failed to resolve user from corp directory.');
+        btn.disabled = false;
+        btn.textContent = 'Add';
+      });
+    }
+  </script>
 
 </body>
 
