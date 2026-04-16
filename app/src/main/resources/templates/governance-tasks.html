@@ -7,6 +7,49 @@
     <meta name="_csrf_header" th:content="${_csrf.headerName}">
     <title>Tasks - Governance</title>
     <th:block th:replace="~{navigation :: navHead}"></th:block>
+    <style>
+        /* Governance Tasks — use full horizontal space */
+        .container { max-width: none !important; }
+        /* Clickable task row */
+        .task-row { cursor: pointer; }
+        .task-row:hover td { background: #f0f4ff; }
+        /* Status pill mini-popup */
+        .status-pill-anchor { position: relative; display: inline-block; }
+        .status-mini-popup {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            z-index: 200;
+            background: #fff;
+            border: 1px solid #d0d4e0;
+            border-radius: 8px;
+            padding: 6px 8px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.14);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 170px;
+        }
+        .status-mini-popup .smp-pill {
+            display: block;
+            width: 100%;
+            padding: 5px 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.85em;
+            text-align: left;
+            font-weight: 500;
+        }
+        .status-mini-popup .smp-pill:hover { opacity: 0.82; }
+        .smp-identified  { background: #e0eaff; color: #2558c8; }
+        .smp-inprogress  { background: #fff3cd; color: #856404; }
+        .smp-approval    { background: #cfe2ff; color: #0a58ca; }
+        .smp-done        { background: #d1e7dd; color: #146c43; }
+        /* Badge fade transition */
+        .task-status-badge { transition: opacity 0.25s ease, transform 0.25s ease; }
+        .task-status-badge.status-updating { opacity: 0; transform: scale(0.85); }
+    </style>
 </head>
 <body>
 <div th:replace="~{navigation :: mainNav}"></div>
@@ -45,17 +88,6 @@
     </div>
 
     <table class="table card" id="tasksTable">
-        <colgroup>
-            <col style="width:18%">
-            <col style="width:8%">
-            <col style="width:10%">
-            <col style="width:9%">
-            <col style="width:14%">
-            <col style="width:9%">
-            <col style="width:9%">
-            <col style="width:11%">
-            <col style="width:12%">
-        </colgroup>
         <thead>
             <tr>
                 <th>Title</th>
@@ -65,26 +97,38 @@
                 <th>Project</th>
                 <th>Security Control</th>
                 <th>Due Date</th>
-                <th>Status Select</th>
-                <th style="white-space:nowrap">Actions</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody id="tasksTbody">
             <tr th:each="task : ${tasks}" class="task-row"
+                th:data-task-id="${task.id}"
                 th:data-status="${task.status.name()}"
+                th:data-title="${task.title}"
+                th:data-description="${task.description}"
                 th:data-user="${task.assignedUser != null ? task.assignedUser.id : ''}"
+                th:data-user-id="${task.assignedUser != null ? task.assignedUser.id : ''}"
                 th:data-project="${task.project != null ? task.project.id : ''}"
-                th:data-task-id="${task.id}">
+                th:data-project-id="${task.project != null ? task.project.id : ''}"
+                th:data-control-id="${task.securityControl != null ? task.securityControl.id : ''}"
+                th:data-catalog-id="${task.securityCatalog != null ? task.securityCatalog.id : ''}"
+                th:data-due-date="${task.dueDate != null ? #temporals.format(task.dueDate, 'yyyy-MM-dd') : ''}"
+                onclick="openEditTaskModal(this)">
                 <td th:text="${task.title}"></td>
-                <td>
-                    <span class="task-status-badge"
-                          th:classappend="${task.status.name() == 'DONE' ? 'status-done' : (task.status.name() == 'IN_PROGRESS' ? 'status-inprogress' : (task.status.name() == 'READY_FOR_APPROVAL' ? 'status-approval' : 'status-identified'))}"
-                          th:text="${task.status.displayName}"></span>
+                <td onclick="event.stopPropagation()">
+                    <div class="status-pill-anchor">
+                        <span class="task-status-badge"
+                              th:classappend="${task.status.name() == 'DONE' ? 'status-done' : (task.status.name() == 'IN_PROGRESS' ? 'status-inprogress' : (task.status.name() == 'READY_FOR_APPROVAL' ? 'status-approval' : 'status-identified'))}"
+                              th:text="${task.status.displayName}"
+                              th:data-task-id="${task.id}"
+                              style="cursor:pointer;"
+                              onclick="openStatusMiniPopup(this)"></span>
+                    </div>
                 </td>
                 <td th:text="${task.assignedUser != null ? task.assignedUser.name : '-'}"></td>
                 <td th:text="${task.createdBy != null ? task.createdBy.name : '-'}"></td>
                 <td th:text="${task.project != null ? task.project.name : '-'}"></td>
-                <td>
+                <td onclick="event.stopPropagation()">
                     <span th:if="${task.securityControl == null}">-</span>
                     <a th:if="${task.securityControl != null}"
                        th:href="@{/security-control/edit(id=${task.securityControl.id},returnUrl='/governance/tasks')}"
@@ -92,23 +136,7 @@
                        class="link"></a>
                 </td>
                 <td th:text="${task.dueDate != null ? #temporals.format(task.dueDate, 'yyyy-MM-dd') : '-'}"></td>
-                <td>
-                    <select class="tiny status-select" th:data-task-id="${task.id}" onchange="updateTaskStatus(this)">
-                        <option th:each="s : ${statuses}" th:value="${s.name()}" th:text="${s.displayName}" th:selected="${s == task.status}"></option>
-                    </select>
-                </td>
-                <td style="white-space:nowrap">
-                    <button type="button" class="btn-edit btn-sm"
-                            th:data-task-id="${task.id}"
-                            th:data-title="${task.title}"
-                            th:data-description="${task.description}"
-                            th:data-status="${task.status.name()}"
-                            th:data-user-id="${task.assignedUser != null ? task.assignedUser.id : ''}"
-                            th:data-project-id="${task.project != null ? task.project.id : ''}"
-                            th:data-control-id="${task.securityControl != null ? task.securityControl.id : ''}"
-                            th:data-catalog-id="${task.securityCatalog != null ? task.securityCatalog.id : ''}"
-                            th:data-due-date="${task.dueDate != null ? #temporals.format(task.dueDate, 'yyyy-MM-dd') : ''}"
-                            onclick="openEditTaskModal(this)">Edit</button>
+                <td onclick="event.stopPropagation()">
                     <button type="button" class="btn-danger btn-sm" th:data-task-id="${task.id}" onclick="deleteTask(this)">Delete</button>
                 </td>
             </tr>
@@ -320,6 +348,83 @@
             method: 'PUT', headers: headers, body: JSON.stringify({ status: sel.value })
         }).then(function(r) {
             if (r.ok) { window.location.reload(); } else { alert('Failed to update status'); }
+        });
+    }
+
+    // ---- Status mini-popup ----
+    var _activeMiniPopup = null;
+
+    function openStatusMiniPopup(badge) {
+        closeStatusMiniPopup();
+        var taskId = badge.getAttribute('data-task-id');
+        var popup = document.createElement('div');
+        popup.className = 'status-mini-popup';
+        popup.innerHTML =
+            '<button class="smp-pill smp-identified"  data-status="IDENTIFIED"        onclick="applyStatusFromPopup(this)">Identified</button>' +
+            '<button class="smp-pill smp-inprogress"  data-status="IN_PROGRESS"       onclick="applyStatusFromPopup(this)">In Progress</button>' +
+            '<button class="smp-pill smp-approval"    data-status="READY_FOR_APPROVAL" onclick="applyStatusFromPopup(this)">Ready for Approval</button>' +
+            '<button class="smp-pill smp-done"        data-status="DONE"              onclick="applyStatusFromPopup(this)">Done</button>';
+        popup.setAttribute('data-task-id', taskId);
+        badge.parentNode.appendChild(popup);
+        _activeMiniPopup = popup;
+        setTimeout(function() {
+            document.addEventListener('click', _closeMiniPopupOutside, { once: true });
+        }, 0);
+    }
+
+    function _closeMiniPopupOutside(e) {
+        if (_activeMiniPopup && !_activeMiniPopup.contains(e.target)) {
+            closeStatusMiniPopup();
+        }
+    }
+
+    function closeStatusMiniPopup() {
+        if (_activeMiniPopup) {
+            _activeMiniPopup.remove();
+            _activeMiniPopup = null;
+        }
+    }
+
+    function applyStatusFromPopup(btn) {
+        var popup = btn.closest('.status-mini-popup');
+        var taskId = popup.getAttribute('data-task-id');
+        var status = btn.getAttribute('data-status');
+
+        // Status display name + CSS class map
+        var statusMeta = {
+            'IDENTIFIED':        { label: 'Identified',          cls: 'status-identified' },
+            'IN_PROGRESS':       { label: 'In Progress',         cls: 'status-inprogress' },
+            'READY_FOR_APPROVAL':{ label: 'Ready for Approval',  cls: 'status-approval'   },
+            'DONE':              { label: 'Done',                cls: 'status-done'       }
+        };
+
+        // Find the badge from the anchor that owns this popup
+        var anchor = popup.parentNode;
+        var badge = anchor ? anchor.querySelector('.task-status-badge') : null;
+
+        closeStatusMiniPopup();
+
+        var headers = { 'Content-Type': 'application/json' };
+        headers[csrfHeader] = csrfToken;
+        fetch('/governance/tasks/' + taskId + '/status', {
+            method: 'PUT', headers: headers, body: JSON.stringify({ status: status })
+        }).then(function(r) {
+            if (!r.ok) { alert('Failed to update status'); return; }
+            if (!badge || !statusMeta[status]) return;
+            var meta = statusMeta[status];
+            // Fade out
+            badge.classList.add('status-updating');
+            setTimeout(function() {
+                // Swap class and text
+                badge.classList.remove('status-identified','status-inprogress','status-approval','status-done');
+                badge.classList.add(meta.cls);
+                badge.textContent = meta.label;
+                // Update row data-status for filter
+                var row = badge.closest('tr');
+                if (row) row.setAttribute('data-status', status);
+                // Fade back in
+                badge.classList.remove('status-updating');
+            }, 260);
         });
     }
 

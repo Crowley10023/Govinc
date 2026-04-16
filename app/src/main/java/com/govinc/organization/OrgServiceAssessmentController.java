@@ -42,6 +42,19 @@ public class OrgServiceAssessmentController {
         return authorizationService.canAccessOrganization() || isResponsiblePerson(orgServiceId);
     }
 
+    @Autowired
+    private OrgServiceAssessmentRepository orgServiceAssessmentRepository;
+
+    @GetMapping("/list")
+    public String listAssessments(Model model) {
+        if (!authorizationService.canAccessOrganization()) {
+            throw new UnauthorizedException("You do not have permission to view org assessments.");
+        }
+        List<OrgServiceAssessment> assessments = orgServiceAssessmentRepository.findAll();
+        model.addAttribute("assessments", assessments);
+        return "orgservice-assessment-list";
+    }
+
     @GetMapping("/edit/{orgServiceId}")
     public String editAssessment(@PathVariable Long orgServiceId, Model model) {
         if (!authorizationService.canAccessOrganization()) {

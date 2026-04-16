@@ -132,6 +132,11 @@
         <!-- Answering Guide Modal (shown when guideVisibleInDirect=true) -->
         <div class="modal-bg" id="direct-guide-modal-bg" style="display:none;">
             <div class="modal-popup answering-guide-popup">
+                <!-- Loading overlay -->
+                <div class="guide-overlay" id="direct-guide-overlay">
+                    <div class="guide-overlay-spinner"></div>
+                    <div class="guide-overlay-label" id="direct-guide-overlay-label">Generating questions&hellip;</div>
+                </div>
                 <div class="answering-guide-header">
                     <h3>Answering Guide</h3>
                     <button type="button" class="modal-close-btn" onclick="closeDirectGuide()">X</button>
@@ -511,6 +516,17 @@
         // =================== Answering Guide (Direct View) ===================
         var _directGuideState = { controlId: null, controlName: null, catalogId: 0, questions: [], guideAnswers: [], maturityAnswers: [], proposedAnswer: null };
 
+        function _directGuideShowOverlay(label) {
+            var el = document.getElementById('direct-guide-overlay');
+            var lbl = document.getElementById('direct-guide-overlay-label');
+            if (lbl) lbl.textContent = label || 'Loading…';
+            if (el) el.classList.add('active');
+        }
+        function _directGuideHideOverlay() {
+            var el = document.getElementById('direct-guide-overlay');
+            if (el) el.classList.remove('active');
+        }
+
         function openDirectGuide(btn) {
             var controlId = btn.getAttribute('data-control-id');
             var controlName = btn.getAttribute('data-control-name');
@@ -530,8 +546,9 @@
             document.getElementById('direct-guide-questions').style.display = '';
             document.getElementById('direct-guide-generating').style.display = 'none';
             var loadingEl = document.getElementById('direct-guide-loading');
-            loadingEl.style.display = 'flex';
+            loadingEl.style.display = 'none';
             document.getElementById('direct-guide-modal-bg').style.display = 'flex';
+            _directGuideShowOverlay('Generating questions…');
             populateDirectGuideMaturity();
             fetch('/assessment-direct/guide/questions', {
                 method: 'POST',
@@ -540,6 +557,7 @@
             })
             .then(function(r) { return r.json(); })
             .then(function(resp) {
+                _directGuideHideOverlay();
                 loadingEl.style.display = 'none';
                 if (resp && resp.questions && Array.isArray(resp.questions)) {
                     _directGuideState.questions = resp.questions;
@@ -550,6 +568,7 @@
                 }
             })
             .catch(function() {
+                _directGuideHideOverlay();
                 loadingEl.style.display = 'none';
                 document.getElementById('direct-guide-questions').innerHTML = '<p style="color:red;">Error generating questions. Please try again.</p>';
                 document.getElementById('direct-guide-questions').style.display = 'block';
@@ -595,7 +614,8 @@
                 return { id: a.id, answer: a.answer };
             });
             document.getElementById('direct-guide-questions').style.display = 'none';
-            document.getElementById('direct-guide-generating').style.display = 'flex';
+            document.getElementById('direct-guide-generating').style.display = 'none';
+            _directGuideShowOverlay('Generating answer…');
             fetch('/assessment-direct/guide/answer', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -609,6 +629,7 @@
             })
             .then(function(r) { return r.json(); })
             .then(function(resp) {
+                _directGuideHideOverlay();
                 document.getElementById('direct-guide-generating').style.display = 'none';
                 if (resp && resp.proposedAnswer) {
                     _directGuideState.proposedAnswer = resp.proposedAnswer;
@@ -620,6 +641,7 @@
                 }
             })
             .catch(function() {
+                _directGuideHideOverlay();
                 document.getElementById('direct-guide-generating').style.display = 'none';
                 document.getElementById('direct-guide-questions').style.display = 'flex';
                 alert('Error generating answer. Please try again.');
@@ -697,6 +719,7 @@
 
         function closeDirectGuide() {
             document.getElementById('direct-guide-modal-bg').style.display = 'none';
+            _directGuideHideOverlay();
             _directGuideState = { controlId: null, controlName: null, catalogId: 0, questions: [], guideAnswers: [], maturityAnswers: [], proposedAnswer: null };
             document.getElementById('direct-guide-loading').style.display = 'flex';
             document.getElementById('direct-guide-questions').innerHTML = '';

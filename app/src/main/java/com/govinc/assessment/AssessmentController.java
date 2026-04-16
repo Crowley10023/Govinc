@@ -26,6 +26,8 @@ import com.govinc.authorization.AuthorizationService;
 import com.govinc.authorization.UnauthorizedException;
 import com.govinc.governance.GovernanceProjectRepository;
 
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -35,6 +37,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.util.MultiValueMap;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -1056,29 +1059,177 @@ public class AssessmentController {
         }
     }
 
-    // Download Excel (stub - returns text as Excel file)
+    // Download Excel - proper XLSX with control details, answers, and comments
     @GetMapping("/{id}/excel")
     public ResponseEntity<byte[]> downloadExcel(@PathVariable Long id) throws IOException {
-        // Authorization check
         if (!authorizationService.canAccessAssessment(id) || authorizationService.isAssessor()) {
             throw new UnauthorizedException("You do not have permission to download this assessment data.");
         }
+        Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
+        if (!assessmentOpt.isPresent()) {
+            return ResponseEntity.notFound().build();
+        }
+        Assessment assessment = assessmentOpt.get();
+
+        // Catalog controls sorted by domain then reference
+        List<SecurityControl> controls = new ArrayList<>();
+        if (assessment.getSecurityCatalog() != null && assessment.getSecurityCatalog().getSecurityControls() != null) {
+            controls.addAll(assessment.getSecurityCatalog().getSecurityControls());
+        }
+        controls.sort(Comparator
+            .comparing((SecurityControl sc) -> sc.getSecurityControlDomain() != null ? sc.getSecurityControlDomain().getName() : "",
+                Comparator.nullsLast(String::compareTo))
+            .thenComparing(sc -> sc.getReference() != null ? sc.getReference() : "",
+                Comparator.nullsLast(String::compareTo)));
+
+        // Local answers map: controlId → AssessmentControlAnswer
         Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
-        StringBuilder builder = new StringBuilder();
-        builder.append("Control,Answer\n");
-        if (detailsOpt.isPresent()) {
-            AssessmentDetails details = detailsOpt.get();
-            for (AssessmentControlAnswer aca : details.getControlAnswers()) {
-                String answer = (aca.getMaturityAnswer() != null) ? aca.getMaturityAnswer().getAnswer() : "";
-                builder.append(aca.getSecurityControl().getName()).append(",")
-                        .append(answer).append("\n");
+        Map<Long, AssessmentControlAnswer> localAnswers = new HashMap<>();
+        if (detailsOpt.isPresent() && detailsOpt.get().getControlAnswers() != null) {
+            for (AssessmentControlAnswer aca : detailsOpt.get().getControlAnswers()) {
+                if (aca.getSecurityControl() != null) {
+                    localAnswers.put(aca.getSecurityControl().getId(), aca);
+                }
             }
         }
-        byte[] excelBytes = builder.toString().getBytes(StandardCharsets.UTF_8);
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=assessment_" + id + ".csv")
-                .contentType(MediaType.parseMediaType("text/csv"))
+
+        // Inherited answers from org services (same logic as assessment view)
+        Map<Long, OrgServiceInheritance> inherited = collectOrgServiceInheritance(assessment);
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+
+            // ---- Styles ----
+            CellStyle headerStyle = wb.createCellStyle();
+            Font headerFont = wb.createFont();
+            headerFont.setBold(true);
+            headerFont.setColor(IndexedColors.WHITE.getIndex());
+            headerStyle.setFont(headerFont);
+            headerStyle.setFillForegroundColor(IndexedColors.CORNFLOWER_BLUE.getIndex());
+            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            headerStyle.setBorderBottom(BorderStyle.THIN);
+
+            CellStyle metaLabelStyle = wb.createCellStyle();
+            Font metaLabelFont = wb.createFont();
+            metaLabelFont.setBold(true);
+            metaLabelStyle.setFont(metaLabelFont);
+
+            CellStyle wrapStyle = wb.createCellStyle();
+            wrapStyle.setWrapText(true);
+            wrapStyle.setVerticalAlignment(VerticalAlignment.TOP);
+
+            Sheet sheet = wb.createSheet("Assessment");
+
+            // ---- Meta info rows ----
+            int rowIdx = 0;
+            String[][] metaRows = {
+                { "Assessment",   assessment.getName() != null ? assessment.getName() : "" },
+                { "Org Unit",     assessment.getOrgUnit() != null ? assessment.getOrgUnit().getName() : "-" },
+                { "Catalog",      assessment.getSecurityCatalog() != null ? assessment.getSecurityCatalog().getName() : "-" },
+                { "Status",       assessment.getStatus() != null ? assessment.getStatus().toString() : "-" },
+                { "Creation Date", assessment.getCreationDate() != null ? assessment.getCreationDate().toString() : "-" },
+                { "Export Date",   LocalDate.now().toString() }
+            };
+            for (String[] meta : metaRows) {
+                Row r = sheet.createRow(rowIdx++);
+                Cell c0 = r.createCell(0);
+                c0.setCellValue(meta[0]);
+                c0.setCellStyle(metaLabelStyle);
+                r.createCell(1).setCellValue(meta[1]);
+            }
+            rowIdx++; // blank separator
+
+            // ---- Header row ----
+            String[] headers = { "Domain", "Reference", "Control Name", "Answer", "Score (%)", "Source", "Comment" };
+            Row headerRow = sheet.createRow(rowIdx++);
+            for (int i = 0; i < headers.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(headers[i]);
+                cell.setCellStyle(headerStyle);
+            }
+
+            // ---- Data rows ----
+            for (SecurityControl sc : controls) {
+                Long ctrlId = sc.getId();
+                String answerText = "";
+                int score = 0;
+                String source = "Not answered";
+                String comment = "";
+
+                boolean hasOverride = localAnswers.containsKey(ctrlId)
+                    && Boolean.TRUE.equals(localAnswers.get(ctrlId).getIsOverride());
+
+                if (hasOverride) {
+                    AssessmentControlAnswer aca = localAnswers.get(ctrlId);
+                    if (aca.getMaturityAnswer() != null) {
+                        answerText = aca.getMaturityAnswer().getAnswer() != null ? aca.getMaturityAnswer().getAnswer() : "";
+                        score = aca.getMaturityAnswer().getRating();
+                    }
+                    String orgSvcName = inherited.containsKey(ctrlId) ? inherited.get(ctrlId).orgServiceName : null;
+                    source = "Override" + (orgSvcName != null ? " (overriding: " + orgSvcName + ")" : "");
+                    if (aca.getComment() != null) comment = aca.getComment();
+
+                } else if (inherited.containsKey(ctrlId)) {
+                    OrgServiceInheritance inh = inherited.get(ctrlId);
+                    if (inh.answer != null) {
+                        answerText = inh.answer.getAnswer() != null ? inh.answer.getAnswer() : "";
+                        score = inh.percent;
+                    }
+                    source = "Inherited from: " + (inh.orgServiceName != null ? inh.orgServiceName : "Org Service");
+                    // Prefer local comment, fall back to org service comment
+                    AssessmentControlAnswer local = localAnswers.get(ctrlId);
+                    if (local != null && local.getComment() != null && !local.getComment().isEmpty()) {
+                        comment = local.getComment();
+                    } else if (inh.comment != null) {
+                        comment = inh.comment;
+                    }
+
+                } else if (localAnswers.containsKey(ctrlId)) {
+                    AssessmentControlAnswer aca = localAnswers.get(ctrlId);
+                    if (aca.getMaturityAnswer() != null) {
+                        answerText = aca.getMaturityAnswer().getAnswer() != null ? aca.getMaturityAnswer().getAnswer() : "";
+                        score = aca.getMaturityAnswer().getRating();
+                    }
+                    source = "Direct";
+                    if (aca.getComment() != null) comment = aca.getComment();
+                }
+
+                Row row = sheet.createRow(rowIdx++);
+                row.createCell(0).setCellValue(sc.getSecurityControlDomain() != null ? sc.getSecurityControlDomain().getName() : "");
+                row.createCell(1).setCellValue(sc.getReference() != null ? sc.getReference() : "");
+                row.createCell(2).setCellValue(sc.getName() != null ? sc.getName() : "");
+                row.createCell(3).setCellValue(answerText);
+                if (!answerText.isEmpty()) {
+                    row.createCell(4).setCellValue(score);
+                } else {
+                    row.createCell(4).setCellValue("");
+                }
+                row.createCell(5).setCellValue(source);
+                Cell commentCell = row.createCell(6);
+                commentCell.setCellValue(comment);
+                if (!comment.isEmpty()) commentCell.setCellStyle(wrapStyle);
+            }
+
+            // Column widths
+            sheet.setColumnWidth(0, 6000);   // Domain
+            sheet.setColumnWidth(1, 3500);   // Reference
+            sheet.setColumnWidth(2, 12000);  // Control Name
+            sheet.setColumnWidth(3, 6000);   // Answer
+            sheet.setColumnWidth(4, 3000);   // Score
+            sheet.setColumnWidth(5, 8000);   // Source
+            sheet.setColumnWidth(6, 14000);  // Comment
+
+            // Freeze panes above data rows
+            int dataStartRow = metaRows.length + 2; // meta + blank separator + header
+            sheet.createFreezePane(0, dataStartRow);
+
+            wb.write(out);
+            byte[] excelBytes = out.toByteArray();
+            String filename = "assessment_" + id + ".xlsx";
+            return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .body(excelBytes);
+        }
     }
 
     // --- Create direct URL for assessment ---

@@ -659,6 +659,16 @@ var currentAnsweringGuideState = {
     proposedAnswer: null
 };
 
+function _aguideShowOverlay(label) {
+    var $el = $('#answering-guide-overlay');
+    var $lbl = $('#answering-guide-overlay-label');
+    if ($lbl.length) $lbl.text(label || 'Loading…');
+    $el.addClass('active');
+}
+function _aguideHideOverlay() {
+    $('#answering-guide-overlay').removeClass('active');
+}
+
 function openAnsweringGuideModal(controlId, controlName, controlDetail, securityCatalogId) {
     currentAnsweringGuideState.controlId = controlId;
     currentAnsweringGuideState.controlName = controlName;
@@ -671,8 +681,9 @@ function openAnsweringGuideModal(controlId, controlName, controlDetail, security
     $('#answering-guide-questions').empty();
     $('#answering-guide-proposed-answer').hide();
     $('#answering-guide-generating').hide();
-    $('#answering-guide-loading').show();
+    $('#answering-guide-loading').hide();
     $('#answering-guide-modal-bg').css('display', 'flex');
+    _aguideShowOverlay('Generating questions…');
 
     // Populate right panel with maturity answers
     populateGuideMaturityAnswers(controlId);
@@ -690,6 +701,7 @@ function openAnsweringGuideModal(controlId, controlName, controlDetail, security
         }),
         success: function(response) {
             $('#answering-guide-loading').hide();
+            _aguideHideOverlay();
             if (response && response.questions && Array.isArray(response.questions)) {
                 currentAnsweringGuideState.questions = response.questions;
                 displayAnsweringGuideQuestions(response.questions);
@@ -699,6 +711,7 @@ function openAnsweringGuideModal(controlId, controlName, controlDetail, security
         },
         error: function(xhr) {
             $('#answering-guide-loading').hide();
+            _aguideHideOverlay();
             var errorMsg = 'Error generating questions. Please try again.';
             if (xhr.responseJSON && xhr.responseJSON.message) {
                 errorMsg = xhr.responseJSON.message;
@@ -777,10 +790,11 @@ function submitAnsweringGuideAnswers() {
         return;
     }
 
-    // Show loading indicator on submit
+    // Show loading overlay on submit
     $('#answering-guide-questions').hide();
     $('#answering-guide-proposed-answer').hide();
-    $('#answering-guide-generating').show();
+    $('#answering-guide-generating').hide();
+    _aguideShowOverlay('Generating answer…');
 
     // Send answers to backend to get proposed answer
     $.ajax({
@@ -796,18 +810,19 @@ function submitAnsweringGuideAnswers() {
         }),
         success: function(response) {
             $('#answering-guide-generating').hide();
+            _aguideHideOverlay();
             if (response && response.proposedAnswer) {
                 currentAnsweringGuideState.proposedAnswer = response.proposedAnswer;
                 $('#answering-guide-questions').show();
                 highlightSuggestedAnswer(response.proposedAnswer);
             } else {
                 alert('Error generating answer. Please try again.');
-                $('#answering-guide-generating').hide();
                 $('#answering-guide-questions').show();
             }
         },
         error: function(xhr) {
             $('#answering-guide-generating').hide();
+            _aguideHideOverlay();
             var errorMsg = 'Error generating answer. Please try again.';
             if (xhr.responseJSON && xhr.responseJSON.message) {
                 errorMsg = xhr.responseJSON.message;
@@ -861,6 +876,7 @@ function discardProposedAnswer() {
 
 function closeAnsweringGuideModal() {
     $('#answering-guide-modal-bg').css('display', 'none');
+    _aguideHideOverlay();
     
     // Reset all modal elements for next use
     $('#answering-guide-loading').hide();

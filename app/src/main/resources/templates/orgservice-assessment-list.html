@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <meta charset="UTF-8">
+    <title>Org Assessments</title>
+    <th:block th:replace="~{navigation :: navHead}"></th:block>
+</head>
+
+<body>
+    <div th:replace="~{navigation :: mainNav}"></div>
+    <div class="container">
+
+        <h1 class="page-title">Org Assessments</h1>
+        <p class="text-muted" style="margin-bottom:1.5em;">All available Org Service assessments. Click View to open the simplified assessment view.</p>
+
+        <div th:if="${#lists.isEmpty(assessments)}" class="info-message">
+            No org service assessments found. Assessments are created automatically when you open an Org Service.
+        </div>
+
+        <div class="form-table-wrapper" th:unless="${#lists.isEmpty(assessments)}">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Service Name</th>
+                        <th>Org Unit(s)</th>
+                        <th>Assessment Date</th>
+                        <th style="white-space:nowrap;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="assessment : ${assessments}">
+                        <td th:text="${assessment.orgService.name}"></td>
+                        <td>
+                            <span th:if="${assessment.orgService.orgUnits == null or #sets.isEmpty(assessment.orgService.orgUnits)}" class="text-muted">—</span>
+                            <span th:each="unit, iterStat : ${assessment.orgService.orgUnits}">
+                                <span th:text="${unit.name}"></span><span th:if="${!iterStat.last}">, </span>
+                            </span>
+                        </td>
+                        <td th:text="${assessment.assessmentDate}"></td>
+                        <td style="white-space:nowrap;">
+                            <a th:href="@{/orgservice-assessment/simple/{id}(id=${assessment.orgService.id})}"
+                               class="btn-action" style="text-decoration:none;font-size:0.88em;">
+                                &#128065; View
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+</body>
+
+</html>

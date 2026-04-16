@@ -35,9 +35,20 @@
     <div class="container">
 
         <div class="simple-assessment-header assessment-header">
-            <h1 class="page-title">Org Service Assessment</h1>
-            <h2 th:text="${assessment.orgService.name}"></h2>
-            <p style="color:#888;font-size:0.88em;margin-top:0.2em;">Simple view &mdash; showing only applicable security controls</p>
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:0.5em;">
+                <div>
+                    <h1 class="page-title">Org Service Assessment</h1>
+                    <h2 th:text="${assessment.orgService.name}"></h2>
+                    <p style="color:#888;font-size:0.88em;margin-top:0.2em;">Simple view &mdash; showing only applicable security controls</p>
+                </div>
+                <div style="flex-shrink:0;padding-top:0.3em;display:flex;gap:0.5em;flex-wrap:wrap;align-items:flex-start;">
+                    <button type="button" class="btn-action" onclick="copySimpleViewUrl()"
+                            title="Copy Simple View URL to clipboard"
+                            style="display:inline-flex;align-items:center;gap:6px;font-size:0.88em;">
+                        &#128279; Copy Link
+                    </button>
+                </div>
+            </div>
         </div>
 
         <form id="assessmentForm">
@@ -113,6 +124,11 @@
     <!-- Answering Guide Modal -->
     <div class="modal-bg" id="org-guide-modal-bg" style="display:none;">
         <div class="modal-popup answering-guide-popup">
+            <!-- Loading overlay -->
+            <div class="guide-overlay" id="org-guide-overlay">
+                <div class="guide-overlay-spinner"></div>
+                <div class="guide-overlay-label" id="org-guide-overlay-label">Generating questions&hellip;</div>
+            </div>
             <div class="answering-guide-header">
                 <h3>Answering Guide</h3>
                 <button type="button" class="modal-close-btn" onclick="closeOrgGuide()">X</button>
@@ -321,9 +337,29 @@
         loadMaturityModels();
     </script>
 
+    <!-- Copy toast -->
+    <div id="copyToast" style="display:none;position:fixed;bottom:2em;left:50%;transform:translateX(-50%);background:#2563eb;color:#fff;padding:0.6em 1.4em;border-radius:24px;font-size:0.95em;box-shadow:0 4px 16px rgba(0,0,0,0.18);z-index:9999;align-items:center;gap:0.5em;"></div>
+    <style>
+        @keyframes copyToastIn  { from { opacity:0; transform:translateX(-50%) translateY(16px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+        @keyframes copyToastOut { from { opacity:1; } to { opacity:0; transform:translateX(-50%) translateY(8px); } }
+        .copy-toast-in  { animation: copyToastIn  0.28s ease forwards; }
+        .copy-toast-out { animation: copyToastOut 0.32s ease forwards; }
+    </style>
+
     <script>
         // =================== Answering Guide (same logic as orgservice-assessment.html) ===================
-        var _orgGuideState = { controlId: null, questions: [], proposedAnswer: null };
+        function _orgGuideShowOverlay(label) {
+            var el = document.getElementById('org-guide-overlay');
+            var lbl = document.getElementById('org-guide-overlay-label');
+            if (lbl) lbl.textContent = label || 'Loading…';
+            if (el) el.classList.add('active');
+        }
+        function _orgGuideHideOverlay() {
+            var el = document.getElementById('org-guide-overlay');
+            if (el) el.classList.remove('active');
+        }
+
+        var _orgGuideState = { controlId: null, controlName: null, questions: [], guideAnswers: [], proposedAnswer: null };
 
         function escapeOrgGuideHtml(str) {
             var d = document.createElement('div');
@@ -343,15 +379,16 @@
             var controlName = (row.querySelector('.control-name-simple') || {}).textContent || '';
             var controlDetail = (row.querySelector('.control-detail-simple') || {}).textContent || '';
 
-            _orgGuideState = { controlId: controlId, questions: [], proposedAnswer: null };
+            _orgGuideState = { controlId: controlId, controlName: controlName, questions: [], guideAnswers: [], proposedAnswer: null };
 
             document.getElementById('org-guide-control-name').innerHTML =
                 '<h4>' + escapeOrgGuideHtml(controlName) + '</h4><p>' + escapeOrgGuideHtml(controlDetail) + '</p>';
             document.getElementById('org-guide-questions').innerHTML = '';
             document.getElementById('org-guide-questions').style.display = '';
             document.getElementById('org-guide-generating').style.display = 'none';
-            document.getElementById('org-guide-loading').style.display = 'flex';
+            document.getElementById('org-guide-loading').style.display = 'none';
             document.getElementById('org-guide-modal-bg').style.display = 'flex';
+            _orgGuideShowOverlay('Generating questions…');
 
             populateOrgGuideMaturity();
 
@@ -363,6 +400,7 @@
             .then(function(r) { return r.json(); })
             .then(function(resp) {
                 document.getElementById('org-guide-loading').style.display = 'none';
+                _orgGuideHideOverlay();
                 if (resp && resp.questions && Array.isArray(resp.questions)) {
                     _orgGuideState.questions = resp.questions;
                     renderOrgGuideQuestions(resp.questions);
@@ -372,6 +410,7 @@
                 }
             })
             .catch(function() {
+                _orgGuideHideOverlay();
                 document.getElementById('org-guide-loading').style.display = 'none';
                 document.getElementById('org-guide-questions').innerHTML = '<p style="color:red;">Error generating questions. Please try again.</p>';
                 document.getElementById('org-guide-questions').style.display = 'block';
@@ -414,6 +453,7 @@
                 answers.push(sel.getAttribute('data-val'));
             }
             if (!allAnswered) { alert('Please answer all questions before submitting.'); return; }
+            _orgGuideState.guideAnswers = answers;
             if (!currentMaturityModel || !currentMaturityModel.maturityAnswers) {
                 alert('Please select a maturity model to enable answer suggestions.'); return;
             }
@@ -421,7 +461,8 @@
                 return { id: a.id, answer: a.answer, rating: a.rating, description: a.description || '' };
             });
             document.getElementById('org-guide-questions').style.display = 'none';
-            document.getElementById('org-guide-generating').style.display = 'flex';
+            document.getElementById('org-guide-generating').style.display = 'none';
+            _orgGuideShowOverlay('Generating answer…');
 
             fetch('/assessment/generate-answer-from-guide', {
                 method: 'POST',
@@ -436,18 +477,19 @@
             })
             .then(function(r) { return r.json(); })
             .then(function(resp) {
+                _orgGuideHideOverlay();
                 document.getElementById('org-guide-generating').style.display = 'none';
                 if (resp && resp.proposedAnswer) {
                     _orgGuideState.proposedAnswer = resp.proposedAnswer;
                     document.getElementById('org-guide-questions').style.display = 'flex';
                     highlightOrgGuideAnswer(resp.proposedAnswer);
-                    showOrgGuideTakeoverBtn(resp.proposedAnswer);
                 } else {
                     alert('Error generating answer. Please try again.');
                     document.getElementById('org-guide-questions').style.display = 'flex';
                 }
             })
             .catch(function() {
+                _orgGuideHideOverlay();
                 document.getElementById('org-guide-generating').style.display = 'none';
                 document.getElementById('org-guide-questions').style.display = 'flex';
                 alert('Error generating answer. Please try again.');
@@ -511,6 +553,9 @@
 
         function applyOrgGuideAnswer(rating, answerText) {
             var controlId = _orgGuideState.controlId;
+            var controlName = _orgGuideState.controlName || '';
+            var capturedQuestions = (_orgGuideState.questions || []).slice();
+            var capturedAnswers = (_orgGuideState.guideAnswers || []).slice();
             if (!controlId) return;
             var row = document.querySelector('.control-row[data-control-id="' + controlId + '"]');
             if (!row) return;
@@ -520,11 +565,29 @@
             if (answerSelect && currentMaturityModel) answerSelect.value = String(rating);
             saveControlChange(controlId, true, String(rating));
             closeOrgGuide();
+            // Generate AI guide summary and populate comment
+            fetch('/assessment/generate-answer-summary', {
+                method: 'POST',
+                headers: _orgGuideFetchHeaders(),
+                body: JSON.stringify({ controlName: controlName, questions: capturedQuestions, answers: capturedAnswers, proposedAnswer: answerText || '' })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(resp) {
+                if (resp && resp.success && resp.summary) {
+                    var ta = row.querySelector('.control-comment');
+                    if (ta && !ta.disabled) {
+                        ta.value = resp.summary;
+                        ta.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                }
+            })
+            .catch(function() { /* summary is optional */ });
         }
 
         function closeOrgGuide() {
             document.getElementById('org-guide-modal-bg').style.display = 'none';
-            _orgGuideState = { controlId: null, questions: [], proposedAnswer: null };
+            _orgGuideHideOverlay();
+            _orgGuideState = { controlId: null, controlName: null, questions: [], guideAnswers: [], proposedAnswer: null };
             document.getElementById('org-guide-loading').style.display = 'flex';
             document.getElementById('org-guide-questions').innerHTML = '';
             document.getElementById('org-guide-questions').style.display = '';
@@ -536,6 +599,48 @@
             var bg = document.getElementById('org-guide-modal-bg');
             if (bg) bg.addEventListener('mousedown', function(e) { if (e.target === this) closeOrgGuide(); });
         });
+
+        function copySimpleViewUrl() {
+            var url = window.location.origin + '/orgservice-assessment/simple/' + orgServiceId;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(url).then(function() {
+                    showCopyToast('Link copied to clipboard!');
+                }).catch(function() {
+                    fallbackCopyUrl(url);
+                });
+            } else {
+                fallbackCopyUrl(url);
+            }
+        }
+
+        function fallbackCopyUrl(url) {
+            var ta = document.createElement('textarea');
+            ta.value = url;
+            ta.style.cssText = 'position:fixed;top:-999px;left:-999px;';
+            document.body.appendChild(ta);
+            ta.select();
+            try {
+                document.execCommand('copy');
+                showCopyToast('Link copied to clipboard!');
+            } catch (e) {
+                showCopyToast('Could not copy: ' + url, true);
+            }
+            document.body.removeChild(ta);
+        }
+
+        function showCopyToast(msg, isError) {
+            var toast = document.getElementById('copyToast');
+            toast.textContent = msg;
+            toast.style.background = isError ? '#c0392b' : '#2563eb';
+            toast.style.display = 'flex';
+            toast.classList.remove('copy-toast-out');
+            toast.classList.add('copy-toast-in');
+            setTimeout(function() {
+                toast.classList.remove('copy-toast-in');
+                toast.classList.add('copy-toast-out');
+                setTimeout(function() { toast.style.display = 'none'; }, 350);
+            }, 2200);
+        }
     </script>
 </body>
 

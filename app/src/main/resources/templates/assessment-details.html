@@ -562,6 +562,11 @@
             <!-- Answering Guide Modal -->
             <div class="modal-bg" id="answering-guide-modal-bg">
                 <div class="modal-popup answering-guide-popup">
+                    <!-- Loading overlay (covers whole popup during AI fetch) -->
+                    <div class="guide-overlay" id="answering-guide-overlay">
+                        <div class="guide-overlay-spinner"></div>
+                        <div class="guide-overlay-label" id="answering-guide-overlay-label">Generating questions&hellip;</div>
+                    </div>
                     <div class="answering-guide-header">
                         <h3>Answering Guide</h3>
                         <button type="button" class="modal-close-btn" onclick="closeAnsweringGuideModal()">X</button>
