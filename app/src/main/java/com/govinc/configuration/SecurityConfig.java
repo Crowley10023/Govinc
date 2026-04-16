@@ -49,6 +49,10 @@ public class SecurityConfig {
             "/assessment-direct/*/answer",
             "/assessment-direct/*/control/*/comment",
             "/assessment-direct/*/finalize",
+            // Public AI guide endpoints for assessment-direct
+            "/assessment-direct/guide/questions",
+            "/assessment-direct/guide/answer",
+            "/assessment-direct/guide/summary",
 
             // Static assets and theme
             "/static/**",
@@ -74,7 +78,10 @@ public class SecurityConfig {
     private static final String[] CSRF_IGNORED_URLS = {
             "/assessment-direct/*/answer",
             "/assessment-direct/*/control/*/comment",
-            "/assessment-direct/*/finalize"
+            "/assessment-direct/*/finalize",
+            "/assessment-direct/guide/questions",
+            "/assessment-direct/guide/answer",
+            "/assessment-direct/guide/summary"
     };
 
     private static final Logger logger = LoggerFactory.getLogger(SecurityConfig.class);

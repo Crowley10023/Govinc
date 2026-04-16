@@ -8,7 +8,7 @@
 </head>
 <body th:classappend="${(embed != null and embed) or (param.embed != null and #strings.equalsIgnoreCase(param.embed[0], 'true'))} ? 'embed-mode' : ''">
 <div th:unless="${(embed != null and embed) or (param.embed != null and #strings.equalsIgnoreCase(param.embed[0], 'true'))}" th:replace="~{navigation :: mainNav}"></div>
-<div class="container">
+<div class="container form-container">
     <h1 class="page-title" th:text="${orgUnit.id != null} ? 'Edit Organization Unit' : 'Create Organization Unit'"></h1>
 
             <form th:action="@{'/orgunits/save'}" method="post">

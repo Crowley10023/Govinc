@@ -416,7 +416,13 @@
                     <h3>Assessment URL Created</h3>
                     <div class="modal-content">
                         <p>The following link grants direct access to this assessment:</p>
-                        <p><a id="create-url-modal-link" href="#" target="_blank" style="word-break: break-all;"></a></p>
+                        <p style="display:flex;align-items:center;gap:0.5em;">
+                            <a id="create-url-modal-link" href="#" target="_blank" style="word-break: break-all;"></a>
+                            <button type="button" id="create-url-copy-btn" class="btn-secondary" style="flex-shrink:0;padding:0.2em 0.5em;" title="Copy URL to clipboard" onclick="copyAssessmentUrl()">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            </button>
+                            <span id="create-url-copy-status" style="font-size:0.85em;color:green;display:none;">Copied!</span>
+                        </p>
                         <p class="text-muted text-sm mt-sm">Expiration date: <strong id="create-url-modal-expiry"></strong></p>
                     </div>
                     <div class="modal-btn-row">

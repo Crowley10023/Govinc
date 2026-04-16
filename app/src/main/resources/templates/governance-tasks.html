@@ -60,6 +60,7 @@
                 <th>Title</th>
                 <th>Status</th>
                 <th>Assigned To</th>
+                <th>Requestor</th>
                 <th>Project</th>
                 <th>Security Control</th>
                 <th>Due Date</th>
@@ -80,6 +81,7 @@
                           th:text="${task.status.displayName}"></span>
                 </td>
                 <td th:text="${task.assignedUser != null ? task.assignedUser.name : '-'}"></td>
+                <td th:text="${task.createdBy != null ? task.createdBy.name : '-'}"></td>
                 <td th:text="${task.project != null ? task.project.name : '-'}"></td>
                 <td>
                     <span th:if="${task.securityControl == null}">-</span>

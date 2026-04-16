@@ -441,6 +441,7 @@ network segmentation","SC-7","Network"</div>
             var html = '<div class="version-tree">';
             for (var i = 0; i < data.length; i++) {
                 var v = data[i];
+                var prev = data[i + 1] || null; // next in array = older version (newest-first order)
                 var isCurrent = v.isCurrent;
                 var nodeClass = isCurrent ? 'version-node version-node-current' : 'version-node';
                 html += '<div class="' + nodeClass + '">';
@@ -449,7 +450,7 @@ network segmentation","SC-7","Network"</div>
                 if (isCurrent) {
                     html += ' <span class="badge badge-success">Current</span>';
                 }
-                html += ' <strong>' + escapeHtml(v.name || '') + '</strong>';
+                html += ' <strong>' + diffOrEscape(prev ? prev.name : null, v.name) + '</strong>';
                 if (v.changedAt) {
                     html += ' <span class="text-muted text-sm">' + v.changedAt.substring(0, 19).replace('T', ' ') + '</span>';
                 }
@@ -458,10 +459,16 @@ network segmentation","SC-7","Network"</div>
                 }
                 html += '</div>';
                 html += '<div class="version-node-detail">';
-                if (v.reference) html += '<div><strong>Reference:</strong> ' + escapeHtml(v.reference) + '</div>';
-                if (v.domain) html += '<div><strong>Domain:</strong> ' + escapeHtml(v.domain) + '</div>';
-                if (v.tag) html += '<div><strong>Tags:</strong> ' + escapeHtml(v.tag) + '</div>';
-                if (v.detail) html += '<div class="version-detail-text">' + escapeHtml(v.detail).substring(0, 300) + (v.detail.length > 300 ? '...' : '') + '</div>';
+                if (v.reference || (prev && prev.reference)) html += '<div><strong>Reference:</strong> ' + diffOrEscape(prev ? prev.reference : null, v.reference) + '</div>';
+                if (v.domain || (prev && prev.domain)) html += '<div><strong>Domain:</strong> ' + diffOrEscape(prev ? prev.domain : null, v.domain) + '</div>';
+                if (v.tag || (prev && prev.tag)) html += '<div><strong>Tags:</strong> ' + diffOrEscape(prev ? prev.tag : null, v.tag) + '</div>';
+                if (v.detail || (prev && prev.detail)) {
+                    var oldDetail = prev ? (prev.detail || '') : '';
+                    var newDetail = v.detail || '';
+                    var truncNew = newDetail.length > 300 ? newDetail.substring(0, 300) + '...' : newDetail;
+                    var truncOld = oldDetail.length > 300 ? oldDetail.substring(0, 300) + '...' : oldDetail;
+                    html += '<div class="version-detail-text">' + (prev ? wordDiff(truncOld, truncNew) : escapeHtml(truncNew)) + '</div>';
+                }
                 html += '</div>';
                 html += '</div>';
                 if (i < data.length - 1) {
@@ -474,6 +481,55 @@ network segmentation","SC-7","Network"</div>
         .catch(function() {
             document.getElementById('historyContent').innerHTML = '<p class="text-muted">Failed to load history.</p>';
         });
+    }
+
+    function diffOrEscape(oldText, newText) {
+        if (!oldText) return escapeHtml(newText || '');
+        return wordDiff(oldText, newText);
+    }
+
+    function wordDiff(oldText, newText) {
+        var old = (oldText || '').trim();
+        var nw = (newText || '').trim();
+        if (old === nw) return escapeHtml(nw);
+        var oldWords = old ? old.split(/\s+/) : [];
+        var newWords = nw ? nw.split(/\s+/) : [];
+        var lcs = computeWordLCS(oldWords, newWords);
+        var html = '';
+        var oi = 0, ni = 0;
+        for (var li = 0; li < lcs.length; li++) {
+            var target = lcs[li];
+            while (oi < oldWords.length && oldWords[oi] !== target) {
+                html += '<span class="hist-diff-removed">' + escapeHtml(oldWords[oi]) + '</span> ';
+                oi++;
+            }
+            while (ni < newWords.length && newWords[ni] !== target) {
+                html += '<span class="hist-diff-added">' + escapeHtml(newWords[ni]) + '</span> ';
+                ni++;
+            }
+            html += escapeHtml(target) + ' ';
+            oi++; ni++;
+        }
+        while (oi < oldWords.length) html += '<span class="hist-diff-removed">' + escapeHtml(oldWords[oi++]) + '</span> ';
+        while (ni < newWords.length) html += '<span class="hist-diff-added">' + escapeHtml(newWords[ni++]) + '</span> ';
+        return html.trim();
+    }
+
+    function computeWordLCS(a, b) {
+        var m = a.length, n = b.length;
+        var dp = [], i, j;
+        for (i = 0; i <= m; i++) { dp[i] = []; for (j = 0; j <= n; j++) dp[i][j] = 0; }
+        for (i = 1; i <= m; i++)
+            for (j = 1; j <= n; j++)
+                dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] + 1 : Math.max(dp[i-1][j], dp[i][j-1]);
+        var r = [];
+        i = m; j = n;
+        while (i > 0 && j > 0) {
+            if (a[i-1] === b[j-1]) { r.unshift(a[i-1]); i--; j--; }
+            else if (dp[i-1][j] >= dp[i][j-1]) i--;
+            else j--;
+        }
+        return r;
     }
 
     function closeHistoryModal() {

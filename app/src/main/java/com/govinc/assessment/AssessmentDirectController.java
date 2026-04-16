@@ -40,6 +40,8 @@ public class AssessmentDirectController {
     private AssessmentRepository assessmentRepository;
     @Autowired
     private AssessmentDetailsService assessmentDetailsService;
+    @Autowired
+    private AnsweringGuideService answeringGuideService;
 
     // Replaced Thymeleaf mapping with RESTful endpoints
 
@@ -281,6 +283,62 @@ public class AssessmentDirectController {
         } else {
             return org.springframework.http.ResponseEntity.status(404).body(java.util.Map.of("error", "Not found"));
         }
+    }
+
+    // Public AI Guide: generate guide questions (no authentication required)
+    @PostMapping("/assessment-direct/guide/questions")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public Map<String, Object> generateDirectGuideQuestions(
+            @org.springframework.web.bind.annotation.RequestBody Map<String, Object> request) {
+        Object controlIdObj = request.get("controlId");
+        Long controlId = controlIdObj instanceof Number
+                ? ((Number) controlIdObj).longValue()
+                : controlIdObj != null ? Long.parseLong(controlIdObj.toString()) : null;
+        String controlName = (String) request.get("controlName");
+        String controlDetail = (String) request.get("controlDetail");
+        if (controlId == null || controlName == null || controlName.isBlank()) {
+            return Map.of("success", false, "message", "controlId and controlName are required");
+        }
+        return answeringGuideService.getAnsweringGuide(controlId, controlName, controlDetail);
+    }
+
+    // Public AI Guide: propose maturity answer from guide answers (no authentication required)
+    @PostMapping("/assessment-direct/guide/answer")
+    @org.springframework.web.bind.annotation.ResponseBody
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> proposeDirectGuideAnswer(
+            @org.springframework.web.bind.annotation.RequestBody Map<String, Object> request) {
+        Object controlIdObj = request.get("controlId");
+        Long controlId = controlIdObj instanceof Number
+                ? ((Number) controlIdObj).longValue()
+                : controlIdObj != null ? Long.parseLong(controlIdObj.toString()) : null;
+        Object catalogIdObj = request.get("securityCatalogId");
+        Long securityCatalogId = catalogIdObj instanceof Number
+                ? ((Number) catalogIdObj).longValue()
+                : catalogIdObj != null ? Long.parseLong(catalogIdObj.toString()) : null;
+        List<String> questions = (List<String>) request.get("questions");
+        List<String> answers = (List<String>) request.get("answers");
+        List<Map<String, Object>> maturityModelAnswers = (List<Map<String, Object>>) request.get("maturityModelAnswers");
+        if (controlId == null) {
+            return Map.of("success", false, "message", "controlId is required");
+        }
+        return answeringGuideService.proposeAnswerFromGuide(controlId, securityCatalogId, questions, answers, maturityModelAnswers);
+    }
+
+    // Public AI Guide: generate answer summary comment (no authentication required)
+    @PostMapping("/assessment-direct/guide/summary")
+    @org.springframework.web.bind.annotation.ResponseBody
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> generateDirectGuideSummary(
+            @org.springframework.web.bind.annotation.RequestBody Map<String, Object> request) {
+        String controlName = (String) request.get("controlName");
+        List<String> questions = (List<String>) request.get("questions");
+        List<String> answers = (List<String>) request.get("answers");
+        String proposedAnswer = (String) request.get("proposedAnswer");
+        if (controlName == null || controlName.isBlank()) {
+            return Map.of("success", false, "message", "controlName is required");
+        }
+        return answeringGuideService.generateAnswerSummary(controlName, questions, answers, proposedAnswer);
     }
 
     // Finalize assessment via assessment-direct (POST by obfuscated ID)

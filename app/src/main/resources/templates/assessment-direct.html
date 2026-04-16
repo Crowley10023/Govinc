@@ -183,12 +183,17 @@
         var CHECKMARK_SVG = '<svg width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" stroke="#22b573" stroke-width="2" fill="#fff"/><polyline points="6,12 10,16 16,7" stroke="#22b573" stroke-width="2.5" fill="none"/></svg>';
         function toggleDomain(header) {
             var controlsDiv = header.nextElementSibling;
+            if (!controlsDiv) return;
             var isHidden = controlsDiv.classList.contains('d-none') || controlsDiv.style.display === 'none';
             if (isHidden) {
                 controlsDiv.classList.remove('d-none');
                 controlsDiv.style.display = '';
             } else {
                 controlsDiv.classList.add('d-none');
+            }
+            var chevron = header.querySelector('.domain-chevron svg');
+            if (chevron) {
+                chevron.style.transform = isHidden ? 'rotate(180deg)' : '';
             }
         }
         function toggleAssessmentDetails(header) {
@@ -504,7 +509,7 @@
         });
 
         // =================== Answering Guide (Direct View) ===================
-        var _directGuideState = { controlId: null, catalogId: 0, questions: [], maturityAnswers: [], proposedAnswer: null };
+        var _directGuideState = { controlId: null, controlName: null, catalogId: 0, questions: [], guideAnswers: [], maturityAnswers: [], proposedAnswer: null };
 
         function openDirectGuide(btn) {
             var controlId = btn.getAttribute('data-control-id');
@@ -512,8 +517,10 @@
             var controlDetail = btn.getAttribute('data-control-detail');
             _directGuideState = {
                 controlId: controlId,
+                controlName: controlName,
                 catalogId: window._directCatalogId || 0,
                 questions: [],
+                guideAnswers: [],
                 maturityAnswers: window._directMaturityAnswers || [],
                 proposedAnswer: null
             };
@@ -526,7 +533,7 @@
             loadingEl.style.display = 'flex';
             document.getElementById('direct-guide-modal-bg').style.display = 'flex';
             populateDirectGuideMaturity();
-            fetch('/assessment/generate-answering-guide-questions', {
+            fetch('/assessment-direct/guide/questions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ controlId: controlId, controlName: controlName, controlDetail: controlDetail, securityCatalogId: _directGuideState.catalogId })
@@ -583,12 +590,13 @@
                 answers.push(sel.getAttribute('data-val'));
             }
             if (!allAnswered) { alert('Please answer all questions before submitting.'); return; }
+            _directGuideState.guideAnswers = answers;
             var maturityModelAnswers = (_directGuideState.maturityAnswers || []).map(function(a) {
                 return { id: a.id, answer: a.answer };
             });
             document.getElementById('direct-guide-questions').style.display = 'none';
             document.getElementById('direct-guide-generating').style.display = 'flex';
-            fetch('/assessment/generate-answer-from-guide', {
+            fetch('/assessment-direct/guide/answer', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -635,14 +643,61 @@
                 var card = document.createElement('div');
                 card.className = 'maturity-answer-card';
                 card.setAttribute('data-answer', a.answer || '');
+                card.setAttribute('data-answer-id', a.id || '');
                 card.innerHTML = '<span class="maturity-answer-name">' + escapeHtml(a.answer || '') + '</span>';
+                card.style.cursor = 'pointer';
+                card.addEventListener('click', function() { acceptDirectGuideCard(card); });
                 list.appendChild(card);
             });
         }
 
+        function acceptDirectGuideCard(card) {
+            var answerText = card.getAttribute('data-answer') || '';
+            var controlId = _directGuideState.controlId;
+            if (!controlId) return;
+            // Find the matching option in the select by text
+            var select = document.querySelector('select.answer-select[data-control-id="' + controlId + '"]');
+            if (select) {
+                for (var i = 0; i < select.options.length; i++) {
+                    if (select.options[i].text.trim() === answerText.trim()) {
+                        select.value = select.options[i].value;
+                        select.dispatchEvent(new Event('change', { bubbles: true }));
+                        break;
+                    }
+                }
+            }
+            // Generate and populate AI summary comment
+            var questions = (_directGuideState.questions || []).slice();
+            var guideAnswers = (_directGuideState.guideAnswers || []).slice();
+            var controlName = _directGuideState.controlName || '';
+            var capturedControlId = controlId;
+            closeDirectGuide();
+            fetch('/assessment-direct/guide/summary', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    controlName: controlName,
+                    questions: questions,
+                    answers: guideAnswers,
+                    proposedAnswer: answerText
+                })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(resp) {
+                if (resp && resp.success && resp.summary) {
+                    var textarea = document.querySelector('textarea.comment-textarea[data-control-id="' + capturedControlId + '"]');
+                    if (textarea && !textarea.disabled) {
+                        textarea.value = resp.summary;
+                        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                }
+            })
+            .catch(function() { /* summary is optional; ignore errors */ });
+        }
+
         function closeDirectGuide() {
             document.getElementById('direct-guide-modal-bg').style.display = 'none';
-            _directGuideState = { controlId: null, catalogId: 0, questions: [], maturityAnswers: [], proposedAnswer: null };
+            _directGuideState = { controlId: null, controlName: null, catalogId: 0, questions: [], guideAnswers: [], maturityAnswers: [], proposedAnswer: null };
             document.getElementById('direct-guide-loading').style.display = 'flex';
             document.getElementById('direct-guide-questions').innerHTML = '';
             document.getElementById('direct-guide-questions').style.display = '';

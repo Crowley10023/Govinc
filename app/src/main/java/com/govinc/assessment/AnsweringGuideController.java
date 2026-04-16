@@ -117,4 +117,25 @@ public class AnsweringGuideController {
         // The proposed answer will be constrained to the provided maturity model answers
         return answeringGuideService.proposeAnswerFromGuide(controlId, securityCatalogId, questions, answers, maturityModelAnswers);
     }
+
+    /**
+     * Generate an AI summary comment from guide Q&A answers.
+     */
+    @PostMapping("/generate-answer-summary")
+    @ResponseBody
+    public Map<String, Object> generateAnswerSummary(@RequestBody Map<String, Object> request) {
+        String controlName = (String) request.get("controlName");
+        @SuppressWarnings("unchecked")
+        List<String> questions = (List<String>) request.get("questions");
+        @SuppressWarnings("unchecked")
+        List<String> answers = (List<String>) request.get("answers");
+        String proposedAnswer = (String) request.get("proposedAnswer");
+        if (controlName == null || controlName.isBlank()) {
+            Map<String, Object> err = new HashMap<>();
+            err.put("success", false);
+            err.put("message", "controlName is required");
+            return err;
+        }
+        return answeringGuideService.generateAnswerSummary(controlName, questions, answers, proposedAnswer);
+    }
 }

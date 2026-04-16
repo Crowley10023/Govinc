@@ -275,9 +275,10 @@
                 defaultOption.textContent = '-- Select an answer --';
                 answerSelect.appendChild(defaultOption);
 
-                // Add maturity answers as options
+                // Add maturity answers as options, sorted by rating ascending
                 if (model.maturityAnswers && Array.isArray(model.maturityAnswers)) {
-                    model.maturityAnswers.forEach(answer => {
+                    const sortedAnswers = model.maturityAnswers.slice().sort((a, b) => (a.rating || 0) - (b.rating || 0));
+                    sortedAnswers.forEach(answer => {
                         const option = document.createElement('option');
                         option.value = answer.rating;
                         option.textContent = answer.answer;

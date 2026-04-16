@@ -202,4 +202,35 @@ public class AnsweringGuideService {
         
         return response;
     }
+
+    /**
+     * Generate a concise AI summary of the Q&A answers to be placed in the security control's comment field.
+     */
+    public Map<String, Object> generateAnswerSummary(String controlName, List<String> questions, List<String> answers, String proposedAnswer) {
+        Map<String, Object> response = new HashMap<>();
+
+        if (questions == null || answers == null || questions.isEmpty()) {
+            response.put("success", false);
+            response.put("message", "Questions and answers are required");
+            return response;
+        }
+
+        StringBuilder qaBuilder = new StringBuilder();
+        for (int i = 0; i < questions.size(); i++) {
+            qaBuilder.append("Q").append(i + 1).append(": ").append(questions.get(i))
+                    .append(" → ").append(i < answers.size() ? answers.get(i) : "N/A").append("\n");
+        }
+
+        String prompt = "You are a security assessment expert. Based on the following yes/no Q&A answers for the security control \"" + controlName + "\", " +
+                "write a concise 2-3 sentence summary of the current state of this control. " +
+                "The proposed maturity rating is: " + (proposedAnswer != null ? proposedAnswer : "N/A") + ".\n\n" +
+                "Q&A:\n" + qaBuilder + "\n" +
+                "Write the summary in a neutral, professional tone suitable for an assessment comment. " +
+                "Return ONLY the summary text, no headings or extra formatting.";
+
+        String summary = openAIUtil.askAI(prompt);
+        response.put("success", true);
+        response.put("summary", summary != null ? summary.trim() : "");
+        return response;
+    }
 }

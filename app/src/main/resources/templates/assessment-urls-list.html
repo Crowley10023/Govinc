@@ -14,27 +14,34 @@
     <div class="container">
         <h1 class="page-title">Assessment URLs</h1>
         <section>
-            <div style="margin-bottom:1em;display:flex;align-items:center;gap:1em;">
+            <div style="margin-bottom:1em;display:flex;align-items:center;gap:1em;flex-wrap:wrap;">
                 <form th:action="@{'/assessment-direct/urls/check-expiration'}" method="post" style="display:inline;">
                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                     <button type="submit" class="btn-action">Check Expiration</button>
                 </form>
                 <span class="text-muted text-sm">Immediately removes all URLs that have passed their expiration date.</span>
+                <label for="catalogFilter" style="margin-left:auto;font-weight:600;">Filter by Catalog:</label>
+                <select id="catalogFilter" onchange="filterByCatalog()" style="min-width:180px;">
+                    <option value="">All catalogs</option>
+                </select>
             </div>
             <table class="table card" id="urlsTable">
                 <thead>
                     <tr>
                         <th class="sortable-th" data-col="0">Obfuscated URL<span class="sort-arrow"></span></th>
                         <th class="sortable-th" data-col="1">Assessment Name<span class="sort-arrow"></span></th>
-                        <th class="sortable-th" data-col="2">Remaining Days<span class="sort-arrow"></span></th>
-                        <th class="sortable-th" data-col="3">Expiration Date<span class="sort-arrow"></span></th>
+                        <th class="sortable-th" data-col="2">Security Catalog<span class="sort-arrow"></span></th>
+                        <th class="sortable-th" data-col="3">Remaining Days<span class="sort-arrow"></span></th>
+                        <th class="sortable-th" data-col="4">Expiration Date<span class="sort-arrow"></span></th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr th:each="url : ${urls}"
                         th:data-url-id="${url.id}"
-                        th:data-url-name="${url.assessment != null ? url.assessment.name : ''}">
+                        th:data-url-name="${url.assessment != null ? url.assessment.name : ''}"
+                        th:data-catalog-id="${url.assessment != null and url.assessment.securityCatalog != null ? url.assessment.securityCatalog.id : ''}"
+                        th:data-catalog-name="${url.assessment != null and url.assessment.securityCatalog != null ? url.assessment.securityCatalog.name : ''}">
                         <td>
                             <a th:href="@{'/assessment-direct/' + ${url.url}}" th:text="${url.url}" target="_blank"
                                 style="display:inline-block;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;" th:title="${url.url}"></a>
@@ -44,6 +51,7 @@
                                 th:text="${url.assessment.name}"></a>
                             <span th:if="${url.assessment == null}">—</span>
                         </td>
+                        <td th:text="${url.assessment != null and url.assessment.securityCatalog != null ? url.assessment.securityCatalog.name : '—'}"></td>
                         <td th:text="${url.assessment != null and url.assessment.urlExpirationDate != null ? url.assessment.daysUntilUrlExpiration : 'N/A'}"
                             th:classappend="${url.assessment != null and url.assessment.urlExpirationDate != null and url.assessment.daysUntilUrlExpiration <= 3} ? 'text-danger' : ''"></td>
                         <td th:text="${url.assessment != null and url.assessment.urlExpirationDate != null ? #temporals.format(url.assessment.urlExpirationDate, 'dd MMM yyyy') : 'N/A'}"></td>
@@ -114,18 +122,18 @@
 
             function sortTable(col, dir) {
                 var tbody = document.querySelector('#urlsTable tbody');
-                var rows = Array.from(tbody.querySelectorAll('tr'));
+                var rows = Array.from(tbody.querySelectorAll('tr:not([style*="display: none"]):not([style*="display:none"])'));
                 if (dir === 0) {
                     rows.sort(function(a, b) { return a.rowIndex - b.rowIndex; });
                 } else {
                     rows.sort(function(a, b) {
                         var av = a.children[col].textContent.trim().toLowerCase();
                         var bv = b.children[col].textContent.trim().toLowerCase();
-                        if (col === 2) { // Remaining Days — numeric sort
+                        if (col === 3) { // Remaining Days — numeric sort
                             var an = parseFloat(av), bn = parseFloat(bv);
                             if (!isNaN(an) && !isNaN(bn)) return (an - bn) * dir;
                         }
-                        if (col === 3) { // Expiration Date — use data-iso or text
+                        if (col === 4) { // Expiration Date — use data-iso or text
                             var ad = a.children[col].getAttribute('data-iso') || av;
                             var bd = b.children[col].getAttribute('data-iso') || bv;
                             return ad.localeCompare(bd) * dir;
@@ -136,6 +144,37 @@
                 rows.forEach(function(r) { tbody.appendChild(r); });
             }
         })();
+
+        // Catalog filter — populate dropdown and apply filtering
+        (function() {
+            var rows = Array.from(document.querySelectorAll('#urlsTable tbody tr'));
+            var catalogs = {};
+            rows.forEach(function(row) {
+                var id = row.getAttribute('data-catalog-id') || '';
+                var name = row.getAttribute('data-catalog-name') || '';
+                if (id && !catalogs[id]) catalogs[id] = name;
+            });
+            var select = document.getElementById('catalogFilter');
+            Object.keys(catalogs).sort(function(a, b) {
+                return (catalogs[a] || '').localeCompare(catalogs[b] || '');
+            }).forEach(function(id) {
+                var opt = document.createElement('option');
+                opt.value = id;
+                opt.textContent = catalogs[id] || '(unknown)';
+                select.appendChild(opt);
+            });
+        })();
+
+        function filterByCatalog() {
+            var selected = document.getElementById('catalogFilter').value;
+            document.querySelectorAll('#urlsTable tbody tr').forEach(function(row) {
+                if (!selected || row.getAttribute('data-catalog-id') === selected) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
     </script>
 </body>
 

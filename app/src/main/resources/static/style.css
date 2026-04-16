@@ -11209,6 +11209,8 @@ a.back-link:hover {
 .version-detail-text { margin-top: 0.3em; font-style: italic; white-space: pre-wrap; }
 .version-connector { display: flex; justify-content: center; padding: 0.3em 0; }
 .version-connector::after { content: "│"; font-size: 1.2em; color: var(--gray-777, #999); }
+.hist-diff-added { background: #c8f0c8; color: #1a5c1a; border-radius: 2px; padding: 0 2px; }
+.hist-diff-removed { background: #f5c6c6; color: #8b0000; text-decoration: line-through; border-radius: 2px; padding: 0 2px; }
 
 /* Modal large variant */
 .modal-popup-lg { max-width: 800px; width: 90%; }

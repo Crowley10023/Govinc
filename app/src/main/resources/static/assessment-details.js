@@ -626,9 +626,33 @@ $(document).ready(function () {
     });
 });
 
+// =================== Copy Assessment URL ===================
+function copyAssessmentUrl() {
+    var url = $('#create-url-modal-link').text().trim();
+    if (!url) return;
+    navigator.clipboard.writeText(url).then(function() {
+        var status = document.getElementById('create-url-copy-status');
+        status.style.display = 'inline';
+        setTimeout(function() { status.style.display = 'none'; }, 2000);
+    }).catch(function() {
+        // Fallback for browsers that don't support clipboard API
+        var ta = document.createElement('textarea');
+        ta.value = url;
+        ta.style.cssText = 'position:fixed;opacity:0;';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        var status = document.getElementById('create-url-copy-status');
+        status.style.display = 'inline';
+        setTimeout(function() { status.style.display = 'none'; }, 2000);
+    });
+}
+
 // =================== Answering Guide Functions ===================
 var currentAnsweringGuideState = {
     controlId: null,
+    controlName: null,
     securityCatalogId: null,
     questions: [],
     answers: {},
@@ -637,6 +661,7 @@ var currentAnsweringGuideState = {
 
 function openAnsweringGuideModal(controlId, controlName, controlDetail, securityCatalogId) {
     currentAnsweringGuideState.controlId = controlId;
+    currentAnsweringGuideState.controlName = controlName;
     currentAnsweringGuideState.securityCatalogId = securityCatalogId;
     currentAnsweringGuideState.questions = [];
     currentAnsweringGuideState.answers = {};
@@ -846,6 +871,7 @@ function closeAnsweringGuideModal() {
     
     currentAnsweringGuideState = {
         controlId: null,
+        controlName: null,
         securityCatalogId: null,
         questions: [],
         answers: {},
@@ -921,7 +947,32 @@ function applyAnswerFromGuide(answerId, answerText) {
     var $select = $('select[data-control-id="' + controlId + '"]');
     if ($select.length > 0) {
         $select.val(answerId).change();
+        // Generate AI summary comment and populate the comment textarea
+        var questions = (currentAnsweringGuideState.questions || []).slice();
+        var answersMap = currentAnsweringGuideState.answers || {};
+        var answersArray = questions.map(function(q, i) { return answersMap[i] || ''; });
+        var controlName = currentAnsweringGuideState.controlName || '';
+        var capturedControlId = controlId;
         closeAnsweringGuideModal();
+        $.ajax({
+            url: '/assessment/generate-answer-summary',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                controlName: controlName,
+                questions: questions,
+                answers: answersArray,
+                proposedAnswer: answerText || ''
+            }),
+            success: function(resp) {
+                if (resp && resp.success && resp.summary) {
+                    var $textarea = $('textarea.comment-textarea[data-control-id="' + capturedControlId + '"]');
+                    if ($textarea.length > 0 && !$textarea.prop('disabled')) {
+                        $textarea.val(resp.summary).trigger('input');
+                    }
+                }
+            }
+        });
     } else {
         alert('Could not find answer dropdown for this control.');
     }
