@@ -66,6 +66,7 @@ public class AssessmentDirectController {
             out.put("assessment", assessmentMap);
             out.put("guideVisibleInDirect", assessment.isGuideVisibleInDirect());
             out.put("securityCatalogId", assessment.getSecurityCatalog() != null ? assessment.getSecurityCatalog().getId() : null);
+            out.put("catalogHeadline", assessment.getSecurityCatalog() != null ? assessment.getSecurityCatalog().getHeadline() : null);
 
             // Controls, sorted
             List<SecurityControl> controls = new ArrayList<>();

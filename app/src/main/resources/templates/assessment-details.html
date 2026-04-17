@@ -36,6 +36,11 @@
                 <option value="tag">Tag</option>
             </select>
         </div>
+        <div class="filter-item">
+            <button type="button" id="expand-collapse-all-btn" class="btn-secondary btn-sm" onclick="toggleAllDomains()" title="Expand or collapse all security control domain sections">
+                &#8597; Expand All
+            </button>
+        </div>
         </div>
         <div class="progress-section">
             <div class="progress-info">
@@ -49,6 +54,9 @@
         </div>
     </div>
     <div class="container">
+        <!-- Catalog Headline (if set) -->
+        <h1 th:if="${assessment.securityCatalog != null and assessment.securityCatalog.headline != null and !#strings.isEmpty(assessment.securityCatalog.headline)}"
+            class="page-title" th:text="${assessment.securityCatalog.headline}"></h1>
         <!-- Collapsible Assessment Details Section (Default: Collapsed) -->
         <div class="domain-outline card assessment-details-collapsible domain-collapsible">
             <div class="domain-header" onclick="toggleAssessmentDetails(this)">
@@ -317,6 +325,8 @@
                                                 <span th:text="${ctrl.name}"></span>
                                                 <div>
                                                     <div th:utext="${#strings.escapeXml(ctrl.detail) ?: 'No detail'}"></div>
+                                                    <div th:if="${ctrl.reference != null and !#strings.isEmpty(ctrl.reference)}"
+                                                         class="ctrl-reference">Reference: <span th:text="${ctrl.reference}"></span></div>
                                                 </div>
                                             </div>
                                         </td>
@@ -628,8 +638,6 @@
                                     <span class="help-text text-sm" style="width:100%;margin-bottom:1px;">Ctrl / Cmd for multiple.</span>
                                     <button type="button" class="btn-action" style="font-size:0.78em;padding:2px 7px;"
                                             onclick="openEmailUserPickModal()">&#128101; Assigned Users</button>
-                                    <button type="button" class="btn-action" style="font-size:0.78em;padding:2px 7px;"
-                                            onclick="openCorpDirModal()">&#9729; Corp. Directory</button>
                                 </div>
                             </div>
 

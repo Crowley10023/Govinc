@@ -287,6 +287,25 @@ public class UserController {
         return orgUnitService.getAllOrgUnits();
     }
 
+    // Find a local user by email (used by org-unit team lead corporate directory picker)
+    @GetMapping("/api/find-by-email")
+    @ResponseBody
+    public Map<String, Object> apiFindByEmail(@RequestParam("email") String email) {
+        if (!authorizationService.canAccessOrganization()) {
+            throw new UnauthorizedException("You do not have permission to look up users.");
+        }
+        Optional<User> found = userRepository.findByEmail(email.trim().toLowerCase());
+        if (found.isPresent()) {
+            User u = found.get();
+            Map<String, Object> out = new HashMap<>();
+            out.put("id", u.getId());
+            out.put("name", u.getName());
+            out.put("email", u.getEmail());
+            return out;
+        }
+        return Map.of("notFound", true);
+    }
+
     // Endpoint to get current logged-in user's name and email
     @GetMapping("/me")
     @ResponseBody

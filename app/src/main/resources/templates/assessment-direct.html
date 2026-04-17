@@ -42,6 +42,7 @@
         </div>
 
         <div class="assessment-direct-content">
+            <h1 id="catalog-headline-el" class="page-title" style="display:none;"></h1>
             <div class="domain-outline card domain-collapsible assessment-details-collapsible assessment-details-card">
                 <div class="domain-header" onclick="toggleAssessmentDetails(this)">
                     <div class="domain-header-info">
@@ -319,6 +320,12 @@
                 // Hide finalize bar if finalized (read-only mode)
                 var finalizeBar = document.getElementById('finalize-button-sticky');
                 if (!isOpen && finalizeBar) { finalizeBar.style.display = 'none'; }
+                // Catalog headline
+                var headlineEl = document.getElementById('catalog-headline-el');
+                if (data.catalogHeadline && data.catalogHeadline.trim() !== '') {
+                    headlineEl.textContent = data.catalogHeadline;
+                    headlineEl.style.display = '';
+                }
                 var controlsHtml = '';
                 domains.forEach(function (domain) {
                     controlsHtml += '<div class="domain-outline card domain-collapsible domain-card-spaced">' +

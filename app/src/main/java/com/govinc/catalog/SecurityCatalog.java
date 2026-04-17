@@ -24,6 +24,9 @@ public class SecurityCatalog {
     private String description;
     private String revision;
 
+    @Column(length = 2000)
+    private String headline;
+
     @Column(length = 100000)
     private String reportInstructions;
 
@@ -67,6 +70,12 @@ public class SecurityCatalog {
     }
     public void setRevision(String revision) {
         this.revision = revision;
+    }
+    public String getHeadline() {
+        return headline;
+    }
+    public void setHeadline(String headline) {
+        this.headline = headline;
     }
     public String getReportInstructions() {
         return reportInstructions;

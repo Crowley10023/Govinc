@@ -90,6 +90,8 @@
                             <td>
                                 <div class="control-name-simple" th:text="${control.securityControl.name}"></div>
                                 <div class="control-detail-simple" th:text="${control.securityControl.detail}"></div>
+                                <div th:if="${control.securityControl.reference != null and !#strings.isEmpty(control.securityControl.reference)}"
+                                     class="ctrl-reference">Reference: <span th:text="${control.securityControl.reference}"></span></div>
                             </td>
                             <td class="simple-answer-cell">
                                 <!-- Percent input (shown when no maturity model) -->

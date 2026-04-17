@@ -1004,6 +1004,27 @@ function toggleDomain(header) {
     }
 }
 
+// Toggle all security control domain sections (not the assessment-details card)
+var _allDomainsExpanded = false;
+function toggleAllDomains() {
+    _allDomainsExpanded = !_allDomainsExpanded;
+    // Select only domain-collapsible cards that are NOT the assessment-details card
+    document.querySelectorAll('.domain-collapsible:not(.assessment-details-collapsible)').forEach(function(card) {
+        var header = card.querySelector('.domain-header');
+        var body = header ? header.nextElementSibling : null;
+        if (!body) return;
+        body.style.display = _allDomainsExpanded ? 'block' : 'none';
+        var chevron = header.querySelector('.domain-chevron svg');
+        if (chevron) {
+            chevron.style.transform = _allDomainsExpanded ? 'rotate(180deg)' : '';
+        }
+    });
+    var btn = document.getElementById('expand-collapse-all-btn');
+    if (btn) {
+        btn.textContent = _allDomainsExpanded ? '\u2195 Collapse All' : '\u2195 Expand All';
+    }
+}
+
 function toggleAssessmentDetails(header) {
     var body = header.nextElementSibling;
     if (body.style.display === 'none' || body.style.display === '') {

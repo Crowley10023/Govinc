@@ -37,6 +37,7 @@ public class SecurityCatalogService {
                 existing.setName(catalog.getName());
                 existing.setDescription(catalog.getDescription());
                 existing.setRevision(catalog.getRevision());
+                existing.setHeadline(catalog.getHeadline());
                 existing.setReportInstructions(catalog.getReportInstructions());
                 existing.setVersionManaged(catalog.isVersionManaged());
                 existing.setSecurityControls(new HashSet<>(catalog.getSecurityControls()));

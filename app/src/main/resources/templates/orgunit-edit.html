@@ -38,18 +38,17 @@
 
                     <div class="form-group">
                         <label for="leaderId">Team Leader</label>
-                        <select id="leaderId" name="leaderId" onchange="updateLeaderWarning()">
-                            <option value="" selected>(none)</option>
-                            <option th:each="user : ${allUsers}"
-                                th:value="${user.id}"
-                                th:text="${user.name}"
-                                th:selected="${orgUnit.leader != null and user.id == orgUnit.leader.id}"
-                                th:attr="data-current-org=${orgUnit.id}">
-                            </option>
-                        </select>
-                        <span class="help-text">Assign a team leader for this organization unit. Any user can be assigned. A single person may lead multiple organization units.</span>
+                        <input type="hidden" id="leaderId" name="leaderId" th:value="${orgUnit.leader != null ? orgUnit.leader.id : ''}" />
+                        <div style="display:flex;align-items:center;gap:0.5em;flex-wrap:wrap;">
+                            <span id="leaderLabel" style="min-width:140px;padding:0.3em 0.6em;background:#f0f0f5;border-radius:4px;border:1px solid #ccc;"
+                                  th:text="${orgUnit.leader != null ? orgUnit.leader.name : '(none)'}"></span>
+                            <button type="button" class="btn-secondary btn-sm" id="chooseLeaderBtn">Choose&hellip;</button>
+                            <button type="button" class="btn-cancel btn-sm" id="clearLeaderBtn" onclick="clearLeader()"
+                                    th:style="${orgUnit.leader != null ? '' : 'display:none'}">&#10005;</button>
+                        </div>
+                        <span class="help-text">Assign a team leader for this organization unit. A single person may lead multiple organization units.</span>
                         <div id="leaderWarning" class="warning-box">
-                            <strong>⚠️ Warning:</strong> <span id="leaderWarningText"></span>
+                            <strong>&#9888;&#65039; Warning:</strong> <span id="leaderWarningText"></span>
                         </div>
                     </div>
                 </div>
@@ -99,15 +98,146 @@
     })();
 
     function updateLeaderWarning() {
-        const leaderSelect = document.getElementById('leaderId');
-        const selectedOption = leaderSelect.options[leaderSelect.selectedIndex];
-        const warningBox = document.getElementById('leaderWarning');
-        
-        if (selectedOption.value === '' || selectedOption.value === undefined) {
-            warningBox.classList.remove('show');
-        } else {
-            warningBox.classList.remove('show');
+        // nothing to check currently
+    }
+
+    function clearLeader() {
+        document.getElementById('leaderId').value = '';
+        document.getElementById('leaderLabel').textContent = '(none)';
+        document.getElementById('clearLeaderBtn').style.display = 'none';
+    }
+
+    // ---- Leader Picker (two-tab: Local + Corp Directory) ----
+    function openLeaderPickerModal(tab) {
+        document.getElementById('leaderPickerModalBg').style.display = 'flex';
+        switchLeaderTab(tab || 'local');
+    }
+
+    function closeLeaderPickerModal() {
+        document.getElementById('leaderPickerModalBg').style.display = 'none';
+    }
+
+    function switchLeaderTab(tab) {
+        var isLocal = tab === 'local';
+        document.getElementById('leaderTabLocalPanel').style.display = isLocal ? '' : 'none';
+        document.getElementById('leaderTabCorpPanel').style.display = isLocal ? 'none' : '';
+        document.getElementById('leaderTabLocalBtn').style.background = isLocal ? '' : '#6c757d';
+        document.getElementById('leaderTabCorpBtn').style.background = isLocal ? '#6c757d' : '';
+    }
+
+    function filterLeaderLocalUsers() {
+        var q = document.getElementById('leaderLocalUserSearch').value.toLowerCase();
+        var rows = document.querySelectorAll('#leaderLocalUsersTbody .leader-local-user-row');
+        var visible = 0;
+        rows.forEach(function(row) {
+            var name = (row.getAttribute('data-name') || '').toLowerCase();
+            var email = (row.getAttribute('data-email') || '').toLowerCase();
+            var show = !q || name.indexOf(q) !== -1 || email.indexOf(q) !== -1;
+            row.style.display = show ? '' : 'none';
+            if (show) visible++;
+        });
+        document.getElementById('leaderLocalUsersEmpty').style.display = (visible === 0) ? '' : 'none';
+    }
+
+    function pickLeaderLocalUser(btn) {
+        var row = btn.closest('tr');
+        setLeader(row.getAttribute('data-id'), row.getAttribute('data-name'));
+        closeLeaderPickerModal();
+    }
+
+    function searchLeaderCorpDir() {
+        var query = document.getElementById('leaderCorpDirQuery').value.trim();
+        if (!query) { document.getElementById('leaderCorpDirStatus').textContent = 'Please enter a search term.'; return; }
+        var csrfEl = document.querySelector('input[name="_csrf"]');
+        var csrfTok = csrfEl ? csrfEl.value : '';
+        var statusEl  = document.getElementById('leaderCorpDirStatus');
+        var searchBtn = document.getElementById('leaderCorpDirSearchBtn');
+        searchBtn.disabled = true;
+        statusEl.style.color = '#555';
+        statusEl.textContent = 'Searching\u2026';
+        document.getElementById('leaderCorpDirTable').style.display = 'none';
+        document.getElementById('leaderCorpDirEmpty').style.display = 'none';
+        fetch('/users/azure/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfTok },
+            body: JSON.stringify({ query: query })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            searchBtn.disabled = false;
+            if (data.error) { statusEl.style.color = '#c00'; statusEl.textContent = data.error; return; }
+            var results = data.results || [];
+            statusEl.style.color = '#555';
+            statusEl.textContent = results.length + ' result(s) found.';
+            renderLeaderCorpDirResults(results);
+        })
+        .catch(function(err) {
+            searchBtn.disabled = false;
+            statusEl.style.color = '#c00';
+            statusEl.textContent = 'Request failed: ' + err;
+        });
+    }
+
+    function renderLeaderCorpDirResults(results) {
+        var tbody = document.getElementById('leaderCorpDirTbody');
+        tbody.innerHTML = '';
+        if (!results || results.length === 0) {
+            document.getElementById('leaderCorpDirEmpty').style.display = '';
+            document.getElementById('leaderCorpDirTable').style.display = 'none';
+            return;
         }
+        document.getElementById('leaderCorpDirEmpty').style.display = 'none';
+        document.getElementById('leaderCorpDirTable').style.display = '';
+        results.forEach(function(u) {
+            var mail = u.mail || u.userPrincipalName || '';
+            var displayName = u.displayName || (u.givenName + ' ' + (u.surname || '')).trim() || mail;
+            var row = document.createElement('tr');
+            row.innerHTML =
+                '<td>' + escLeaderHtml(displayName) + '</td>' +
+                '<td>' + escLeaderHtml(mail) + '</td>' +
+                '<td><button type="button" class="btn-action btn-sm" onclick="pickLeaderCorpDirUser(this)" ' +
+                  'data-name="' + escLeaderHtml(displayName) + '" data-email="' + escLeaderHtml(mail) + '">Select</button></td>';
+            tbody.appendChild(row);
+        });
+    }
+
+    function pickLeaderCorpDirUser(btn) {
+        var name = btn.getAttribute('data-name');
+        var email = btn.getAttribute('data-email');
+        var csrfEl = document.querySelector('input[name="_csrf"]');
+        var csrfTok = csrfEl ? csrfEl.value : '';
+        btn.disabled = true;
+        btn.textContent = 'Resolving\u2026';
+        fetch('/users/azure/resolve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfTok },
+            body: JSON.stringify([{ displayName: name, mail: email, givenName: '', surname: '' }])
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var resolved = data.resolved || [];
+            if (resolved.length > 0) {
+                setLeader(resolved[0].id, resolved[0].name || name);
+                closeLeaderPickerModal();
+            } else {
+                alert('Could not resolve user from corp directory.');
+                btn.disabled = false; btn.textContent = 'Select';
+            }
+        })
+        .catch(function() {
+            alert('Failed to resolve user from corp directory.');
+            btn.disabled = false; btn.textContent = 'Select';
+        });
+    }
+
+    function setLeader(id, name) {
+        document.getElementById('leaderId').value = id;
+        document.getElementById('leaderLabel').textContent = name;
+        document.getElementById('clearLeaderBtn').style.display = '';
+    }
+
+    function escLeaderHtml(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -139,6 +269,14 @@
                 document.getElementById('clearParentOrgUnitBtn').style.display = '';
             }
         });
+
+        document.getElementById('chooseLeaderBtn').addEventListener('click', function() {
+            openLeaderPickerModal('local');
+        });
+        var leaderPickerBg = document.getElementById('leaderPickerModalBg');
+        if (leaderPickerBg) leaderPickerBg.addEventListener('mousedown', function(e) { if (e.target === this) closeLeaderPickerModal(); });
+        document.getElementById('leaderCorpDirSearchBtn').addEventListener('click', searchLeaderCorpDir);
+        document.getElementById('leaderCorpDirQuery').addEventListener('keydown', function(e) { if (e.key === 'Enter') searchLeaderCorpDir(); });
     });
 
     function clearParentOrgUnit() {
@@ -147,5 +285,52 @@
         document.getElementById('clearParentOrgUnitBtn').style.display = 'none';
     }
 </script>
+
+<!-- Leader Picker Modal (two-tab: Local Users + Corp Directory) -->
+<div class="modal-bg" id="leaderPickerModalBg" style="display:none;z-index:1100;">
+    <div class="modal-popup" style="width:min(580px,96vw);display:flex;flex-direction:column;max-height:82vh;">
+        <h3 style="flex-shrink:0;margin-bottom:0.8em;">Choose Team Leader</h3>
+        <div style="display:flex;gap:0.5em;margin-bottom:0.8em;flex-shrink:0;">
+            <button type="button" id="leaderTabLocalBtn" class="btn-action" onclick="switchLeaderTab('local')">Local Users</button>
+            <button type="button" id="leaderTabCorpBtn" class="btn-action" style="background:#6c757d;" onclick="switchLeaderTab('corp')">&#9729; Corp. Directory</button>
+        </div>
+        <!-- Local users tab -->
+        <div id="leaderTabLocalPanel" style="flex:1;overflow-y:auto;min-height:0;">
+            <input type="text" id="leaderLocalUserSearch" class="form-control" placeholder="Filter by name or e-mail&hellip;"
+                   oninput="filterLeaderLocalUsers()" style="margin-bottom:0.5em;" />
+            <table class="table" style="width:100%;">
+                <thead><tr><th>Name</th><th>E-Mail</th><th></th></tr></thead>
+                <tbody id="leaderLocalUsersTbody">
+                    <tr th:each="u : ${allUsers}"
+                        class="leader-local-user-row"
+                        th:data-id="${u.id}"
+                        th:data-name="${u.name}"
+                        th:data-email="${u.email != null ? u.email : ''}">
+                        <td th:text="${u.name}"></td>
+                        <td th:text="${u.email}"></td>
+                        <td><button type="button" class="btn-action btn-sm" onclick="pickLeaderLocalUser(this)">Select</button></td>
+                    </tr>
+                </tbody>
+            </table>
+            <p id="leaderLocalUsersEmpty" style="display:none;color:#888;">No users found.</p>
+        </div>
+        <!-- Corp directory tab -->
+        <div id="leaderTabCorpPanel" style="display:none;flex:1;overflow-y:auto;min-height:0;">
+            <div style="display:flex;gap:0.5em;margin-bottom:0.5em;">
+                <input type="text" id="leaderCorpDirQuery" class="form-control" placeholder="Search by name or e-mail&hellip;" style="flex:1;" />
+                <button type="button" class="btn-action" id="leaderCorpDirSearchBtn">Search</button>
+            </div>
+            <div id="leaderCorpDirStatus" style="font-size:0.88em;color:#555;min-height:1.1em;margin-bottom:0.4em;"></div>
+            <table id="leaderCorpDirTable" class="table" style="display:none;width:100%;">
+                <thead><tr><th>Name</th><th>E-Mail</th><th></th></tr></thead>
+                <tbody id="leaderCorpDirTbody"></tbody>
+            </table>
+            <p id="leaderCorpDirEmpty" style="display:none;color:#888;">No users found.</p>
+        </div>
+        <div style="flex-shrink:0;margin-top:0.8em;">
+            <button type="button" class="btn-cancel" onclick="closeLeaderPickerModal()">Close</button>
+        </div>
+    </div>
+</div>
 </body>
 </html>

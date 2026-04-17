@@ -75,6 +75,22 @@
     width: 100%;
 }
 
+.ctrl-reference {
+    font-size: 0.82em;
+    color: var(--gray-888, #888);
+    margin-top: 0.2em;
+}
+
+.catalog-headline-banner {
+    padding: 0.8em 1.2em;
+    margin-bottom: 1em;
+    font-size: 1.08em;
+    font-weight: 600;
+    color: var(--primary, #2274A5);
+    border-left: 4px solid var(--primary, #2274A5);
+    background: var(--card-bg, #fff);
+}
+
 .taken-over {
     background: var(--taken-over-bg) !important;
     color: var(--gray-888) !important;
