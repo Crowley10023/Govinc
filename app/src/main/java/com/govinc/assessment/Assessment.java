@@ -1,7 +1,12 @@
 package com.govinc.assessment;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
 import com.govinc.catalog.SecurityCatalog;
+import com.govinc.catalog.SecurityControl;
 import com.govinc.compliance.ComplianceCheck;
 import com.govinc.user.User;
 import com.govinc.organization.OrgUnit;
@@ -57,6 +62,16 @@ public class Assessment {
     @ManyToMany(cascade = { CascadeType.MERGE })
     @JoinTable(name = "assessment_orgservice", joinColumns = @JoinColumn(name = "assessment_id"), inverseJoinColumns = @JoinColumn(name = "orgservice_id"))
     private Set<OrgService> orgServices = new HashSet<>();
+
+    // Snapshot of security controls frozen at finalization time.
+    // When an assessment is CLOSED, these controls define the fixed scope.
+    @ManyToMany
+    @JoinTable(
+        name = "assessment_snapshot_controls",
+        joinColumns = @JoinColumn(name = "assessment_id"),
+        inverseJoinColumns = @JoinColumn(name = "security_control_id")
+    )
+    private Set<SecurityControl> snapshotControls = new HashSet<>();
 
     public void setOrgServices(Set<OrgService> orgServices) {
         this.orgServices = orgServices;
@@ -253,6 +268,31 @@ public class Assessment {
     public long getDaysUntilUrlExpiration() {
         if (urlExpirationDate == null) return 0;
         return java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), urlExpirationDate);
+    }
+
+    public Set<SecurityControl> getSnapshotControls() {
+        return snapshotControls;
+    }
+
+    public void setSnapshotControls(Set<SecurityControl> snapshotControls) {
+        this.snapshotControls = snapshotControls;
+    }
+
+    /**
+     * Returns the effective set of security controls for this assessment, sorted by name.
+     * If the assessment is CLOSED and has a non-empty snapshot, returns the frozen snapshot.
+     * Otherwise returns the live controls from the associated security catalog.
+     */
+    public List<SecurityControl> getEffectiveControls() {
+        if (isClosed() && snapshotControls != null && !snapshotControls.isEmpty()) {
+            return snapshotControls.stream()
+                .sorted(Comparator.comparing(SecurityControl::getName, String.CASE_INSENSITIVE_ORDER))
+                .collect(Collectors.toList());
+        }
+        if (securityCatalog != null) {
+            return securityCatalog.getSecurityControls();
+        }
+        return new ArrayList<>();
     }
 
     }

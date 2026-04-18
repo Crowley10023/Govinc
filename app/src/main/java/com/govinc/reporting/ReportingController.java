@@ -67,7 +67,8 @@ public class ReportingController {
         for (Assessment a : assessments) {
             Long catalogId = a.getSecurityCatalog().getId();
             String catalogName = a.getSecurityCatalog().getName();
-            int totalControls = a.getSecurityCatalog().getSecurityControls().size();
+            // Use effective controls to respect snapshot for closed assessments
+            int totalControls = a.getEffectiveControls().size();
 
             Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(a.getId());
             if (!detailsOpt.isPresent()) continue;

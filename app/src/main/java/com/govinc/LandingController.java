@@ -103,9 +103,8 @@ public class LandingController {
             for (Assessment a : filtered) {
                 Long aid = a.getId();
                 int totalControls = 0;
-                if (a.getSecurityCatalog() != null && a.getSecurityCatalog().getSecurityControls() != null) {
-                    totalControls = a.getSecurityCatalog().getSecurityControls().size();
-                }
+                // Use effective controls to respect snapshot for closed assessments
+                totalControls = a.getEffectiveControls().size();
                 int answered = 0;
                 try {
                     // Collect directly-answered control IDs from pre-loaded assessment details

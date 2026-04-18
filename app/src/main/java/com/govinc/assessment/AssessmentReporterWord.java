@@ -197,8 +197,7 @@ public class AssessmentReporterWord {
             }
 
             // Prepare table data: controls and answers (used only as fallback if AI didn't include a table)
-            List<SecurityControl> allControls = assessment.getSecurityCatalog() != null ?
-                    assessment.getSecurityCatalog().getSecurityControls() : Collections.emptyList();
+            List<SecurityControl> allControls = assessment.getEffectiveControls();
             Map<Long, AssessmentControlAnswer> answerMap = new HashMap<>();
             for (AssessmentControlAnswer a : answers) {
                 if (a.getSecurityControl() != null) answerMap.put(a.getSecurityControl().getId(), a);
@@ -406,11 +405,9 @@ public class AssessmentReporterWord {
         // Provide a concise list of security control domains present in this assessment
         sb.append("Security Control Domains:\n");
         Set<String> domains = new java.util.TreeSet<>();
-        if (assessment.getSecurityCatalog() != null && assessment.getSecurityCatalog().getSecurityControls() != null) {
-            for (SecurityControl ctrl : assessment.getSecurityCatalog().getSecurityControls()) {
-                if (ctrl.getSecurityControlDomain() != null && ctrl.getSecurityControlDomain().getName() != null) {
-                    domains.add(ctrl.getSecurityControlDomain().getName());
-                }
+        for (SecurityControl ctrl : assessment.getEffectiveControls()) {
+            if (ctrl.getSecurityControlDomain() != null && ctrl.getSecurityControlDomain().getName() != null) {
+                domains.add(ctrl.getSecurityControlDomain().getName());
             }
         }
         if (!domains.isEmpty()) {
@@ -425,8 +422,7 @@ public class AssessmentReporterWord {
         sb.append("SECURITY CONTROLS AND ASSESSMENT RESULTS\n");
         sb.append("========================================\n\n");
 
-        List<SecurityControl> allControls = assessment.getSecurityCatalog() != null ?
-                assessment.getSecurityCatalog().getSecurityControls() : Collections.emptyList();
+        List<SecurityControl> allControls = assessment.getEffectiveControls();
         Map<Long, AssessmentControlAnswer> answerMap = new HashMap<>();
         for (AssessmentControlAnswer a : answers) {
             if (a.getSecurityControl() != null) answerMap.put(a.getSecurityControl().getId(), a);

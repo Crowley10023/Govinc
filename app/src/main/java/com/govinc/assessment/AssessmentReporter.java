@@ -212,7 +212,7 @@ public class AssessmentReporter {
             }
 
             // Gather all control answers, including per-service
-            java.util.List<SecurityControl> allControls = assessment.getSecurityCatalog().getSecurityControls();
+            java.util.List<SecurityControl> allControls = assessment.getEffectiveControls();
             java.util.Map<Long, AssessmentControlAnswer> answerMap = answers.stream()
                     .collect(Collectors.toMap(
                             a -> a.getSecurityControl().getId(),

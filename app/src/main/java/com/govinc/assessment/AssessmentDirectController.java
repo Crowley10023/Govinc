@@ -68,12 +68,9 @@ public class AssessmentDirectController {
             out.put("securityCatalogId", assessment.getSecurityCatalog() != null ? assessment.getSecurityCatalog().getId() : null);
             out.put("catalogHeadline", assessment.getSecurityCatalog() != null ? assessment.getSecurityCatalog().getHeadline() : null);
 
-            // Controls, sorted
-            List<SecurityControl> controls = new ArrayList<>();
-            if (assessment.getSecurityCatalog() != null) {
-                controls.addAll(assessment.getSecurityCatalog().getSecurityControls());
-                controls.sort(Comparator.comparing(SecurityControl::getName, Comparator.nullsLast(String::compareTo)));
-            }
+            // Controls, sorted (uses frozen snapshot for closed assessments)
+            List<SecurityControl> controls = new ArrayList<>(assessment.getEffectiveControls());
+            controls.sort(Comparator.comparing(SecurityControl::getName, Comparator.nullsLast(String::compareTo)));
             List<Map<String, Object>> controlsList = controls.stream().map(ctrl -> {
                 Map<String, Object> m = new HashMap<>();
                 m.put("id", ctrl.getId());
@@ -355,6 +352,12 @@ public class AssessmentDirectController {
         // Set assessment status to CLOSED (finalized) to align with existing DB values
         assessment.setStatus(AssessmentStatus.CLOSED);
         assessment.setCloseDate(LocalDate.now());
+        // Snapshot the current catalog controls so the closed assessment
+        // retains a fixed scope even if the catalog is later modified.
+        if (assessment.getSecurityCatalog() != null) {
+            assessment.setSnapshotControls(
+                new java.util.HashSet<>(assessment.getSecurityCatalog().getSecurityControls()));
+        }
         assessmentRepository.save(assessment);
 
         // Update assessment details with completion date

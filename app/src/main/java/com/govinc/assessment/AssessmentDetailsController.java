@@ -85,12 +85,13 @@ public class AssessmentDetailsController {
             List<MaturityAnswer> allMaturityAnswers = maturityAnswerRepository.findAll();
             
             if (assessment != null) {
-                if (assessment.getSecurityCatalog() != null && assessment.getSecurityCatalog().getSecurityControls() != null) {
+                List<com.govinc.catalog.SecurityControl> effectiveControls = assessment.getEffectiveControls();
+                if (!effectiveControls.isEmpty()) {
                     List<OrgService> assignedOrgServices = (assessment.getOrgServices() != null)
                         ? assessment.getOrgServices().stream().toList() : java.util.Collections.emptyList();
                     System.out.println("Assessment: " + assessment.getName());
                     
-                    for (var ctrl : assessment.getSecurityCatalog().getSecurityControls()) {
+                    for (var ctrl : effectiveControls) {
                         boolean found = false;
                         String takenFromName = null;
                         int foundPercent = 0;
@@ -150,9 +151,9 @@ public class AssessmentDetailsController {
                 }
             }
             
-            // Defensive: ensure every catalog control gets a value
-            if (assessment != null && assessment.getSecurityCatalog() != null && assessment.getSecurityCatalog().getSecurityControls() != null) {
-                for (var ctrl : assessment.getSecurityCatalog().getSecurityControls()) {
+            // Defensive: ensure every effective control gets a value
+            if (assessment != null) {
+                for (var ctrl : assessment.getEffectiveControls()) {
                     controlAnswerIsTakenOver.putIfAbsent(ctrl.getId(), false);
                     controlAnswerIsOverridden.putIfAbsent(ctrl.getId(), false);
                 }
@@ -164,7 +165,7 @@ public class AssessmentDetailsController {
             Set<com.govinc.assessment.AssessmentControlAnswer> detailAnswers = ad.getControlAnswers();
             
             if (assessment != null && detailAnswers != null) {
-                for (var ctrl : assessment.getSecurityCatalog().getSecurityControls()) {
+                for (var ctrl : assessment.getEffectiveControls()) {
                     Long foundUserAnswerId = null;
                     String foundUserComment = null;
                     Boolean foundUserOverride = false;

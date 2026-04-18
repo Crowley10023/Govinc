@@ -5,9 +5,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.HashMap;
-import java.util.Map;
+import com.govinc.util.JsonResponseUtil;
 
 @Controller
 @RequestMapping("/security-control-domain")
@@ -38,46 +36,23 @@ public class SecurityControlDomainController {
     @ResponseBody
     public String deleteDomain(@RequestParam(required = false) Long id) {
         if (id == null) {
-            return buildErrorResponse("Invalid ID", "The provided domain ID is invalid.");
+            return JsonResponseUtil.buildErrorResponse("Invalid ID", "The provided domain ID is invalid.");
         }
         
         try {
             service.deleteById(id);
-            return buildSuccessResponse();
+            return JsonResponseUtil.buildSuccessResponse("Domain deleted successfully");
         } catch (DataIntegrityViolationException e) {
             // Handle foreign key constraint violations
-            return buildErrorResponse(
+            return JsonResponseUtil.buildErrorResponse(
                 "Cannot Delete Domain",
                 "This domain cannot be deleted because it is still in use. Please remove all associated security controls first."
             );
         } catch (Exception e) {
-            return buildErrorResponse(
+            return JsonResponseUtil.buildErrorResponse(
                 "Deletion Error",
                 "An error occurred while deleting the domain. Please try again later."
             );
-        }
-    }
-    
-    private String buildSuccessResponse() {
-        try {
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "Domain deleted successfully");
-            return new ObjectMapper().writeValueAsString(response);
-        } catch (Exception e) {
-            return "{\"success\":true}"; 
-        }
-    }
-    
-    private String buildErrorResponse(String title, String message) {
-        try {
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("title", title);
-            response.put("message", message);
-            return new ObjectMapper().writeValueAsString(response);
-        } catch (Exception e) {
-            return "{\"success\":false}"; 
         }
     }
 

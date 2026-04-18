@@ -1,12 +1,12 @@
 package com.govinc.reporting;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.govinc.authorization.AuthorizationService;
 import com.govinc.authorization.UnauthorizedException;
 import com.govinc.catalog.SecurityCapabilityService;
 import com.govinc.catalog.SecurityCatalogService;
 import com.govinc.maturity.MaturityModelRepository;
 import com.govinc.organization.OrgUnitService;
+import com.govinc.util.JsonResponseUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Controller;
@@ -14,9 +14,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.NoSuchElementException;
 
 @Controller
@@ -107,19 +105,19 @@ public class CapabilityReportController {
     @ResponseBody
     public String delete(@RequestParam(required = false) Long id) {
         if (!authorizationService.canAccessCompliance()) {
-            return buildErrorResponse("Forbidden", "You do not have permission to delete capability reports.");
+            return JsonResponseUtil.buildErrorResponse("Forbidden", "You do not have permission to delete capability reports.");
         }
         if (id == null) {
-            return buildErrorResponse("Invalid ID", "The provided report ID is invalid.");
+            return JsonResponseUtil.buildErrorResponse("Invalid ID", "The provided report ID is invalid.");
         }
         try {
             service.deleteById(id);
-            return buildSuccessResponse();
+            return JsonResponseUtil.buildSuccessResponse("Report deleted successfully");
         } catch (DataIntegrityViolationException e) {
-            return buildErrorResponse("Cannot Delete Report",
+            return JsonResponseUtil.buildErrorResponse("Cannot Delete Report",
                     "This report cannot be deleted because it is still in use.");
         } catch (Exception e) {
-            return buildErrorResponse("Deletion Error", "An error occurred while deleting the report.");
+            return JsonResponseUtil.buildErrorResponse("Deletion Error", "An error occurred while deleting the report.");
         }
     }
 
@@ -164,28 +162,5 @@ public class CapabilityReportController {
         model.addAttribute("allMaturityModels", maturityModelRepository.findAll());
         model.addAttribute("allOrgUnits", orgUnitService.getAllOrgUnits());
         model.addAttribute("allCapabilities", capabilityService.findAll());
-    }
-
-    private String buildSuccessResponse() {
-        try {
-            Map<String, Object> r = new HashMap<>();
-            r.put("success", true);
-            r.put("message", "Report deleted successfully");
-            return new ObjectMapper().writeValueAsString(r);
-        } catch (Exception e) {
-            return "{\"success\":true}";
-        }
-    }
-
-    private String buildErrorResponse(String title, String message) {
-        try {
-            Map<String, Object> r = new HashMap<>();
-            r.put("success", false);
-            r.put("title", title);
-            r.put("message", message);
-            return new ObjectMapper().writeValueAsString(r);
-        } catch (Exception e) {
-            return "{\"success\":false}";
-        }
     }
 }

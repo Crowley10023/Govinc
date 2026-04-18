@@ -1072,7 +1072,7 @@ function startProgressPolling() {
                 // Continue polling on error
             }
         });
-    }, 300);
+    }, 1000);
 }
 
 function resetProgress() {

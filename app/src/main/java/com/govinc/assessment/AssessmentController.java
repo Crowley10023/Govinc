@@ -311,12 +311,9 @@ public class AssessmentController {
         }
         Assessment assessment = assessmentOpt.get();
         model.addAttribute("assessment", assessment);
-        // Sorted controls by name
-        List<SecurityControl> controls = new ArrayList<>();
-        if (assessment.getSecurityCatalog() != null) {
-            controls.addAll(assessment.getSecurityCatalog().getSecurityControls());
-            controls.sort(Comparator.comparing(SecurityControl::getName, Comparator.nullsLast(String::compareTo)));
-        }
+        // Sorted controls by name (uses frozen snapshot for closed assessments)
+        List<SecurityControl> controls = new ArrayList<>(assessment.getEffectiveControls());
+        controls.sort(Comparator.comparing(SecurityControl::getName, Comparator.nullsLast(String::compareTo)));
         model.addAttribute("controls", controls);
         // Sorted answers
         List<MaturityAnswer> answers = new ArrayList<>();
@@ -478,12 +475,9 @@ public class AssessmentController {
             Assessment assessment = assessmentOpt.get();
             model.addAttribute("assessment", assessment);
 
-            // All security controls from the assessment's security catalog
-            List<SecurityControl> controls = new ArrayList<>();
-            if (assessment.getSecurityCatalog() != null) {
-                controls.addAll(assessment.getSecurityCatalog().getSecurityControls());
-                controls.sort(Comparator.comparing(SecurityControl::getName, Comparator.nullsLast(String::compareTo)));
-            }
+            // All security controls (uses frozen snapshot for closed assessments)
+            List<SecurityControl> controls = new ArrayList<>(assessment.getEffectiveControls());
+            controls.sort(Comparator.comparing(SecurityControl::getName, Comparator.nullsLast(String::compareTo)));
             model.addAttribute("controls", controls);
             // Also prepare controls sorted by 'reference' for template grouping
             List<SecurityControl> controlsByReference = new ArrayList<>(controls);
@@ -703,10 +697,8 @@ public class AssessmentController {
             if (assessment.getComplianceCheck() != null && details != null) {
                 ComplianceCheck cc = assessment.getComplianceCheck();
                 Set<Long> catalogControlIds = new java.util.LinkedHashSet<>();
-                if (assessment.getSecurityCatalog() != null && assessment.getSecurityCatalog().getSecurityControls() != null) {
-                    for (SecurityControl sc : assessment.getSecurityCatalog().getSecurityControls()) {
-                        catalogControlIds.add(sc.getId());
-                    }
+                for (SecurityControl sc : assessment.getEffectiveControls()) {
+                    catalogControlIds.add(sc.getId());
                 }
                 List<AssessmentControlAnswer> answerList = new ArrayList<>();
                 int answered = 0;
@@ -903,6 +895,12 @@ public class AssessmentController {
             // Adhere to existing DB values: use CLOSED to indicate finalized
             assessment.setStatus(AssessmentStatus.CLOSED);
             assessment.setCloseDate(LocalDate.now());
+            // Snapshot the current catalog controls so the closed assessment
+            // retains a fixed scope even if the catalog is later modified.
+            if (assessment.getSecurityCatalog() != null) {
+                assessment.setSnapshotControls(
+                    new java.util.HashSet<>(assessment.getSecurityCatalog().getSecurityControls()));
+            }
             assessmentRepository.save(assessment);
             }
 
@@ -931,6 +929,8 @@ public class AssessmentController {
             Assessment assessment = assessmentOpt.get();
             assessment.setStatus(AssessmentStatus.OPEN);
             assessment.setCloseDate(null);
+            // Clear the frozen snapshot so the assessment uses live catalog controls again
+            assessment.getSnapshotControls().clear();
             assessmentRepository.save(assessment);
         }
         return ResponseEntity.ok().build();
@@ -1071,11 +1071,8 @@ public class AssessmentController {
         }
         Assessment assessment = assessmentOpt.get();
 
-        // Catalog controls sorted by domain then reference
-        List<SecurityControl> controls = new ArrayList<>();
-        if (assessment.getSecurityCatalog() != null && assessment.getSecurityCatalog().getSecurityControls() != null) {
-            controls.addAll(assessment.getSecurityCatalog().getSecurityControls());
-        }
+        // Catalog controls sorted by domain then reference (uses frozen snapshot for closed assessments)
+        List<SecurityControl> controls = new ArrayList<>(assessment.getEffectiveControls());
         controls.sort(Comparator
             .comparing((SecurityControl sc) -> sc.getSecurityControlDomain() != null ? sc.getSecurityControlDomain().getName() : "",
                 Comparator.nullsLast(String::compareTo))

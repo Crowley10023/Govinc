@@ -1,6 +1,5 @@
 package com.govinc.catalog;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.govinc.authorization.AuthorizationService;
 import com.govinc.authorization.UnauthorizedException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,6 +7,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+
+import com.govinc.util.JsonResponseUtil;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -136,17 +137,17 @@ public class SecurityCapabilityController {
     @ResponseBody
     public String mappingAdd(@RequestParam Long capabilityId, @RequestParam Long domainId) {
         if (!authorizationService.canAccessSecurityFramework()) {
-            return buildErrorResponse("Forbidden", "You do not have permission to manage capability mappings.");
+            return JsonResponseUtil.buildErrorResponse("Forbidden", "You do not have permission to manage capability mappings.");
         }
         try {
             SecurityControlDomain domain = domainService.findById(domainId)
                     .orElseThrow(() -> new NoSuchElementException("Domain not found: " + domainId));
             service.addDomainToCapability(capabilityId, domain);
-            return buildSuccessResponse();
+            return JsonResponseUtil.buildSuccessResponse("Mapping added successfully");
         } catch (NoSuchElementException e) {
-            return buildErrorResponse("Not Found", e.getMessage());
+            return JsonResponseUtil.buildErrorResponse("Not Found", e.getMessage());
         } catch (Exception e) {
-            return buildErrorResponse("Error", "Unable to add mapping.");
+            return JsonResponseUtil.buildErrorResponse("Error", "Unable to add mapping.");
         }
     }
 
@@ -154,15 +155,15 @@ public class SecurityCapabilityController {
     @ResponseBody
     public String mappingRemove(@RequestParam Long capabilityId, @RequestParam Long domainId) {
         if (!authorizationService.canAccessSecurityFramework()) {
-            return buildErrorResponse("Forbidden", "You do not have permission to manage capability mappings.");
+            return JsonResponseUtil.buildErrorResponse("Forbidden", "You do not have permission to manage capability mappings.");
         }
         try {
             service.removeDomainFromCapability(capabilityId, domainId);
-            return buildSuccessResponse();
+            return JsonResponseUtil.buildSuccessResponse("Mapping removed successfully");
         } catch (NoSuchElementException e) {
-            return buildErrorResponse("Not Found", e.getMessage());
+            return JsonResponseUtil.buildErrorResponse("Not Found", e.getMessage());
         } catch (Exception e) {
-            return buildErrorResponse("Error", "Unable to remove mapping.");
+            return JsonResponseUtil.buildErrorResponse("Error", "Unable to remove mapping.");
         }
     }
 
@@ -172,42 +173,19 @@ public class SecurityCapabilityController {
     @ResponseBody
     public String delete(@RequestParam(required = false) Long id) {
         if (!authorizationService.canAccessSecurityFramework()) {
-            return buildErrorResponse("Forbidden", "You do not have permission to delete security capabilities.");
+            return JsonResponseUtil.buildErrorResponse("Forbidden", "You do not have permission to delete security capabilities.");
         }
         if (id == null) {
-            return buildErrorResponse("Invalid ID", "The provided capability ID is invalid.");
+            return JsonResponseUtil.buildErrorResponse("Invalid ID", "The provided capability ID is invalid.");
         }
         try {
             service.deleteById(id);
-            return buildSuccessResponse();
+            return JsonResponseUtil.buildSuccessResponse("Capability deleted successfully");
         } catch (DataIntegrityViolationException e) {
-            return buildErrorResponse("Cannot Delete Capability",
+            return JsonResponseUtil.buildErrorResponse("Cannot Delete Capability",
                     "This capability cannot be deleted because it is referenced by a capability report.");
         } catch (Exception e) {
-            return buildErrorResponse("Deletion Error", "An error occurred while deleting the capability.");
-        }
-    }
-
-    private String buildSuccessResponse() {
-        try {
-            Map<String, Object> r = new HashMap<>();
-            r.put("success", true);
-            r.put("message", "Capability deleted successfully");
-            return new ObjectMapper().writeValueAsString(r);
-        } catch (Exception e) {
-            return "{\"success\":true}";
-        }
-    }
-
-    private String buildErrorResponse(String title, String message) {
-        try {
-            Map<String, Object> r = new HashMap<>();
-            r.put("success", false);
-            r.put("title", title);
-            r.put("message", message);
-            return new ObjectMapper().writeValueAsString(r);
-        } catch (Exception e) {
-            return "{\"success\":false}";
+            return JsonResponseUtil.buildErrorResponse("Deletion Error", "An error occurred while deleting the capability.");
         }
     }
 }
