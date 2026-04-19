@@ -5,6 +5,34 @@
     <title th:text="'Capability Report: ' + ${result.report.name}"></title>
     <meta charset="UTF-8">
     <th:block th:replace="~{navigation :: navHead}"></th:block>
+    <style>
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-box {
+            background: #fff;
+            border-radius: 8px;
+            padding: 2rem;
+            max-width: 700px;
+            width: 95%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.22);
+        }
+        .modal-box h2 { margin-top: 0; }
+        .modal-close-row { text-align: right; margin-top: 1.25rem; }
+        .clickable-item { cursor: pointer; }
+        .clickable-item:hover { opacity: 0.85; }
+        .link-like { text-decoration: underline dotted; cursor: pointer; }
+        .ctrl-score-answered { color: #2a7a2a; font-weight: 600; }
+        .ctrl-score-unanswered { color: #999; font-style: italic; }
+    </style>
 </head>
 <body>
 <div th:replace="~{navigation :: mainNav}"></div>
@@ -33,9 +61,9 @@
             <span class="text-muted">Org units included:</span>
             <strong th:text="${result.orgUnitsIncluded}"></strong>
         </span>
-        <span class="filter-item">
+        <span class="filter-item clickable-item" onclick="openAssessmentListModal()" title="Click to see used assessments">
             <span class="text-muted">Assessments used:</span>
-            <strong th:text="${result.assessmentsIncluded}"></strong>
+            <strong class="link-like" th:text="${result.assessmentsIncluded}"></strong>
         </span>
         <span class="filter-item">
             <span class="text-muted">Maturity model:</span>
@@ -89,7 +117,9 @@
 
             <div th:each="ds : ${cs.domainScores}" class="cap-domain-tree-item">
                 <div class="cap-domain-branch"></div>
-                <div class="cap-node-card cap-node-card-domain">
+                <div class="cap-node-card cap-node-card-domain clickable-item"
+                     th:attr="onclick='openDomainControlsModal(' + ${ds.domain.id} + ')'"
+                     title="Click to see security controls">
                     <div class="cap-node-title-wrap">
                         <span class="cap-node-title" th:text="${ds.domain.name}"></span>
                     </div>
@@ -122,5 +152,113 @@
     </div><!-- end cap-tree-forest -->
 
 </div>
+
+<!-- Modal: Assessments used -->
+<div id="assessmentListModal" class="modal-overlay">
+    <div class="modal-box">
+        <h2>Assessments used in this calculation</h2>
+        <table class="data-table" style="width:100%;">
+            <thead>
+                <tr>
+                    <th>Assessment</th>
+                    <th>Org Unit</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="ai : ${result.usedAssessments}">
+                    <td th:text="${ai.name}"></td>
+                    <td th:text="${ai.orgUnitName}"></td>
+                    <td th:text="${ai.date}"></td>
+                    <td th:text="${ai.status}"></td>
+                </tr>
+                <tr th:if="${#lists.isEmpty(result.usedAssessments)}">
+                    <td colspan="4" class="text-muted">No assessments found.</td>
+                </tr>
+            </tbody>
+        </table>
+        <div class="modal-close-row">
+            <button class="btn-secondary" onclick="closeModal('assessmentListModal')">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Domain controls -->
+<div id="domainControlsModal" class="modal-overlay">
+    <div class="modal-box">
+        <h2 id="domainControlsTitle">Security Controls</h2>
+        <table class="data-table" style="width:100%;">
+            <thead>
+                <tr>
+                    <th>Security Control</th>
+                    <th>Avg Score</th>
+                    <th>Answered</th>
+                </tr>
+            </thead>
+            <tbody id="domainControlsBody"></tbody>
+        </table>
+        <div class="modal-close-row">
+            <button class="btn-secondary" onclick="closeModal('domainControlsModal')">Close</button>
+        </div>
+    </div>
+</div>
+
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    var domainControlData = {};
+    /*[# th:each="cs : ${result.capabilityScores}" ]*/
+      /*[# th:each="ds : ${cs.domainScores}" ]*/
+        var _did = [[${ds.domain.id}]];
+        domainControlData[_did] = { name: [[${ds.domain.name}]], controls: [] };
+        /*[# th:each="ctrl : ${ds.controlScores}" ]*/
+        domainControlData[_did].controls.push({ name: [[${ctrl.name}]], score: [[${ctrl.score}]], answered: [[${ctrl.answered}]] });
+        /*[/]*/
+      /*[/]*/
+    /*[/]*/
+
+    function openAssessmentListModal() {
+        document.getElementById('assessmentListModal').style.display = 'flex';
+    }
+
+    function openDomainControlsModal(domainId) {
+        var data = domainControlData[domainId];
+        if (!data) return;
+        document.getElementById('domainControlsTitle').textContent = (data.name || 'Domain') + ' — Security Controls';
+        var tbody = document.getElementById('domainControlsBody');
+        tbody.innerHTML = '';
+        if (!data.controls || data.controls.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" style="color:#999;font-style:italic;">No controls in this domain.</td></tr>';
+        } else {
+            data.controls.forEach(function(c) {
+                var tr = document.createElement('tr');
+                var scoreCell = c.answered
+                    ? '<span class="ctrl-score-answered">' + c.score.toFixed(1) + '</span>'
+                    : '<span class="ctrl-score-unanswered">&mdash;</span>';
+                var answeredCell = c.answered ? '&#10003;' : '';
+                tr.innerHTML = '<td>' + escHtml(c.name || '') + '</td><td>' + scoreCell + '</td><td>' + answeredCell + '</td>';
+                tbody.appendChild(tr);
+            });
+        }
+        document.getElementById('domainControlsModal').style.display = 'flex';
+    }
+
+    function closeModal(id) {
+        document.getElementById(id).style.display = 'none';
+    }
+
+    function escHtml(s) {
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    document.addEventListener('click', function(e) {
+        ['assessmentListModal','domainControlsModal'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (e.target === el) el.style.display = 'none';
+        });
+    });
+    /*]]>*/
+</script>
+
 </body>
 </html>

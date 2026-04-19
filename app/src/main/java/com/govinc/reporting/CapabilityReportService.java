@@ -5,6 +5,7 @@ import com.govinc.assessment.AssessmentControlAnswer;
 import com.govinc.assessment.AssessmentDetails;
 import com.govinc.assessment.AssessmentDetailsService;
 import com.govinc.assessment.AssessmentRepository;
+import com.govinc.assessment.AssessmentStatus;
 import com.govinc.catalog.SecurityCapability;
 import com.govinc.catalog.SecurityCatalog;
 import com.govinc.catalog.SecurityControl;
@@ -17,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -47,21 +49,54 @@ public class CapabilityReportService {
 
     // ─── Calculation ─────────────────────────────────────────────────────────
 
+    /** Summary info about an assessment included in this calculation. */
+    public static class AssessmentInfo {
+        public final Long id;
+        public final String name;
+        public final String orgUnitName;
+        public final LocalDate date;
+        public final String status;
+
+        AssessmentInfo(Assessment a) {
+            this.id = a.getId();
+            this.name = a.getName() != null ? a.getName() : "Assessment #" + a.getId();
+            this.orgUnitName = a.getOrgUnit() != null && a.getOrgUnit().getName() != null
+                    ? a.getOrgUnit().getName() : "";
+            this.date = a.getCloseDate() != null ? a.getCloseDate() : a.getCreationDate();
+            this.status = a.getStatus() != null ? a.getStatus().name() : "";
+        }
+    }
+
+    /** Score for a single security control within a domain (averaged across all assessments). */
+    public static class ControlScore {
+        public final String name;
+        public final double score;
+        public final boolean answered;
+
+        ControlScore(String name, double score, boolean answered) {
+            this.name = name;
+            this.score = score;
+            this.answered = answered;
+        }
+    }
+
     /** Top-level result returned to the controller/template. */
     public static class CalculationResult {
         public final CapabilityReport report;
         public final List<CapabilityScore> capabilityScores;
         public final int orgUnitsIncluded;
         public final int assessmentsIncluded;
+        public final List<AssessmentInfo> usedAssessments;
 
         CalculationResult(CapabilityReport report,
                           List<CapabilityScore> capabilityScores,
                           int orgUnitsIncluded,
-                          int assessmentsIncluded) {
+                          List<AssessmentInfo> usedAssessments) {
             this.report = report;
             this.capabilityScores = capabilityScores;
             this.orgUnitsIncluded = orgUnitsIncluded;
-            this.assessmentsIncluded = assessmentsIncluded;
+            this.assessmentsIncluded = usedAssessments.size();
+            this.usedAssessments = usedAssessments;
         }
     }
 
@@ -95,17 +130,20 @@ public class CapabilityReportService {
         public final int answeredControls;
         public final int totalControls;
         public final MaturityLevel maturityLevel;
+        public final List<ControlScore> controlScores;
 
         DomainScore(SecurityControlDomain domain,
                     ReportingCalculator.AssessmentStats stats,
                     int totalControls,
-                    MaturityLevel maturityLevel) {
+                    MaturityLevel maturityLevel,
+                    List<ControlScore> controlScores) {
             this.domain = domain;
             this.score = stats.averageRating;
             this.coverage = stats.coveragePercent;
             this.answeredControls = stats.answeredControls;
             this.totalControls = totalControls;
             this.maturityLevel = maturityLevel;
+            this.controlScores = controlScores;
         }
     }
 
@@ -142,32 +180,77 @@ public class CapabilityReportService {
                         .collect(Collectors.toSet())
                 : null; // null means "no catalog filter"
 
-        // 3. Gather the latest assessment per org unit (same catalog), then pool all answers
+        // 3. For each org unit pick the single best assessment:
+        //    - effective date (closeDate for CLOSED, else creationDate) is compared first
+        //    - tiebreaker: more answered controls wins
         List<Assessment> relevantAssessments = assessmentRepository.findAll().stream()
                 .filter(a -> a.getOrgUnit() != null && orgUnitIds.contains(a.getOrgUnit().getId()))
                 .filter(a -> catalog == null || (a.getSecurityCatalog() != null
                         && a.getSecurityCatalog().getId().equals(catalog.getId())))
                 .collect(Collectors.toList());
 
-        // keep only the most-recent assessment per org unit
+        List<Long> relevantIds = relevantAssessments.stream()
+                .map(Assessment::getId).collect(Collectors.toList());
+        Map<Long, AssessmentDetails> detailsById =
+                assessmentDetailsService.findAllByAssessmentIds(relevantIds);
+
         Map<Long, Assessment> latestByOrgUnit = new LinkedHashMap<>();
         for (Assessment a : relevantAssessments) {
             Long ouId = a.getOrgUnit().getId();
             Assessment existing = latestByOrgUnit.get(ouId);
-            if (existing == null || (a.getCreationDate() != null && existing.getCreationDate() != null
-                    && a.getCreationDate().isAfter(existing.getCreationDate()))) {
+            LocalDate candidateEff = effectiveDate(a);
+            LocalDate existingEff  = existing == null ? null : effectiveDate(existing);
+            int cmp;
+            if (existing == null) {
+                cmp = 1;
+            } else if (candidateEff == null) {
+                cmp = -1;
+            } else if (existingEff == null) {
+                cmp = 1;
+            } else {
+                cmp = candidateEff.compareTo(existingEff);
+            }
+            if (cmp > 0) {
                 latestByOrgUnit.put(ouId, a);
+            } else if (cmp == 0) {
+                int candidateCount = detailsById.containsKey(a.getId())
+                        ? detailsById.get(a.getId()).getControlAnswers().size() : 0;
+                int existingCount  = detailsById.containsKey(existing.getId())
+                        ? detailsById.get(existing.getId()).getControlAnswers().size() : 0;
+                if (candidateCount > existingCount) {
+                    latestByOrgUnit.put(ouId, a);
+                }
             }
         }
 
+        // 4. Pool answers from the one selected assessment per org unit,
+        //    then average per control across all org units.
         List<AssessmentControlAnswer> allAnswers = new ArrayList<>();
         for (Assessment a : latestByOrgUnit.values()) {
-            Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(a.getId());
-            detailsOpt.ifPresent(d -> allAnswers.addAll(d.getControlAnswers()));
+            AssessmentDetails d = detailsById.get(a.getId());
+            if (d == null) continue;
+            // For CLOSED assessments that have a snapshot, only include answers
+            // for controls that were frozen in that snapshot.
+            Set<Long> snapshotIds = null;
+            if (a.getStatus() == AssessmentStatus.CLOSED
+                    && a.getSnapshotControls() != null
+                    && !a.getSnapshotControls().isEmpty()) {
+                snapshotIds = a.getSnapshotControls().stream()
+                        .map(SecurityControl::getId)
+                        .collect(Collectors.toSet());
+            }
+            final Set<Long> finalSnapshotIds = snapshotIds;
+            for (AssessmentControlAnswer aca : d.getControlAnswers()) {
+                if (finalSnapshotIds == null
+                        || aca.getSecurityControl() == null
+                        || finalSnapshotIds.contains(aca.getSecurityControl().getId())) {
+                    allAnswers.add(aca);
+                }
+            }
         }
 
-        // 4. Deduplicate answers across the full pool
-        Map<Long, AssessmentControlAnswer> effectiveAnswers = CapabilityCalculator.deduplicateAnswers(allAnswers);
+        // 5. Average scores per control across all selected assessments
+        Map<Long, Double> averagedScores = CapabilityCalculator.averageScoresPerControl(allAnswers);
 
         // 5. Score each capability
         MaturityModel maturityModel = report.getMaturityModel();
@@ -185,12 +268,27 @@ public class CapabilityReportService {
                 capabilityControlIds.addAll(domainControlIds);
 
                 ReportingCalculator.AssessmentStats domainStats =
-                        CapabilityCalculator.computeForControls(effectiveAnswers, domainControlIds);
+                        CapabilityCalculator.computeForControlsAveraged(averagedScores, domainControlIds);
+
+                // Build per-control scores for the domain popup
+                List<ControlScore> controlScores = new ArrayList<>();
+                for (SecurityControl ctrl : domain.getSecurityControls()) {
+                    if (catalogControlIds != null && !catalogControlIds.contains(ctrl.getId())) continue;
+                    Double avg = averagedScores.get(ctrl.getId());
+                    controlScores.add(new ControlScore(
+                            ctrl.getName() != null ? ctrl.getName() : "Control #" + ctrl.getId(),
+                            avg != null ? Math.round(avg * 10.0) / 10.0 : 0.0,
+                            avg != null));
+                }
+                controlScores.sort(Comparator.comparing(
+                        c -> c.name != null ? c.name : "", String.CASE_INSENSITIVE_ORDER));
+
                 domainScores.add(new DomainScore(
                     domain,
                     domainStats,
                     domainControlIds.size(),
-                    nearestMaturityLevel(maturityModel, domainStats.averageRating)
+                    nearestMaturityLevel(maturityModel, domainStats.averageRating),
+                    controlScores
                 ));
             }
 
@@ -200,7 +298,7 @@ public class CapabilityReportService {
                     String.CASE_INSENSITIVE_ORDER));
 
             ReportingCalculator.AssessmentStats capStats =
-                    CapabilityCalculator.computeForControls(effectiveAnswers, capabilityControlIds);
+                    CapabilityCalculator.computeForControlsAveraged(averagedScores, capabilityControlIds);
                 capabilityScores.add(new CapabilityScore(
                     capability,
                     capStats,
@@ -213,10 +311,24 @@ public class CapabilityReportService {
                 cs -> cs.capability.getName() != null ? cs.capability.getName() : "",
                 String.CASE_INSENSITIVE_ORDER));
 
-        return new CalculationResult(report, capabilityScores, orgUnitIds.size(), latestByOrgUnit.size());
+        List<AssessmentInfo> usedAssessments = new ArrayList<>();
+        for (Assessment a : latestByOrgUnit.values()) {
+            usedAssessments.add(new AssessmentInfo(a));
+        }
+        usedAssessments.sort(Comparator.comparing(
+                ai -> ai.orgUnitName != null ? ai.orgUnitName : "", String.CASE_INSENSITIVE_ORDER));
+
+        return new CalculationResult(report, capabilityScores, orgUnitIds.size(), usedAssessments);
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────
+
+    /** Effective date used to determine which of two assessments is "later".
+     *  CLOSED assessments are authoritative at their closeDate (snapshot point);
+     *  all others are ordered by creationDate. */
+    private static LocalDate effectiveDate(Assessment a) {
+        return (a.getCloseDate() != null) ? a.getCloseDate() : a.getCreationDate();
+    }
 
     private Set<Long> collectOrgUnitIds(OrgUnit root) {
         Set<Long> ids = new HashSet<>();
