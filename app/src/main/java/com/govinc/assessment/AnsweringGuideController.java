@@ -5,6 +5,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/assessment")
@@ -137,5 +138,66 @@ public class AnsweringGuideController {
             return err;
         }
         return answeringGuideService.generateAnswerSummary(controlName, questions, answers, proposedAnswer);
+    }
+
+    /**
+     * AI-based ordering of controls for the Assessment Wizard.
+     * Suggests the best order to assess security controls based on similarity and logical grouping.
+     * Results are cached per security catalog and re-calculated when the catalog changes.
+     */
+    @PostMapping("/wizard-order-controls")
+    @ResponseBody
+    public Map<String, Object> wizardOrderControls(@RequestBody Map<String, Object> request) {
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> controls = (List<Map<String, Object>>) request.get("controls");
+        
+        if (controls == null || controls.isEmpty()) {
+            Map<String, Object> err = new HashMap<>();
+            err.put("success", false);
+            err.put("message", "Controls list is required");
+            return err;
+        }
+
+        Long securityCatalogId = null;
+        Object catalogIdObj = request.get("securityCatalogId");
+        if (catalogIdObj instanceof Number) {
+            securityCatalogId = ((Number) catalogIdObj).longValue();
+        } else if (catalogIdObj instanceof String) {
+            try { securityCatalogId = Long.parseLong((String) catalogIdObj); } catch (NumberFormatException ignored) { }
+        }
+        
+        return answeringGuideService.suggestWizardOrder(securityCatalogId, controls);
+    }
+
+    /**
+     * AI-based answer guessing for a single control in the Assessment Wizard.
+     * Provides a confidence-rated pre-assessment before the user answers.
+     */
+    @PostMapping("/wizard-guess-answer")
+    @ResponseBody
+    public Map<String, Object> wizardGuessAnswer(@RequestBody Map<String, Object> request) {
+        String controlName = (String) request.get("controlName");
+        String controlDetail = (String) request.get("controlDetail");
+        String domainName = (String) request.get("domainName");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> maturityModelAnswers = (List<Map<String, Object>>) request.get("maturityModelAnswers");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> previousAnswers = (List<Map<String, Object>>) request.get("previousAnswers");
+        
+        if (controlName == null || controlName.isBlank()) {
+            Map<String, Object> err = new HashMap<>();
+            err.put("success", false);
+            err.put("message", "controlName is required");
+            return err;
+        }
+        
+        if (maturityModelAnswers == null || maturityModelAnswers.isEmpty()) {
+            Map<String, Object> err = new HashMap<>();
+            err.put("success", false);
+            err.put("message", "maturityModelAnswers are required");
+            return err;
+        }
+        
+        return answeringGuideService.guessAnswer(controlName, controlDetail, domainName, maturityModelAnswers, previousAnswers);
     }
 }

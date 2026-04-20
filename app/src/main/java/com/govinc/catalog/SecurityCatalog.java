@@ -33,6 +33,12 @@ public class SecurityCatalog {
     @Column(nullable = false)
     private boolean versionManaged = false;
 
+    @Column(length = 10000)
+    private String wizardControlOrder;
+
+    @Column(length = 64)
+    private String wizardControlOrderHash;
+
     @ManyToMany
     @JoinTable(
         name = "security_catalog_controls",
@@ -88,6 +94,18 @@ public class SecurityCatalog {
     }
     public void setVersionManaged(boolean versionManaged) {
         this.versionManaged = versionManaged;
+    }
+    public String getWizardControlOrder() {
+        return wizardControlOrder;
+    }
+    public void setWizardControlOrder(String wizardControlOrder) {
+        this.wizardControlOrder = wizardControlOrder;
+    }
+    public String getWizardControlOrderHash() {
+        return wizardControlOrderHash;
+    }
+    public void setWizardControlOrderHash(String wizardControlOrderHash) {
+        this.wizardControlOrderHash = wizardControlOrderHash;
     }
     /**
      * Returns security controls sorted by name.

@@ -95,7 +95,7 @@
                 <th>Assigned To</th>
                 <th>Requestor</th>
                 <th>Project</th>
-                <th>Security Control</th>
+                <th>Related Item</th>
                 <th>Due Date</th>
                 <th>Actions</th>
             </tr>
@@ -129,11 +129,15 @@
                 <td th:text="${task.createdBy != null ? task.createdBy.name : '-'}"></td>
                 <td th:text="${task.project != null ? task.project.name : '-'}"></td>
                 <td onclick="event.stopPropagation()">
-                    <span th:if="${task.securityControl == null}">-</span>
+                    <span th:if="${task.securityControl == null and task.securityCatalog == null}">-</span>
                     <a th:if="${task.securityControl != null}"
                        th:href="@{/security-control/edit(id=${task.securityControl.id},returnUrl='/governance/tasks')}"
                        th:text="${task.securityControl.name}"
-                       class="link"></a>
+                       class="link related-item-control"></a>
+                    <a th:if="${task.securityCatalog != null}"
+                       th:href="@{/security-catalog/edit(id=${task.securityCatalog.id})}"
+                       th:text="${task.securityCatalog.name}"
+                       class="link related-item-catalog"></a>
                 </td>
                 <td th:text="${task.dueDate != null ? #temporals.format(task.dueDate, 'yyyy-MM-dd') : '-'}"></td>
                 <td onclick="event.stopPropagation()">
@@ -149,61 +153,80 @@
 
 <!-- Create Task Modal -->
 <div id="createTaskModal" class="modal-bg">
-    <div class="modal-popup">
-        <h3>Create Task</h3>
+    <div class="modal-popup task-modal">
+        <div class="task-modal-header">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="4" rx="1"/><rect x="3" y="7" width="18" height="14" rx="2"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/></svg>
+            <h3>Create Task</h3>
+        </div>
         <div class="modal-form">
             <label>Title *
-                <input type="text" id="newTaskTitle">
+                <input type="text" id="newTaskTitle" placeholder="Task title...">
+                <span class="field-error" id="newTaskTitleError">Title is required</span>
             </label>
             <label>Description
-                <textarea id="newTaskDescription" rows="3"></textarea>
+                <textarea id="newTaskDescription" rows="2" placeholder="Optional notes or context..."></textarea>
             </label>
-            <label>Assigned To
-                <select id="newTaskUser">
-                    <option value="">-- Select User --</option>
-                    <option th:each="u : ${users}" th:value="${u.id}" th:text="${u.name}"></option>
-                </select>
-            </label>
-            <label>Project
+            <div class="modal-form-row">
+                <label>Assigned To
+                    <select id="newTaskUser">
+                        <option value="">— Select User —</option>
+                        <option th:each="u : ${users}" th:value="${u.id}" th:text="${u.name}"></option>
+                    </select>
+                </label>
+                <label>Due Date
+                    <input type="date" id="newTaskDueDate">
+                </label>
+            </div>
+            <label>Project *
                 <select id="newTaskProject">
-                    <option value="">-- No Project --</option>
+                    <option value="">— Select Project —</option>
                     <option th:each="p : ${projects}" th:value="${p.id}" th:text="${p.name}"></option>
                 </select>
+                <span class="field-error" id="newTaskProjectError">Project is required</span>
             </label>
-            <label>Security Control
-                <select id="newTaskControl">
-                    <option value="">-- None --</option>
-                    <option th:each="sc : ${securityControls}" th:value="${sc.id}" th:text="${sc.name}"></option>
-                </select>
-            </label>
-            <label>Security Catalog
-                <select id="newTaskCatalog">
-                    <option value="">-- None --</option>
-                    <option th:each="cat : ${securityCatalogs}" th:value="${cat.id}" th:text="${cat.name}"></option>
-                </select>
-            </label>
-            <label>Due Date
-                <input type="date" id="newTaskDueDate">
-            </label>
+            <div class="task-link-section">
+                <div class="task-link-label">Related Item</div>
+                <div class="link-type-toggle" id="newTaskLinkToggle">
+                    <button type="button" class="link-type-btn link-active" data-type="none" onclick="setNewTaskLinkType('none')">None</button>
+                    <button type="button" class="link-type-btn" data-type="control" onclick="setNewTaskLinkType('control')">Security Control</button>
+                    <button type="button" class="link-type-btn" data-type="catalog" onclick="setNewTaskLinkType('catalog')">Security Catalog</button>
+                </div>
+                <div id="newTaskControlRow" style="display:none;">
+                    <select id="newTaskControl">
+                        <option value="">— Select Control —</option>
+                        <option th:each="sc : ${securityControls}" th:value="${sc.id}" th:text="${sc.name}"></option>
+                    </select>
+                </div>
+                <div id="newTaskCatalogRow" style="display:none;">
+                    <select id="newTaskCatalog">
+                        <option value="">— Select Catalog —</option>
+                        <option th:each="cat : ${securityCatalogs}" th:value="${cat.id}" th:text="${cat.name}"></option>
+                    </select>
+                </div>
+            </div>
         </div>
         <div class="modal-btn-row">
             <button type="button" class="btn-cancel" onclick="closeCreateTaskModal()">Cancel</button>
-            <button type="button" class="btn-action" onclick="submitCreateTask()">Create</button>
+            <button type="button" class="btn-action" onclick="submitCreateTask()">Create Task</button>
         </div>
     </div>
 </div>
 
 <!-- Edit Task Modal -->
 <div id="editTaskModal" class="modal-bg">
-    <div class="modal-popup">
-        <h3>Edit Task</h3>
+    <div class="modal-popup task-modal">
+        <div class="task-modal-header">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <h3>Edit Task</h3>
+        </div>
         <input type="hidden" id="editTaskId">
         <div class="modal-form">
             <label>Title *
-                <input type="text" id="editTaskTitle">
+                <input type="text" id="editTaskTitle" placeholder="Task title...">
+                <span class="field-error" id="editTaskTitleError">Title is required</span>
             </label>
             <label>Description
-                <textarea id="editTaskDescription" rows="3"></textarea>
+                <textarea id="editTaskDescription" rows="2" placeholder="Optional notes or context..."></textarea>
             </label>
             <label>Status
                 <div class="status-pill-group">
@@ -214,25 +237,47 @@
                 </div>
                 <input type="hidden" id="editTaskStatus">
             </label>
-            <label>Assigned To
-                <select id="editTaskUser">
-                    <option value="">-- Select User --</option>
-                    <option th:each="u : ${users}" th:value="${u.id}" th:text="${u.name}"></option>
-                </select>
-            </label>
+            <div class="modal-form-row">
+                <label>Assigned To
+                    <select id="editTaskUser">
+                        <option value="">— Select User —</option>
+                        <option th:each="u : ${users}" th:value="${u.id}" th:text="${u.name}"></option>
+                    </select>
+                </label>
+                <label>Due Date
+                    <input type="date" id="editTaskDueDate">
+                </label>
+            </div>
             <label>Project
                 <select id="editTaskProject">
-                    <option value="">-- No Project --</option>
+                    <option value="">— No Project —</option>
                     <option th:each="p : ${projects}" th:value="${p.id}" th:text="${p.name}"></option>
                 </select>
             </label>
-            <label>Due Date
-                <input type="date" id="editTaskDueDate">
-            </label>
+            <div class="task-link-section">
+                <div class="task-link-label">Related Item</div>
+                <div class="link-type-toggle" id="editTaskLinkToggle">
+                    <button type="button" class="link-type-btn link-active" data-type="none" onclick="setEditTaskLinkType('none')">None</button>
+                    <button type="button" class="link-type-btn" data-type="control" onclick="setEditTaskLinkType('control')">Security Control</button>
+                    <button type="button" class="link-type-btn" data-type="catalog" onclick="setEditTaskLinkType('catalog')">Security Catalog</button>
+                </div>
+                <div id="editTaskControlRow" style="display:none;">
+                    <select id="editTaskControl">
+                        <option value="">— Select Control —</option>
+                        <option th:each="sc : ${securityControls}" th:value="${sc.id}" th:text="${sc.name}"></option>
+                    </select>
+                </div>
+                <div id="editTaskCatalogRow" style="display:none;">
+                    <select id="editTaskCatalog">
+                        <option value="">— Select Catalog —</option>
+                        <option th:each="cat : ${securityCatalogs}" th:value="${cat.id}" th:text="${cat.name}"></option>
+                    </select>
+                </div>
+            </div>
         </div>
         <div class="modal-btn-row">
             <button type="button" class="btn-cancel" onclick="closeEditTaskModal()">Cancel</button>
-            <button type="button" class="btn-action" onclick="submitEditTask()">Save</button>
+            <button type="button" class="btn-action" onclick="submitEditTask()">Save Changes</button>
         </div>
     </div>
 </div>
@@ -267,23 +312,58 @@
         });
     }
 
+    function setNewTaskLinkType(type) {
+        document.querySelectorAll('#newTaskLinkToggle .link-type-btn').forEach(function(b) {
+            b.classList.toggle('link-active', b.getAttribute('data-type') === type);
+        });
+        document.getElementById('newTaskControlRow').style.display = type === 'control' ? '' : 'none';
+        document.getElementById('newTaskCatalogRow').style.display = type === 'catalog' ? '' : 'none';
+    }
+    function setEditTaskLinkType(type) {
+        document.querySelectorAll('#editTaskLinkToggle .link-type-btn').forEach(function(b) {
+            b.classList.toggle('link-active', b.getAttribute('data-type') === type);
+        });
+        document.getElementById('editTaskControlRow').style.display = type === 'control' ? '' : 'none';
+        document.getElementById('editTaskCatalogRow').style.display = type === 'catalog' ? '' : 'none';
+    }
+    function getActiveLinkType(toggleId) {
+        var active = document.querySelector('#' + toggleId + ' .link-active');
+        return active ? active.getAttribute('data-type') : 'none';
+    }
+
     function openCreateTaskModal() {
+        document.getElementById('newTaskTitle').value = '';
+        document.getElementById('newTaskDescription').value = '';
+        document.getElementById('newTaskUser').value = '';
+        document.getElementById('newTaskProject').value = '';
+        document.getElementById('newTaskDueDate').value = '';
+        setNewTaskLinkType('none');
+        document.getElementById('newTaskTitleError').style.display = 'none';
+        document.getElementById('newTaskProjectError').style.display = 'none';
         document.getElementById('createTaskModal').style.display = 'flex';
+        document.getElementById('newTaskTitle').focus();
     }
     function closeCreateTaskModal() {
         document.getElementById('createTaskModal').style.display = 'none';
     }
 
     function submitCreateTask() {
+        var titleErr = document.getElementById('newTaskTitleError');
+        var projectErr = document.getElementById('newTaskProjectError');
+        titleErr.style.display = 'none';
+        projectErr.style.display = 'none';
         var title = document.getElementById('newTaskTitle').value.trim();
-        if (!title) { alert('Title is required'); return; }
+        if (!title) { titleErr.style.display = ''; document.getElementById('newTaskTitle').focus(); return; }
+        var projectId = document.getElementById('newTaskProject').value;
+        if (!projectId) { projectErr.style.display = ''; return; }
+        var linkType = getActiveLinkType('newTaskLinkToggle');
         var payload = {
             title: title,
             description: document.getElementById('newTaskDescription').value.trim() || null,
             assignedUserId: document.getElementById('newTaskUser').value || null,
-            projectId: document.getElementById('newTaskProject').value || null,
-            securityControlId: document.getElementById('newTaskControl').value || null,
-            securityCatalogId: document.getElementById('newTaskCatalog').value || null,
+            projectId: projectId,
+            securityControlId: linkType === 'control' ? (document.getElementById('newTaskControl').value || null) : null,
+            securityCatalogId: linkType === 'catalog' ? (document.getElementById('newTaskCatalog').value || null) : null,
             dueDate: document.getElementById('newTaskDueDate').value || null
         };
         var headers = { 'Content-Type': 'application/json' };
@@ -314,6 +394,13 @@
         document.getElementById('editTaskUser').value = btn.getAttribute('data-user-id') || '';
         document.getElementById('editTaskProject').value = btn.getAttribute('data-project-id') || '';
         document.getElementById('editTaskDueDate').value = btn.getAttribute('data-due-date') || '';
+        var controlId = btn.getAttribute('data-control-id') || '';
+        var catalogId = btn.getAttribute('data-catalog-id') || '';
+        var linkType = controlId ? 'control' : (catalogId ? 'catalog' : 'none');
+        setEditTaskLinkType(linkType);
+        if (controlId) document.getElementById('editTaskControl').value = controlId;
+        if (catalogId) document.getElementById('editTaskCatalog').value = catalogId;
+        document.getElementById('editTaskTitleError').style.display = 'none';
         document.getElementById('editTaskModal').style.display = 'flex';
     }
     function closeEditTaskModal() {
@@ -322,13 +409,18 @@
     function submitEditTask() {
         var taskId = document.getElementById('editTaskId').value;
         var title = document.getElementById('editTaskTitle').value.trim();
-        if (!title) { alert('Title is required'); return; }
+        var titleErr = document.getElementById('editTaskTitleError');
+        if (!title) { titleErr.style.display = ''; document.getElementById('editTaskTitle').focus(); return; }
+        titleErr.style.display = 'none';
+        var linkType = getActiveLinkType('editTaskLinkToggle');
         var payload = {
             title: title,
             description: document.getElementById('editTaskDescription').value.trim() || null,
             status: document.getElementById('editTaskStatus').value,
             assignedUserId: document.getElementById('editTaskUser').value || null,
             projectId: document.getElementById('editTaskProject').value || null,
+            securityControlId: linkType === 'control' ? (document.getElementById('editTaskControl').value || null) : null,
+            securityCatalogId: linkType === 'catalog' ? (document.getElementById('editTaskCatalog').value || null) : null,
             dueDate: document.getElementById('editTaskDueDate').value || null
         };
         var headers = { 'Content-Type': 'application/json' };

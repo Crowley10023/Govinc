@@ -95,7 +95,12 @@
                         </tr>
                         <tr>
                             <th>Organization Unit</th>
-                            <td th:text="${assessment.orgUnit != null ? assessment.orgUnit.name : 'None'}"></td>
+                            <td>
+                                <div class="detail-inline-edit">
+                                    <span id="assessment-orgunit-name" th:text="${assessment.orgUnit != null ? assessment.orgUnit.name : 'None'}"></span>
+                                    <button th:if="${isAdminOrISM and assessment.isOpen}" id="choose-orgunit-btn" type="button" class="modal-launch-btn btn-action">Choose Org Unit</button>
+                                </div>
+                            </td>
                         </tr>
                         <tr>
                             <th>Security Catalog</th>
@@ -126,12 +131,14 @@
                             <th>Completed Date</th>
                             <td th:text="${completedDateDisplay}"></td>
                         </tr>
-                        <tr th:if="${orgServices != null}">
+                        <tr th:if="${orgServices != null or (assessment.isOpen and !isAssessor)}">
                             <th>Org Services</th>
                             <td>
-                                <ul>
+                                <span th:if="${orgServices == null or #lists.isEmpty(orgServices)}" class="text-muted">None</span>
+                                <ul th:if="${orgServices != null and !#lists.isEmpty(orgServices)}" style="margin:0 0 0.4em 0;padding-left:1.2em;">
                                     <li th:each="orgService : ${orgServices}" th:text="${orgService.name}"></li>
                                 </ul>
+                                <button th:if="${assessment.isOpen and !isAssessor}" id="choose-orgservices-btn" type="button" class="modal-launch-btn btn-action">Choose Org Services</button>
                             </td>
                         </tr>
                         <tr>
@@ -162,6 +169,7 @@
                                 <div th:if="${assessment.users != null && !#lists.isEmpty(assessment.users)}" class="pill-list">
                                     <span th:each="user : ${assessment.users}" class="user-pill" th:text="${user.name}"></span>
                                 </div>
+                                <button th:if="${(isAdminOrISM or canManageAssessors) and assessment.isOpen}" id="choose-users-btn" type="button" class="modal-launch-btn btn-action" th:text="${canManageAssessors ? 'Add User' : 'Choose Users'}">Choose Users</button>
                             </td>
                         </tr>
                         <tr>
@@ -404,18 +412,21 @@
         </div>
 
         <section class="general-button-bar">
-            <button th:if="${isAdminOrISM and assessment.isOpen}" id="choose-orgunit-btn" type="button" class="modal-launch-btn btn-action">Choose Org Unit</button>
-            <button th:if="${(isAdminOrISM or canManageAssessors) and assessment.isOpen}" id="choose-users-btn" type="button" class="modal-launch-btn btn-action" th:text="${canManageAssessors ? 'Add User' : 'Choose Users'}">Choose Users</button>
-            <button th:if="${assessment.isOpen and !isAssessor}" id="choose-orgservices-btn" type="button" class="modal-launch-btn btn-action">Choose Org Services</button>
+            <button th:if="${assessment.isOpen}" id="assessment-wizard-btn" type="button" class="btn-action wizard-launch-btn" onclick="openAssessmentWizard()">&#129302; Assessment Wizard</button>
 
             <button th:if="${assessment.isOpen and isAdminOrISM}" id="finalize-btn" type="button" class="btn-action">Finalize</button>
             <button th:if="${!assessment.isOpen and isAdminOrISM}" id="reopen-assessment-btn" type="button" class="btn-action">Re-open Assessment</button>
             <form th:if="${isAdminOrISM}" id="deleteAssessmentForm" th:action="@{'/assessment/' + ${assessment.id} + '/delete'}" method="post" style="display:inline">
                 <button type="button" class="modal-launch-btn btn-danger" onclick="document.getElementById('deleteAssessmentModal').style.display='flex'">Delete</button>
             </form>
-            <a th:if="${!isAssessor}" th:href="@{'/assessment/' + ${assessment.id} + '/report'}" class="btn-action">Create Report (PDF)</a>
-            <a th:if="${!isAssessor}" id="word-report-btn" th:href="@{'/assessment/' + ${assessment.id} + '/word-report'}" class="btn-action">Create Report (Word)</a>
-            <a th:if="${!isAssessor}" th:href="@{'/assessment/' + ${assessment.id} + '/excel'}" class="btn-action">Export to Excel</a>
+            <div th:if="${!isAssessor}" style="position:relative;display:inline-block;">
+                <button type="button" class="btn-action" onclick="toggleReportingPopup(this)">Reporting &#9660;</button>
+                <div id="reporting-popup" class="reporting-dropdown" style="display:none;">
+                    <a th:href="@{'/assessment/' + ${assessment.id} + '/report'}" class="reporting-option">Create Report (PDF)</a>
+                    <a id="word-report-btn" th:href="@{'/assessment/' + ${assessment.id} + '/word-report'}" class="reporting-option">Create Report (Word)</a>
+                    <a th:href="@{'/assessment/' + ${assessment.id} + '/excel'}" class="reporting-option">Export to Excel</a>
+                </div>
+            </div>
             <button th:if="${isAdminOrISM and assessment.isOpen}" id="create-url-btn" type="button" class="btn-action">Create URL</button>
             <button th:if="${isAdminOrISM}" id="send-email-btn" type="button" class="btn-action"
                     onclick="openEmailModal()">&#9993; Send E-Mail</button>
@@ -566,6 +577,69 @@
                             <button type="button" id="orgservice-modal-cancel" class="btn-cancel">Cancel</button>
                         </div>
                     </form>
+                </div>
+            </div>
+
+            <!-- Assessment Wizard Modal -->
+            <div class="modal-bg" id="wizard-modal-bg">
+                <div class="modal-popup wizard-popup">
+                    <!-- Loading overlay -->
+                    <div class="guide-overlay" id="wizard-loading-overlay">
+                        <div class="guide-overlay-spinner"></div>
+                        <div class="guide-overlay-label" id="wizard-loading-label">Loading...</div>
+                    </div>
+
+                    <!-- Header -->
+                    <div class="wizard-header">
+                        <div class="wizard-header-left">
+                            <h3>&#129302; Assessment Wizard</h3>
+                            <div class="wizard-progress-info">
+                                <span>Control <strong id="wizard-progress-current">1</strong> of <strong id="wizard-progress-total">0</strong></span>
+                                <span class="wizard-progress-sep">|</span>
+                                <span><strong id="wizard-progress-answered">0</strong> answered</span>
+                                <span class="wizard-progress-sep">|</span>
+                                <span id="wizard-progress-pct">0%</span>
+                            </div>
+                        </div>
+                        <button type="button" class="modal-close-btn" onclick="closeAssessmentWizard()">&#10005;</button>
+                    </div>
+
+                    <!-- Progress bar -->
+                    <div class="wizard-progress-bar">
+                        <div class="wizard-progress-bar-fill" id="wizard-progress-bar-fill"></div>
+                    </div>
+
+                    <!-- Minimap -->
+                    <div class="wizard-minimap" id="wizard-minimap"></div>
+
+                    <!-- Main content area -->
+                    <div class="wizard-body" id="wizard-content-scroll">
+                        <div class="wizard-two-col">
+                            <!-- LEFT: control info, answer cards, comment -->
+                            <div class="wizard-col-left">
+                                <div id="wizard-control-info" class="wizard-control-info"></div>
+                                <div class="wizard-answers-section">
+                                    <label class="wizard-section-label">Select Maturity Level</label>
+                                    <div id="wizard-answer-cards" class="wizard-answer-cards"></div>
+                                </div>
+                                <div id="wizard-comment-area" class="wizard-comment-area"></div>
+                            </div>
+                            <!-- RIGHT: AI guided assessment questions -->
+                            <div class="wizard-col-right">
+                                <div id="wizard-ai-guide" class="wizard-ai-guide wizard-guide-panel"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Footer navigation -->
+                    <div class="wizard-footer">
+                        <button type="button" class="btn-cancel wizard-exit-btn" onclick="closeAssessmentWizard()">&#10005; Exit Wizard</button>
+                        <div class="wizard-nav-btns">
+                            <button type="button" id="wizard-prev-btn" class="btn-secondary" onclick="wizardPrev()" disabled>&#8592; Previous</button>
+                            <button type="button" id="wizard-skip-btn" class="btn-secondary wizard-skip-btn" onclick="wizardSkip()">Skip</button>
+                            <button type="button" id="wizard-next-btn" class="btn-action" onclick="wizardNext()">Next &#8594;</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -765,6 +839,7 @@
     <script src="/webjars/jquery/3.6.0/jquery.min.js"></script>
     <script src="/org-unit-wizard.js"></script>
     <script src="/assessment-details.js"></script>
+    <script src="/assessment-wizard.js"></script>
 
     <!-- Global Variables and Finalize Modal Handler -->
     <script th:inline="javascript">
@@ -1158,6 +1233,20 @@
 
             return null;
         }
+
+        function toggleReportingPopup(btn) {
+            var popup = document.getElementById('reporting-popup');
+            if (!popup) return;
+            var visible = popup.style.display !== 'none';
+            popup.style.display = visible ? 'none' : 'block';
+        }
+        document.addEventListener('click', function(e) {
+            var popup = document.getElementById('reporting-popup');
+            if (!popup) return;
+            if (!popup.contains(e.target) && !e.target.closest('[onclick="toggleReportingPopup(this)"]')) {
+                popup.style.display = 'none';
+            }
+        });
 
         function toggleGuideVisible(checkbox) {
             var csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
@@ -1555,8 +1644,11 @@
 
     <!-- ISM Create Task for Control Modal -->
     <div id="ctrlTaskModal" class="modal-bg">
-        <div class="modal-popup modal-popup-ctrl-task">
-            <h3>New Governance Task</h3>
+        <div class="modal-popup task-modal modal-popup-ctrl-task">
+            <div class="task-modal-header">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="4" rx="1"/><rect x="3" y="7" width="18" height="14" rx="2"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/></svg>
+                <h3>New Governance Task</h3>
+            </div>
             <input type="hidden" id="ctrlTaskControlId">
             <div class="ctrl-task-context-badge">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="4" rx="1"/><rect x="3" y="7" width="18" height="14" rx="2"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/></svg>

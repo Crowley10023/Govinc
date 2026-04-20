@@ -3,6 +3,7 @@ package com.govinc.governance;
 import com.govinc.assessment.Assessment;
 import com.govinc.authorization.AuthorizationService;
 import com.govinc.catalog.SecurityCatalogRepository;
+import com.govinc.catalog.SecurityControlRepository;
 import com.govinc.organization.OrgUnitService;
 import com.govinc.user.User;
 import com.govinc.user.UserRepository;
@@ -35,6 +36,9 @@ public class GovernanceProjectController {
     private SecurityCatalogRepository securityCatalogRepository;
 
     @Autowired
+    private SecurityControlRepository securityControlRepository;
+
+    @Autowired
     private OrgUnitService orgUnitService;
 
     @GetMapping("")
@@ -56,6 +60,7 @@ public class GovernanceProjectController {
         model.addAttribute("users", userRepository.findAll());
         model.addAttribute("statuses", TaskStatus.values());
         model.addAttribute("catalogs", securityCatalogRepository.findAll());
+        model.addAttribute("securityControls", securityControlRepository.findAll());
         return "governance-project-detail";
     }
 
