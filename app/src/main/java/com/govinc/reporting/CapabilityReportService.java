@@ -223,6 +223,32 @@ public class CapabilityReportService {
             }
         }
 
+        // 3b. Refine catalogControlIds for CLOSED assessments with a snapshot.
+        //     Controls added to the catalog after assessment finalization must not inflate the
+        //     total control count.  For each selected CLOSED assessment that has a snapshot,
+        //     use the frozen snapshot IDs instead of the live catalog controls.
+        final Set<Long> effectiveCatalogControlIds;
+        if (!latestByOrgUnit.isEmpty()) {
+            boolean skipRefinement = false;
+            Set<Long> effectiveIds = new HashSet<>();
+            for (Assessment a : latestByOrgUnit.values()) {
+                if (a.getStatus() == AssessmentStatus.CLOSED
+                        && a.getSnapshotControls() != null
+                        && !a.getSnapshotControls().isEmpty()) {
+                    a.getSnapshotControls().forEach(sc -> effectiveIds.add(sc.getId()));
+                } else if (catalogControlIds != null) {
+                    effectiveIds.addAll(catalogControlIds);
+                } else {
+                    // At least one assessment has no catalog filter – keep catalogControlIds as-is.
+                    skipRefinement = true;
+                    break;
+                }
+            }
+            effectiveCatalogControlIds = skipRefinement ? catalogControlIds : effectiveIds;
+        } else {
+            effectiveCatalogControlIds = catalogControlIds;
+        }
+
         // 4. Pool answers from the one selected assessment per org unit,
         //    then average per control across all org units.
         List<AssessmentControlAnswer> allAnswers = new ArrayList<>();
@@ -262,7 +288,7 @@ public class CapabilityReportService {
             for (SecurityControlDomain domain : capability.getDomains()) {
                 Set<Long> domainControlIds = domain.getSecurityControls().stream()
                         .map(SecurityControl::getId)
-                        .filter(cid -> catalogControlIds == null || catalogControlIds.contains(cid))
+                        .filter(cid -> effectiveCatalogControlIds == null || effectiveCatalogControlIds.contains(cid))
                         .collect(Collectors.toSet());
 
                 capabilityControlIds.addAll(domainControlIds);
@@ -273,7 +299,7 @@ public class CapabilityReportService {
                 // Build per-control scores for the domain popup
                 List<ControlScore> controlScores = new ArrayList<>();
                 for (SecurityControl ctrl : domain.getSecurityControls()) {
-                    if (catalogControlIds != null && !catalogControlIds.contains(ctrl.getId())) continue;
+                    if (effectiveCatalogControlIds != null && !effectiveCatalogControlIds.contains(ctrl.getId())) continue;
                     Double avg = averagedScores.get(ctrl.getId());
                     controlScores.add(new ControlScore(
                             ctrl.getName() != null ? ctrl.getName() : "Control #" + ctrl.getId(),
