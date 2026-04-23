@@ -34,7 +34,7 @@
                 <!-- Org Unit Selection -->
                 <div class="form-group">
                     <label>Organizational Unit</label>
-                    <input type="hidden" id="orgUnitId" name="orgUnitId" required>
+                    <input type="hidden" id="orgUnitId" name="orgUnitId">
                     <div style="display:flex;gap:1em;align-items:center;">
                         <button type="button" id="openOrgUnitModal" class="btn-action">Select Org Unit</button>
                         <span id="selectedOrgUnitName" class="text-muted">No org unit selected</span>
@@ -254,7 +254,7 @@
             var orgUnitError = document.getElementById('orgUnitError');
 
             function clearErrors(){
-                [nameError,catalogError,orgUnitError].forEach(function(el){ if(el) el.style.display='none'; });
+                [nameError,catalogError,orgUnitError].forEach(function(el){ if(el) el.classList.add('d-none'); });
                 if(catalog) catalog.classList.remove('input-error');
                 if(nameInput) nameInput.classList.remove('input-error');
                 var sel = document.getElementById('selectedOrgUnitName');
@@ -265,17 +265,17 @@
                 clearErrors();
                 var valid = true;
                 if(!nameInput || !nameInput.value.trim()){
-                    if(nameError) nameError.style.display='block';
+                    if(nameError) nameError.classList.remove('d-none');
                     if(nameInput) nameInput.classList.add('input-error');
                     valid = false;
                 }
                 if(!catalog || !catalog.value || catalog.selectedIndex === 0){
-                    if(catalogError) catalogError.style.display='block';
+                    if(catalogError) catalogError.classList.remove('d-none');
                     if(catalog) catalog.classList.add('input-error');
                     valid = false;
                 }
                 if(!orgUnitId || !orgUnitId.value.trim()){
-                    if(orgUnitError) orgUnitError.style.display='block';
+                    if(orgUnitError) orgUnitError.classList.remove('d-none');
                     var sel = document.getElementById('selectedOrgUnitName');
                     if(sel) sel.classList.add('input-error');
                     valid = false;

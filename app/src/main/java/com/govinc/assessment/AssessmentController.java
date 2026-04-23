@@ -561,41 +561,54 @@ public class AssessmentController {
                     }
                 } else if (inheritedByControl.containsKey(ctrlId)) {
                     OrgServiceInheritance inh = inheritedByControl.get(ctrlId);
-                    controlAnswers.put(ctrlId, inh.answer.getAnswer());
                     controlAnswerIsTakenOver.put(ctrlId, Boolean.TRUE);
                     controlTakenOverOrgServiceName.put(ctrlId, inh.orgServiceName);
                     controlAnswerIsOverridden.put(ctrlId, Boolean.FALSE);
 
-                    if (details != null) {
-                        AssessmentControlAnswer existing = localControlAnswers.get(ctrlId);
-                        if (existing != null) {
-                            Long existingAnswerId = existing.getMaturityAnswer() != null
-                                    ? existing.getMaturityAnswer().getId()
-                                    : null;
-                            Long inheritedAnswerId = inh.answer.getId();
-                            if (!Objects.equals(existingAnswerId, inheritedAnswerId)) {
-                                existing.setMaturityAnswer(inh.answer);
-                                detailsAnswers.add(existing);
-                                answersPersisted = true;
-                            }
-                        } else {
-                            AssessmentControlAnswer aca = new AssessmentControlAnswer(control, inh.answer);
-                            aca = assessmentControlAnswerRepository.save(aca);
-                            detailsAnswers.add(aca);
-                            answersPersisted = true;
-                            localControlAnswers.put(ctrlId, aca);
-                        }
-                    }
-                    // If inherited, try to fetch the comment from local (user) answer if exists, else use org service comment
-                    if (localControlAnswers.containsKey(ctrlId)) {
-                        String comment = localControlAnswers.get(ctrlId).getComment();
+                    if (assessment.isClosed() && localControlAnswers.containsKey(ctrlId)) {
+                        // Closed assessment: use the frozen stored value; never overwrite with live org service data.
+                        AssessmentControlAnswer aca = localControlAnswers.get(ctrlId);
+                        controlAnswers.put(ctrlId, aca.getMaturityAnswer() != null ? aca.getMaturityAnswer().getAnswer() : inh.answer.getAnswer());
+                        String comment = aca.getComment();
                         if (comment != null && !comment.isEmpty()) {
                             controlComments.put(ctrlId, comment);
                         } else if (orgServiceControlComments.containsKey(ctrlId)) {
                             controlComments.put(ctrlId, orgServiceControlComments.get(ctrlId));
                         }
-                    } else if (orgServiceControlComments.containsKey(ctrlId)) {
-                        controlComments.put(ctrlId, orgServiceControlComments.get(ctrlId));
+                    } else {
+                        // Open assessment (or closed without a stored value): use live inherited value.
+                        controlAnswers.put(ctrlId, inh.answer.getAnswer());
+                        if (!assessment.isClosed() && details != null) {
+                            AssessmentControlAnswer existing = localControlAnswers.get(ctrlId);
+                            if (existing != null) {
+                                Long existingAnswerId = existing.getMaturityAnswer() != null
+                                        ? existing.getMaturityAnswer().getId()
+                                        : null;
+                                Long inheritedAnswerId = inh.answer.getId();
+                                if (!Objects.equals(existingAnswerId, inheritedAnswerId)) {
+                                    existing.setMaturityAnswer(inh.answer);
+                                    detailsAnswers.add(existing);
+                                    answersPersisted = true;
+                                }
+                            } else {
+                                AssessmentControlAnswer aca = new AssessmentControlAnswer(control, inh.answer);
+                                aca = assessmentControlAnswerRepository.save(aca);
+                                detailsAnswers.add(aca);
+                                answersPersisted = true;
+                                localControlAnswers.put(ctrlId, aca);
+                            }
+                        }
+                        // Try to fetch the comment from local (user) answer if exists, else use org service comment
+                        if (localControlAnswers.containsKey(ctrlId)) {
+                            String comment = localControlAnswers.get(ctrlId).getComment();
+                            if (comment != null && !comment.isEmpty()) {
+                                controlComments.put(ctrlId, comment);
+                            } else if (orgServiceControlComments.containsKey(ctrlId)) {
+                                controlComments.put(ctrlId, orgServiceControlComments.get(ctrlId));
+                            }
+                        } else if (orgServiceControlComments.containsKey(ctrlId)) {
+                            controlComments.put(ctrlId, orgServiceControlComments.get(ctrlId));
+                        }
                     }
                 } else if (localControlAnswers.containsKey(ctrlId)) {
                     AssessmentControlAnswer aca = localControlAnswers.get(ctrlId);
@@ -900,6 +913,56 @@ public class AssessmentController {
             if (assessment.getSecurityCatalog() != null) {
                 assessment.setSnapshotControls(
                     new java.util.HashSet<>(assessment.getSecurityCatalog().getSecurityControls()));
+            }
+            // Freeze org service inherited answers into AssessmentDetails so that subsequent
+            // changes to org service assessments do not affect this closed assessment.
+            Map<Long, OrgServiceInheritance> inheritedAtClose = collectOrgServiceInheritance(assessment);
+            if (!inheritedAtClose.isEmpty()) {
+                Optional<AssessmentDetails> closeDetailsOpt = assessmentDetailsService.findById(id);
+                AssessmentDetails closeDetails;
+                if (closeDetailsOpt.isPresent()) {
+                    closeDetails = closeDetailsOpt.get();
+                } else {
+                    closeDetails = new AssessmentDetails();
+                    Set<Assessment> aSet = new HashSet<>();
+                    aSet.add(assessment);
+                    closeDetails.setAssessments(aSet);
+                    closeDetails.setDate(LocalDate.now());
+                }
+                Map<Long, AssessmentControlAnswer> closeAnswersMap = new HashMap<>();
+                for (AssessmentControlAnswer aca : closeDetails.getControlAnswers()) {
+                    if (aca.getSecurityControl() != null) {
+                        closeAnswersMap.put(aca.getSecurityControl().getId(), aca);
+                    }
+                }
+                boolean closeChanged = false;
+                for (Map.Entry<Long, OrgServiceInheritance> entry : inheritedAtClose.entrySet()) {
+                    Long ctrlId = entry.getKey();
+                    OrgServiceInheritance inh = entry.getValue();
+                    AssessmentControlAnswer existing = closeAnswersMap.get(ctrlId);
+                    if (existing != null && Boolean.TRUE.equals(existing.getIsOverride())) {
+                        continue; // user's manual override takes priority; leave as is
+                    }
+                    if (existing != null) {
+                        Long existingAnswerId = existing.getMaturityAnswer() != null ? existing.getMaturityAnswer().getId() : null;
+                        Long inheritedAnswerId = inh.answer != null ? inh.answer.getId() : null;
+                        if (!Objects.equals(existingAnswerId, inheritedAnswerId)) {
+                            existing.setMaturityAnswer(inh.answer);
+                            closeChanged = true;
+                        }
+                    } else {
+                        SecurityControl ctrl = securityControlRepository.findById(ctrlId).orElse(null);
+                        if (ctrl != null) {
+                            AssessmentControlAnswer newAca = new AssessmentControlAnswer(ctrl, inh.answer, inh.comment);
+                            newAca = assessmentControlAnswerRepository.save(newAca);
+                            closeDetails.getControlAnswers().add(newAca);
+                            closeChanged = true;
+                        }
+                    }
+                }
+                if (closeChanged || !closeDetailsOpt.isPresent()) {
+                    assessmentDetailsService.save(closeDetails);
+                }
             }
             assessmentRepository.save(assessment);
             }

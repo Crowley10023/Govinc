@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <meta charset="UTF-8">
+    <meta name="_csrf" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:content="${_csrf.headerName}">
+    <title>Compare Assessments</title>
+    <script src="/org-unit-wizard.js"></script>
+    <th:block th:replace="~{navigation :: navHead}"></th:block>
+    <style>
+        .compare-filters { display: flex; gap: 1.5em; flex-wrap: wrap; margin-bottom: 1em; align-items: flex-end; }
+        .compare-selectors { display: flex; gap: 1.5em; flex-wrap: wrap; margin-bottom: 1em; }
+        .compare-col { flex: 1; min-width: 260px; }
+        .compare-table-wrap { overflow-x: auto; margin-top: 1em; }
+        .compare-table { width: 100%; border-collapse: collapse; font-size: 0.93em; }
+        .compare-table th, .compare-table td { padding: 0.45em 0.75em; border-bottom: 1px solid #e0e0ea; text-align: left; }
+        .compare-table th { background: #f4f4f8; font-weight: 600; position: sticky; top: 0; z-index: 1; }
+        .compare-table tbody tr:hover { background: #f9f9fd; }
+        .answer-badge {
+            display: inline-block; padding: 0.18em 0.55em; border-radius: 4px;
+            font-size: 0.87em; font-weight: 500;
+        }
+        .diff-row td { background: #fff8ed; }
+        .no-answer { color: #aaa; font-style: italic; font-size: 0.87em; }
+        .assess-meta-card {
+            padding: 0.6em 0.8em; background: #f5f5fa; border-radius: 6px;
+            border: 1px solid #dde; margin-bottom: 0.5em;
+        }
+        .assess-meta-card .meta-name { font-weight: 600; font-size: 1em; margin-bottom: 0.2em; }
+        .assess-meta-card .meta-details { font-size: 0.84em; color: #666; display: flex; flex-wrap: wrap; gap: 0.6em; }
+        .compare-actions { display: flex; gap: 1em; align-items: center; flex-wrap: wrap; margin-top: 0.5em; }
+        #compareLoading { display: none; padding: 1em; color: #888; }
+        #compareError { display: none; padding: 0.7em 1em; color: #c00; background: #fff0f0; border-radius: 4px; margin-top: 0.5em; }
+        .stat-badge { font-size: 0.8em; padding: 0.1em 0.5em; border-radius: 10px; background: #e8e8f0; color: #555; margin-left: 0.5em; }
+    </style>
+</head>
+<body>
+    <div th:replace="~{navigation :: mainNav}"></div>
+    <div class="container">
+        <h1 class="page-title">Compare Assessments</h1>
+        <p class="text-muted">Select a security catalog and org unit, then choose two assessments to compare their maturity answers side by side.</p>
+
+        <div class="reporting-card">
+            <!-- Catalog + Org Unit row -->
+            <div class="compare-filters">
+                <div class="form-group" style="min-width:200px;flex:1;">
+                    <label for="catalogSelect">Security Catalog</label>
+                    <select id="catalogSelect" class="form-select">
+                        <option value="">-- Select catalog --</option>
+                        <option th:each="c : ${catalogs}" th:value="${c.id}" th:text="${c.name}"></option>
+                    </select>
+                </div>
+                <div class="form-group" style="min-width:200px;flex:1;">
+                    <label>Org Unit</label>
+                    <input type="hidden" id="orgUnitId" />
+                    <div style="display:flex;align-items:center;gap:0.5em;flex-wrap:wrap;">
+                        <span id="orgUnitLabel" style="min-width:160px;padding:0.3em 0.6em;background:#f0f0f5;border-radius:4px;border:1px solid #ccc;color:#888;">Not selected</span>
+                        <button type="button" class="btn-secondary btn-sm" id="chooseOrgUnitBtn">Choose&hellip;</button>
+                        <button type="button" class="btn-cancel btn-sm" id="clearOrgUnitBtn" style="display:none;">&#10005; Clear</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Two assessment selectors -->
+            <div class="compare-selectors">
+                <div class="compare-col">
+                    <label for="assessment1Select"><strong>Assessment 1</strong></label>
+                    <select id="assessment1Select" class="form-select" disabled>
+                        <option value="">-- Select first assessment --</option>
+                    </select>
+                </div>
+                <div class="compare-col">
+                    <label for="assessment2Select"><strong>Assessment 2</strong></label>
+                    <select id="assessment2Select" class="form-select" disabled>
+                        <option value="">-- Select second assessment --</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="compare-actions">
+                <button type="button" id="compareBtn" class="btn-submit" disabled onclick="runCompare()">Compare</button>
+                <label style="display:flex;align-items:center;gap:0.4em;cursor:pointer;">
+                    <input type="checkbox" id="onlyDiffsToggle" onchange="applyDiffFilter()" disabled>
+                    <span>Show only differences</span>
+                </label>
+                <span id="diffStats" style="display:none;font-size:0.88em;color:#666;"></span>
+            </div>
+
+            <div id="compareLoading">Loading comparison&hellip;</div>
+            <div id="compareError"></div>
+        </div>
+
+        <!-- Comparison result section -->
+        <div id="compareResult" style="display:none;">
+            <div class="compare-selectors" id="compareHeader"></div>
+            <div class="compare-table-wrap">
+                <table class="compare-table" id="compareTable">
+                    <thead>
+                        <tr>
+                            <th>Domain</th>
+                            <th>Ref</th>
+                            <th>Control</th>
+                            <th id="th-a1">Assessment 1</th>
+                            <th id="th-a2">Assessment 2</th>
+                        </tr>
+                    </thead>
+                    <tbody id="compareTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Org Unit Wizard Modal -->
+    <div id="compareOrgUnitModal" style="display:none;position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;">
+        <div class="ou-wizard-modal-inner" style="background:#fff;border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.18);">
+            <div class="ou-wizard-title" style="padding:1em 1.2em 0.5em;font-weight:700;font-size:1.1em;border-bottom:1px solid #e0e0e8;">Choose Org Unit</div>
+            <div id="compareOrgUnitViewport" class="ou-wizard-viewport" style="padding:0.7em 1.2em;"></div>
+            <div class="ou-wizard-footer" style="padding:0.7em 1.2em;border-top:1px solid #e0e0e8;display:flex;justify-content:flex-end;gap:0.5em;">
+                <button type="button" class="btn-cancel" id="compareOrgUnitCancelBtn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var currentCompareData = null;
+
+        // ---- Org Unit Wizard ----
+        (function () {
+            if (window.createOrgUnitWizard) {
+                window.createOrgUnitWizard({
+                    modalId: 'compareOrgUnitModal',
+                    viewportId: 'compareOrgUnitViewport',
+                    openButtonId: 'chooseOrgUnitBtn',
+                    cancelButtonId: 'compareOrgUnitCancelBtn',
+                    closeOnSelect: true,
+                    selectedId: function () { return document.getElementById('orgUnitId').value || ''; },
+                    onSelect: function (unit) {
+                        document.getElementById('orgUnitId').value = String(unit.id);
+                        var label = document.getElementById('orgUnitLabel');
+                        label.textContent = unit.name;
+                        label.style.color = '';
+                        document.getElementById('clearOrgUnitBtn').style.display = '';
+                        loadAssessments();
+                    }
+                });
+            }
+            document.getElementById('clearOrgUnitBtn').addEventListener('click', function () {
+                document.getElementById('orgUnitId').value = '';
+                var label = document.getElementById('orgUnitLabel');
+                label.textContent = 'Not selected';
+                label.style.color = '#888';
+                document.getElementById('clearOrgUnitBtn').style.display = 'none';
+                loadAssessments();
+            });
+        })();
+
+        document.getElementById('catalogSelect').addEventListener('change', loadAssessments);
+        document.getElementById('assessment1Select').addEventListener('change', updateCompareBtn);
+        document.getElementById('assessment2Select').addEventListener('change', updateCompareBtn);
+
+        function loadAssessments() {
+            var catalogId = document.getElementById('catalogSelect').value;
+            var orgUnitId = document.getElementById('orgUnitId').value;
+            // Reset result
+            currentCompareData = null;
+            document.getElementById('compareResult').style.display = 'none';
+            document.getElementById('compareError').style.display = 'none';
+            document.getElementById('diffStats').style.display = 'none';
+
+            if (!catalogId) {
+                resetAssessmentSelects();
+                return;
+            }
+            var url = '/reporting/compare/assessments?catalogId=' + encodeURIComponent(catalogId);
+            if (orgUnitId) url += '&orgUnitId=' + encodeURIComponent(orgUnitId);
+            fetch(url)
+                .then(function (r) { if (!r.ok) throw new Error(); return r.json(); })
+                .then(function (items) {
+                    populateAssessmentSelect(document.getElementById('assessment1Select'), items, '-- Select first assessment --');
+                    populateAssessmentSelect(document.getElementById('assessment2Select'), items, '-- Select second assessment --');
+                    document.getElementById('assessment1Select').disabled = false;
+                    document.getElementById('assessment2Select').disabled = false;
+                    updateCompareBtn();
+                })
+                .catch(function () { resetAssessmentSelects(); });
+        }
+
+        function populateAssessmentSelect(sel, items, placeholder) {
+            var prev = sel.value;
+            sel.innerHTML = '<option value="">' + escHtml(placeholder) + '</option>';
+            items.forEach(function (item) {
+                var opt = document.createElement('option');
+                opt.value = item.id;
+                var label = item.name + ' [' + item.status + ']';
+                if (item.creationDate) label += ' \u2013 ' + item.creationDate;
+                if (item.orgUnitName) label += ' \u00b7 ' + item.orgUnitName;
+                opt.textContent = label;
+                if (String(item.id) === String(prev)) opt.selected = true;
+                sel.appendChild(opt);
+            });
+        }
+
+        function resetAssessmentSelects() {
+            ['assessment1Select', 'assessment2Select'].forEach(function (id) {
+                var sel = document.getElementById(id);
+                sel.innerHTML = '<option value="">-- Select assessment --</option>';
+                sel.disabled = true;
+            });
+            document.getElementById('compareBtn').disabled = true;
+            document.getElementById('onlyDiffsToggle').disabled = true;
+        }
+
+        function updateCompareBtn() {
+            var a1 = document.getElementById('assessment1Select').value;
+            var a2 = document.getElementById('assessment2Select').value;
+            document.getElementById('compareBtn').disabled = !(a1 && a2);
+        }
+
+        function runCompare() {
+            var a1 = document.getElementById('assessment1Select').value;
+            var a2 = document.getElementById('assessment2Select').value;
+            if (!a1 || !a2) return;
+            document.getElementById('compareLoading').style.display = 'block';
+            document.getElementById('compareResult').style.display = 'none';
+            document.getElementById('compareError').style.display = 'none';
+            document.getElementById('diffStats').style.display = 'none';
+
+            fetch('/reporting/compare/data?a1=' + encodeURIComponent(a1) + '&a2=' + encodeURIComponent(a2))
+                .then(function (r) { if (!r.ok) throw new Error(); return r.json(); })
+                .then(function (data) {
+                    document.getElementById('compareLoading').style.display = 'none';
+                    if (data.error) {
+                        var errEl = document.getElementById('compareError');
+                        errEl.textContent = data.error;
+                        errEl.style.display = 'block';
+                        return;
+                    }
+                    currentCompareData = data;
+                    renderCompare(data);
+                    document.getElementById('compareResult').style.display = 'block';
+                    document.getElementById('onlyDiffsToggle').disabled = false;
+                    applyDiffFilter();
+                })
+                .catch(function () {
+                    document.getElementById('compareLoading').style.display = 'none';
+                    var errEl = document.getElementById('compareError');
+                    errEl.textContent = 'Error loading comparison data. Please try again.';
+                    errEl.style.display = 'block';
+                });
+        }
+
+        function renderCompare(data) {
+            // Column headers
+            document.getElementById('th-a1').textContent = data.assessment1.name || 'Assessment 1';
+            document.getElementById('th-a2').textContent = data.assessment2.name || 'Assessment 2';
+
+            // Assessment meta cards
+            var header = document.getElementById('compareHeader');
+            header.innerHTML =
+                '<div class="compare-col">' + buildAssessmentCard(data.assessment1) + '</div>' +
+                '<div class="compare-col">' + buildAssessmentCard(data.assessment2) + '</div>';
+
+            // Table body
+            var tbody = document.getElementById('compareTableBody');
+            tbody.innerHTML = '';
+            var totalControls = (data.controls || []).length;
+            var diffCount = 0;
+            (data.controls || []).forEach(function (row) {
+                if (!row.same) diffCount++;
+                var tr = document.createElement('tr');
+                tr.className = row.same ? '' : 'diff-row';
+                tr.dataset.same = row.same ? '1' : '0';
+                tr.innerHTML =
+                    '<td>' + escHtml(row.domainName || '') + '</td>' +
+                    '<td style="white-space:nowrap;">' + escHtml(row.controlReference || '') + '</td>' +
+                    '<td>' + escHtml(row.controlName || '') + '</td>' +
+                    '<td>' + answerBadge(row.answer1, row.rating1) + '</td>' +
+                    '<td>' + answerBadge(row.answer2, row.rating2) + '</td>';
+                tbody.appendChild(tr);
+            });
+
+            // Stats
+            var statsEl = document.getElementById('diffStats');
+            statsEl.textContent = diffCount + ' difference' + (diffCount !== 1 ? 's' : '') + ' in ' + totalControls + ' controls';
+            statsEl.style.display = '';
+        }
+
+        function buildAssessmentCard(a) {
+            var statusColor = a.status === 'CLOSED' ? '#c06' : '#2a6';
+            return '<div class="assess-meta-card">' +
+                '<div class="meta-name">' + escHtml(a.name || '') + '</div>' +
+                '<div class="meta-details">' +
+                    '<span style="color:' + statusColor + ';font-weight:600;">' + escHtml(a.status || '') + '</span>' +
+                    (a.creationDate ? '<span>&#128197; ' + escHtml(a.creationDate) + '</span>' : '') +
+                    (a.closeDate ? '<span>&#128274; Closed ' + escHtml(a.closeDate) + '</span>' : '') +
+                    (a.orgUnitName ? '<span>&#127970; ' + escHtml(a.orgUnitName) + '</span>' : '') +
+                    (a.catalogName ? '<span>&#128204; ' + escHtml(a.catalogName) + '</span>' : '') +
+                '</div>' +
+            '</div>';
+        }
+
+        function answerBadge(answer, rating) {
+            if (answer === null || answer === undefined || answer === '') {
+                return '<span class="no-answer">\u2014</span>';
+            }
+            var c = ratingToColors(rating);
+            return '<span class="answer-badge" style="background:' + c.bg + ';color:' + c.fg + ';">' + escHtml(answer) + '</span>';
+        }
+
+        function ratingToColors(rating) {
+            if (rating < 0) return { bg: '#e8e8f0', fg: '#555' };
+            if (rating <= 25) return { bg: '#f9e0e0', fg: '#8b1a1a' };
+            if (rating <= 50) return { bg: '#fcecd9', fg: '#7a4200' };
+            if (rating <= 75) return { bg: '#fdf6d3', fg: '#5a4a00' };
+            return { bg: '#dff2e3', fg: '#1a5c2a' };
+        }
+
+        function applyDiffFilter() {
+            var onlyDiffs = document.getElementById('onlyDiffsToggle').checked;
+            document.querySelectorAll('#compareTableBody tr').forEach(function (tr) {
+                tr.style.display = (onlyDiffs && tr.dataset.same === '1') ? 'none' : '';
+            });
+        }
+
+        function escHtml(str) {
+            return String(str == null ? '' : str)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+    </script>
+</body>
+</html>
