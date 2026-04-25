@@ -301,6 +301,8 @@ public class OrganisationDetailsController {
                 } catch (Exception ignored) {}
             }
             response.put("placeholderMapping", phMapping.getRoleToAttribute());
+            response.put("roleToSelectedSectionIndex", phMapping.getRoleToSelectedSectionIndex());
+            response.put("customRoles", phMapping.getCustomRoles());
             response.put("structure", meta.getStructure() != null ? meta.getStructure() : new java.util.ArrayList<>());
             return ResponseEntity.ok(response);
         } catch (Exception e) {

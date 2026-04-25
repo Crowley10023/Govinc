@@ -185,6 +185,8 @@ public class AssessmentReporterWord {
                         } catch (Exception eAiHints) {
                             System.err.println("[AssessmentReporterWord] Failed to apply AI hints: " + eAiHints.getMessage());
                         }
+                        // Apply user's explicit candidate selections (overrides AI/fuzzy detection)
+                        applyUserCandidateSelections(phMapping, templateAnalysis, wordMLPackage);
                     }
 
                     System.out.println("[AssessmentReporterWord] Template analysis complete:");
@@ -948,6 +950,7 @@ public class AssessmentReporterWord {
             for (TemplateSection ts : analysis.getTemplateStructure()) {
                 WordTemplateMetadata.TemplateSectionMeta sm = new WordTemplateMetadata.TemplateSectionMeta();
                 sm.setStyle(ts.getStyle());
+                sm.setSectionIndex(ts.getSectionIndex());
                 String preview = ts.getText().length() > 100 ? ts.getText().substring(0, 100) + "..." : ts.getText();
                 sm.setTextPreview(preview);
                 for (String marker : KNOWN_MARKERS) {
@@ -1170,6 +1173,190 @@ public class AssessmentReporterWord {
         } catch (Exception e) {
             System.err.println("[AssessmentReporterWord] applyAiBodyHints failed: " + e.getMessage());
         }
+    }
+
+    /**
+     * Applies user-saved candidate selections (roleToSelectedSectionIndex) to update
+     * namedPlaceholders / namedHeaderFooterPlaceholders before replacement.
+     * This overrides the initial fuzzy/AI detection with the user's explicit choice.
+     * Handles both standard roles (TITLE, DATE, AUTHOR, ORG) and custom roles.
+     */
+    private void applyUserCandidateSelections(WordPlaceholderAttributeMapping phMapping,
+                                              TemplateAnalysis templateAnalysis,
+                                              WordprocessingMLPackage pkg) {
+        Map<String, Integer> selectedIndices = phMapping.getRoleToSelectedSectionIndex();
+        if (selectedIndices == null || selectedIndices.isEmpty()) return;
+        List<TemplateSection> structure = templateAnalysis.getTemplateStructure();
+        if (structure == null || structure.isEmpty()) return;
+        Map<String, P> namedPH   = templateAnalysis.getNamedPlaceholders();
+        Map<String, P> namedHFPH = templateAnalysis.getNamedHeaderFooterPlaceholders();
+        // build sectionIndex → TemplateSection map for fast lookup
+        Map<Integer, TemplateSection> secMap = new LinkedHashMap<>();
+        for (TemplateSection ts : structure) secMap.put(ts.getSectionIndex(), ts);
+
+        List<Object> bodyContent = pkg.getMainDocumentPart().getContent();
+
+        for (Map.Entry<String, Integer> entry : selectedIndices.entrySet()) {
+            String role = entry.getKey();
+            int sectionIdx = entry.getValue();
+            if (sectionIdx < 0) {
+                // explicit SKIP: -1 means the user chose to not replace this role at all
+                continue;
+            }
+            TemplateSection section = secMap.get(sectionIdx);
+            if (section == null) continue;
+            String marker = "{{" + role + "}}";
+            String sectionText = section.getText() != null ? section.getText() : "";
+            int contentIndex = section.getContentIndex();
+            String sectionStyle = section.getStyle() != null ? section.getStyle() : "";
+
+            boolean isHF = sectionStyle.startsWith("Header") || sectionStyle.startsWith("Footer")
+                    || contentIndex < 0;
+
+            if (!isHF) {
+                // Body section — look up the paragraph at contentIndex
+                if (contentIndex >= 0 && contentIndex < bodyContent.size()) {
+                    Object obj = XmlUtils.unwrap(bodyContent.get(contentIndex));
+                    if (obj instanceof P) {
+                        namedPH.put(marker, (P) obj);
+                        if (!sectionText.isEmpty()) templateAnalysis.getPlaceholderTexts().put(marker, sectionText);
+                        namedHFPH.remove(marker);
+                        System.out.println("[applyUserCandidateSelections] " + marker + " → body sectionIdx=" + sectionIdx + " contentIdx=" + contentIndex);
+                    }
+                }
+            } else {
+                // Header/Footer section — find the P in H/F parts by text matching
+                P found = findParagraphInHFParts(pkg, sectionText);
+                if (found != null) {
+                    namedHFPH.put(marker, found);
+                    if (!sectionText.isEmpty()) templateAnalysis.getPlaceholderTexts().put(marker, sectionText);
+                    namedPH.remove(marker);
+                    System.out.println("[applyUserCandidateSelections] " + marker + " → H/F sectionIdx=" + sectionIdx);
+                } else {
+                    System.out.println("[applyUserCandidateSelections] " + marker + " → H/F sectionIdx=" + sectionIdx + " but no matching paragraph found");
+                }
+            }
+        }
+    }
+
+    /** Extract plain-text from a P by concatenating all run Text values. */
+    private static String extractRunTextFromP(P p) {
+        StringBuilder sb = new StringBuilder();
+        for (Object c : p.getContent()) {
+            Object uw = XmlUtils.unwrap(c);
+            if (uw instanceof R) {
+                for (Object rc : ((R) uw).getContent()) {
+                    Object ruw = XmlUtils.unwrap(rc);
+                    if (ruw instanceof org.docx4j.wml.Text) sb.append(((org.docx4j.wml.Text) ruw).getValue());
+                }
+            }
+        }
+        return sb.toString();
+    }
+
+    /** Collect all P elements (including those inside Tbl cells) from a content list. */
+    private static List<P> collectAllParagraphs(List<Object> content) {
+        List<P> result = new ArrayList<>();
+        for (Object c : content) {
+            Object uw = XmlUtils.unwrap(c);
+            if (uw instanceof P) {
+                result.add((P) uw);
+            } else if (uw instanceof org.docx4j.wml.Tbl) {
+                for (Object row : ((org.docx4j.wml.Tbl) uw).getContent()) {
+                    Object rowUw = XmlUtils.unwrap(row);
+                    if (rowUw instanceof org.docx4j.wml.Tr) {
+                        for (Object cell : ((org.docx4j.wml.Tr) rowUw).getContent()) {
+                            Object cellUw = XmlUtils.unwrap(cell);
+                            if (cellUw instanceof org.docx4j.wml.Tc) {
+                                result.addAll(collectAllParagraphs(((org.docx4j.wml.Tc) cellUw).getContent()));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Find a paragraph in any header or footer part whose text (runs + textbox XML)
+     * starts with the same characters as the given snippet.
+     */
+    private P findParagraphInHFParts(WordprocessingMLPackage pkg, String targetText) {
+        if (targetText == null || targetText.isBlank()) return null;
+        String snippet = targetText.length() > 40 ? targetText.substring(0, 40).toLowerCase() : targetText.toLowerCase();
+        Set<String> seenUris = new java.util.LinkedHashSet<>();
+        List<P> found = new ArrayList<>();
+        try {
+            // scan via parts registry
+            for (java.util.Map.Entry<?, ?> e : pkg.getParts().getParts().entrySet()) {
+                org.docx4j.openpackaging.parts.Part part =
+                        (org.docx4j.openpackaging.parts.Part) e.getValue();
+                String uri = part.getPartName() != null ? part.getPartName().toString() : "";
+                if (!seenUris.add(uri)) continue;
+                List<Object> hfContent = null;
+                try {
+                    if (part instanceof org.docx4j.openpackaging.parts.WordprocessingML.FooterPart) {
+                        org.docx4j.wml.Ftr ftr = ((org.docx4j.openpackaging.parts.WordprocessingML.FooterPart) part).getJaxbElement();
+                        if (ftr != null) hfContent = ftr.getContent();
+                    } else if (part instanceof org.docx4j.openpackaging.parts.WordprocessingML.HeaderPart) {
+                        org.docx4j.wml.Hdr hdr = ((org.docx4j.openpackaging.parts.WordprocessingML.HeaderPart) part).getJaxbElement();
+                        if (hdr != null) hfContent = hdr.getContent();
+                    }
+                } catch (Exception ignored) {}
+                if (hfContent == null) continue;
+                for (P p : collectAllParagraphs(hfContent)) {
+                    String txt = extractRunTextFromP(p).toLowerCase();
+                    // also check textbox text via XML
+                    try {
+                        String xml = XmlUtils.marshaltoString(p, true);
+                        if (xml != null) {
+                            txt += " " + xml.replaceAll("<[^>]+>", " ").toLowerCase();
+                        }
+                    } catch (Exception ignored) {}
+                    if (txt.contains(snippet)) { found.add(p); break; }
+                }
+                if (!found.isEmpty()) break;
+            }
+            // fallback: relationship-based scan
+            if (found.isEmpty()) {
+                org.docx4j.openpackaging.parts.relationships.RelationshipsPart relsPart =
+                        pkg.getMainDocumentPart().getRelationshipsPart();
+                if (relsPart != null) {
+                    for (org.docx4j.relationships.Relationship rel :
+                            relsPart.getRelationships().getRelationship()) {
+                        String type = rel.getType();
+                        if (!type.endsWith("/header") && !type.endsWith("/footer")) continue;
+                        String target = rel.getTarget();
+                        if (!target.startsWith("/")) target = "/word/" + target;
+                        if (!seenUris.add(target)) continue;
+                        try {
+                            org.docx4j.openpackaging.parts.Part part2 =
+                                    pkg.getParts().get(new org.docx4j.openpackaging.parts.PartName(target));
+                            List<Object> hfContent2 = null;
+                            if (part2 instanceof org.docx4j.openpackaging.parts.WordprocessingML.FooterPart) {
+                                org.docx4j.wml.Ftr ftr = ((org.docx4j.openpackaging.parts.WordprocessingML.FooterPart) part2).getJaxbElement();
+                                if (ftr != null) hfContent2 = ftr.getContent();
+                            } else if (part2 instanceof org.docx4j.openpackaging.parts.WordprocessingML.HeaderPart) {
+                                org.docx4j.wml.Hdr hdr = ((org.docx4j.openpackaging.parts.WordprocessingML.HeaderPart) part2).getJaxbElement();
+                                if (hdr != null) hfContent2 = hdr.getContent();
+                            }
+                            if (hfContent2 == null) continue;
+                            for (P p : collectAllParagraphs(hfContent2)) {
+                                String txt = extractRunTextFromP(p).toLowerCase();
+                                try {
+                                    String xml = XmlUtils.marshaltoString(p, true);
+                                    if (xml != null) txt += " " + xml.replaceAll("<[^>]+>", " ").toLowerCase();
+                                } catch (Exception ignored) {}
+                                if (txt.contains(snippet)) { found.add(p); break; }
+                            }
+                            if (!found.isEmpty()) break;
+                        } catch (Exception ignored) {}
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return found.isEmpty() ? null : found.get(0);
     }
 
     private static final Pattern STYLE_TAG = Pattern.compile("(?is)<style\\s+([^>]*)>(.*?)</style>");
@@ -1545,29 +1732,15 @@ public class AssessmentReporterWord {
 
                 // Also scan headers and footers so their text appears as candidates in role dropdowns
                 java.util.Set<String> seenHFUris = new java.util.HashSet<>();
-                for (java.util.Map.Entry<?, ?> partEntry : wordMLPackage.getParts().getParts().entrySet()) {
-                    org.docx4j.openpackaging.parts.Part hfPart = (org.docx4j.openpackaging.parts.Part) partEntry.getValue();
-                    boolean isFtr = hfPart instanceof org.docx4j.openpackaging.parts.WordprocessingML.FooterPart;
-                    boolean isHdr = hfPart instanceof org.docx4j.openpackaging.parts.WordprocessingML.HeaderPart;
-                    if (!isFtr && !isHdr) continue;
-                    String partUri = hfPart.getPartName() != null ? hfPart.getPartName().toString() : "";
-                    if (!seenHFUris.add(partUri)) continue; // deduplicate
+                for (Object[] hfEntry : getHFContents()) {
+                    @SuppressWarnings("unchecked")
+                    List<Object> hfContent = (List<Object>) hfEntry[0];
+                    boolean isHdr = (Boolean) hfEntry[1];
+                    String hfUri   = (String) hfEntry[2];
+                    if (!seenHFUris.add(hfUri)) continue; // deduplicate
                     String partType = isHdr ? "Header" : "Footer";
-                    List<Object> hfContent = null;
-                    try {
-                        if (isFtr) {
-                            org.docx4j.wml.Ftr ftr = ((org.docx4j.openpackaging.parts.WordprocessingML.FooterPart) hfPart).getJaxbElement();
-                            if (ftr != null) hfContent = ftr.getContent();
-                        } else {
-                            org.docx4j.wml.Hdr hdr = ((org.docx4j.openpackaging.parts.WordprocessingML.HeaderPart) hfPart).getJaxbElement();
-                            if (hdr != null) hfContent = hdr.getContent();
-                        }
-                    } catch (Exception ignored) {}
-                    if (hfContent == null) continue;
-                    for (Object hfc : hfContent) {
-                        Object hfuw = org.docx4j.XmlUtils.unwrap(hfc);
-                        if (!(hfuw instanceof P)) continue;
-                        P hfp = (P) hfuw;
+                    // Collect all paragraphs (including those inside table cells)
+                    for (P hfp : AssessmentReporterWord.collectAllParagraphs(hfContent)) {
                         String pStyle = extractStyleFromParagraph(hfp);
                         String hfStyle = partType + (pStyle != null && !pStyle.equals("Normal") ? "/" + pStyle : "");
                         String ptxt = extractTextFromParagraph(hfp);
@@ -1857,36 +2030,24 @@ public class AssessmentReporterWord {
                     }
                 }
                 // Scan header and footer parts for markers
-                for (java.util.Map.Entry<?, ?> entry : wordMLPackage.getParts().getParts().entrySet()) {
-                    org.docx4j.openpackaging.parts.Part part = (org.docx4j.openpackaging.parts.Part) entry.getValue();
-                    java.util.List<Object> partContent = null;
-                    try {
-                        if (part instanceof org.docx4j.openpackaging.parts.WordprocessingML.FooterPart) {
-                            org.docx4j.wml.Ftr ftr = ((org.docx4j.openpackaging.parts.WordprocessingML.FooterPart) part).getJaxbElement();
-                            if (ftr != null) partContent = ftr.getContent();
-                        } else if (part instanceof org.docx4j.openpackaging.parts.WordprocessingML.HeaderPart) {
-                            org.docx4j.wml.Hdr hdr = ((org.docx4j.openpackaging.parts.WordprocessingML.HeaderPart) part).getJaxbElement();
-                            if (hdr != null) partContent = hdr.getContent();
+                Set<String> seenHFUrisForPH = new java.util.HashSet<>();
+                for (Object[] hfEntry : getHFContents()) {
+                    @SuppressWarnings("unchecked")
+                    List<Object> partContent = (List<Object>) hfEntry[0];
+                    String hfUri = (String) hfEntry[2];
+                    if (!seenHFUrisForPH.add(hfUri)) continue;
+                    for (P p : AssessmentReporterWord.collectAllParagraphs(partContent)) {
+                        String txt = extractTextFromParagraph(p);
+                        String tbTxt = extractTextBoxTextFromParagraph(p);
+                        if (tbTxt != null && !tbTxt.isBlank()) {
+                            txt = (txt == null || txt.isBlank()) ? tbTxt : txt + " " + tbTxt;
                         }
-                    } catch (Exception ignored) {}
-                    if (partContent != null) {
-                        for (Object c : partContent) {
-                            Object unwrapped = org.docx4j.XmlUtils.unwrap(c);
-                            if (unwrapped instanceof P) {
-                                P p = (P) unwrapped;
-                                String txt = extractTextFromParagraph(p);
-                                String tbTxt = extractTextBoxTextFromParagraph(p);
-                                if (tbTxt != null && !tbTxt.isBlank()) {
-                                    txt = (txt == null || txt.isBlank()) ? tbTxt : txt + " " + tbTxt;
-                                }
-                                if (txt == null || txt.isBlank()) continue;
-                                for (String marker : KNOWN_MARKERS) {
-                                    if (txt.contains(marker) && !"{{REPORT_CONTENT}}".equals(marker)) {
-                                        namedHFPHs.put(marker, p);
-                                        analysis.getPlaceholderTexts().put(marker, txt);
-                                        break;
-                                    }
-                                }
+                        if (txt == null || txt.isBlank()) continue;
+                        for (String marker : KNOWN_MARKERS) {
+                            if (txt.contains(marker) && !"{{REPORT_CONTENT}}".equals(marker)) {
+                                namedHFPHs.put(marker, p);
+                                analysis.getPlaceholderTexts().put(marker, txt);
+                                break;
                             }
                         }
                     }
@@ -2046,27 +2207,17 @@ public class AssessmentReporterWord {
             } catch (Exception e) {
                 System.err.println("[TemplateAnalyzer] detectFuzzyPlaceholders body error: " + e.getMessage());
             }
-            // Also scan headers and footers for fuzzy matches
-            if (!needTitle && !needDate && !needAuthor && !needOrg) return;
+            // Scan headers and footers for fuzzy matches (for roles still needed)
+            // and also always build H/F candidate pool for all roles (so user can choose H/F override)
             try {
                 Map<String, P> namedHFPH = analysis.getNamedHeaderFooterPlaceholders();
-                for (java.util.Map.Entry<?, ?> entry : wordMLPackage.getParts().getParts().entrySet()) {
-                    org.docx4j.openpackaging.parts.Part part = (org.docx4j.openpackaging.parts.Part) entry.getValue();
-                    java.util.List<Object> partContent = null;
-                    try {
-                        if (part instanceof org.docx4j.openpackaging.parts.WordprocessingML.FooterPart) {
-                            org.docx4j.wml.Ftr ftr = ((org.docx4j.openpackaging.parts.WordprocessingML.FooterPart) part).getJaxbElement();
-                            if (ftr != null) partContent = ftr.getContent();
-                        } else if (part instanceof org.docx4j.openpackaging.parts.WordprocessingML.HeaderPart) {
-                            org.docx4j.wml.Hdr hdr = ((org.docx4j.openpackaging.parts.WordprocessingML.HeaderPart) part).getJaxbElement();
-                            if (hdr != null) partContent = hdr.getContent();
-                        }
-                    } catch (Exception ignored) {}
-                    if (partContent == null) continue;
-                    for (Object c : partContent) {
-                        Object uw = org.docx4j.XmlUtils.unwrap(c);
-                        if (!(uw instanceof P)) continue;
-                        P p = (P) uw;
+                Set<String> seenHFUrisFuzzy = new java.util.HashSet<>();
+                for (Object[] hfEntry : getHFContents()) {
+                    @SuppressWarnings("unchecked")
+                    List<Object> partContent = (List<Object>) hfEntry[0];
+                    String hfUri = (String) hfEntry[2];
+                    if (!seenHFUrisFuzzy.add(hfUri)) continue;
+                    for (P p : AssessmentReporterWord.collectAllParagraphs(partContent)) {
                         String hfParaText = extractTextFromParagraph(p);
                         List<String> hfCandidates = new ArrayList<>();
                         if (hfParaText != null && !hfParaText.isBlank()) hfCandidates.add(hfParaText);
@@ -2098,11 +2249,101 @@ public class AssessmentReporterWord {
             } catch (Exception e) {
                 System.err.println("[TemplateAnalyzer] detectFuzzyPlaceholders H/F error: " + e.getMessage());
             }
+            // Always add H/F sections to every role's candidate pool (allows user to override body detection with H/F)
+            try {
+                List<Map<String, Object>> allHFCandidates = new ArrayList<>();
+                for (TemplateSection ts : analysis.getTemplateStructure()) {
+                    if (ts.getStyle() == null) continue;
+                    if (!ts.getStyle().startsWith("Header") && !ts.getStyle().startsWith("Footer")) continue;
+                    if (ts.getText() == null || ts.getText().isBlank()) continue;
+                    Map<String, Object> cm = new java.util.LinkedHashMap<>();
+                    cm.put("index", ts.getSectionIndex());
+                    String txt = ts.getText();
+                    cm.put("text", txt.length() > 100 ? txt.substring(0, 100) + "..." : txt);
+                    cm.put("style", ts.getStyle());
+                    allHFCandidates.add(cm);
+                }
+                if (!allHFCandidates.isEmpty()) {
+                    for (String role : Arrays.asList("TITLE", "DATE", "AUTHOR", "ORG")) {
+                        List<Map<String, Object>> existing = analysis.getAiCandidateDetails().get(role);
+                        if (existing == null) {
+                            analysis.getAiCandidateDetails().put(role, new ArrayList<>(allHFCandidates));
+                        } else {
+                            Set<Integer> existingIdxs = new java.util.HashSet<>();
+                            for (Map<String, Object> cm : existing) { if (cm.get("index") instanceof Integer) existingIdxs.add((Integer) cm.get("index")); }
+                            for (Map<String, Object> hfc : allHFCandidates) {
+                                if (existingIdxs.add((Integer) hfc.get("index"))) existing.add(hfc);
+                            }
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
         }
 
         private boolean matchesAny(String text, List<String> patterns) {
             for (String pat : patterns) { if (text.contains(pat)) return true; }
             return false;
+        }
+
+        /**
+         * Returns all header/footer content lists with metadata: [{content, isHeader, uri}, ...].
+         * Uses the parts registry first, then relationship-based fallback so no H/F part is missed.
+         */
+        private List<Object[]> getHFContents() {
+            List<Object[]> result = new ArrayList<>();
+            Set<String> seenUris = new java.util.HashSet<>();
+            // Primary: flat parts registry
+            for (java.util.Map.Entry<?, ?> e : wordMLPackage.getParts().getParts().entrySet()) {
+                org.docx4j.openpackaging.parts.Part part = (org.docx4j.openpackaging.parts.Part) e.getValue();
+                boolean isFtr = part instanceof org.docx4j.openpackaging.parts.WordprocessingML.FooterPart;
+                boolean isHdr = part instanceof org.docx4j.openpackaging.parts.WordprocessingML.HeaderPart;
+                if (!isFtr && !isHdr) continue;
+                String uri = part.getPartName() != null ? part.getPartName().toString() : "";
+                if (!seenUris.add(uri)) continue;
+                List<Object> content = null;
+                try {
+                    if (isFtr) {
+                        org.docx4j.wml.Ftr ftr = ((org.docx4j.openpackaging.parts.WordprocessingML.FooterPart) part).getJaxbElement();
+                        if (ftr != null) content = ftr.getContent();
+                    } else {
+                        org.docx4j.wml.Hdr hdr = ((org.docx4j.openpackaging.parts.WordprocessingML.HeaderPart) part).getJaxbElement();
+                        if (hdr != null) content = hdr.getContent();
+                    }
+                } catch (Exception ignored) {}
+                if (content != null) result.add(new Object[]{content, isHdr, uri});
+            }
+            // Fallback: relationship-based (catches parts not yet in the flat registry)
+            try {
+                org.docx4j.openpackaging.parts.relationships.RelationshipsPart relsPart =
+                        wordMLPackage.getMainDocumentPart().getRelationshipsPart();
+                if (relsPart != null) {
+                    for (org.docx4j.relationships.Relationship rel :
+                            relsPart.getRelationships().getRelationship()) {
+                        String type = rel.getType();
+                        boolean isHdr2 = type.endsWith("/header");
+                        boolean isFtr2 = type.endsWith("/footer");
+                        if (!isHdr2 && !isFtr2) continue;
+                        String target = rel.getTarget();
+                        if (!target.startsWith("/")) target = "/word/" + target;
+                        if (!seenUris.add(target)) continue;
+                        try {
+                            org.docx4j.openpackaging.parts.Part part2 =
+                                    wordMLPackage.getParts().get(new org.docx4j.openpackaging.parts.PartName(target));
+                            if (part2 == null) continue;
+                            List<Object> content2 = null;
+                            if (part2 instanceof org.docx4j.openpackaging.parts.WordprocessingML.FooterPart) {
+                                org.docx4j.wml.Ftr ftr = ((org.docx4j.openpackaging.parts.WordprocessingML.FooterPart) part2).getJaxbElement();
+                                if (ftr != null) content2 = ftr.getContent();
+                            } else if (part2 instanceof org.docx4j.openpackaging.parts.WordprocessingML.HeaderPart) {
+                                org.docx4j.wml.Hdr hdr = ((org.docx4j.openpackaging.parts.WordprocessingML.HeaderPart) part2).getJaxbElement();
+                                if (hdr != null) content2 = hdr.getContent();
+                            }
+                            if (content2 != null) result.add(new Object[]{content2, isHdr2, target});
+                        } catch (Exception ignored) {}
+                    }
+                }
+            } catch (Exception ignored) {}
+            return result;
         }
 
         private Set<String> scanTableStyles(MainDocumentPart mdp, TemplateAnalysis analysis) {
@@ -2860,6 +3101,7 @@ public class AssessmentReporterWord {
             private String style;
             private String textPreview;
             private String marker;
+            private int sectionIndex;
 
             public String getStyle() { return style; }
             public void setStyle(String style) { this.style = style; }
@@ -2867,6 +3109,8 @@ public class AssessmentReporterWord {
             public void setTextPreview(String textPreview) { this.textPreview = textPreview; }
             public String getMarker() { return marker; }
             public void setMarker(String marker) { this.marker = marker; }
+            public int getSectionIndex() { return sectionIndex; }
+            public void setSectionIndex(int sectionIndex) { this.sectionIndex = sectionIndex; }
         }
     }
 
@@ -2904,8 +3148,18 @@ public class AssessmentReporterWord {
     public static class WordPlaceholderAttributeMapping {
         // role (e.g. "TITLE", "DATE", "AUTHOR", "ORG") → assessment attribute path
         private Map<String, String> roleToAttribute = new LinkedHashMap<>();
+        // role → sectionIndex chosen by the user in the candidate dropdown (-1 = SKIP)
+        private Map<String, Integer> roleToSelectedSectionIndex = new LinkedHashMap<>();
+        // user-defined role names beyond the default TITLE/DATE/AUTHOR/ORG set
+        private List<String> customRoles = new ArrayList<>();
 
         public Map<String, String> getRoleToAttribute() { return roleToAttribute; }
         public void setRoleToAttribute(Map<String, String> m) { this.roleToAttribute = m != null ? m : new LinkedHashMap<>(); }
+
+        public Map<String, Integer> getRoleToSelectedSectionIndex() { return roleToSelectedSectionIndex; }
+        public void setRoleToSelectedSectionIndex(Map<String, Integer> m) { this.roleToSelectedSectionIndex = m != null ? m : new LinkedHashMap<>(); }
+
+        public List<String> getCustomRoles() { return customRoles; }
+        public void setCustomRoles(List<String> l) { this.customRoles = l != null ? l : new ArrayList<>(); }
     }
 }

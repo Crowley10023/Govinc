@@ -208,6 +208,9 @@
                     // Merge detectedPlaceholders with detectedPlaceholderTexts fallback
                     const dpt = data.detectedPlaceholderTexts || {};
                     const aiCandidates = data.aiCandidates || {};
+                    const savedCandidateIndices = data.roleToSelectedSectionIndex || {};
+                    const savedCustomRoles = data.customRoles || [];
+                    window.fullStructure = data.structure || [];
                     let allRoles = new Set(detectedPlaceholders.map(p => p.role));
                     // Add roles from legacy detectedPlaceholderTexts keys
                     for (const mk of Object.keys(dpt)) {
@@ -216,6 +219,8 @@
                     }
                     // Also ensure standard roles appear
                     ['TITLE','DATE','AUTHOR','ORG'].forEach(r => allRoles.add(r));
+                    // Exclude custom roles from allRoles (they are added separately below)
+                    savedCustomRoles.forEach(r => allRoles.delete(r));
                     allRoles.forEach(role => {
                         // Find best entry
                         const ph = detectedPlaceholders.find(p => p.role === role);
@@ -253,6 +258,14 @@
                                 if (i === 0) o.selected = true;
                                 chooserSel.appendChild(o);
                             });
+                            // Pre-populate with saved selection if exists
+                            const savedIdx = savedCandidateIndices[role];
+                            if (savedIdx !== undefined && savedIdx !== null) {
+                                const savedStr = String(savedIdx);
+                                const opt = chooserSel.querySelector('option[value="' + savedStr + '"]');
+                                if (opt) opt.selected = true;
+                                else if (savedIdx === -1) chooserSel.querySelector('option[value="SKIP"]').selected = true;
+                            }
                             const aiLabel = document.createElement('div');
                             aiLabel.style.cssText = 'font-size:10px;color:#dc3545;margin-top:2px;';
                             aiLabel.textContent = roleCandidates.length === 1 ? '1 candidate' : roleCandidates.length + ' candidates';
@@ -303,6 +316,11 @@
                         tr.appendChild(tdAttr);
 
                         phBody.appendChild(tr);
+                    });
+
+                    // Load saved custom roles
+                    savedCustomRoles.forEach(role => {
+                        addRoleRow(role, savedCandidateIndices[role], placeholderMapping[role] || '');
                     });
 
                     // ---- Tab 2: Styles ----
@@ -416,17 +434,127 @@
                 });
         }
 
+        let customRoleCounter = 0;
+
+        function addRoleRow(roleName, sectionIdx, attrValue) {
+            customRoleCounter++;
+            const id = 'custom_' + customRoleCounter;
+            const phBody = document.getElementById('ph-table-body');
+            const tr = document.createElement('tr');
+            tr.id = 'ph_row_' + id;
+
+            // Role name input
+            const tdRole = document.createElement('td');
+            tdRole.style.cssText = 'padding:6px 8px;';
+            const nameInput = document.createElement('input');
+            nameInput.type = 'text';
+            nameInput.id = 'ph_role_name_' + id;
+            nameInput.placeholder = 'ROLE_NAME';
+            nameInput.value = roleName || '';
+            nameInput.style.cssText = 'font-size:12px;width:95px;padding:2px 5px;border:1px solid #ced4da;border-radius:3px;';
+            nameInput.title = 'Role name (upper-case). Corresponding marker: {{ROLE_NAME}}';
+            tdRole.appendChild(nameInput);
+            tr.appendChild(tdRole);
+
+            // Candidate section dropdown — all template structure sections
+            const tdText = document.createElement('td');
+            tdText.style.cssText = 'padding:6px 8px;';
+            const chooserSel = document.createElement('select');
+            chooserSel.id = 'ph_candidate_' + id;
+            chooserSel.style.cssText = 'font-size:11px;max-width:170px;width:100%;';
+            const noneOpt2 = document.createElement('option');
+            noneOpt2.value = 'SKIP';
+            noneOpt2.textContent = '(nothing — skip this role)';
+            chooserSel.appendChild(noneOpt2);
+            (window.fullStructure || []).forEach(s => {
+                const o = document.createElement('option');
+                o.value = s.sectionIndex;
+                const preview = (s.textPreview || '').substring(0, 45);
+                o.textContent = '[' + (s.style || '?') + '] ' + (preview || '(empty)');
+                if (sectionIdx !== undefined && sectionIdx !== null && s.sectionIndex === sectionIdx) o.selected = true;
+                chooserSel.appendChild(o);
+            });
+            const lbl = document.createElement('div');
+            lbl.style.cssText = 'font-size:10px;color:#6c757d;margin-top:2px;';
+            lbl.textContent = 'Select section to replace';
+            tdText.appendChild(chooserSel);
+            tdText.appendChild(lbl);
+            tr.appendChild(tdText);
+
+            // Detection badge
+            const tdType = document.createElement('td');
+            tdType.style.cssText = 'padding:6px 8px;';
+            const badge = document.createElement('span');
+            badge.style.cssText = 'font-size:10px;padding:2px 6px;border-radius:10px;color:#fff;background:#6c757d;';
+            badge.textContent = 'CUSTOM';
+            tdType.appendChild(badge);
+            tr.appendChild(tdType);
+
+            // Location
+            const tdLoc = document.createElement('td');
+            tdLoc.style.cssText = 'font-size:12px;padding:6px 8px;color:#aaa;';
+            tdLoc.textContent = '–';
+            tr.appendChild(tdLoc);
+
+            // Attribute mapping + remove button
+            const tdAttr = document.createElement('td');
+            tdAttr.style.cssText = 'padding:6px 8px;';
+            const attrWrap = document.createElement('div');
+            attrWrap.style.cssText = 'display:flex;gap:4px;align-items:center;';
+            const sel = document.createElement('select');
+            sel.id = 'ph_attr_' + id;
+            sel.style.cssText = 'flex:1;font-size:12px;';
+            ATTR_OPTIONS.forEach(opt => {
+                const o = document.createElement('option');
+                o.value = opt.value;
+                o.textContent = opt.label;
+                if ((attrValue || '') === opt.value) o.selected = true;
+                sel.appendChild(o);
+            });
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.textContent = '✕';
+            removeBtn.title = 'Remove this role';
+            removeBtn.style.cssText = 'background:#dc3545;color:#fff;border:none;border-radius:3px;padding:2px 7px;cursor:pointer;font-size:12px;flex-shrink:0;';
+            removeBtn.onclick = () => tr.remove();
+            attrWrap.appendChild(sel);
+            attrWrap.appendChild(removeBtn);
+            tdAttr.appendChild(attrWrap);
+            tr.appendChild(tdAttr);
+
+            phBody.appendChild(tr);
+        }
+
         function savePlaceholderMapping() {
             const csrf = document.querySelector('input[name="_csrf"]');
             const roleToAttribute = {};
+            const roleToSelectedSectionIndex = {};
+            const customRoles = [];
+
+            // Collect attribute mappings for all rows
             document.querySelectorAll('[id^="ph_attr_"]').forEach(sel => {
-                const role = sel.id.replace('ph_attr_', '');
+                const suffix = sel.id.replace('ph_attr_', '');
+                const nameInput = document.getElementById('ph_role_name_' + suffix);
+                const role = nameInput ? nameInput.value.trim().toUpperCase() : suffix;
+                if (!role) return;
                 roleToAttribute[role] = sel.value;
+                if (nameInput) customRoles.push(role); // track custom roles
             });
+
+            // Collect candidate selections for all rows
+            document.querySelectorAll('[id^="ph_candidate_"]').forEach(sel => {
+                const suffix = sel.id.replace('ph_candidate_', '');
+                const nameInput = document.getElementById('ph_role_name_' + suffix);
+                const role = nameInput ? nameInput.value.trim().toUpperCase() : suffix;
+                if (!role) return;
+                const val = sel.value;
+                roleToSelectedSectionIndex[role] = (val === 'SKIP' || val === '') ? -1 : (parseInt(val, 10) || -1);
+            });
+
             fetch('/config/organisation-details/save-placeholder-mapping', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf.value },
-                body: JSON.stringify({ roleToAttribute })
+                body: JSON.stringify({ roleToAttribute, roleToSelectedSectionIndex, customRoles })
             })
             .then(r => r.json())
             .then(data => {
@@ -497,7 +625,8 @@
                             <tbody id="ph-table-body"></tbody>
                         </table>
                     </div>
-                    <div style="margin-top:14px;display:flex;justify-content:flex-end;">
+                    <div style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                        <button type="button" class="btn-secondary" onclick="addRoleRow()" style="font-size:13px;padding:6px 14px;background:#6c757d;border:none;color:#fff;border-radius:4px;cursor:pointer;">+ Add Role</button>
                         <button type="button" class="btn-submit" onclick="savePlaceholderMapping()">💾 Save Placeholder Mapping</button>
                     </div>
                 </div>
