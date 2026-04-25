@@ -1,0 +1,31 @@
+﻿
+> Task :app:compileJava FAILED
+.\gradlew.bat : C:\DATA\govincVScode\Govinc\app\src\main\java\com\govinc\assess
+ment\AssessmentReporterWord.java:2324: Fehler: class, interface, enum oder 
+record erwartet
+In Zeile:1 Zeichen:1
++ .\gradlew.bat :app:compileJava 2>&1 | Out-File -FilePath "build_outpu ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (C:\DATA\govincV...record erwartet 
+   :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+}
+^
+1 Fehler
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileJava'.
+> Compilation failed; see the compiler error output for details.
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+
+* Get more help at https://help.gradle.org
+
+BUILD FAILED in 2s
+1 actionable task: 1 executed

@@ -80,41 +80,46 @@
                         <tr>
                             <th>Assessment Name</th>
                             <td th:text="${assessment.name}"></td>
+                            <td class="details-action-col"></td>
                         </tr>
                         <tr>
                             <th>Creation Date</th>
                             <td th:text="${creationDateDisplay}"></td>
+                            <td class="details-action-col"></td>
                         </tr>
                         <tr>
                             <th>Created By</th>
                             <td th:text="${assessment.createdBy != null ? assessment.createdBy.name : 'Unknown'}"></td>
+                            <td class="details-action-col"></td>
                         </tr>
                         <tr th:if="${assessment.closeDate != null}">
                             <th>Close Date</th>
                             <td th:text="${closeDateDisplay}"></td>
+                            <td class="details-action-col"></td>
                         </tr>
                         <tr>
                             <th>Organization Unit</th>
                             <td>
-                                <div class="detail-inline-edit">
-                                    <span id="assessment-orgunit-name" th:text="${assessment.orgUnit != null ? assessment.orgUnit.name : 'None'}"></span>
-                                    <button th:if="${isAdminOrISM and assessment.isOpen}" id="choose-orgunit-btn" type="button" class="modal-launch-btn btn-action">Choose Org Unit</button>
-                                </div>
+                                <span id="assessment-orgunit-name" th:text="${assessment.orgUnit != null ? assessment.orgUnit.name : 'None'}"></span>
+                            </td>
+                            <td class="details-action-col">
+                                <button th:if="${isAdminOrISM and assessment.isOpen}" id="choose-orgunit-btn" type="button" class="modal-launch-btn btn-action">Choose Org Unit</button>
                             </td>
                         </tr>
                         <tr>
                             <th>Security Catalog</th>
                             <td th:text="${assessment.securityCatalog.name}"></td>
+                            <td class="details-action-col"></td>
                         </tr>
                         <tr>
                             <th>Compliance Check</th>
                             <td>
-                                <div class="detail-inline-edit">
-                                    <span id="assessment-compliance-check-name"
-                                        th:text="${assessment.complianceCheck != null ? assessment.complianceCheck.name : 'None'}"></span>
-                                    <button th:if="${isAdminOrISM and assessment.isOpen}" id="choose-compliance-check-btn"
-                                        type="button" class="btn-action">Modify</button>
-                                </div>
+                                <span id="assessment-compliance-check-name"
+                                    th:text="${assessment.complianceCheck != null ? assessment.complianceCheck.name : 'None'}"></span>
+                            </td>
+                            <td class="details-action-col">
+                                <button th:if="${isAdminOrISM and assessment.isOpen}" id="choose-compliance-check-btn"
+                                    type="button" class="btn-action">Modify</button>
                             </td>
                         </tr>
                         <tr th:if="${assessment.predecessor != null}">
@@ -122,14 +127,17 @@
                             <td><a th:href="@{'/assessment/' + ${assessment.predecessor.id}}" th:text="${assessment.predecessor.name}"></a>
                                 <span class="text-muted text-sm" th:text="${' (' + assessment.predecessor.status + ')'}"></span>
                             </td>
+                            <td class="details-action-col"></td>
                         </tr>
                         <tr>
                             <th>Status</th>
                             <td th:text="${assessment.status}"></td>
+                            <td class="details-action-col"></td>
                         </tr>
                         <tr th:if="${assessment.status == 'CLOSED' and details != null and details.completedDate != null}">
                             <th>Completed Date</th>
                             <td th:text="${completedDateDisplay}"></td>
+                            <td class="details-action-col"></td>
                         </tr>
                         <tr th:if="${orgServices != null or (assessment.isOpen and !isAssessor)}">
                             <th>Org Services</th>
@@ -138,6 +146,8 @@
                                 <ul th:if="${orgServices != null and !#lists.isEmpty(orgServices)}" style="margin:0 0 0.4em 0;padding-left:1.2em;">
                                     <li th:each="orgService : ${orgServices}" th:text="${orgService.name}"></li>
                                 </ul>
+                            </td>
+                            <td class="details-action-col">
                                 <button th:if="${assessment.isOpen and !isAssessor}" id="choose-orgservices-btn" type="button" class="modal-launch-btn btn-action">Choose Org Services</button>
                             </td>
                         </tr>
@@ -149,6 +159,7 @@
                                         th:text="${assessment.name}" target="_blank"></a></span><span
                                     th:if="${assessment.assessmentUrls == null || assessment.assessmentUrls.url == null}">Not
                                     set</span></td>
+                            <td class="details-action-col"></td>
                         </tr>
                         <tr>
                             <th>Guide in Direct View</th>
@@ -161,6 +172,7 @@
                                 </label>
                                 <span id="guide-visible-status" class="text-muted text-sm" style="margin-left:0.5em;"></span>
                             </td>
+                            <td class="details-action-col"></td>
                         </tr>
                         <tr>
                             <th>Users</th>
@@ -169,19 +181,21 @@
                                 <div th:if="${assessment.users != null && !#lists.isEmpty(assessment.users)}" class="pill-list">
                                     <span th:each="user : ${assessment.users}" class="user-pill" th:text="${user.name}"></span>
                                 </div>
+                            </td>
+                            <td class="details-action-col">
                                 <button th:if="${(isAdminOrISM or canManageAssessors) and assessment.isOpen}" id="choose-users-btn" type="button" class="modal-launch-btn btn-action" th:text="${canManageAssessors ? 'Add User' : 'Choose Users'}">Choose Users</button>
                             </td>
                         </tr>
                         <tr>
                             <th>Interviewees</th>
                             <td id="assessment-interviewees-cell">
-                                <div class="detail-inline-edit">
-                                    <div th:if="${assessment.interviewees != null && !assessment.interviewees.isEmpty()}" class="pill-list">
-                                        <span th:each="user : ${assessment.interviewees}" class="user-pill" th:text="${user.name}"></span>
-                                    </div>
-                                    <span th:if="${assessment.interviewees == null || assessment.interviewees.isEmpty()}" class="text-muted">None</span>
-                                    <button th:if="${isAdminOrISM}" type="button" class="btn-action" onclick="openIntervieweeModal()">Assign</button>
+                                <div th:if="${assessment.interviewees != null && !assessment.interviewees.isEmpty()}" class="pill-list">
+                                    <span th:each="user : ${assessment.interviewees}" class="user-pill" th:text="${user.name}"></span>
                                 </div>
+                                <span th:if="${assessment.interviewees == null || assessment.interviewees.isEmpty()}" class="text-muted">None</span>
+                            </td>
+                            <td class="details-action-col">
+                                <button th:if="${isAdminOrISM}" type="button" class="btn-action" onclick="openIntervieweeModal()">Assign</button>
                             </td>
                         </tr>
                     </table>

@@ -52,6 +52,9 @@
                     <span>📎 Current Template:</span>
                     <div class="template-name" th:text="${currentTemplateName}"></div>
                     <div class="template-actions">
+                        <button type="button" class="btn-action" onclick="openStyleSettings()">
+                            📐 Analyze Template
+                        </button>
                         <button type="button" class="btn-danger" onclick="removeTemplate()">
                             Remove Template
                         </button>
@@ -135,6 +138,404 @@
                 });
             }
         }
+
+        function openStyleSettings() {
+            document.getElementById('styleSettingsModal').style.display = 'flex';
+            document.getElementById('styleLoadingMsg').style.display = 'block';
+            document.getElementById('styleLoadingMsg').textContent = 'Analysing template, please wait…';
+            document.getElementById('styleSettingsContent').style.display = 'none';
+            loadStyleSettings();
+        }
+
+        function openStyleSettings() {
+            document.getElementById('styleSettingsModal').style.display = 'flex';
+            document.getElementById('styleLoadingMsg').style.display = 'block';
+            document.getElementById('styleLoadingMsg').textContent = 'Analysing template, please wait…';
+            document.getElementById('styleSettingsContent').style.display = 'none';
+            loadStyleSettings();
+        }
+
+        function closeStyleSettings() {
+            document.getElementById('styleSettingsModal').style.display = 'none';
+        }
+
+        function showTab(tab) {
+            ['placeholders','styles','details'].forEach(t => {
+                document.getElementById('tab-' + t).style.display = (t === tab) ? 'block' : 'none';
+                document.getElementById('tabBtn-' + t).style.fontWeight = (t === tab) ? '700' : '400';
+                document.getElementById('tabBtn-' + t).style.borderBottom = (t === tab) ? '2px solid #2274A5' : '2px solid transparent';
+            });
+        }
+
+        const ATTR_OPTIONS = [
+            { value: 'SKIP', label: '(nothing — do not fill)' },
+            { value: '', label: '(Not mapped)' },
+            { value: 'assessment.name', label: 'Assessment Name' },
+            { value: 'assessment.creationDate', label: 'Creation Date' },
+            { value: 'assessment.closeDate', label: 'Close Date' },
+            { value: 'assessment.createdBy.name', label: 'Author / Creator' },
+            { value: 'assessment.orgUnit.name', label: 'Organisation Unit' },
+            { value: 'assessment.status', label: 'Status' },
+            { value: 'assessment.managementSummary', label: 'Management Summary' },
+            { value: 'assessment.securityCatalog.name', label: 'Security Catalog' },
+            { value: 'org.organisationName', label: 'Organisation Name (global)' },
+        ];
+
+        function loadStyleSettings() {
+            fetch('/config/organisation-details/template-styles')
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) {
+                        document.getElementById('styleLoadingMsg').textContent =
+                            data.message || 'Error loading template styles.';
+                        return;
+                    }
+                    const styles = data.availableStyles || [];
+                    const tableStyles = data.tableStyles || [];
+                    const tableStyleNames = data.tableStyleNames || {};
+                    const m = data.mapping || {};
+                    const detectedPlaceholders = data.detectedPlaceholders || [];
+                    const placeholderMapping = data.placeholderMapping || {};
+                    const charStyles = data.characterStyles || [];
+                    const headings = data.headingHierarchy || [];
+                    const toc = data.toc || null;
+                    const headerInfo = data.headerInfo || null;
+                    const footerInfo = data.footerInfo || null;
+
+                    // ---- Tab 1: Placeholders ----
+                    const phBody = document.getElementById('ph-table-body');
+                    phBody.innerHTML = '';
+                    // Merge detectedPlaceholders with detectedPlaceholderTexts fallback
+                    const dpt = data.detectedPlaceholderTexts || {};
+                    const aiCandidates = data.aiCandidates || {};
+                    let allRoles = new Set(detectedPlaceholders.map(p => p.role));
+                    // Add roles from legacy detectedPlaceholderTexts keys
+                    for (const mk of Object.keys(dpt)) {
+                        const role = mk.replace(/[{}]/g,'').replace(/_.*$/,'');
+                        allRoles.add(role);
+                    }
+                    // Also ensure standard roles appear
+                    ['TITLE','DATE','AUTHOR','ORG'].forEach(r => allRoles.add(r));
+                    allRoles.forEach(role => {
+                        // Find best entry
+                        const ph = detectedPlaceholders.find(p => p.role === role);
+                        const originalText = ph ? (ph.originalText || '') : (dpt['{{'+role+'}}'] || '');
+                        const detType = ph ? ph.detectionType : (originalText ? 'FUZZY' : '');
+                        const location = ph ? (ph.location || 'BODY') : 'BODY';
+
+                        const tr = document.createElement('tr');
+                        // Role badge
+                        const tdRole = document.createElement('td');
+                        tdRole.style.cssText = 'font-weight:600;font-size:13px;white-space:nowrap;padding:6px 8px;';
+                        tdRole.textContent = role;
+                        tr.appendChild(tdRole);
+
+                        // Original text — show multi-candidate chooser if AI found multiple options
+                        const tdText = document.createElement('td');
+                        tdText.style.cssText = 'font-size:12px;color:#495057;padding:6px 8px;max-width:180px;';
+                        const roleCandidates = aiCandidates[role] || [];
+                        if (roleCandidates.length >= 1) {
+                            const chooserSel = document.createElement('select');
+                            chooserSel.id = 'ph_candidate_' + role;
+                            chooserSel.style.cssText = 'font-size:11px;max-width:170px;width:100%;';
+                            chooserSel.title = roleCandidates.length === 1
+                                ? 'Detected placeholder — change if incorrect'
+                                : 'Multiple candidates detected — choose the correct one';
+                            const noneOpt = document.createElement('option');
+                            noneOpt.value = 'SKIP';
+                            noneOpt.textContent = '(nothing — skip this role)';
+                            chooserSel.appendChild(noneOpt);
+                            roleCandidates.forEach((c, i) => {
+                                const o = document.createElement('option');
+                                o.value = c.index;
+                                const preview = (c.text || '').substring(0, 45);
+                                o.textContent = '[' + (c.style || '?') + '] ' + (preview || '(empty)');
+                                if (i === 0) o.selected = true;
+                                chooserSel.appendChild(o);
+                            });
+                            const aiLabel = document.createElement('div');
+                            aiLabel.style.cssText = 'font-size:10px;color:#dc3545;margin-top:2px;';
+                            aiLabel.textContent = roleCandidates.length === 1 ? '1 candidate' : roleCandidates.length + ' candidates';
+                            tdText.appendChild(chooserSel);
+                            tdText.appendChild(aiLabel);
+                        } else {
+                            tdText.title = originalText || '-';
+                            tdText.style.overflow = 'hidden';
+                            tdText.style.textOverflow = 'ellipsis';
+                            tdText.style.whiteSpace = 'nowrap';
+                            tdText.textContent = originalText || '-';
+                        }
+                        tr.appendChild(tdText);
+
+                        // Detection type badge
+                        const tdType = document.createElement('td');
+                        tdType.style.cssText = 'padding:6px 8px;';
+                        const effectiveDetType = roleCandidates.length > 0 ? 'AI' : detType;
+                        if (effectiveDetType) {
+                            const badge = document.createElement('span');
+                            const typeColors = {EXPLICIT_MARKER:'#198754',FIELD:'#0d6efd',SDT:'#6f42c1',DOCPROPERTY:'#0dcaf0',FUZZY:'#fd7e14',AI:'#dc3545'};
+                            badge.style.cssText = 'font-size:10px;padding:2px 6px;border-radius:10px;color:#fff;background:' + (typeColors[effectiveDetType] || '#6c757d') + ';';
+                            badge.textContent = effectiveDetType.replace('_',' ');
+                            tdType.appendChild(badge);
+                        }
+                        tr.appendChild(tdType);
+
+                        // Location
+                        const tdLoc = document.createElement('td');
+                        tdLoc.style.cssText = 'font-size:12px;padding:6px 8px;';
+                        tdLoc.textContent = location;
+                        tr.appendChild(tdLoc);
+
+                        // Attribute mapping select
+                        const tdAttr = document.createElement('td');
+                        tdAttr.style.cssText = 'padding:6px 8px;';
+                        const sel = document.createElement('select');
+                        sel.id = 'ph_attr_' + role;
+                        sel.style.cssText = 'width:100%;font-size:12px;';
+                        ATTR_OPTIONS.forEach(opt => {
+                            const o = document.createElement('option');
+                            o.value = opt.value;
+                            o.textContent = opt.label;
+                            if ((placeholderMapping[role] || '') === opt.value) o.selected = true;
+                            sel.appendChild(o);
+                        });
+                        tdAttr.appendChild(sel);
+                        tr.appendChild(tdAttr);
+
+                        phBody.appendChild(tr);
+                    });
+
+                    // ---- Tab 2: Styles ----
+                    function populateSel(id, currentVal) {
+                        const sel = document.getElementById(id);
+                        sel.innerHTML = '';
+                        styles.forEach(s => {
+                            const opt = document.createElement('option');
+                            opt.value = s; opt.textContent = s;
+                            if (s === currentVal) opt.selected = true;
+                            sel.appendChild(opt);
+                        });
+                    }
+                    populateSel('sm_title',    m.titleStyle    || 'Title');
+                    populateSel('sm_h1',       m.heading1Style || 'Heading1');
+                    populateSel('sm_h2',       m.heading2Style || 'Heading2');
+                    populateSel('sm_normal',   m.normalStyle   || 'Normal');
+
+                    const tSel = document.getElementById('sm_table');
+                    tSel.innerHTML = '<option value="">(No specific table style)</option>';
+                    tableStyles.forEach(id => {
+                        const opt = document.createElement('option');
+                        opt.value = id;
+                        opt.textContent = tableStyleNames[id] || id;
+                        if (id === (m.tableStyle || '')) opt.selected = true;
+                        tSel.appendChild(opt);
+                    });
+
+                    // ---- Tab 3: Details ----
+                    let details3 = '';
+                    if (toc && toc.present) {
+                        details3 += '<strong>Table of Contents:</strong> Present<br>';
+                        if (toc.headingLevels) details3 += '&nbsp;&nbsp;Heading levels: ' + toc.headingLevels + '<br>';
+                        if (toc.fieldCode) details3 += '&nbsp;&nbsp;Field: <code>' + toc.fieldCode.substring(0,80) + '</code><br>';
+                    } else {
+                        details3 += '<strong>Table of Contents:</strong> Not detected<br>';
+                    }
+                    details3 += '<br>';
+                    if (headerInfo && headerInfo.present) {
+                        details3 += '<strong>Header:</strong> ' + (headerInfo.fullText || '(empty)') + '<br>';
+                        if (headerInfo.hasPageNumber) details3 += '&nbsp;&nbsp;✓ Page number field<br>';
+                        if (headerInfo.hasDate) details3 += '&nbsp;&nbsp;✓ Date field<br>';
+                        if (headerInfo.hasClassification) details3 += '&nbsp;&nbsp;✓ Classification text<br>';
+                        if (headerInfo.fieldCodes && headerInfo.fieldCodes.length)
+                            details3 += '&nbsp;&nbsp;Fields: ' + headerInfo.fieldCodes.map(f => '<code>' + f.substring(0,40) + '</code>').join(', ') + '<br>';
+                    }
+                    if (footerInfo && footerInfo.present) {
+                        details3 += '<strong>Footer:</strong> ' + (footerInfo.fullText || '(empty)') + '<br>';
+                        if (footerInfo.hasPageNumber) details3 += '&nbsp;&nbsp;✓ Page number field<br>';
+                        if (footerInfo.hasDate) details3 += '&nbsp;&nbsp;✓ Date field<br>';
+                        if (footerInfo.hasClassification) details3 += '&nbsp;&nbsp;✓ Classification text<br>';
+                        if (footerInfo.fieldCodes && footerInfo.fieldCodes.length)
+                            details3 += '&nbsp;&nbsp;Fields: ' + footerInfo.fieldCodes.map(f => '<code>' + f.substring(0,40) + '</code>').join(', ') + '<br>';
+                    }
+                    details3 += '<br>';
+                    if (headings && headings.length) {
+                        details3 += '<strong>Heading Hierarchy:</strong><br>';
+                        headings.forEach(h => {
+                            details3 += '&nbsp;&nbsp;H' + h.level + ': ' + h.displayName + ' (<code>' + h.styleId + '</code>)<br>';
+                        });
+                        details3 += '<br>';
+                    }
+                    if (charStyles && charStyles.length) {
+                        details3 += '<strong>Character Styles (' + charStyles.length + '):</strong> ';
+                        details3 += charStyles.map(s => s.displayName || s.id).slice(0,15).join(', ');
+                        if (charStyles.length > 15) details3 += '…';
+                        details3 += '<br>';
+                    }
+                    if (data.foundMarkers && data.foundMarkers.length)
+                        details3 += '<br><strong>Explicit markers found:</strong> ' + data.foundMarkers.join(', ') + '<br>';
+
+                    // ---- Template Structure ----
+                    const structure = data.structure || [];
+                    if (structure.length) {
+                        details3 += '<br><strong>Template Structure (' + structure.length + ' sections):</strong><br>';
+                        details3 += '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:4px;">';
+                        details3 += '<thead><tr style="background:#f8f9fa;">'
+                            + '<th style="text-align:left;padding:4px 8px;border-bottom:1px solid #dee2e6;">#</th>'
+                            + '<th style="text-align:left;padding:4px 8px;border-bottom:1px solid #dee2e6;">Style</th>'
+                            + '<th style="text-align:left;padding:4px 8px;border-bottom:1px solid #dee2e6;">Text Preview</th>'
+                            + '<th style="text-align:left;padding:4px 8px;border-bottom:1px solid #dee2e6;">Marker</th>'
+                            + '</tr></thead><tbody>';
+                        structure.forEach((s, i) => {
+                            const isTextBox = s.style && s.style.includes('/TextBox');
+                            const rowBg = isTextBox ? '#fff8e1' : (i % 2 === 0 ? '#fff' : '#f8f9fa');
+                            const styleLabel = isTextBox
+                                ? '<span style="color:#fd7e14;font-weight:600;">' + s.style + '</span>'
+                                : (s.style || '-');
+                            const preview = (s.textPreview || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                            const markerCell = s.marker
+                                ? '<code style="background:#e8f5e9;padding:1px 4px;border-radius:3px;">' + s.marker + '</code>'
+                                : '';
+                            details3 += '<tr style="background:' + rowBg + ';">'
+                                + '<td style="padding:3px 8px;border-bottom:1px solid #f0f0f0;color:#6c757d;">' + (i+1) + '</td>'
+                                + '<td style="padding:3px 8px;border-bottom:1px solid #f0f0f0;white-space:nowrap;">' + styleLabel + '</td>'
+                                + '<td style="padding:3px 8px;border-bottom:1px solid #f0f0f0;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + preview + '">' + preview + '</td>'
+                                + '<td style="padding:3px 8px;border-bottom:1px solid #f0f0f0;">' + markerCell + '</td>'
+                                + '</tr>';
+                        });
+                        details3 += '</tbody></table>';
+                    }
+
+                    document.getElementById('details-content').innerHTML = details3 || 'No additional details available.';
+
+                    document.getElementById('styleLoadingMsg').style.display = 'none';
+                    document.getElementById('styleSettingsContent').style.display = 'block';
+                    showTab('placeholders');
+                })
+                .catch(err => {
+                    document.getElementById('styleLoadingMsg').textContent = 'Error: ' + err.message;
+                });
+        }
+
+        function savePlaceholderMapping() {
+            const csrf = document.querySelector('input[name="_csrf"]');
+            const roleToAttribute = {};
+            document.querySelectorAll('[id^="ph_attr_"]').forEach(sel => {
+                const role = sel.id.replace('ph_attr_', '');
+                roleToAttribute[role] = sel.value;
+            });
+            fetch('/config/organisation-details/save-placeholder-mapping', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf.value },
+                body: JSON.stringify({ roleToAttribute })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) alert('Placeholder mapping saved!');
+                else alert('Error: ' + (data.message || 'Unknown error'));
+            })
+            .catch(err => alert('Error: ' + err.message));
+        }
+
+        function saveStyleSettings() {
+            const csrf = document.querySelector('input[name="_csrf"]');
+            const mapping = {
+                titleStyle:    document.getElementById('sm_title').value,
+                heading1Style: document.getElementById('sm_h1').value,
+                heading2Style: document.getElementById('sm_h2').value,
+                normalStyle:   document.getElementById('sm_normal').value,
+                tableStyle:    document.getElementById('sm_table').value
+            };
+            fetch('/config/organisation-details/save-style-mapping', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrf.value
+                },
+                body: JSON.stringify(mapping)
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) alert('Style settings saved!');
+                else alert('Error: ' + (data.message || 'Unknown error'));
+            })
+            .catch(err => alert('Error: ' + err.message));
+        }
     </script>
+
+    <!-- Analyze Template Modal — 3 tabs -->
+    <div id="styleSettingsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;align-items:center;justify-content:center;padding:16px;">
+        <div style="width:100%;max-width:780px;background:#fff;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,0.2);padding:24px;max-height:90vh;display:flex;flex-direction:column;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-shrink:0;">
+                <h3 style="margin:0;font-size:18px;color:#212529;">📐 Analyze Template</h3>
+                <button onclick="closeStyleSettings()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#6c757d;">&times;</button>
+            </div>
+
+            <div id="styleLoadingMsg" style="color:#6c757d;margin-bottom:12px;">Loading template analysis…</div>
+
+            <div id="styleSettingsContent" style="display:none;flex:1;overflow:hidden;display:flex;flex-direction:column;">
+                <!-- Tab bar -->
+                <div style="display:flex;gap:0;border-bottom:1px solid #dee2e6;margin-bottom:16px;flex-shrink:0;">
+                    <button id="tabBtn-placeholders" onclick="showTab('placeholders')" style="background:none;border:none;border-bottom:2px solid #2274A5;font-weight:700;padding:8px 16px;cursor:pointer;font-size:14px;color:#212529;">🔍 Placeholders</button>
+                    <button id="tabBtn-styles" onclick="showTab('styles')" style="background:none;border:none;border-bottom:2px solid transparent;font-weight:400;padding:8px 16px;cursor:pointer;font-size:14px;color:#212529;">🎨 Styles</button>
+                    <button id="tabBtn-details" onclick="showTab('details')" style="background:none;border:none;border-bottom:2px solid transparent;font-weight:400;padding:8px 16px;cursor:pointer;font-size:14px;color:#212529;">📋 Template Details</button>
+                </div>
+
+                <!-- Tab 1: Placeholders -->
+                <div id="tab-placeholders" style="overflow-y:auto;flex:1;">
+                    <p style="margin:0 0 10px;font-size:13px;color:#495057;">Map each detected placeholder to the assessment attribute it should contain in the generated report.</p>
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                            <thead>
+                                <tr style="background:#f8f9fa;border-bottom:2px solid #dee2e6;">
+                                    <th style="padding:8px;text-align:left;white-space:nowrap;">Role</th>
+                                    <th style="padding:8px;text-align:left;">Detected Text</th>
+                                    <th style="padding:8px;text-align:left;white-space:nowrap;">Type</th>
+                                    <th style="padding:8px;text-align:left;white-space:nowrap;">Location</th>
+                                    <th style="padding:8px;text-align:left;min-width:200px;">Map to Assessment Attribute</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ph-table-body"></tbody>
+                        </table>
+                    </div>
+                    <div style="margin-top:14px;display:flex;justify-content:flex-end;">
+                        <button type="button" class="btn-submit" onclick="savePlaceholderMapping()">💾 Save Placeholder Mapping</button>
+                    </div>
+                </div>
+
+                <!-- Tab 2: Styles -->
+                <div id="tab-styles" style="display:none;overflow-y:auto;flex:1;">
+                    <p style="margin:0 0 12px;font-size:14px;color:#495057;">Map each report section to the corresponding style in your Word template:</p>
+                    <div style="display:grid;grid-template-columns:160px 1fr;gap:8px 12px;align-items:center;margin-bottom:16px;">
+                        <label style="font-weight:600;font-size:14px;">Title style</label>
+                        <select id="sm_title" class="form-control" style="width:100%;"></select>
+
+                        <label style="font-weight:600;font-size:14px;">Heading 1 style</label>
+                        <select id="sm_h1" class="form-control" style="width:100%;"></select>
+
+                        <label style="font-weight:600;font-size:14px;">Heading 2 style</label>
+                        <select id="sm_h2" class="form-control" style="width:100%;"></select>
+
+                        <label style="font-weight:600;font-size:14px;">Normal / body style</label>
+                        <select id="sm_normal" class="form-control" style="width:100%;"></select>
+
+                        <label style="font-weight:600;font-size:14px;">Table style</label>
+                        <select id="sm_table" class="form-control" style="width:100%;"></select>
+                    </div>
+                    <div style="display:flex;justify-content:flex-end;">
+                        <button type="button" class="btn-submit" onclick="saveStyleSettings()">💾 Save Style Mapping</button>
+                    </div>
+                </div>
+
+                <!-- Tab 3: Details -->
+                <div id="tab-details" style="display:none;overflow-y:auto;flex:1;">
+                    <div id="details-content" style="font-size:13px;color:#212529;line-height:1.7;"></div>
+                </div>
+            </div>
+
+            <div style="flex-shrink:0;padding-top:12px;border-top:1px solid #e9ecef;margin-top:8px;display:flex;justify-content:flex-end;">
+                <button type="button" class="btn-cancel" onclick="closeStyleSettings()">Close</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

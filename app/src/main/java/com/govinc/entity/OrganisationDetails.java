@@ -21,6 +21,18 @@ public class OrganisationDetails {
     @Column(length = 255)
     private String wordTemplateFilename;
 
+    @Column(columnDefinition = "TEXT")
+    private String wordTemplateAnalysisJson;
+
+    @Column(length = 64)
+    private String wordTemplateChecksum;
+
+    @Column(columnDefinition = "TEXT")
+    private String wordTemplateStyleMappingJson;
+
+    @Column(columnDefinition = "TEXT")
+    private String wordTemplatePlaceholderMappingJson;
+
     public OrganisationDetails() {}
 
     public Long getId() { return id; }
@@ -37,4 +49,16 @@ public class OrganisationDetails {
 
     public String getWordTemplateFilename() { return wordTemplateFilename; }
     public void setWordTemplateFilename(String wordTemplateFilename) { this.wordTemplateFilename = wordTemplateFilename; }
+
+    public String getWordTemplateAnalysisJson() { return wordTemplateAnalysisJson; }
+    public void setWordTemplateAnalysisJson(String wordTemplateAnalysisJson) { this.wordTemplateAnalysisJson = wordTemplateAnalysisJson; }
+
+    public String getWordTemplateChecksum() { return wordTemplateChecksum; }
+    public void setWordTemplateChecksum(String wordTemplateChecksum) { this.wordTemplateChecksum = wordTemplateChecksum; }
+
+    public String getWordTemplateStyleMappingJson() { return wordTemplateStyleMappingJson; }
+    public void setWordTemplateStyleMappingJson(String wordTemplateStyleMappingJson) { this.wordTemplateStyleMappingJson = wordTemplateStyleMappingJson; }
+
+    public String getWordTemplatePlaceholderMappingJson() { return wordTemplatePlaceholderMappingJson; }
+    public void setWordTemplatePlaceholderMappingJson(String wordTemplatePlaceholderMappingJson) { this.wordTemplatePlaceholderMappingJson = wordTemplatePlaceholderMappingJson; }
 }

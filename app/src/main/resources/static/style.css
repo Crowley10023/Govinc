@@ -11508,6 +11508,14 @@ a.back-link:hover {
     flex-wrap: wrap;
 }
 
+.details-action-col {
+    width: 1%;
+    white-space: nowrap;
+    text-align: right;
+    vertical-align: middle;
+    padding-left: 0.3em;
+}
+
 .pill-list {
     display: flex;
     flex-wrap: wrap;
