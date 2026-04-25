@@ -185,9 +185,12 @@ public class AssessmentReporterWord {
                         } catch (Exception eAiHints) {
                             System.err.println("[AssessmentReporterWord] Failed to apply AI hints: " + eAiHints.getMessage());
                         }
-                        // Apply user's explicit candidate selections (overrides AI/fuzzy detection)
-                        applyUserCandidateSelections(phMapping, templateAnalysis, wordMLPackage);
                     }
+                    // Always apply user's explicit candidate selections — uses paragraphRef for direct access.
+                    // This runs regardless of whether the analysis JSON is present.
+                    applyUserCandidateSelections(phMapping, templateAnalysis, wordMLPackage);
+                    System.out.println("[AssessmentReporterWord] phMapping roleToAttribute=" + phMapping.getRoleToAttribute() + " roleToSelectedSectionIndex=" + phMapping.getRoleToSelectedSectionIndex());
+                    System.out.println("[AssessmentReporterWord] namedHFPH after applyUserCandidateSelections: " + templateAnalysis.getNamedHeaderFooterPlaceholders().keySet());
 
                     System.out.println("[AssessmentReporterWord] Template analysis complete:");
                     System.out.println("  - Available styles: " + templateAnalysis.getAvailableStyles());
@@ -241,6 +244,7 @@ public class AssessmentReporterWord {
                     System.out.println("[AssessmentReporterWord] Replaced body marker " + phEntry.getKey() + " \u2192 " + replVal + (targetText != null ? " (target='" + targetText.substring(0, Math.min(30, targetText.length())) + "...')" : ""));
                 }
             }
+            System.out.println("[AssessmentReporterWord] namedHFPH at replacement time: " + namedHFPH.size() + " entries: " + namedHFPH.keySet());
             for (Map.Entry<String, P> phEntry : namedHFPH.entrySet()) {
                 String role = phEntry.getKey().replaceAll("[{}]", "").replaceAll("_.*$", "");
                 if ("SKIP".equals(finalPhMapping.getRoleToAttribute().get(role))) continue;
@@ -250,6 +254,58 @@ public class AssessmentReporterWord {
                     String targetText = ta.getPlaceholderTexts().get(phEntry.getKey());
                     replaceMarkerInParagraphOrTextBox(factory, phEntry.getValue(), phEntry.getKey(), replVal, targetText);
                     System.out.println("[AssessmentReporterWord] Replaced header/footer marker " + phEntry.getKey() + " \u2192 " + replVal);
+                }
+            }
+
+            // --- Direct H/F replacement (belt-and-suspenders) ---
+            // Handles cases where namedHFPH was not populated or the P-ref approach failed.
+            // Uses the paragraphRef stored in TemplateSection directly — bypasses namedHFPH entirely.
+            {
+                Map<String, Integer> hfSelections = finalPhMapping.getRoleToSelectedSectionIndex();
+                List<TemplateSection> hfStructure = ta.getTemplateStructure();
+                System.out.println("[AssessmentReporterWord] DirectHF check: hfSelections=" + hfSelections);
+                if (hfSelections != null && !hfSelections.isEmpty() && hfStructure != null) {
+                    Map<Integer, TemplateSection> hfSecMap = new LinkedHashMap<>();
+                    for (TemplateSection ts : hfStructure) hfSecMap.put(ts.getSectionIndex(), ts);
+                    for (Map.Entry<String, Integer> hfEntry : hfSelections.entrySet()) {
+                        String hfRole = hfEntry.getKey();
+                        int hfSecIdx = hfEntry.getValue();
+                        if (hfSecIdx < 0) continue;
+                        TemplateSection hfSec = hfSecMap.get(hfSecIdx);
+                        if (hfSec == null) {
+                            System.out.println("[AssessmentReporterWord] DirectHF: no section found for idx=" + hfSecIdx);
+                            continue;
+                        }
+                        String hfStyle = hfSec.getStyle() != null ? hfSec.getStyle() : "";
+                        boolean isHFSection = hfStyle.startsWith("Header") || hfStyle.startsWith("Footer")
+                                || hfSec.getContentIndex() < 0;
+                        if (!isHFSection) continue; // body section — already handled by namedPH loop above
+                        String hfMarker = "{{" + hfRole + "}}";
+                        if ("SKIP".equals(finalPhMapping.getRoleToAttribute().get(hfRole))) continue;
+                        String hfReplVal = resolveAttributeValue(finalPhMapping.getRoleToAttribute().get(hfRole), assessment, finalOrgDetails);
+                        if (hfReplVal == null) hfReplVal = resolveMarkerValue(hfMarker, titleVal, authorVal, dateVal, orgVal);
+                        if (hfReplVal == null) {
+                            System.out.println("[AssessmentReporterWord] DirectHF: no replVal for role=" + hfRole
+                                    + " attr=" + finalPhMapping.getRoleToAttribute().get(hfRole));
+                            continue;
+                        }
+                        String hfTargetText = hfSec.getText();
+                        P hfP = hfSec.getParagraphRef();
+                        if (hfP == null) {
+                            hfP = findParagraphInHFParts(wordMLPackage, hfTargetText);
+                            System.out.println("[AssessmentReporterWord] DirectHF: paragraphRef=null, findByText="
+                                    + (hfP != null ? "found" : "NOT FOUND") + " for target='" + hfTargetText + "'");
+                        }
+                        if (hfP != null) {
+                            replaceMarkerInParagraphOrTextBox(factory, hfP, hfMarker, hfReplVal, hfTargetText);
+                            System.out.println("[AssessmentReporterWord] DirectHF replaced " + hfMarker + " \u2192 '" + hfReplVal
+                                    + "' (sectionIdx=" + hfSecIdx + ", style=" + hfStyle + ", target='"
+                                    + (hfTargetText != null ? hfTargetText.substring(0, Math.min(30, hfTargetText.length())) : "null") + "')");
+                        } else {
+                            System.out.println("[AssessmentReporterWord] DirectHF: no paragraph found for " + hfMarker
+                                    + " (target='" + hfTargetText + "')");
+                        }
+                    }
                 }
             }
 
@@ -1225,13 +1281,18 @@ public class AssessmentReporterWord {
                     }
                 }
             } else {
-                // Header/Footer section — find the P in H/F parts by text matching
-                P found = findParagraphInHFParts(pkg, sectionText);
+                // Header/Footer section — use the stored live JAXB reference (most reliable).
+                // Fall back to text-based search only if the reference wasn't captured.
+                P found = section.getParagraphRef();
+                if (found == null) {
+                    found = findParagraphInHFParts(pkg, sectionText);
+                }
                 if (found != null) {
                     namedHFPH.put(marker, found);
                     if (!sectionText.isEmpty()) templateAnalysis.getPlaceholderTexts().put(marker, sectionText);
                     namedPH.remove(marker);
-                    System.out.println("[applyUserCandidateSelections] " + marker + " → H/F sectionIdx=" + sectionIdx);
+                    System.out.println("[applyUserCandidateSelections] " + marker + " → H/F sectionIdx=" + sectionIdx
+                            + " via " + (section.getParagraphRef() != null ? "direct-ref" : "text-match"));
                 } else {
                     System.out.println("[applyUserCandidateSelections] " + marker + " → H/F sectionIdx=" + sectionIdx + " but no matching paragraph found");
                 }
@@ -1745,12 +1806,17 @@ public class AssessmentReporterWord {
                         String hfStyle = partType + (pStyle != null && !pStyle.equals("Normal") ? "/" + pStyle : "");
                         String ptxt = extractTextFromParagraph(hfp);
                         if (ptxt != null && !ptxt.isBlank()) {
-                            sections.add(new TemplateSection(ptxt, hfStyle, -1));
+                            TemplateSection ts = new TemplateSection(ptxt, hfStyle, -1);
+                            ts.setParagraphRef(hfp); // store live JAXB reference for direct replacement
+                            sections.add(ts);
                             sectionCount++;
                         }
                         for (String tbEntry : extractTextBoxListFromParagraph(hfp)) {
                             if (!tbEntry.isBlank()) {
-                                sections.add(new TemplateSection(tbEntry, hfStyle + "/TextBox", -1));
+                                // For text box sections the container P (hfp) is the replacement target
+                                TemplateSection ts = new TemplateSection(tbEntry, hfStyle + "/TextBox", -1);
+                                ts.setParagraphRef(hfp);
+                                sections.add(ts);
                                 sectionCount++;
                             }
                         }
@@ -2091,8 +2157,8 @@ public class AssessmentReporterWord {
             boolean needAuthor = !namedPH.containsKey("{{AUTHOR}}") && !namedPH.containsKey("{{CREATED_BY}}");
             boolean needOrg    = !namedPH.containsKey("{{ORG}}")    && !namedPH.containsKey("{{ORG_UNIT}}")
                                && !namedPH.containsKey("{{ORGANISATION}}");
-            if (!needTitle && !needDate && !needAuthor && !needOrg) return;
-            // Scan body paragraphs
+            // Scan body paragraphs only when at least one role is still needed
+            if (needTitle || needDate || needAuthor || needOrg) {
             try {
                 List<Object> content = mdp.getContent();
                 for (int i = 0; i < content.size(); i++) {
@@ -2249,6 +2315,7 @@ public class AssessmentReporterWord {
             } catch (Exception e) {
                 System.err.println("[TemplateAnalyzer] detectFuzzyPlaceholders H/F error: " + e.getMessage());
             }
+            } // end if (needTitle || needDate || needAuthor || needOrg)
             // Always add H/F sections to every role's candidate pool (allows user to override body detection with H/F)
             try {
                 List<Map<String, Object>> allHFCandidates = new ArrayList<>();
@@ -2710,6 +2777,8 @@ public class AssessmentReporterWord {
         private final String style;
         private final int contentIndex;
         private int sectionIndex; // unique sequential position in the full structure list
+        /** Live JAXB reference to the paragraph — only set for H/F sections; never serialized. */
+        private transient P paragraphRef;
 
         public TemplateSection(String text, String style, int contentIndex) {
             this.text = text;
@@ -2731,6 +2800,8 @@ public class AssessmentReporterWord {
 
         public int getSectionIndex() { return sectionIndex; }
         public void setSectionIndex(int idx) { this.sectionIndex = idx; }
+        public P getParagraphRef() { return paragraphRef; }
+        public void setParagraphRef(P p) { this.paragraphRef = p; }
     }
 
     /**
