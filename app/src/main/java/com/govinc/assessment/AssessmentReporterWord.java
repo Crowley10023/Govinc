@@ -233,9 +233,17 @@ public class AssessmentReporterWord {
             final OrganisationDetails finalOrgDetails = orgDetails;
             final WordPlaceholderAttributeMapping finalPhMapping = phMapping;
             for (Map.Entry<String, P> phEntry : namedPH.entrySet()) {
-                String role = phEntry.getKey().replaceAll("[{}]", "").replaceAll("_.*$", ""); // TITLE, AUTHOR, DATE, ORG
-                if ("SKIP".equals(finalPhMapping.getRoleToAttribute().get(role))) continue;
-                String replVal = resolveAttributeValue(finalPhMapping.getRoleToAttribute().get(role), assessment, finalOrgDetails);
+                // Use full role name (no suffix stripping) so custom roles like MY_CUSTOM_ROLE are looked up correctly.
+                // resolveMarkerValue handles standard variant markers ({{REPORT_TITLE}}, {{CREATED_DATE}}, etc.) via fallback.
+                String role = phEntry.getKey().replaceAll("[{}]", "");
+                String attrPath = finalPhMapping.getRoleToAttribute().get(role);
+                if (attrPath == null) {
+                    // Legacy fallback: try base name (strip underscore suffix) for compatibility
+                    String roleBase = role.replaceAll("_.*$", "");
+                    attrPath = finalPhMapping.getRoleToAttribute().get(roleBase);
+                }
+                if ("SKIP".equals(attrPath)) continue;
+                String replVal = resolveAttributeValue(attrPath, assessment, finalOrgDetails);
                 if (replVal == null) replVal = resolveMarkerValue(phEntry.getKey(), titleVal, authorVal, dateVal, orgVal);
                 if (replVal != null) {
                     // targetText: the original textbox text detected during analysis — used to find the right textbox
@@ -246,9 +254,14 @@ public class AssessmentReporterWord {
             }
             System.out.println("[AssessmentReporterWord] namedHFPH at replacement time: " + namedHFPH.size() + " entries: " + namedHFPH.keySet());
             for (Map.Entry<String, P> phEntry : namedHFPH.entrySet()) {
-                String role = phEntry.getKey().replaceAll("[{}]", "").replaceAll("_.*$", "");
-                if ("SKIP".equals(finalPhMapping.getRoleToAttribute().get(role))) continue;
-                String replVal = resolveAttributeValue(finalPhMapping.getRoleToAttribute().get(role), assessment, finalOrgDetails);
+                String role = phEntry.getKey().replaceAll("[{}]", "");
+                String attrPathHF = finalPhMapping.getRoleToAttribute().get(role);
+                if (attrPathHF == null) {
+                    String roleBaseHF = role.replaceAll("_.*$", "");
+                    attrPathHF = finalPhMapping.getRoleToAttribute().get(roleBaseHF);
+                }
+                if ("SKIP".equals(attrPathHF)) continue;
+                String replVal = resolveAttributeValue(attrPathHF, assessment, finalOrgDetails);
                 if (replVal == null) replVal = resolveMarkerValue(phEntry.getKey(), titleVal, authorVal, dateVal, orgVal);
                 if (replVal != null) {
                     String targetText = ta.getPlaceholderTexts().get(phEntry.getKey());
@@ -304,6 +317,55 @@ public class AssessmentReporterWord {
                         } else {
                             System.out.println("[AssessmentReporterWord] DirectHF: no paragraph found for " + hfMarker
                                     + " (target='" + hfTargetText + "')");
+                        }
+                        // Sweep ALL header/footer parts in case the template has multiple variants
+                        // (default, first-page, even-odd). Replace every paragraph whose text matches.
+                        if (hfTargetText != null && !hfTargetText.isBlank()) {
+                            boolean wantHeader = hfStyle.startsWith("Header");
+                            String snippetLC = (hfTargetText.length() > 40
+                                    ? hfTargetText.substring(0, 40) : hfTargetText).toLowerCase().trim();
+                            final P hfPSnapshot = hfP; // capture final ref for identity check
+                            java.util.Set<P> alreadyReplaced = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+                            if (hfPSnapshot != null) alreadyReplaced.add(hfPSnapshot);
+                            try {
+                                for (java.util.Map.Entry<?, ?> pe : wordMLPackage.getParts().getParts().entrySet()) {
+                                    org.docx4j.openpackaging.parts.Part pt =
+                                            (org.docx4j.openpackaging.parts.Part) pe.getValue();
+                                    boolean isFtrPt = pt instanceof org.docx4j.openpackaging.parts.WordprocessingML.FooterPart;
+                                    boolean isHdrPt = pt instanceof org.docx4j.openpackaging.parts.WordprocessingML.HeaderPart;
+                                    if (wantHeader ? !isHdrPt : !isFtrPt) continue;
+                                    List<Object> sweepContent = null;
+                                    try {
+                                        if (isFtrPt) {
+                                            org.docx4j.wml.Ftr f = ((org.docx4j.openpackaging.parts.WordprocessingML.FooterPart) pt).getJaxbElement();
+                                            if (f != null) sweepContent = f.getContent();
+                                        } else {
+                                            org.docx4j.wml.Hdr h = ((org.docx4j.openpackaging.parts.WordprocessingML.HeaderPart) pt).getJaxbElement();
+                                            if (h != null) sweepContent = h.getContent();
+                                        }
+                                    } catch (Exception ignored) {}
+                                    if (sweepContent == null) continue;
+                                    for (P scanP : collectAllParagraphs(sweepContent)) {
+                                        if (alreadyReplaced.contains(scanP)) continue;
+                                        String scanTxt = extractRunTextFromP(scanP).toLowerCase().trim();
+                                        if (scanTxt.isEmpty()) {
+                                            // also check textbox text via XML
+                                            try {
+                                                String scanXml = XmlUtils.marshaltoString(scanP, true);
+                                                if (scanXml != null) scanTxt = scanXml.replaceAll("<[^>]+>", " ").toLowerCase().trim();
+                                            } catch (Exception ignored) {}
+                                        }
+                                        if (scanTxt.contains(snippetLC)) {
+                                            replaceMarkerInParagraphOrTextBox(factory, scanP, hfMarker, hfReplVal, hfTargetText);
+                                            alreadyReplaced.add(scanP);
+                                            System.out.println("[AssessmentReporterWord] DirectHF sweep replaced " + hfMarker
+                                                    + " in additional " + (wantHeader ? "header" : "footer") + " part");
+                                        }
+                                    }
+                                }
+                            } catch (Exception sweepEx) {
+                                System.err.println("[AssessmentReporterWord] DirectHF sweep error: " + sweepEx.getMessage());
+                            }
                         }
                     }
                 }
