@@ -26,6 +26,8 @@ import com.govinc.authorization.AuthorizationService;
 import com.govinc.authorization.UnauthorizedException;
 import com.govinc.governance.GovernanceProjectRepository;
 
+import java.util.stream.StreamSupport;
+
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -104,6 +106,9 @@ public class AssessmentController {
 
     @Autowired
     private GovernanceProjectRepository governanceProjectRepository;
+
+    @Autowired
+    private AssessmentStereotypeRepository assessmentStereotypeRepository;
 
     @GetMapping("/create")
     public String showCreateAssessmentForm(Model model) {
@@ -706,6 +711,47 @@ public class AssessmentController {
             model.addAttribute("governanceProjects", governanceProjectRepository.findAll());
             model.addAttribute("allUsers", userRepository.findAll());
 
+            // Stereotypes: force-initialize lazy collection, then pass assigned ones and all available for the catalog
+            List<AssessmentStereotype> assignedStereotypesList = new ArrayList<>(assessment.getStereotypes());
+            model.addAttribute("assessmentStereotypes", assignedStereotypesList);
+            Long catalogId = assessment.getSecurityCatalog() != null ? assessment.getSecurityCatalog().getId() : null;
+            List<AssessmentStereotype> availableStereotypes = catalogId != null
+                    ? assessmentStereotypeRepository.findBySecurityCatalogId(catalogId)
+                    : new ArrayList<>();
+            model.addAttribute("availableStereotypes", availableStereotypes);
+            // Simple DTOs for safe inline-JS serialization (avoid serializing nested JPA entities)
+            List<Map<String, Object>> availableStereotypesData = availableStereotypes.stream().map(st -> {
+                Map<String, Object> m = new java.util.LinkedHashMap<>();
+                m.put("id", st.getId());
+                m.put("name", st.getName());
+                m.put("description", st.getDescription() != null ? st.getDescription() : "");
+                return m;
+            }).collect(Collectors.toList());
+            Set<Long> assignedStereotypeIds = assignedStereotypesList.stream()
+                    .map(AssessmentStereotype::getId)
+                    .collect(Collectors.toSet());
+            model.addAttribute("availableStereotypesData", availableStereotypesData);
+            model.addAttribute("assignedStereotypeIds", assignedStereotypeIds);
+
+            // Current user info for creator/ISM permission checks
+            User currentUser = null;
+            try { currentUser = authorizationService.getCurrentUser(); } catch (Exception ignored) {}
+            final User finalCurrentUser = currentUser;
+            boolean isCreator = finalCurrentUser != null && assessment.getCreatedBy() != null
+                    && assessment.getCreatedBy().getId().equals(finalCurrentUser.getId());
+            boolean isAssignedISM = isAdminOrISM && finalCurrentUser != null
+                    && assessment.getUsers() != null
+                    && assessment.getUsers().stream().anyMatch(u -> finalCurrentUser.getId().equals(u.getId()));
+            boolean isCreatorOrAssignedISM = isCreator || isAssignedISM;
+            boolean isAssignedInterviewee = finalCurrentUser != null
+                    && assessment.getInterviewees() != null
+                    && assessment.getInterviewees().stream().anyMatch(u -> finalCurrentUser.getId().equals(u.getId()));
+            // Controls can be edited: OPEN state (all), REVIEW state (admin/ISM only)
+            boolean canEditControls = assessment.isOpen() || (assessment.isReview() && isAdminOrISM);
+            model.addAttribute("isCreatorOrAssignedISM", isCreatorOrAssignedISM);
+            model.addAttribute("isAssignedInterviewee", isAssignedInterviewee);
+            model.addAttribute("canEditControls", canEditControls);
+
             // Compliance check score calculation
             if (assessment.getComplianceCheck() != null && details != null) {
                 ComplianceCheck cc = assessment.getComplianceCheck();
@@ -901,79 +947,160 @@ public class AssessmentController {
         if (!isAdmin && !isISM) {
             throw new UnauthorizedException("You do not have permission to finalize assessments.");
         }
-        
+
         Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
         if (assessmentOpt.isPresent()) {
-            Assessment assessment = assessmentOpt.get();
-            // Adhere to existing DB values: use CLOSED to indicate finalized
-            assessment.setStatus(AssessmentStatus.CLOSED);
-            assessment.setCloseDate(LocalDate.now());
-            // Snapshot the current catalog controls so the closed assessment
-            // retains a fixed scope even if the catalog is later modified.
-            if (assessment.getSecurityCatalog() != null) {
-                assessment.setSnapshotControls(
-                    new java.util.HashSet<>(assessment.getSecurityCatalog().getSecurityControls()));
-            }
-            // Freeze org service inherited answers into AssessmentDetails so that subsequent
-            // changes to org service assessments do not affect this closed assessment.
-            Map<Long, OrgServiceInheritance> inheritedAtClose = collectOrgServiceInheritance(assessment);
-            if (!inheritedAtClose.isEmpty()) {
-                Optional<AssessmentDetails> closeDetailsOpt = assessmentDetailsService.findById(id);
-                AssessmentDetails closeDetails;
-                if (closeDetailsOpt.isPresent()) {
-                    closeDetails = closeDetailsOpt.get();
-                } else {
-                    closeDetails = new AssessmentDetails();
-                    Set<Assessment> aSet = new HashSet<>();
-                    aSet.add(assessment);
-                    closeDetails.setAssessments(aSet);
-                    closeDetails.setDate(LocalDate.now());
-                }
-                Map<Long, AssessmentControlAnswer> closeAnswersMap = new HashMap<>();
-                for (AssessmentControlAnswer aca : closeDetails.getControlAnswers()) {
-                    if (aca.getSecurityControl() != null) {
-                        closeAnswersMap.put(aca.getSecurityControl().getId(), aca);
-                    }
-                }
-                boolean closeChanged = false;
-                for (Map.Entry<Long, OrgServiceInheritance> entry : inheritedAtClose.entrySet()) {
-                    Long ctrlId = entry.getKey();
-                    OrgServiceInheritance inh = entry.getValue();
-                    AssessmentControlAnswer existing = closeAnswersMap.get(ctrlId);
-                    if (existing != null && Boolean.TRUE.equals(existing.getIsOverride())) {
-                        continue; // user's manual override takes priority; leave as is
-                    }
-                    if (existing != null) {
-                        Long existingAnswerId = existing.getMaturityAnswer() != null ? existing.getMaturityAnswer().getId() : null;
-                        Long inheritedAnswerId = inh.answer != null ? inh.answer.getId() : null;
-                        if (!Objects.equals(existingAnswerId, inheritedAnswerId)) {
-                            existing.setMaturityAnswer(inh.answer);
-                            closeChanged = true;
-                        }
-                    } else {
-                        SecurityControl ctrl = securityControlRepository.findById(ctrlId).orElse(null);
-                        if (ctrl != null) {
-                            AssessmentControlAnswer newAca = new AssessmentControlAnswer(ctrl, inh.answer, inh.comment);
-                            newAca = assessmentControlAnswerRepository.save(newAca);
-                            closeDetails.getControlAnswers().add(newAca);
-                            closeChanged = true;
-                        }
-                    }
-                }
-                if (closeChanged || !closeDetailsOpt.isPresent()) {
-                    assessmentDetailsService.save(closeDetails);
-                }
-            }
-            assessmentRepository.save(assessment);
-            }
+            doFinalizeAssessment(assessmentOpt.get(), id);
+        }
+        return "redirect:/assessment/" + id;
+    }
 
-            Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
-            if (detailsOpt.isPresent()) {
+    // Shared finalize logic: CLOSED state, snapshot, org-service freeze
+    private void doFinalizeAssessment(Assessment assessment, Long id) {
+        assessment.setStatus(AssessmentStatus.CLOSED);
+        assessment.setCloseDate(LocalDate.now());
+        try { assessment.setClosedBy(authorizationService.getCurrentUser()); } catch (Exception ignored) {}
+        if (assessment.getSecurityCatalog() != null) {
+            assessment.setSnapshotControls(
+                new java.util.HashSet<>(assessment.getSecurityCatalog().getSecurityControls()));
+        }
+        Map<Long, OrgServiceInheritance> inheritedAtClose = collectOrgServiceInheritance(assessment);
+        if (!inheritedAtClose.isEmpty()) {
+            Optional<AssessmentDetails> closeDetailsOpt = assessmentDetailsService.findById(id);
+            AssessmentDetails closeDetails;
+            if (closeDetailsOpt.isPresent()) {
+                closeDetails = closeDetailsOpt.get();
+            } else {
+                closeDetails = new AssessmentDetails();
+                Set<Assessment> aSet = new HashSet<>();
+                aSet.add(assessment);
+                closeDetails.setAssessments(aSet);
+                closeDetails.setDate(LocalDate.now());
+            }
+            Map<Long, AssessmentControlAnswer> closeAnswersMap = new HashMap<>();
+            for (AssessmentControlAnswer aca : closeDetails.getControlAnswers()) {
+                if (aca.getSecurityControl() != null) {
+                    closeAnswersMap.put(aca.getSecurityControl().getId(), aca);
+                }
+            }
+            boolean closeChanged = false;
+            for (Map.Entry<Long, OrgServiceInheritance> entry : inheritedAtClose.entrySet()) {
+                Long ctrlId = entry.getKey();
+                OrgServiceInheritance inh = entry.getValue();
+                AssessmentControlAnswer existing = closeAnswersMap.get(ctrlId);
+                if (existing != null && Boolean.TRUE.equals(existing.getIsOverride())) {
+                    continue;
+                }
+                if (existing != null) {
+                    Long existingAnswerId = existing.getMaturityAnswer() != null ? existing.getMaturityAnswer().getId() : null;
+                    Long inheritedAnswerId = inh.answer != null ? inh.answer.getId() : null;
+                    if (!Objects.equals(existingAnswerId, inheritedAnswerId)) {
+                        existing.setMaturityAnswer(inh.answer);
+                        closeChanged = true;
+                    }
+                } else {
+                    SecurityControl ctrl = securityControlRepository.findById(ctrlId).orElse(null);
+                    if (ctrl != null) {
+                        AssessmentControlAnswer newAca = new AssessmentControlAnswer(ctrl, inh.answer, inh.comment);
+                        newAca = assessmentControlAnswerRepository.save(newAca);
+                        closeDetails.getControlAnswers().add(newAca);
+                        closeChanged = true;
+                    }
+                }
+            }
+            if (closeChanged || !closeDetailsOpt.isPresent()) {
+                assessmentDetailsService.save(closeDetails);
+            }
+        }
+        assessmentRepository.save(assessment);
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
+        if (detailsOpt.isPresent()) {
             AssessmentDetails details = detailsOpt.get();
             details.setCompletedDate(LocalDate.now());
             assessmentDetailsService.save(details);
+        }
+    }
+
+
+    // Change assessment status: OPEN→REVIEW (for creator/assigned ISM), REVIEW→CLOSED (full close)
+    @PostMapping("/{id}/change-status")
+    public String changeAssessmentStatus(@PathVariable Long id,
+                                         @RequestParam(value = "newStatus", required = false) String newStatus) {
+        Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
+        if (assessmentOpt.isEmpty()) return "redirect:/assessment/" + id;
+        Assessment assessment = assessmentOpt.get();
+
+        boolean isAdmin = authorizationService.isAdmin();
+        boolean isISM = authorizationService.isInformationSecurityManager();
+        boolean isAdminOrISM = isAdmin || isISM;
+        User currentUser = null;
+        try { currentUser = authorizationService.getCurrentUser(); } catch (Exception ignored) {}
+        final User cu = currentUser;
+        boolean isCreator = cu != null && assessment.getCreatedBy() != null
+                && assessment.getCreatedBy().getId().equals(cu.getId());
+        boolean isAssignedISM = isAdminOrISM && cu != null
+                && assessment.getUsers() != null
+                && assessment.getUsers().stream().anyMatch(u -> cu.getId().equals(u.getId()));
+        if (!isCreator && !isAssignedISM) {
+            throw new UnauthorizedException("You do not have permission to change assessment status.");
+        }
+
+        // If no newStatus param (legacy call), fall back to forward progression
+        if (newStatus == null || newStatus.isBlank()) {
+            if (assessment.isOpen()) {
+                assessment.setStatus(AssessmentStatus.REVIEW);
+                assessmentRepository.save(assessment);
+            } else if (assessment.isReview()) {
+                doFinalizeAssessment(assessment, id);
             }
-        
+            return "redirect:/assessment/" + id;
+        }
+
+        AssessmentStatus targetStatus;
+        try {
+            targetStatus = AssessmentStatus.valueOf(newStatus.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return "redirect:/assessment/" + id;
+        }
+
+        if (targetStatus == assessment.getStatus()) {
+            return "redirect:/assessment/" + id;
+        }
+
+        if (targetStatus == AssessmentStatus.CLOSED) {
+            doFinalizeAssessment(assessment, id);
+        } else {
+            // Reverting away from CLOSED: clear close date and closedBy
+            if (assessment.getStatus() == AssessmentStatus.CLOSED) {
+                assessment.setCloseDate(null);
+                assessment.setClosedBy(null);
+            }
+            assessment.setStatus(targetStatus);
+            assessmentRepository.save(assessment);
+        }
+        return "redirect:/assessment/" + id;
+    }
+
+    // Ready for Review: interviewee-initiated OPEN→REVIEW
+    @PostMapping("/{id}/ready-for-review")
+    public String readyForReview(@PathVariable Long id) {
+        Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
+        if (assessmentOpt.isEmpty()) return "redirect:/assessment/" + id;
+        Assessment assessment = assessmentOpt.get();
+        if (!assessment.isOpen()) return "redirect:/assessment/" + id;
+
+        User cu = null;
+        try { cu = authorizationService.getCurrentUser(); } catch (Exception ignored) {}
+        if (cu == null) throw new UnauthorizedException("Not authenticated.");
+        boolean isAdminOrISM = authorizationService.isAdmin() || authorizationService.isInformationSecurityManager();
+        final User finalCu = cu;
+        boolean isInterviewee = assessment.getInterviewees() != null
+                && assessment.getInterviewees().stream().anyMatch(u -> finalCu.getId().equals(u.getId()));
+        if (!isAdminOrISM && !isInterviewee) {
+            throw new UnauthorizedException("You do not have permission to change assessment status.");
+        }
+        assessment.setStatus(AssessmentStatus.REVIEW);
+        assessmentRepository.save(assessment);
         return "redirect:/assessment/" + id;
     }
 
@@ -1020,6 +1147,44 @@ public class AssessmentController {
             assessmentRepository.delete(assessment);
         }
         return "redirect:/assessment/list";
+    }
+
+    // Rename assessment (AJAX POST)
+    @PostMapping("/{id}/rename")
+    @ResponseBody
+    public ResponseEntity<Map<String, String>> renameAssessment(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        if (!authorizationService.isAdmin() && !authorizationService.isInformationSecurityManager()) {
+            return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
+        }
+        String newName = body.get("name");
+        if (newName == null || newName.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Name must not be empty"));
+        }
+        Optional<Assessment> opt = assessmentRepository.findById(id);
+        if (opt.isEmpty()) return ResponseEntity.notFound().build();
+        Assessment assessment = opt.get();
+        assessment.setName(newName.trim());
+        assessmentRepository.save(assessment);
+        return ResponseEntity.ok(Map.of("name", assessment.getName()));
+    }
+
+    // Set stereotypes for an assessment (AJAX PUT)
+    @PutMapping("/{id}/stereotypes")
+    @ResponseBody
+    public ResponseEntity<Void> setStereotypes(@PathVariable Long id, @RequestBody List<Long> stereotypeIds) {
+        if (!authorizationService.isAdmin() && !authorizationService.isInformationSecurityManager()) {
+            return ResponseEntity.status(403).build();
+        }
+        Optional<Assessment> opt = assessmentRepository.findById(id);
+        if (opt.isEmpty()) return ResponseEntity.notFound().build();
+        Assessment assessment = opt.get();
+        Set<AssessmentStereotype> chosen = new HashSet<>();
+        for (Long sid : stereotypeIds) {
+            assessmentStereotypeRepository.findById(sid).ifPresent(chosen::add);
+        }
+        assessment.setStereotypes(chosen);
+        assessmentRepository.save(assessment);
+        return ResponseEntity.ok().build();
     }
 
     @GetMapping("/{id}/word-report-progress")
@@ -1618,7 +1783,23 @@ public class AssessmentController {
             prompt.append("\nCompliance Check: ").append(assessment.getComplianceCheck().getName()).append("\n");
         }
 
-        prompt.append("\nPlease provide a 3-5 paragraph management summary covering: overall security posture, key findings, risks, and recommendations. Use plain text without markdown headers.");
+        Set<AssessmentStereotype> stereotypes = assessment.getStereotypes();
+        if (stereotypes != null && !stereotypes.isEmpty()) {
+            prompt.append("\nAssessment Stereotypes:\n");
+            for (AssessmentStereotype st : stereotypes) {
+                prompt.append("- ").append(st.getName());
+                if (st.getDescription() != null && !st.getDescription().isBlank()) {
+                    prompt.append(": ").append(st.getDescription());
+                }
+                prompt.append("\n");
+            }
+        }
+
+        prompt.append("\nPlease provide a management summary covering: overall security posture, key findings, risks, and recommendations.");
+        if (stereotypes != null && !stereotypes.isEmpty()) {
+            prompt.append(" Additionally, include a dedicated paragraph for each assigned stereotype, discussing how the assessment findings relate to that stereotype's specific context and risk profile.");
+        }
+        prompt.append(" Return the response as HTML using only <p>, <strong>, <ul>, <li> tags. No markdown, no headers, no other HTML tags.");
 
         try {
             String summary = openAIUtil.askAI(prompt.toString(), false);

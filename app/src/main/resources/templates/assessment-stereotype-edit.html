@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <title th:text="${editMode} ? 'Edit Stereotype' : 'Create Stereotype'">Stereotype</title>
+    <meta charset="UTF-8">
+    <th:block th:replace="~{navigation :: navHead}"></th:block>
+</head>
+<body>
+<div th:replace="~{navigation :: mainNav}"></div>
+<div class="container">
+    <h1 class="page-title" th:text="${editMode} ? 'Edit Stereotype' : 'Create Stereotype'">Stereotype</h1>
+
+    <form th:action="@{/assessment-stereotype/save}" method="post" style="max-width:600px;">
+        <input type="hidden" name="id" th:if="${editMode}" th:value="${stereotype.id}">
+
+        <div class="form-group">
+            <label for="name">Name <span class="required-hint">*</span></label>
+            <input type="text" id="name" name="name" required
+                   th:value="${stereotype.name}" placeholder="e.g. Internal Audit">
+        </div>
+
+        <div class="form-group">
+            <label for="description">Description</label>
+            <textarea id="description" name="description" rows="3"
+                      placeholder="Optional description"
+                      th:text="${stereotype.description}"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="catalogId">Related Catalog</label>
+            <select id="catalogId" name="catalogId">
+                <option value="">— None (applies to all catalogs) —</option>
+                <option th:each="c : ${catalogs}"
+                        th:value="${c.id}"
+                        th:text="${c.name}"
+                        th:selected="${stereotype.securityCatalog != null and stereotype.securityCatalog.id == c.id}"></option>
+            </select>
+            <span class="help-text">Restrict this stereotype to a specific security catalog, or leave blank for all.</span>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn-submit" th:text="${editMode} ? 'Save Changes' : 'Create Stereotype'">Create Stereotype</button>
+            <a href="/assessment-stereotype/list" class="btn-cancel">Cancel</a>
+        </div>
+    </form>
+</div>
+</body>
+</html>

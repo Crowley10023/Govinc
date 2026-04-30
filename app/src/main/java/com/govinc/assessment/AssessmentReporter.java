@@ -347,6 +347,7 @@ public class AssessmentReporter {
             for (String domain : domainOrder) {
                 java.util.List<SecurityControl> ctrlList = controlsPerDomain.get(domain);
 
+                doc.newPage();
                 Paragraph domainP = new Paragraph("5." + domainNum + " " + domain, subHeaderFont);
                 domainP.setSpacingBefore(13);
                 domainP.setSpacingAfter(2);

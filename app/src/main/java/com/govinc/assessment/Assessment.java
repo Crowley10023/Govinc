@@ -18,6 +18,20 @@ import jakarta.persistence.*;
 @Entity
 @Table(name = "assessments")
 public class Assessment {
+
+    // Who closed / finalized this assessment
+    @ManyToOne(optional = true)
+    @JoinColumn(name = "closed_by_id")
+    private User closedBy;
+
+    // Stereotypes assigned to this assessment
+    @ManyToMany
+    @JoinTable(
+        name = "assessment_stereotype_assignments",
+        joinColumns = @JoinColumn(name = "assessment_id"),
+        inverseJoinColumns = @JoinColumn(name = "stereotype_id")
+    )
+    private Set<AssessmentStereotype> stereotypes = new HashSet<>();
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -38,6 +52,7 @@ public class Assessment {
     private String name;
 
     @Enumerated(EnumType.STRING)
+    @Column(columnDefinition = "VARCHAR(20)")
     private AssessmentStatus status = AssessmentStatus.OPEN;
 
     // Removed assessmentUrl field
@@ -157,6 +172,10 @@ public class Assessment {
         return AssessmentStatus.OPEN.equals(this.status);
     }
 
+    public boolean isReview() {
+        return AssessmentStatus.REVIEW.equals(this.status);
+    }
+
     // Removed getAssessmentUrl and setAssessmentUrl methods
 
     public AssessmentUrls getAssessmentUrls() {
@@ -248,6 +267,12 @@ public class Assessment {
     public void setGuideVisibleInDirect(boolean guideVisibleInDirect) {
         this.guideVisibleInDirect = guideVisibleInDirect;
     }
+
+    public User getClosedBy() { return closedBy; }
+    public void setClosedBy(User closedBy) { this.closedBy = closedBy; }
+
+    public Set<AssessmentStereotype> getStereotypes() { return stereotypes; }
+    public void setStereotypes(Set<AssessmentStereotype> stereotypes) { this.stereotypes = stereotypes; }
 
     // Absolute expiration date for the assessment's direct URL (replaces day-decrement counter)
     @Column(name = "url_expiration_date")

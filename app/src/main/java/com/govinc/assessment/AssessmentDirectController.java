@@ -348,26 +348,11 @@ public class AssessmentDirectController {
         }
 
         Assessment assessment = maybeUrl.get().getAssessment();
-        
-        // Set assessment status to CLOSED (finalized) to align with existing DB values
-        assessment.setStatus(AssessmentStatus.CLOSED);
-        assessment.setCloseDate(LocalDate.now());
-        // Snapshot the current catalog controls so the closed assessment
-        // retains a fixed scope even if the catalog is later modified.
-        if (assessment.getSecurityCatalog() != null) {
-            assessment.setSnapshotControls(
-                new java.util.HashSet<>(assessment.getSecurityCatalog().getSecurityControls()));
-        }
+
+        // Move assessment to REVIEW state so the IS Manager can review before closing
+        assessment.setStatus(AssessmentStatus.REVIEW);
         assessmentRepository.save(assessment);
 
-        // Update assessment details with completion date
-        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(assessment.getId());
-        if (detailsOpt.isPresent()) {
-            AssessmentDetails details = detailsOpt.get();
-            details.setCompletedDate(LocalDate.now());
-            assessmentDetailsService.save(details);
-        }
-        
         return "redirect:/assessment-direct/" + obfuscatedId;
     }
 }

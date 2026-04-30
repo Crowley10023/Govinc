@@ -388,11 +388,17 @@ public class AssessmentReporterWord {
 
             final String tblStyle = styleMapping.getTableStyle() != null ? styleMapping.getTableStyle() : "";
 
+            // --- Introduction ---
+            elements.add(createParagraphWithStyle(factory, "Introduction", "Heading1", ta));
+            elements.add(setFullWidth(factory, buildIntroductionTable(factory, assessment, details, users), tblStyle));
+
             // --- Assessment Details ---
+            elements.add(createPageBreak(factory));
             elements.add(createParagraphWithStyle(factory, "Assessment Details", "Heading1", ta));
             elements.add(setFullWidth(factory, buildDetailsTable(factory, assessment, details, users), tblStyle));
 
             // --- Summary of Answers ---
+            elements.add(createPageBreak(factory));
             elements.add(createParagraphWithStyle(factory, "Summary of Answers", "Heading1", ta));
             Map<String, Integer> maturityCounts = new LinkedHashMap<>();
             int totalAnswered = 0;
@@ -415,6 +421,7 @@ public class AssessmentReporterWord {
             elements.add(setFullWidth(factory, buildMaturityCountsTable(factory, maturityCounts, totalAnswered), tblStyle));
 
             // --- Average Maturity Rating by Domain ---
+            elements.add(createPageBreak(factory));
             elements.add(createParagraphWithStyle(factory, "Average Maturity Rating by Domain", "Heading1", ta));
             Map<String, double[]> domainStats = new LinkedHashMap<>();
             for (SecurityControl sc : allControls) {
@@ -442,28 +449,36 @@ public class AssessmentReporterWord {
             // --- Compliance Check ---
             if (assessment.getComplianceCheck() != null && details != null) {
                 ComplianceCheck cc = assessment.getComplianceCheck();
+                elements.add(createPageBreak(factory));
                 elements.add(createParagraphWithStyle(factory, "Compliance Check: " + cc.getName(), "Heading1", ta));
                 elements.add(setFullWidth(factory, buildComplianceTable(factory, assessment, details, answerMap), tblStyle));
             }
 
             // --- Management Summary ---
+            elements.add(createPageBreak(factory));
             elements.add(createParagraphWithStyle(factory, "Management Summary", "Heading1", ta));
             String mgmtSummary = assessment.getManagementSummary();
             if (mgmtSummary != null && !mgmtSummary.isBlank()) {
-                elements.add(createParagraphWithStyle(factory, mgmtSummary, "Normal", ta));
+                for (P htmlPara : createHtmlParagraphs(factory, mgmtSummary, "Normal", ta)) {
+                    elements.add(htmlPara);
+                }
             } else {
                 elements.add(createParagraphWithStyle(factory, "(No management summary available)", "Normal", ta));
             }
 
-            // --- Per-domain control sections ---
+            // --- Per-domain control sections (extra chapter) ---
             Map<String, List<SecurityControl>> controlsByDomain = new LinkedHashMap<>();
             for (SecurityControl sc : allControls) {
                 String dn = sc.getSecurityControlDomain() != null ? sc.getSecurityControlDomain().getName() : "Uncategorized";
                 controlsByDomain.computeIfAbsent(dn, k -> new ArrayList<>()).add(sc);
             }
-            for (Map.Entry<String, List<SecurityControl>> entry : controlsByDomain.entrySet()) {
-                elements.add(createParagraphWithStyle(factory, entry.getKey(), "Heading2", ta));
-                elements.add(setFullWidth(factory, buildDomainControlsTable(factory, entry.getValue(), answerMap), tblStyle));
+            if (!controlsByDomain.isEmpty()) {
+                elements.add(createPageBreak(factory));
+                elements.add(createParagraphWithStyle(factory, "Security Domain Details", "Heading1", ta));
+                for (Map.Entry<String, List<SecurityControl>> entry : controlsByDomain.entrySet()) {
+                    elements.add(createParagraphWithStyle(factory, entry.getKey(), "Heading2", ta));
+                    elements.add(setFullWidth(factory, buildDomainControlsTable(factory, entry.getValue(), answerMap), tblStyle));
+                }
             }
 
             updateProgress(assessmentId, 60, "Inserting content into template...");
@@ -518,6 +533,50 @@ public class AssessmentReporterWord {
     // ======================================================
     // Table building helpers
     // ======================================================
+
+    private Tbl buildIntroductionTable(ObjectFactory factory, Assessment assessment, AssessmentDetails details, List<User> users) {
+        Tbl tbl = factory.createTbl();
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd MMM yyyy");
+
+        // What was done
+        addDetailRow(tbl, factory, "Assessment", assessment.getName() != null ? assessment.getName() : "-");
+        if (assessment.getSecurityCatalog() != null) {
+            addDetailRow(tbl, factory, "Security Catalog", assessment.getSecurityCatalog().getName());
+        }
+        addDetailRow(tbl, factory, "Organization Unit", assessment.getOrgUnit() != null ? assessment.getOrgUnit().getName() : "-");
+        addDetailRow(tbl, factory, "Status", assessment.getStatus() != null ? assessment.getStatus().toString() : "-");
+
+        // When
+        addDetailRow(tbl, factory, "Started", assessment.getCreationDate() != null ? assessment.getCreationDate().format(fmt) : "-");
+        if (details != null && details.getCompletedDate() != null) {
+            addDetailRow(tbl, factory, "Completed", details.getCompletedDate().format(fmt));
+        } else if (assessment.getCloseDate() != null) {
+            addDetailRow(tbl, factory, "Closed", assessment.getCloseDate().format(fmt));
+        }
+
+        // IS Managers
+        String ismStr = "-";
+        if (users != null && !users.isEmpty()) {
+            ismStr = users.stream().map(User::getName).filter(Objects::nonNull).collect(Collectors.joining(", "));
+        } else if (assessment.getUsers() != null && !assessment.getUsers().isEmpty()) {
+            ismStr = assessment.getUsers().stream().map(User::getName).filter(Objects::nonNull).collect(Collectors.joining(", "));
+        }
+        addDetailRow(tbl, factory, "IS Manager(s)", ismStr);
+
+        // Interviewees
+        if (assessment.getInterviewees() != null && !assessment.getInterviewees().isEmpty()) {
+            String iStr = assessment.getInterviewees().stream()
+                    .map(User::getName).filter(Objects::nonNull).collect(Collectors.joining(", "));
+            addDetailRow(tbl, factory, "Interviewees", iStr);
+        } else {
+            addDetailRow(tbl, factory, "Interviewees", "-");
+        }
+
+        // Prepared by
+        addDetailRow(tbl, factory, "Prepared By", assessment.getCreatedBy() != null ? assessment.getCreatedBy().getName() : "-");
+
+        return tbl;
+    }
 
     private Tbl buildDetailsTable(ObjectFactory factory, Assessment assessment, AssessmentDetails details, List<User> users) {
         Tbl tbl = factory.createTbl();
@@ -1533,10 +1592,59 @@ public class AssessmentReporterWord {
     }
 
     /**
+     * Splits an HTML management summary (using &lt;p&gt;, &lt;ul&gt;, &lt;li&gt;, &lt;strong&gt;) into Word paragraphs.
+     * Each &lt;p&gt; becomes a paragraph; &lt;li&gt; items become bullet-style paragraphs.
+     * &lt;strong&gt; content is rendered as bold runs.
+     */
+    private List<P> createHtmlParagraphs(ObjectFactory factory, String html, String styleName, TemplateAnalysis ta) {
+        List<P> result = new ArrayList<>();
+        if (html == null || html.isBlank()) return result;
+
+        // Strip outer whitespace and normalise line endings
+        String src = html.replace("\r\n", "\n").replace("\r", "\n").trim();
+
+        // Extract <p>...</p> and <li>...</li> blocks
+        java.util.regex.Pattern blockPattern = java.util.regex.Pattern.compile(
+                "<(p|li)(?:\\s[^>]*)?>([\\s\\S]*?)</\\1>", java.util.regex.Pattern.CASE_INSENSITIVE);
+        java.util.regex.Matcher bm = blockPattern.matcher(src);
+        boolean found = false;
+        while (bm.find()) {
+            found = true;
+            String tag = bm.group(1).toLowerCase(java.util.Locale.ROOT);
+            String inner = bm.group(2).trim();
+            // Convert <strong> to custom <style bold="true">
+            inner = inner.replaceAll("(?i)<strong>([\\s\\S]*?)</strong>", "<style bold=\"true\">$1</style>");
+            inner = inner.replaceAll("(?i)<em>([\\s\\S]*?)</em>", "<style bold=\"true\">$1</style>");
+            // Strip any other remaining tags
+            inner = inner.replaceAll("<(?!/?(style))[^>]+>", "");
+            String prefix = "li".equals(tag) ? "• " : "";
+            result.add(createParagraphWithStyle(factory, prefix + inner, styleName, ta));
+        }
+        if (!found) {
+            // No block-level tags — treat whole string as single paragraph after stripping tags
+            String plain = src.replaceAll("<[^>]+>", "");
+            if (!plain.isBlank()) {
+                result.add(createParagraphWithStyle(factory, plain.trim(), styleName, ta));
+            }
+        }
+        return result;
+    }
+
+    /**
      * Create a paragraph and attempt to apply the template's style.
      * Use type-safe access to the StyleDefinitionsPart and apply paragraph and run properties.
      * Also processes inline styling tags parsed from AI.
      */
+    private P createPageBreak(ObjectFactory factory) {
+        P p = factory.createP();
+        R r = factory.createR();
+        org.docx4j.wml.Br br = factory.createBr();
+        br.setType(org.docx4j.wml.STBrType.PAGE);
+        r.getContent().add(br);
+        p.getContent().add(r);
+        return p;
+    }
+
     private P createParagraphWithStyle(ObjectFactory factory, String text, String styleName, TemplateAnalysis ta) {
         P p = factory.createP();
 

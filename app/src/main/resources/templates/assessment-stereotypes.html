@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <title>Assessment Stereotypes</title>
+    <meta charset="UTF-8">
+    <meta name="_csrf" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:content="${_csrf.headerName}">
+    <th:block th:replace="~{navigation :: navHead}"></th:block>
+</head>
+<body>
+<div th:replace="~{navigation :: mainNav}"></div>
+<div class="container">
+    <h1 class="page-title">Assessment Stereotypes</h1>
+    <p class="text-muted">Stereotypes classify assessments into predefined types, optionally scoped to a security catalog.</p>
+
+    <div class="general-button-bar">
+        <a href="/assessment-stereotype/create" class="btn-action">Create New Stereotype</a>
+    </div>
+
+    <!-- Catalog filter -->
+    <form method="get" action="/assessment-stereotype/list" style="margin-bottom:1em;display:flex;align-items:center;gap:0.8em;">
+        <label for="catalogFilter" style="font-weight:500;">Filter by Catalog:</label>
+        <select id="catalogFilter" name="catalogId" onchange="this.form.submit()" style="padding:0.3em 0.6em;border-radius:4px;border:1px solid #ccc;">
+            <option value="" th:selected="${selectedCatalogId == null}">All Catalogs</option>
+            <option th:each="cat : ${catalogs}"
+                    th:value="${cat.id}"
+                    th:text="${cat.name}"
+                    th:selected="${selectedCatalogId != null and selectedCatalogId == cat.id}"></option>
+        </select>
+    </form>
+
+    <div th:if="${#lists.isEmpty(stereotypes)}" class="no-results">
+        <p>No stereotypes defined yet.</p>
+        <a href="/assessment-stereotype/create">Create the first one</a>
+    </div>
+
+    <table th:if="${not #lists.isEmpty(stereotypes)}" class="table" id="stereotypesTable">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Related Catalog</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="st : ${stereotypes}">
+                <td th:text="${st.name}"></td>
+                <td th:text="${st.description}"></td>
+                <td th:text="${st.securityCatalog != null ? st.securityCatalog.name : '—'}"></td>
+                <td>
+                    <div class="flex-row gap-sm">
+                        <a th:href="@{'/assessment-stereotype/edit'(id=${st.id})}" class="btn-edit">Edit</a>
+                        <button type="button" class="btn-danger"
+                                th:data-id="${st.id}"
+                                th:data-name="${st.name}"
+                                onclick="handleDeleteClick(event)">Delete</button>
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="deleteModal" class="modal-bg">
+    <div class="modal-popup-confirmation">
+        <h3>Confirm Deletion</h3>
+        <p>Are you sure you want to delete <strong id="stereotypeName"></strong>?</p>
+        <p class="text-muted">This action cannot be undone.</p>
+        <div class="modal-btn-row">
+            <button type="button" class="btn-cancel" onclick="closeDeleteModal()">Cancel</button>
+            <button type="button" class="btn-danger" onclick="confirmDelete()">Delete</button>
+        </div>
+    </div>
+</div>
+
+<!-- Result Modal -->
+<div id="resultModal" class="modal-bg">
+    <div class="modal-popup-confirmation">
+        <h3 id="resultTitle">Success</h3>
+        <p id="resultMessage"></p>
+        <div class="modal-btn-row">
+            <button type="button" class="btn-action" onclick="document.getElementById('resultModal').style.display='none';location.reload();">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let pendingDeleteId = null;
+    const csrfToken = document.querySelector('meta[name="_csrf"]').content;
+    const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+
+    function handleDeleteClick(event) {
+        const btn = event.currentTarget;
+        pendingDeleteId = btn.getAttribute('data-id');
+        document.getElementById('stereotypeName').textContent = btn.getAttribute('data-name');
+        document.getElementById('deleteModal').style.display = 'flex';
+    }
+
+    function closeDeleteModal() {
+        document.getElementById('deleteModal').style.display = 'none';
+        pendingDeleteId = null;
+    }
+
+    function confirmDelete() {
+        if (!pendingDeleteId) return;
+        const idToDelete = pendingDeleteId;
+        closeDeleteModal();
+        const headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
+        headers[csrfHeader] = csrfToken;
+        fetch('/assessment-stereotype/delete', {
+            method: 'POST',
+            headers: headers,
+            body: 'id=' + encodeURIComponent(idToDelete)
+        }).then(function(r) {
+            if (r.ok) {
+                document.getElementById('resultTitle').textContent = 'Deleted';
+                document.getElementById('resultMessage').textContent = 'The stereotype has been deleted.';
+            } else {
+                document.getElementById('resultTitle').textContent = 'Error';
+                document.getElementById('resultMessage').textContent = 'Could not delete stereotype.';
+            }
+            document.getElementById('resultModal').style.display = 'flex';
+        });
+    }
+</script>
+</body>
+</html>

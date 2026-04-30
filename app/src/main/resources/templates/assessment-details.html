@@ -79,8 +79,10 @@
                     <table class="table card">
                         <tr>
                             <th>Assessment Name</th>
-                            <td th:text="${assessment.name}"></td>
-                            <td class="details-action-col"></td>
+                            <td id="assessment-name-display" th:text="${assessment.name}"></td>
+                            <td class="details-action-col">
+                                <button th:if="${isAdminOrISM}" type="button" class="btn-action" onclick="openRenameModal()">Rename</button>
+                            </td>
                         </tr>
                         <tr>
                             <th>Creation Date</th>
@@ -92,9 +94,14 @@
                             <td th:text="${assessment.createdBy != null ? assessment.createdBy.name : 'Unknown'}"></td>
                             <td class="details-action-col"></td>
                         </tr>
-                        <tr th:if="${assessment.closeDate != null}">
-                            <th>Close Date</th>
-                            <td th:text="${closeDateDisplay}"></td>
+                        <tr>
+                            <th>Closed On</th>
+                            <td th:text="${assessment.closeDate != null ? closeDateDisplay : '—'}"></td>
+                            <td class="details-action-col"></td>
+                        </tr>
+                        <tr>
+                            <th>Closed By</th>
+                            <td th:text="${assessment.closedBy != null ? assessment.closedBy.name : '—'}"></td>
                             <td class="details-action-col"></td>
                         </tr>
                         <tr>
@@ -132,6 +139,20 @@
                         <tr>
                             <th>Status</th>
                             <td th:text="${assessment.status}"></td>
+                            <td class="details-action-col">
+                                <button th:if="${isCreatorOrAssignedISM}"
+                                    type="button" id="change-status-btn" class="btn-action">Change Status</button>
+                            </td>
+                        </tr>
+                        <!-- Ready for Review — visible to assigned interviewees when OPEN -->
+                        <tr th:if="${isAssignedInterviewee and assessment.isOpen}">
+                            <th></th>
+                            <td>
+                                <form th:action="@{'/assessment/' + ${assessment.id} + '/ready-for-review'}" method="post">
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <button type="submit" class="btn-action">Ready for Review</button>
+                                </form>
+                            </td>
                             <td class="details-action-col"></td>
                         </tr>
                         <tr th:if="${assessment.status == 'CLOSED' and details != null and details.completedDate != null}">
@@ -175,7 +196,20 @@
                             <td class="details-action-col"></td>
                         </tr>
                         <tr>
-                            <th>Users</th>
+                            <th>Stereotypes</th>
+                            <td id="assessment-stereotypes-cell">
+                                <span th:if="${assessmentStereotypes == null or #sets.isEmpty(assessmentStereotypes)}" class="text-muted">None</span>
+                                <div th:if="${assessmentStereotypes != null and not #sets.isEmpty(assessmentStereotypes)}" class="pill-list">
+                                    <span th:each="st : ${assessmentStereotypes}" class="user-pill" th:text="${st.name}"></span>
+                                </div>
+                            </td>
+                            <td class="details-action-col">
+                                <button th:if="${isAdminOrISM and not #lists.isEmpty(availableStereotypes)}" type="button" class="btn-action" onclick="openStereotypeModal()">Choose</button>
+                                <span th:if="${isAdminOrISM and #lists.isEmpty(availableStereotypes)}" class="text-muted text-sm">No stereotypes for this catalog</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>IS Manager</th>
                             <td id="assessment-users-cell">
                                 <span th:if="${assessment.users == null || #lists.isEmpty(assessment.users)}" class="text-muted">None</span>
                                 <div th:if="${assessment.users != null && !#lists.isEmpty(assessment.users)}" class="pill-list">
@@ -183,7 +217,7 @@
                                 </div>
                             </td>
                             <td class="details-action-col">
-                                <button th:if="${(isAdminOrISM or canManageAssessors) and assessment.isOpen}" id="choose-users-btn" type="button" class="modal-launch-btn btn-action" th:text="${canManageAssessors ? 'Add User' : 'Choose Users'}">Choose Users</button>
+                                <button th:if="${(isAdminOrISM or canManageAssessors) and assessment.isOpen}" id="choose-users-btn" type="button" class="modal-launch-btn btn-action" th:text="${canManageAssessors ? 'Add IS Manager' : 'Choose IS Managers'}">Choose IS Managers</button>
                             </td>
                         </tr>
                         <tr>
@@ -278,9 +312,9 @@
                     <!-- Management Summary -->
                     <h2>Management Summary</h2>
                     <div style="margin-bottom:1em;">
-                        <div id="management-summary-text" style="white-space:pre-wrap;line-height:1.6;min-height:3em;background:#f9f9f9;border-radius:6px;padding:0.8em 1em;border:1px solid #e0e0e0;">
+                        <div id="management-summary-text" style="line-height:1.6;min-height:3em;background:#f9f9f9;border-radius:6px;padding:0.8em 1em;border:1px solid #e0e0e0;">
                             <span th:if="${assessment.managementSummary != null and !assessment.managementSummary.blank}"
-                                  th:text="${assessment.managementSummary}"></span>
+                                  th:utext="${assessment.managementSummary}"></span>
                             <span th:if="${assessment.managementSummary == null or assessment.managementSummary.blank}"
                                   class="text-muted">No summary generated yet. Click "Update" to generate an AI-based summary.</span>
                         </div>
@@ -361,8 +395,8 @@
                                                             th:data-control-id="${ctrl.id}"
                                                             th:data-control-name="${ctrl.name}"
                                                             th:data-control-detail="${ctrl.detail}"
-                                                            th:disabled="${!assessment.isOpen} or (${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])})"
-                                                            th:title="${!assessment.isOpen} ? 'Disabled on finalized assessments' : (${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])} ? 'Disabled for taken-over answers' : 'Get AI-powered answering guide')">
+                                                            th:disabled="${!canEditControls} or (${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])})"
+                                                            th:title="${!canEditControls} ? 'Disabled on locked assessments' : (${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])} ? 'Disabled for taken-over answers' : 'Get AI-powered answering guide')">
                                                             💡 Guide
                                                         </button>
                                                     </div>
@@ -371,7 +405,7 @@
                                                             th:data-control-id="${ctrl.id}"
                                                             th:data-domain-id="${domain.id}"
                                                             class="answer-select"
-                                                            th:disabled="${!assessment.isOpen} or (${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])})"
+                                                            th:disabled="${!canEditControls} or (${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])})"
                                                             th:classappend="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])} ? 'taken-over' : ''">
                                                             <option value="">-- select an answer --</option>
                                                             <option th:each="ans : ${maturityAnswers}"
@@ -392,7 +426,7 @@
                                                                 th:data-control-id="${ctrl.id}"
                                                                 th:data-assessment-id="${assessment.id}"
                                                                 th:checked="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])}"
-                                                                th:disabled="${!assessment.isOpen}"
+                                                                th:disabled="${!canEditControls}"
                                                                 onchange="toggleOverride(this)"
                                                                 title="Toggle override of org service answer">
                                                             <span class="override-slider"></span>
@@ -410,7 +444,7 @@
                                                     <textarea class="comment-textarea"
                                                         th:name="${'comment_' + ctrl.id}"
                                                         th:data-control-id="${ctrl.id}"
-                                                        th:disabled="${!assessment.isOpen} or (${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])})"
+                                                        th:disabled="${!canEditControls} or (${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])})"
                                                         th:placeholder="${(T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id]))} ? 'No comment from Org Service' : 'Add comment (optional)'"
                                                         th:text="${controlComments != null && controlComments[ctrl.id] != null ? controlComments[ctrl.id] : (orgServiceControlComments != null && orgServiceControlComments[ctrl.id] != null ? orgServiceControlComments[ctrl.id] : '')}"
                                                         th:inline="text"></textarea>
@@ -428,8 +462,7 @@
         <section class="general-button-bar">
             <button th:if="${assessment.isOpen}" id="assessment-wizard-btn" type="button" class="btn-action wizard-launch-btn" onclick="openAssessmentWizard()">&#129302; Assessment Wizard</button>
 
-            <button th:if="${assessment.isOpen and isAdminOrISM}" id="finalize-btn" type="button" class="btn-action">Finalize</button>
-            <button th:if="${!assessment.isOpen and isAdminOrISM}" id="reopen-assessment-btn" type="button" class="btn-action">Re-open Assessment</button>
+            <button th:if="${!assessment.isOpen and !assessment.isReview and isAdminOrISM}" id="reopen-assessment-btn" type="button" class="btn-action">Re-open Assessment</button>
             <form th:if="${isAdminOrISM}" id="deleteAssessmentForm" th:action="@{'/assessment/' + ${assessment.id} + '/delete'}" method="post" style="display:inline">
                 <button type="button" class="modal-launch-btn btn-danger" onclick="document.getElementById('deleteAssessmentModal').style.display='flex'">Delete</button>
             </form>
@@ -441,9 +474,39 @@
                     <a th:href="@{'/assessment/' + ${assessment.id} + '/excel'}" class="reporting-option">Export to Excel</a>
                 </div>
             </div>
-            <button th:if="${isAdminOrISM and assessment.isOpen}" id="create-url-btn" type="button" class="btn-action">Create URL</button>
+            <button th:if="${isAdminOrISM and assessment.isOpen and (assessment.assessmentUrls == null or assessment.assessmentUrls.url == null)}" id="create-url-btn" type="button" class="btn-action">Create URL</button>
             <button th:if="${isAdminOrISM}" id="send-email-btn" type="button" class="btn-action"
                     onclick="openEmailModal()">&#9993; Send E-Mail</button>
+
+            <!-- Rename Assessment Modal -->
+            <div id="rename-modal" class="modal-bg">
+                <div class="modal-popup" style="width:420px;">
+                    <h3>Rename Assessment</h3>
+                    <div class="modal-content">
+                        <label for="rename-input" style="display:block;margin-bottom:0.4em;font-weight:600;">New Name</label>
+                        <input type="text" id="rename-input" class="form-control" style="width:100%;box-sizing:border-box;"
+                               placeholder="Assessment name" maxlength="255">
+                        <p id="rename-error" class="text-danger text-sm" style="display:none;margin-top:0.4em;"></p>
+                    </div>
+                    <div class="modal-btn-row">
+                        <button type="button" id="rename-cancel-btn" class="btn-secondary">Cancel</button>
+                        <button type="button" id="rename-confirm-btn" class="btn-action">Rename</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stereotype Selection Modal -->
+            <div id="stereotype-modal" class="modal-bg">
+                <div class="modal-popup" style="width:460px;max-height:70vh;display:flex;flex-direction:column;">
+                    <h3 style="flex-shrink:0;">Choose Stereotypes</h3>
+                    <p class="text-muted text-sm" style="flex-shrink:0;margin-bottom:0.6em;">Select the stereotypes that apply to this assessment.</p>
+                    <div id="stereotype-check-list" class="user-check-list" style="flex:1;overflow-y:auto;min-height:6em;"></div>
+                    <div class="modal-btn-row" style="flex-shrink:0;margin-top:0.8em;">
+                        <button type="button" class="btn-cancel" onclick="closeStereotypeModal()">Cancel</button>
+                        <button type="button" class="btn-action" onclick="submitStereotypes()">Save</button>
+                    </div>
+                </div>
+            </div>
 
             <!-- Create URL Modal -->
             <div id="create-url-modal" class="modal-bg">
@@ -511,20 +574,26 @@
                 </div>
             </div>
 
-            <!-- Finalize Confirmation Modal -->
-            <div id="finalize-modal-bg" class="modal-bg">
+            <!-- Change Status Modal -->
+            <div id="change-status-modal-bg" class="modal-bg">
                 <div class="modal-popup">
-                    <h3>Finalize Assessment</h3>
-                    <div class="modal-content">
-                        <p>Are you sure you want to finalize this assessment?</p>
-                        <p class="text-muted text-sm mt-sm">
-                            <strong>⚠️ Important:</strong> Once finalized, this assessment will be locked and no further edits will be allowed.
-                        </p>
-                    </div>
-                    <div class="modal-btn-row">
-                        <button type="button" id="finalize-cancel-btn" class="btn-secondary">Cancel</button>
-                        <button type="button" id="finalize-confirm-btn" class="btn-primary">Finalize Assessment</button>
-                    </div>
+                    <h3>Change Assessment Status</h3>
+                    <form th:action="@{'/assessment/' + ${assessment.id} + '/change-status'}" method="post">
+                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                        <div class="modal-content">
+                            <label for="change-status-select" style="display:block;margin-bottom:0.4em;font-weight:600;">Set status to</label>
+                            <select id="change-status-select" name="newStatus" class="form-control" style="width:100%;margin-bottom:0.8em;">
+                                <option value="OPEN"      th:selected="${assessment.isOpen}">OPEN — Editing enabled for all assigned users</option>
+                                <option value="REVIEW"    th:selected="${assessment.isReview}">REVIEW — Editing restricted to IS Managers and creator</option>
+                                <option value="CLOSED"    th:selected="${assessment.status.name() == 'CLOSED'}">CLOSED — Assessment finalized and locked</option>
+                            </select>
+                            <p class="text-muted text-sm">Setting to <strong>CLOSED</strong> will record the close date and lock all editing. Changing away from CLOSED will clear the close date.</p>
+                        </div>
+                        <div class="modal-btn-row">
+                            <button type="button" id="change-status-cancel-btn" class="btn-secondary">Cancel</button>
+                            <button type="submit" id="change-status-confirm-btn" class="btn-primary">Save</button>
+                        </div>
+                    </form>
                 </div>
             </div>
 
@@ -726,6 +795,8 @@
                                     <span class="help-text text-sm" style="width:100%;margin-bottom:1px;">Ctrl / Cmd for multiple.</span>
                                     <button type="button" class="btn-action" style="font-size:0.78em;padding:2px 7px;"
                                             onclick="openEmailUserPickModal()">&#128101; Assigned Users</button>
+                                    <button type="button" class="btn-action" style="font-size:0.78em;padding:2px 7px;"
+                                            onclick="openCorpDirModal()">&#9729; Corp Directory</button>
                                 </div>
                             </div>
 
@@ -867,53 +938,26 @@
         window.currentAssessmentIdForProgress = /*[[${assessment.id}]]*/ 0;
         /*]]>*/
 
-        // Finalize Modal Handler
+        // Change Status Modal Handler
         document.addEventListener('DOMContentLoaded', function() {
-            var finalizeBtn = document.getElementById('finalize-btn');
-            var finalizeModal = document.getElementById('finalize-modal-bg');
-            var finalizeCancelBtn = document.getElementById('finalize-cancel-btn');
-            var finalizeConfirmBtn = document.getElementById('finalize-confirm-btn');
+            var changeStatusBtn = document.getElementById('change-status-btn');
+            var changeStatusModal = document.getElementById('change-status-modal-bg');
+            var changeStatusCancelBtn = document.getElementById('change-status-cancel-btn');
 
-            if (finalizeBtn) {
-                finalizeBtn.addEventListener('click', function() {
-                    finalizeModal.style.display = 'flex';
+            if (changeStatusBtn) {
+                changeStatusBtn.addEventListener('click', function() {
+                    changeStatusModal.style.display = 'flex';
                 });
             }
 
-            if (finalizeCancelBtn) {
-                finalizeCancelBtn.addEventListener('click', function() {
-                    finalizeModal.style.display = 'none';
+            if (changeStatusCancelBtn) {
+                changeStatusCancelBtn.addEventListener('click', function() {
+                    changeStatusModal.style.display = 'none';
                 });
             }
 
-            if (finalizeConfirmBtn) {
-                finalizeConfirmBtn.addEventListener('click', function() {
-                    var csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
-                    var csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
-
-                    fetch('/assessment/' + window.assessmentId + '/finalize', {
-                        method: 'POST',
-                        headers: {
-                            [csrfHeader]: csrfToken,
-                            'Content-Type': 'application/x-www-form-urlencoded'
-                        }
-                    })
-                    .then(response => {
-                        if (response.ok) {
-                            window.location.href = '/assessment/' + window.assessmentId;
-                        } else {
-                            alert('Error finalizing assessment. Please try again.');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        alert('Error finalizing assessment. Please try again.');
-                    });
-                });
-            }
-
-            if (finalizeModal) {
-                finalizeModal.addEventListener('mousedown', function(event) {
+            if (changeStatusModal) {
+                changeStatusModal.addEventListener('mousedown', function(event) {
                     if (event.target === this) {
                         this.style.display = 'none';
                     }
@@ -942,7 +986,7 @@
                     .then(function(data) {
                         updateSummaryBtn.disabled = false;
                         if (data.summary) {
-                            textEl.textContent = data.summary;
+                            textEl.innerHTML = data.summary;
                             statusEl.textContent = 'Summary updated.';
                         } else {
                             statusEl.textContent = 'Error: ' + (data.error || 'Unknown error');
@@ -1723,7 +1767,7 @@
         </div>
     </div>
 
-    <script>
+    <script th:inline="javascript">
         function openCtrlTaskModal(btn) {
             var controlId = btn.getAttribute('data-control-id');
             var controlName = btn.getAttribute('data-control-name') || '';
@@ -1804,6 +1848,88 @@
             }).then(function(r) {
                 if (r.ok) { window.location.reload(); }
                 else { alert('Failed to save interviewees'); }
+            });
+        }
+
+        // ---- Rename Assessment ----
+        function openRenameModal() {
+            var currentName = document.getElementById('assessment-name-display').textContent.trim();
+            var input = document.getElementById('rename-input');
+            input.value = currentName;
+            document.getElementById('rename-error').style.display = 'none';
+            document.getElementById('rename-modal').style.display = 'flex';
+            setTimeout(function() { input.focus(); input.select(); }, 50);
+        }
+        document.getElementById('rename-cancel-btn').addEventListener('click', function() {
+            document.getElementById('rename-modal').style.display = 'none';
+        });
+        document.getElementById('rename-confirm-btn').addEventListener('click', function() {
+            var newName = document.getElementById('rename-input').value.trim();
+            var errorEl = document.getElementById('rename-error');
+            if (!newName) { errorEl.textContent = 'Name must not be empty.'; errorEl.style.display = 'block'; return; }
+            var csrfToken = document.querySelector('meta[name="_csrf"]').content;
+            var csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+            var headers = { 'Content-Type': 'application/json' };
+            headers[csrfHeader] = csrfToken;
+            fetch('/assessment/' + window.assessmentId + '/rename', {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify({ name: newName })
+            }).then(function(r) {
+                if (r.ok) return r.json();
+                else throw new Error('Failed');
+            }).then(function(data) {
+                document.getElementById('assessment-name-display').textContent = data.name;
+                document.getElementById('rename-modal').style.display = 'none';
+            }).catch(function() {
+                errorEl.textContent = 'Could not rename assessment.';
+                errorEl.style.display = 'block';
+            });
+        });
+
+        // ---- Stereotype Selection ----
+        var _availableStereotypes = /*[[${availableStereotypesData}]]*/ [];
+        var _assignedStereotypeIds = new Set(/*[[${assignedStereotypeIds}]]*/ []);
+
+        function openStereotypeModal() {
+            var listEl = document.getElementById('stereotype-check-list');
+            listEl.innerHTML = '';
+            if (!_availableStereotypes || _availableStereotypes.length === 0) {
+                listEl.innerHTML = '<p class="text-muted">No stereotypes available for this catalog.</p>';
+            } else {
+                _availableStereotypes.forEach(function(st) {
+                    var label = document.createElement('label');
+                    label.className = 'user-check-item';
+                    var cb = document.createElement('input');
+                    cb.type = 'checkbox';
+                    cb.className = 'stereotype-cb';
+                    cb.value = st.id;
+                    cb.checked = _assignedStereotypeIds.has(st.id);
+                    var span = document.createElement('span');
+                    span.textContent = st.name + (st.description ? ' — ' + st.description : '');
+                    label.appendChild(cb);
+                    label.appendChild(span);
+                    listEl.appendChild(label);
+                });
+            }
+            document.getElementById('stereotype-modal').style.display = 'flex';
+        }
+        function closeStereotypeModal() {
+            document.getElementById('stereotype-modal').style.display = 'none';
+        }
+        function submitStereotypes() {
+            var ids = Array.from(document.querySelectorAll('.stereotype-cb:checked')).map(function(cb) {
+                return parseInt(cb.value);
+            });
+            var csrfToken = document.querySelector('meta[name="_csrf"]').content;
+            var csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+            var headers = { 'Content-Type': 'application/json' };
+            headers[csrfHeader] = csrfToken;
+            fetch('/assessment/' + window.assessmentId + '/stereotypes', {
+                method: 'PUT', headers: headers, body: JSON.stringify(ids)
+            }).then(function(r) {
+                if (r.ok) { window.location.reload(); }
+                else { alert('Failed to save stereotypes'); }
             });
         }
     </script>

@@ -300,6 +300,46 @@ public class DatabaseMigrationService {
     }
 
     /**
+     * Execute migration from 1.4 to 1.5
+     */
+    @Transactional
+    public void migrateTo_1_5() throws Exception {
+        System.out.println("[DB Migration] Starting migration to version 1.5");
+        try {
+            // Check current column type of assessments.status
+            String sql = "SELECT DATA_TYPE, COLUMN_TYPE " +
+                    "FROM INFORMATION_SCHEMA.COLUMNS " +
+                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'assessments' AND COLUMN_NAME = 'status'";
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
+
+            if (rows.isEmpty()) {
+                throw new Exception("Column assessments.status not found");
+            }
+
+            String dataType = rows.get(0).get("DATA_TYPE") != null
+                    ? rows.get(0).get("DATA_TYPE").toString().toLowerCase(Locale.ROOT)
+                    : "";
+
+            if ("enum".equals(dataType)) {
+                jdbcTemplate.execute("ALTER TABLE assessments MODIFY COLUMN status VARCHAR(20) NOT NULL DEFAULT 'OPEN'");
+                System.out.println("[DB Migration] Converted assessments.status from ENUM to VARCHAR(20)");
+            } else {
+                System.out.println("[DB Migration] assessments.status already compatible (" + dataType + "), no ALTER needed");
+            }
+
+            DatabaseConfig config = getDatabaseConfig();
+            config.setCurrentVersion("1.5");
+            config.setDescription("Converted assessments.status to VARCHAR(20) to support new REVIEW status value");
+            databaseConfigRepository.save(config);
+            System.out.println("[DB Migration] Successfully updated database config to version 1.5");
+        } catch (Exception e) {
+            System.out.println("[DB Migration] ERROR: Migration to 1.5 failed: " + e.getMessage());
+            e.printStackTrace();
+            throw new Exception("Migration to 1.5 failed: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Execute a specific migration
      */
     @Transactional
@@ -331,7 +371,8 @@ public class DatabaseMigrationService {
                 new MigrationDefinition("0.9", "1.0", "Fix AIProvider constraints - allow multiple providers of same type"),
                 new MigrationDefinition("1.0", "1.1", "Allow multiple organization units per leader - remove unique constraint on leader_id"),
                 new MigrationDefinition("1.1", "1.2", "Make maturity_answer_id column nullable in assessment_control_answer - allows saving comments without answers"),
-                new MigrationDefinition("1.3", "1.4", "Normalize user.role column for new roles (convert ENUM to VARCHAR)")
+                new MigrationDefinition("1.3", "1.4", "Normalize user.role column for new roles (convert ENUM to VARCHAR)"),
+                new MigrationDefinition("1.4", "1.5", "Convert assessments.status column from ENUM to VARCHAR(20) to support new REVIEW status value")
         );
     }
 
@@ -375,7 +416,7 @@ public class DatabaseMigrationService {
     }
 
     private boolean hasMigrationHandler(String toVersion) {
-        return "1.0".equals(toVersion) || "1.1".equals(toVersion) || "1.2".equals(toVersion) || "1.4".equals(toVersion);
+        return "1.0".equals(toVersion) || "1.1".equals(toVersion) || "1.2".equals(toVersion) || "1.4".equals(toVersion) || "1.5".equals(toVersion);
     }
 
     private void executeSingleMigration(String toVersion) throws Exception {
@@ -387,6 +428,8 @@ public class DatabaseMigrationService {
             migrateTo_1_2();
         } else if ("1.4".equals(toVersion)) {
             migrateTo_1_4();
+        } else if ("1.5".equals(toVersion)) {
+            migrateTo_1_5();
         } else {
             throw new Exception("Unknown migration target version: " + toVersion);
         }
