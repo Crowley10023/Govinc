@@ -46,6 +46,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Controller
 @RequestMapping("/assessment")
@@ -109,6 +110,12 @@ public class AssessmentController {
 
     @Autowired
     private AssessmentStereotypeRepository assessmentStereotypeRepository;
+
+    @Autowired
+    private AssessmentPresenceService assessmentPresenceService;
+
+    @Autowired
+    private AssessmentSseService assessmentSseService;
 
     @GetMapping("/create")
     public String showCreateAssessmentForm(Model model) {
@@ -751,6 +758,8 @@ public class AssessmentController {
             model.addAttribute("isCreatorOrAssignedISM", isCreatorOrAssignedISM);
             model.addAttribute("isAssignedInterviewee", isAssignedInterviewee);
             model.addAttribute("canEditControls", canEditControls);
+            model.addAttribute("currentUserDisplayName",
+                    finalCurrentUser != null && finalCurrentUser.getName() != null ? finalCurrentUser.getName() : "");
 
             // Compliance check score calculation
             if (assessment.getComplianceCheck() != null && details != null) {
@@ -886,6 +895,7 @@ public class AssessmentController {
         // Only update the modified/new answer, do NOT replace the set with only one
         // answer
         assessmentDetailsService.save(details);
+        assessmentSseService.broadcast(id, "update", buildUpdatePayload(id));
         return "ok";
     }
 
@@ -935,6 +945,7 @@ public class AssessmentController {
             found = assessmentControlAnswerRepository.save(found);
         }
         assessmentDetailsService.save(details);
+        assessmentSseService.broadcast(assessmentId, "update", buildUpdatePayload(assessmentId));
         return "ok";
     }
 
@@ -1809,6 +1820,116 @@ public class AssessmentController {
         } catch (Exception e) {
             return Map.of("error", "AI generation failed: " + e.getMessage());
         }
+    }
+
+    // Lightweight poll endpoint: keeps session alive, registers presence, returns change token + active users
+    // ---- SSE live-update subscription ----
+
+    @GetMapping(value = "/{id}/events", produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)
+    @ResponseBody
+    public SseEmitter subscribeEvents(@PathVariable Long id, jakarta.servlet.http.HttpSession session) {
+        if (!authorizationService.canAccessAssessment(id)) {
+            throw new com.govinc.authorization.UnauthorizedException("You do not have permission to access this assessment.");
+        }
+        String displayName = "Unknown";
+        try {
+            User cu = authorizationService.getCurrentUser();
+            if (cu != null && cu.getName() != null) displayName = cu.getName();
+        } catch (Exception ignored) {}
+
+        final Long assessmentId = id;
+        final String sessionKey = session.getId();
+        assessmentPresenceService.register(assessmentId, sessionKey, displayName);
+
+        SseEmitter emitter = assessmentSseService.subscribe(assessmentId, () -> {
+            assessmentPresenceService.remove(assessmentId, sessionKey);
+            assessmentSseService.broadcast(assessmentId, "presence",
+                    assessmentPresenceService.getAllUsers(assessmentId));
+        });
+
+        // Send current state only to the newly connected client
+        try {
+            emitter.send(SseEmitter.event().name("update")
+                    .data(buildUpdatePayload(assessmentId), org.springframework.http.MediaType.APPLICATION_JSON));
+        } catch (java.io.IOException ignored) {}
+
+        // Broadcast updated presence list to ALL connected clients (including the new one)
+        assessmentSseService.broadcast(assessmentId, "presence",
+                assessmentPresenceService.getAllUsers(assessmentId));
+        return emitter;
+    }
+
+    /** Builds the controlAnswers + comments payload used by SSE update events and the ping endpoint. */
+    private Map<String, Object> buildUpdatePayload(Long assessmentId) {
+        Map<String, Long> controlAnswersMap = new java.util.LinkedHashMap<>();
+        Map<String, String> commentsMap = new java.util.LinkedHashMap<>();
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(assessmentId);
+        if (detailsOpt.isPresent()) {
+            for (AssessmentControlAnswer a : detailsOpt.get().getControlAnswers()) {
+                if (a.getSecurityControl() != null && a.getMaturityAnswer() != null) {
+                    controlAnswersMap.put(String.valueOf(a.getSecurityControl().getId()),
+                            a.getMaturityAnswer().getId());
+                }
+                if (a.getSecurityControl() != null && a.getComment() != null && !a.getComment().isEmpty()) {
+                    commentsMap.put(String.valueOf(a.getSecurityControl().getId()), a.getComment());
+                }
+            }
+        }
+        Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("controlAnswers", controlAnswersMap);
+        payload.put("comments", commentsMap);
+        return payload;
+    }
+
+    @GetMapping("/{id}/ping")
+    @ResponseBody
+    public Map<String, Object> pingAssessment(@PathVariable Long id,
+            jakarta.servlet.http.HttpSession session) {
+        Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
+        if (assessmentOpt.isEmpty()) {
+            return Map.of("error", "not_found");
+        }
+        Assessment assessment = assessmentOpt.get();
+        // Register presence
+        String displayName = "Unknown";
+        try {
+            User cu = authorizationService.getCurrentUser();
+            if (cu != null && cu.getName() != null) displayName = cu.getName();
+        } catch (Exception ignored) {}
+        assessmentPresenceService.register(id, session.getId(), displayName);
+        // Build fingerprint + collect inline-update payload
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
+        long answerCount = 0;
+        long maxAnswerId = 0;
+        long maturitySum = 0;
+        Map<String, Long> controlAnswersMap = new java.util.LinkedHashMap<>();
+        Map<String, String> commentsMap = new java.util.LinkedHashMap<>();
+        if (detailsOpt.isPresent()) {
+            Set<AssessmentControlAnswer> answers = detailsOpt.get().getControlAnswers();
+            answerCount = answers.size();
+            for (AssessmentControlAnswer a : answers) {
+                if (a.getId() != null && a.getId() > maxAnswerId) maxAnswerId = a.getId();
+                if (a.getMaturityAnswer() != null && a.getMaturityAnswer().getId() != null) {
+                    maturitySum += a.getMaturityAnswer().getId();
+                }
+                if (a.getSecurityControl() != null && a.getMaturityAnswer() != null) {
+                    controlAnswersMap.put(String.valueOf(a.getSecurityControl().getId()),
+                            a.getMaturityAnswer().getId());
+                }
+                if (a.getSecurityControl() != null && a.getComment() != null && !a.getComment().isEmpty()) {
+                    commentsMap.put(String.valueOf(a.getSecurityControl().getId()), a.getComment());
+                }
+            }
+        }
+        String token = answerCount + "|" + maxAnswerId + "|" + maturitySum + "|" + assessment.getStatus();
+        java.util.List<String> others = assessmentPresenceService.getOtherUsers(id, session.getId());
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("token", token);
+        result.put("status", assessment.getStatus().toString());
+        result.put("activeUsers", others);
+        result.put("controlAnswers", controlAnswersMap);
+        result.put("comments", commentsMap);
+        return result;
     }
 
     // Toggle guide visibility in assessment-direct view

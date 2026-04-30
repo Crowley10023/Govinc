@@ -317,6 +317,7 @@
                 var guideVisible = data.guideVisibleInDirect === true;
                 window._directCatalogId = data.securityCatalogId || 0;
                 window._directMaturityAnswers = answers;
+                window._directControls = controls; // used by inline update
                 // Hide finalize bar if finalized (read-only mode)
                 var finalizeBar = document.getElementById('finalize-button-sticky');
                 if (!isOpen && finalizeBar) { finalizeBar.style.display = 'none'; }
@@ -451,6 +452,8 @@
                 
                 // Store assessmentId globally for finalize button
                 window.assessmentId = a.id;
+                // Start polling now that assessment ID is known
+                if (window._startAssessmentPolling) window._startAssessmentPolling();
                 })
                 .catch(function() {
                     document.getElementById('ad-date').innerHTML = '<h1>Failed to load assessment</h1>';
@@ -737,6 +740,59 @@
         document.getElementById('direct-guide-modal-bg').addEventListener('mousedown', function(e) {
             if (e.target === this) closeDirectGuide();
         });
+    </script>
+
+    <!-- Live-update polling + session keepalive -->
+    <script>
+        (function() {
+            var _es = null;
+
+            function applyInlineUpdate(data) {
+                var answers = data.controlAnswers || {};
+                var comments = data.comments || {};
+                // Update answer selects (skip focused element to avoid disrupting live editing)
+                document.querySelectorAll('select.answer-select').forEach(function(sel) {
+                    var cid = sel.getAttribute('data-control-id');
+                    if (!cid || document.activeElement === sel) return;
+                    var newVal = answers[cid] != null ? String(answers[cid]) : '';
+                    if (sel.value !== newVal) sel.value = newVal;
+                });
+                // Update comment textareas
+                document.querySelectorAll('textarea.comment-textarea').forEach(function(ta) {
+                    var cid = ta.getAttribute('data-control-id');
+                    if (!cid || document.activeElement === ta) return;
+                    var newText = comments[cid] != null ? comments[cid] : '';
+                    if (ta.value !== newText) ta.value = newText;
+                });
+                // Refresh completion bar
+                if (typeof updateCompletionBar === 'function' && typeof getUpdatedControlAnswers === 'function') {
+                    updateCompletionBar(window._directControls || [], getUpdatedControlAnswers());
+                }
+            }
+
+            function startEventSource() {
+                var obfId = window.location.pathname.split('/')[2];
+                if (!obfId) return;
+                if (_es) { _es.close(); _es = null; }
+                _es = new EventSource('/assessment-direct/' + obfId + '/events');
+                _es.addEventListener('update', function(e) {
+                    try { applyInlineUpdate(JSON.parse(e.data)); } catch (ex) {}
+                });
+                _es.onerror = function() {
+                    // EventSource auto-reconnects on error
+                };
+            }
+
+            // Called from loadAssessment callback once window.assessmentId is available
+            window._startAssessmentPolling = function() {
+                if (_es) return; // already started
+                startEventSource();
+            };
+
+            window.addEventListener('beforeunload', function() {
+                if (_es) { _es.close(); _es = null; }
+            });
+        })();
     </script>
 </body>
 

@@ -1138,7 +1138,7 @@ table tbody tr:hover {
     display: flex;
     gap: 1.5em;
     align-items: center;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
 }
 
 .controls-filter-bar.sticky-filter-bar .progress-info {

@@ -45,6 +45,10 @@ public class SecurityConfig {
             "/assessment-direct/*/data",
             "/assessment-direct.html",
             "/assessment-direct/*",
+            // Public ping endpoint for live update detection (read-only)
+            "/assessment-direct/*/ping",
+            // Public SSE live-update subscription endpoint (read-only)
+            "/assessment-direct/*/events",
             // Public (anonymous) assessment direct write endpoints (obfuscated URLs) - must be permitAll
             "/assessment-direct/*/answer",
             "/assessment-direct/*/control/*/comment",

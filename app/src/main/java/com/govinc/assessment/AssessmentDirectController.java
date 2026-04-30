@@ -43,6 +43,12 @@ public class AssessmentDirectController {
     @Autowired
     private AnsweringGuideService answeringGuideService;
 
+    @Autowired
+    private AssessmentPresenceService assessmentPresenceService;
+
+    @Autowired
+    private AssessmentSseService assessmentSseService;
+
     // Replaced Thymeleaf mapping with RESTful endpoints
 
     // New JSON endpoint: Get all assessment data needed for the direct page (formerly Thymeleaf model)
@@ -205,6 +211,7 @@ public class AssessmentDirectController {
         }
         detailsService.save(details);
         System.out.println("[DEBUG] detailsService.save(details) called for assessmentId=" + id);
+        assessmentSseService.broadcast(id, "update", buildDirectUpdatePayload(id));
         return "ok";
     }
 
@@ -246,6 +253,7 @@ public class AssessmentDirectController {
             found.setComment(comment);
         }
         detailsService.save(details);
+        assessmentSseService.broadcast(id, "update", buildDirectUpdatePayload(id));
         return "ok";
     }
 
@@ -337,6 +345,100 @@ public class AssessmentDirectController {
             return Map.of("success", false, "message", "controlName is required");
         }
         return answeringGuideService.generateAnswerSummary(controlName, questions, answers, proposedAnswer);
+    }
+
+    // ---- SSE live-update subscription (public, no presence) ----
+
+    @GetMapping(value = "/assessment-direct/{obfuscatedId}/events",
+            produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)
+    @org.springframework.web.bind.annotation.ResponseBody
+    public org.springframework.web.servlet.mvc.method.annotation.SseEmitter subscribeDirectEvents(
+            @PathVariable String obfuscatedId) {
+        Optional<AssessmentUrls> maybeUrl = assessmentUrlsService.findByObfuscated(obfuscatedId);
+        if (!maybeUrl.isPresent()) {
+            org.springframework.web.servlet.mvc.method.annotation.SseEmitter dead =
+                    new org.springframework.web.servlet.mvc.method.annotation.SseEmitter();
+            dead.complete();
+            return dead;
+        }
+        Long assessmentId = maybeUrl.get().getAssessment().getId();
+        org.springframework.web.servlet.mvc.method.annotation.SseEmitter emitter =
+                assessmentSseService.subscribe(assessmentId, null);
+        try {
+            emitter.send(org.springframework.web.servlet.mvc.method.annotation.SseEmitter.event()
+                    .name("update")
+                    .data(buildDirectUpdatePayload(assessmentId),
+                            org.springframework.http.MediaType.APPLICATION_JSON));
+        } catch (java.io.IOException ignored) {}
+        return emitter;
+    }
+
+    private Map<String, Object> buildDirectUpdatePayload(Long assessmentId) {
+        Map<String, Long> controlAnswersMap = new java.util.LinkedHashMap<>();
+        Map<String, String> commentsMap = new java.util.LinkedHashMap<>();
+        Optional<AssessmentDetails> detailsOpt = detailsService.findById(assessmentId);
+        if (detailsOpt.isPresent()) {
+            for (AssessmentControlAnswer a : detailsOpt.get().getControlAnswers()) {
+                if (a.getSecurityControl() != null && a.getMaturityAnswer() != null) {
+                    controlAnswersMap.put(String.valueOf(a.getSecurityControl().getId()),
+                            a.getMaturityAnswer().getId());
+                }
+                if (a.getSecurityControl() != null && a.getComment() != null && !a.getComment().isEmpty()) {
+                    commentsMap.put(String.valueOf(a.getSecurityControl().getId()), a.getComment());
+                }
+            }
+        }
+        Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("controlAnswers", controlAnswersMap);
+        payload.put("comments", commentsMap);
+        return payload;
+    }
+
+    // Lightweight poll endpoint for assessment-direct (anonymous, read-only)
+    @GetMapping("/assessment-direct/{obfuscatedId}/ping")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public org.springframework.http.ResponseEntity<?> pingAssessmentDirect(
+            @PathVariable String obfuscatedId,
+            jakarta.servlet.http.HttpSession session) {
+        Optional<AssessmentUrls> maybeUrl = assessmentUrlsService.findByObfuscated(obfuscatedId);
+        if (!maybeUrl.isPresent()) {
+            return org.springframework.http.ResponseEntity.notFound().build();
+        }
+        Assessment assessment = maybeUrl.get().getAssessment();
+        // Register presence as "Anonymous" keyed by session ID
+        assessmentPresenceService.register(assessment.getId(), session.getId(), "Anonymous");
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(assessment.getId());
+        long answerCount = 0;
+        long maxAnswerId = 0;
+        long maturitySum = 0;
+        java.util.Map<String, Long> controlAnswersMap = new java.util.LinkedHashMap<>();
+        java.util.Map<String, String> commentsMap = new java.util.LinkedHashMap<>();
+        if (detailsOpt.isPresent()) {
+            Set<AssessmentControlAnswer> answers = detailsOpt.get().getControlAnswers();
+            answerCount = answers.size();
+            for (AssessmentControlAnswer a : answers) {
+                if (a.getId() != null && a.getId() > maxAnswerId) maxAnswerId = a.getId();
+                if (a.getMaturityAnswer() != null && a.getMaturityAnswer().getId() != null) {
+                    maturitySum += a.getMaturityAnswer().getId();
+                }
+                if (a.getSecurityControl() != null && a.getMaturityAnswer() != null) {
+                    controlAnswersMap.put(String.valueOf(a.getSecurityControl().getId()),
+                            a.getMaturityAnswer().getId());
+                }
+                if (a.getSecurityControl() != null && a.getComment() != null && !a.getComment().isEmpty()) {
+                    commentsMap.put(String.valueOf(a.getSecurityControl().getId()), a.getComment());
+                }
+            }
+        }
+        String token = answerCount + "|" + maxAnswerId + "|" + maturitySum + "|" + assessment.getStatus();
+        java.util.List<String> others = assessmentPresenceService.getOtherUsers(assessment.getId(), session.getId());
+        java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("token", token);
+        result.put("status", assessment.getStatus().toString());
+        result.put("activeUsers", others);
+        result.put("controlAnswers", controlAnswersMap);
+        result.put("comments", commentsMap);
+        return org.springframework.http.ResponseEntity.ok(result);
     }
 
     // Finalize assessment via assessment-direct (POST by obfuscated ID)

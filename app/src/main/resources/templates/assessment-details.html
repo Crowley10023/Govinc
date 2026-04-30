@@ -11,6 +11,51 @@
     <!-- CSRF meta tags for AJAX -->
     <meta name="_csrf" th:content="${_csrf.token}" />
     <meta name="_csrf_header" th:content="${_csrf.headerName}" />
+    <style>
+        /* Active users presence strip */
+        .presence-strip {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-left: auto;
+        }
+        .presence-avatar {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #2274a5;
+            color: #fff;
+            font-size: 0.7em;
+            font-weight: 700;
+            cursor: default;
+            position: relative;
+            border: 2px solid #fff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+            flex-shrink: 0;
+        }
+        .presence-avatar .presence-tooltip {
+            display: none;
+            position: absolute;
+            bottom: calc(100% + 6px);
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            background: rgba(30,40,60,0.93);
+            color: #fff;
+            font-size: 0.8em;
+            font-weight: 400;
+            padding: 3px 8px;
+            border-radius: 4px;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        .presence-avatar:hover .presence-tooltip {
+            display: block;
+        }
+    </style>
 </head>
 
 <body>
@@ -50,6 +95,8 @@
                 </div>
                 <span class="progress-percentage" id="completion-percentage">0%</span>
                 <span id="answered-count">0</span> / <span id="total-count">0</span>
+                <!-- Active users working on this assessment -->
+                <div class="presence-strip" id="presence-strip"></div>
             </div>
         </div>
     </div>
@@ -930,6 +977,7 @@
     <script th:inline="javascript">
         /*<![CDATA[*/
         window.assessmentId = /*[[${assessment.id}]]*/ 0;
+        window.currentUserDisplayName = /*[[${currentUserDisplayName}]]*/ '';
         window.securityCatalogId = /*[[${assessment.securityCatalog != null ? assessment.securityCatalog.id : 0}]]*/ 0;
         window.currentOrgUnitId = /*[[${assessment.orgUnit != null ? assessment.orgUnit.id : ''}]]*/ '';
         window.assessmentAssignedUserIds = /*[[${assessment.users != null ? assessment.users.![id] : {}}]]*/[];
@@ -1932,6 +1980,83 @@
                 else { alert('Failed to save stereotypes'); }
             });
         }
+    </script>
+
+    <!-- Live-update polling + session keepalive -->
+    <script>
+        (function() {
+            var _es = null;
+
+            function applyInlineUpdate(data) {
+                var answers = data.controlAnswers || {};
+                var comments = data.comments || {};
+                var changed = false;
+                // Update answer selects — skip focused or disabled (org-service inherited) ones
+                document.querySelectorAll('select.answer-select').forEach(function(sel) {
+                    var cid = sel.getAttribute('data-control-id');
+                    if (!cid || document.activeElement === sel || sel.disabled) return;
+                    var newVal = answers[cid] != null ? String(answers[cid]) : '';
+                    if (sel.value !== newVal) {
+                        sel.value = newVal;
+                        changed = true;
+                    }
+                });
+                // Update comment textareas — skip focused or disabled ones
+                document.querySelectorAll('textarea.comment-textarea').forEach(function(ta) {
+                    var cid = ta.getAttribute('data-control-id');
+                    if (!cid || document.activeElement === ta || ta.disabled) return;
+                    var newText = comments[cid] != null ? comments[cid] : '';
+                    if (ta.value !== newText) ta.value = newText;
+                });
+                // Always refresh completion bar
+                if (typeof updateAnsweredCount === 'function') updateAnsweredCount();
+                // Refresh charts, domain badges and active filters when any answer changed
+                if (changed) {
+                    if (typeof checkDomainCompleteness === 'function') checkDomainCompleteness();
+                    if (typeof debouncedUpdateMaturityChart === 'function') debouncedUpdateMaturityChart();
+                    if (typeof debouncedUpdatePieChart === 'function') debouncedUpdatePieChart();
+                    if (typeof applyFilters === 'function') applyFilters();
+                }
+            }
+
+            function renderPresence(users) {
+                var strip = document.getElementById('presence-strip');
+                if (!strip) return;
+                strip.innerHTML = '';
+                if (!users || users.length === 0) return;
+                var myName = window.currentUserDisplayName || '';
+                users.forEach(function(name) {
+                    if (myName && name === myName) return; // skip self
+                    var av = document.createElement('span');
+                    av.className = 'presence-avatar';
+                    av.innerHTML = '&#128100;' + '<span class="presence-tooltip">' + name.replace(/</g,'&lt;') + '</span>';
+                    strip.appendChild(av);
+                });
+            }
+
+            function startEventSource() {
+                var id = window.assessmentId;
+                if (!id) return;
+                if (_es) { _es.close(); _es = null; }
+                _es = new EventSource('/assessment/' + id + '/events', { withCredentials: true });
+                _es.addEventListener('update', function(e) {
+                    try { applyInlineUpdate(JSON.parse(e.data)); } catch (ex) {}
+                });
+                _es.addEventListener('presence', function(e) {
+                    try { renderPresence(JSON.parse(e.data)); } catch (ex) {}
+                });
+                _es.onerror = function() {
+                    // EventSource auto-reconnects on error — no manual action needed
+                };
+            }
+
+            document.addEventListener('DOMContentLoaded', function() {
+                setTimeout(startEventSource, 500);
+            });
+            window.addEventListener('beforeunload', function() {
+                if (_es) { _es.close(); _es = null; }
+            });
+        })();
     </script>
 </body>
 
