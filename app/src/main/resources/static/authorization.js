@@ -15,14 +15,10 @@
     function showForbiddenError(message) {
         message = message || "You do not have permission to perform this action.";
         
-        // Try to show Bootstrap modal if available
+        // Try to show Bootstrap 5 modal if available
         if (typeof bootstrap !== 'undefined' && typeof bootstrap.Modal !== 'undefined') {
             showErrorModal(message);
-        } else if (typeof $ !== 'undefined') {
-            // Fallback to Bootstrap 4 modal if jQuery available
-            showErrorModalBootstrap4(message);
         } else {
-            // Fallback to alert
             alert("Access Denied:\n\n" + message);
         }
     }

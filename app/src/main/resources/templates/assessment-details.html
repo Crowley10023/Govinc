@@ -2001,10 +2001,11 @@
                         changed = true;
                     }
                 });
-                // Update comment textareas — skip focused or disabled ones
+                // Update comment textareas — skip focused, disabled, or mid-save ones
                 document.querySelectorAll('textarea.comment-textarea').forEach(function(ta) {
                     var cid = ta.getAttribute('data-control-id');
                     if (!cid || document.activeElement === ta || ta.disabled) return;
+                    if (window._commentSaveTimers && window._commentSaveTimers[cid]) return;
                     var newText = comments[cid] != null ? comments[cid] : '';
                     if (ta.value !== newText) ta.value = newText;
                 });

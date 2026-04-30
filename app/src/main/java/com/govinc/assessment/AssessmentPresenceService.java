@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 public class AssessmentPresenceService {
 
     /** Seconds of inactivity before a user is considered gone. */
-    private static final long TIMEOUT_SECONDS = 120;
+    private static final long TIMEOUT_SECONDS = 7200; // 2 hours — SSE connections are long-lived; onClose handles cleanup
 
     public static class PresenceEntry {
         public final String displayName;

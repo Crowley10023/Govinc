@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.servlet.ModelAndView;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,6 +28,16 @@ public class GlobalExceptionHandler {
     public GlobalExceptionHandler(Environment env, LayoutConfigurationRepository layoutConfigurationRepository) {
         this.env = env;
         this.layoutConfigurationRepository = layoutConfigurationRepository;
+    }
+
+    /**
+     * SSE client disconnected (browser navigated away, tab closed) — do nothing.
+     * Without this, the catch-all handler tries to render an error page on a dead connection,
+     * causing a secondary "Response not usable after response errors" exception.
+     */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleAsyncRequestNotUsable(AsyncRequestNotUsableException ex) {
+        // intentionally empty — disconnect is expected and harmless
     }
 
     @ExceptionHandler(UnauthorizedException.class)

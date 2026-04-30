@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // ================== AUTOSAVE ASSESSMENT COMMENT LOGIC =====================
-  var debounceTimers = {};
+  window._commentSaveTimers = {};
   document.addEventListener('input', function(e) {
     if (e.target.classList.contains('comment-textarea')) {
       var textarea = e.target;
@@ -45,9 +45,10 @@ document.addEventListener('DOMContentLoaded', function() {
       if (textarea.disabled) return;
       
       // Clear prior timer
-      if (debounceTimers[controlId]) clearTimeout(debounceTimers[controlId]);
+      if (window._commentSaveTimers[controlId]) clearTimeout(window._commentSaveTimers[controlId]);
       
-      debounceTimers[controlId] = setTimeout(function() {
+      window._commentSaveTimers[controlId] = setTimeout(function() {
+        delete window._commentSaveTimers[controlId];
         // Fetch API call to save comment
         fetch('/assessment/' + assessmentId + '/control/' + controlId + '/comment', {
           method: 'PUT',
