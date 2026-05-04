@@ -55,6 +55,18 @@
         .presence-avatar:hover .presence-tooltip {
             display: block;
         }
+        .presence-self {
+            background: #28a745;
+            border-color: #1e7e34;
+        }
+        /* SSE live-update flash animation */
+        @keyframes sseFlash {
+            0%   { background-color: #b8f0c8; }
+            100% { background-color: transparent; }
+        }
+        .sse-updated {
+            animation: sseFlash 1.5s ease-out;
+        }
     </style>
 </head>
 
@@ -1987,6 +1999,15 @@
         (function() {
             var _es = null;
 
+            function flashElement(el) {
+                el.classList.remove('sse-updated');
+                void el.offsetWidth; // restart animation if already running
+                el.classList.add('sse-updated');
+                el.addEventListener('animationend', function() {
+                    el.classList.remove('sse-updated');
+                }, { once: true });
+            }
+
             function applyInlineUpdate(data) {
                 var answers = data.controlAnswers || {};
                 var comments = data.comments || {};
@@ -1999,6 +2020,7 @@
                     if (sel.value !== newVal) {
                         sel.value = newVal;
                         changed = true;
+                        flashElement(sel);
                     }
                 });
                 // Update comment textareas — skip focused, disabled, or mid-save ones
@@ -2007,7 +2029,10 @@
                     if (!cid || document.activeElement === ta || ta.disabled) return;
                     if (window._commentSaveTimers && window._commentSaveTimers[cid]) return;
                     var newText = comments[cid] != null ? comments[cid] : '';
-                    if (ta.value !== newText) ta.value = newText;
+                    if (ta.value !== newText) {
+                        ta.value = newText;
+                        flashElement(ta);
+                    }
                 });
                 // Always refresh completion bar
                 if (typeof updateAnsweredCount === 'function') updateAnsweredCount();
@@ -2024,15 +2049,26 @@
                 var strip = document.getElementById('presence-strip');
                 if (!strip) return;
                 strip.innerHTML = '';
-                if (!users || users.length === 0) return;
                 var myName = window.currentUserDisplayName || '';
-                users.forEach(function(name) {
-                    if (myName && name === myName) return; // skip self
-                    var av = document.createElement('span');
-                    av.className = 'presence-avatar';
-                    av.innerHTML = '&#128100;' + '<span class="presence-tooltip">' + name.replace(/</g,'&lt;') + '</span>';
-                    strip.appendChild(av);
-                });
+
+                // Always show the current user first (green = you, SSE is live)
+                var selfAv = document.createElement('span');
+                selfAv.className = 'presence-avatar presence-self';
+                var selfInitial = myName ? myName.charAt(0).toUpperCase() : '?';
+                selfAv.innerHTML = selfInitial + '<span class="presence-tooltip">' + (myName ? myName.replace(/</g,'&lt;') : 'You') + ' (you)</span>';
+                strip.appendChild(selfAv);
+
+                // Show other connected users
+                if (users && users.length > 0) {
+                    users.forEach(function(name) {
+                        if (myName && name === myName) return; // skip self, already shown above
+                        var av = document.createElement('span');
+                        av.className = 'presence-avatar';
+                        var initial = name ? name.charAt(0).toUpperCase() : '?';
+                        av.innerHTML = initial + '<span class="presence-tooltip">' + name.replace(/</g,'&lt;') + '</span>';
+                        strip.appendChild(av);
+                    });
+                }
             }
 
             function startEventSource() {
@@ -2052,6 +2088,8 @@
             }
 
             document.addEventListener('DOMContentLoaded', function() {
+                // Show "you" avatar immediately — before SSE connects
+                renderPresence([]);
                 setTimeout(startEventSource, 500);
             });
             window.addEventListener('beforeunload', function() {

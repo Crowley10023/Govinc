@@ -656,7 +656,8 @@ var currentAnsweringGuideState = {
     securityCatalogId: null,
     questions: [],
     answers: {},
-    proposedAnswer: null
+    proposedAnswer: null,
+    comment: null
 };
 
 function _aguideShowOverlay(label) {
@@ -676,6 +677,7 @@ function openAnsweringGuideModal(controlId, controlName, controlDetail, security
     currentAnsweringGuideState.questions = [];
     currentAnsweringGuideState.answers = {};
     currentAnsweringGuideState.proposedAnswer = null;
+    currentAnsweringGuideState.comment = null;
 
     $('#answering-guide-control-name').html('<h4>' + $('<span/>').text(controlName).html() + '</h4><p>' + $('<span/>').text(controlDetail).html() + '</p>');
     $('#answering-guide-questions').empty();
@@ -687,6 +689,10 @@ function openAnsweringGuideModal(controlId, controlName, controlDetail, security
 
     // Populate right panel with maturity answers
     populateGuideMaturityAnswers(controlId);
+
+    // Capture now so the success handler can discard stale responses if the guide
+    // was reopened for a different control while this AJAX was in-flight.
+    var openedForControlId = controlId;
 
     // Fetch questions from backend
     $.ajax({
@@ -702,6 +708,8 @@ function openAnsweringGuideModal(controlId, controlName, controlDetail, security
         success: function(response) {
             $('#answering-guide-loading').hide();
             _aguideHideOverlay();
+            // Guard against stale response from a previously opened guide
+            if (currentAnsweringGuideState.controlId !== openedForControlId) return;
             if (response && response.questions && Array.isArray(response.questions)) {
                 currentAnsweringGuideState.questions = response.questions;
                 displayAnsweringGuideQuestions(response.questions);
@@ -796,6 +804,10 @@ function submitAnsweringGuideAnswers() {
     $('#answering-guide-generating').hide();
     _aguideShowOverlay('Generating answer…');
 
+    // Capture the controlId NOW so the success callback can verify the guide
+    // hasn't been reopened for a different control while this AJAX was in-flight.
+    var submittedControlId = currentAnsweringGuideState.controlId;
+
     // Send answers to backend to get proposed answer
     $.ajax({
         url: '/assessment/generate-answer-from-guide',
@@ -803,6 +815,7 @@ function submitAnsweringGuideAnswers() {
         contentType: 'application/json',
         data: JSON.stringify({
             controlId: currentAnsweringGuideState.controlId,
+            controlName: currentAnsweringGuideState.controlName,
             securityCatalogId: currentAnsweringGuideState.securityCatalogId,
             questions: currentAnsweringGuideState.questions,
             answers: answers,
@@ -811,8 +824,12 @@ function submitAnsweringGuideAnswers() {
         success: function(response) {
             $('#answering-guide-generating').hide();
             _aguideHideOverlay();
+            // Guard: if the user already opened a new guide for a different control,
+            // discard this stale response to prevent state mixing.
+            if (currentAnsweringGuideState.controlId !== submittedControlId) return;
             if (response && response.proposedAnswer) {
                 currentAnsweringGuideState.proposedAnswer = response.proposedAnswer;
+                currentAnsweringGuideState.comment = response.comment || null;
                 $('#answering-guide-questions').show();
                 highlightSuggestedAnswer(response.proposedAnswer);
             } else {
@@ -961,36 +978,53 @@ function applyAnswerFromGuide(answerId, answerText) {
     var controlId = currentAnsweringGuideState.controlId;
     if (!controlId) return;
     var $select = $('select[data-control-id="' + controlId + '"]');
-    if ($select.length > 0) {
+    if ($select.length === 0) {
+        alert('Could not find answer dropdown for this control.');
+        return;
+    }
+
+    var comment = currentAnsweringGuideState.comment || null;
+    var capturedControlId = controlId;
+    var assessmentId = window.assessmentId || 0;
+
+    // Close modal immediately so the user sees the page update
+    closeAnsweringGuideModal();
+
+    function doApplyAnswer() {
         $select.val(answerId).change();
-        // Generate AI summary comment and populate the comment textarea
-        var questions = (currentAnsweringGuideState.questions || []).slice();
-        var answersMap = currentAnsweringGuideState.answers || {};
-        var answersArray = questions.map(function(q, i) { return answersMap[i] || ''; });
-        var controlName = currentAnsweringGuideState.controlName || '';
-        var capturedControlId = controlId;
-        closeAnsweringGuideModal();
-        $.ajax({
-            url: '/assessment/generate-answer-summary',
-            method: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify({
-                controlName: controlName,
-                questions: questions,
-                answers: answersArray,
-                proposedAnswer: answerText || ''
-            }),
-            success: function(resp) {
-                if (resp && resp.success && resp.summary) {
-                    var $textarea = $('textarea.comment-textarea[data-control-id="' + capturedControlId + '"]');
-                    if ($textarea.length > 0 && !$textarea.prop('disabled')) {
-                        $textarea.val(resp.summary).trigger('input');
-                    }
-                }
+    }
+
+    if (comment && assessmentId) {
+        // 1. Set the comment textarea in the UI
+        var $textarea = $('textarea.comment-textarea[data-control-id="' + capturedControlId + '"]');
+        if ($textarea.length > 0 && !$textarea.prop('disabled')) {
+            $textarea.val(comment);
+            // Cancel any pending debounce timer so the immediate save wins
+            if (window._commentSaveTimers && window._commentSaveTimers[capturedControlId]) {
+                clearTimeout(window._commentSaveTimers[capturedControlId]);
+                delete window._commentSaveTimers[capturedControlId];
             }
+        }
+        // 2. Save comment to server immediately, then apply the answer
+        //    so the SSE broadcast triggered by the answer save already includes the comment.
+        var csrfMeta = document.querySelector('meta[name="_csrf"]');
+        var csrfHeaderMeta = document.querySelector('meta[name="_csrf_header"]');
+        var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+        var csrfHeaderName = csrfHeaderMeta ? csrfHeaderMeta.getAttribute('content') : 'X-CSRF-TOKEN';
+        var headers = { 'Content-Type': 'application/json' };
+        headers[csrfHeaderName] = csrfToken;
+        fetch('/assessment/' + assessmentId + '/control/' + capturedControlId + '/comment', {
+            method: 'PUT',
+            headers: headers,
+            body: JSON.stringify({ comment: comment })
+        }).then(function() {
+            doApplyAnswer();
+        }).catch(function() {
+            // Apply answer anyway even if comment save failed
+            doApplyAnswer();
         });
     } else {
-        alert('Could not find answer dropdown for this control.');
+        doApplyAnswer();
     }
 }
 

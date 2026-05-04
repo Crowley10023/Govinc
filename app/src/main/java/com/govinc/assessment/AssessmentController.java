@@ -1838,11 +1838,12 @@ public class AssessmentController {
         } catch (Exception ignored) {}
 
         final Long assessmentId = id;
-        final String sessionKey = session.getId();
-        assessmentPresenceService.register(assessmentId, sessionKey, displayName);
+        // Use a per-connection UUID so multiple tabs in the same browser each get a distinct presence entry
+        final String connectionKey = java.util.UUID.randomUUID().toString();
+        assessmentPresenceService.register(assessmentId, connectionKey, displayName);
 
         SseEmitter emitter = assessmentSseService.subscribe(assessmentId, () -> {
-            assessmentPresenceService.remove(assessmentId, sessionKey);
+            assessmentPresenceService.remove(assessmentId, connectionKey);
             assessmentSseService.broadcast(assessmentId, "presence",
                     assessmentPresenceService.getAllUsers(assessmentId));
         });
@@ -1851,7 +1852,7 @@ public class AssessmentController {
         try {
             emitter.send(SseEmitter.event().name("update")
                     .data(buildUpdatePayload(assessmentId), org.springframework.http.MediaType.APPLICATION_JSON));
-        } catch (java.io.IOException ignored) {}
+        } catch (Exception ignored) {}
 
         // Broadcast updated presence list to ALL connected clients (including the new one)
         assessmentSseService.broadcast(assessmentId, "presence",

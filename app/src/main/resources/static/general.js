@@ -48,17 +48,23 @@ document.addEventListener('DOMContentLoaded', function() {
       if (window._commentSaveTimers[controlId]) clearTimeout(window._commentSaveTimers[controlId]);
       
       window._commentSaveTimers[controlId] = setTimeout(function() {
-        delete window._commentSaveTimers[controlId];
+        // Mark as "fetch in-flight" — keeps applyInlineUpdate from overwriting the textarea
+        // with a stale DB value until the save round-trip is complete.
+        window._commentSaveTimers[controlId] = 'saving';
+        var csrfMeta = document.querySelector('meta[name="_csrf"]');
+        var csrfHeaderMeta = document.querySelector('meta[name="_csrf_header"]');
+        var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+        var csrfHeaderName = csrfHeaderMeta ? csrfHeaderMeta.getAttribute('content') : 'X-CSRF-TOKEN';
+        var headers = { 'Content-Type': 'application/json' };
+        headers[csrfHeaderName] = csrfToken;
         // Fetch API call to save comment
         fetch('/assessment/' + assessmentId + '/control/' + controlId + '/comment', {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-Token': document.querySelector('meta[name="_csrf"]').getAttribute('content')
-          },
+          headers: headers,
           body: JSON.stringify({ comment: comment })
         })
         .then(function(response) {
+          delete window._commentSaveTimers[controlId];
           if (response.ok) {
             textarea.style.background = '#d8ffd8';
             setTimeout(function() {
@@ -69,6 +75,7 @@ document.addEventListener('DOMContentLoaded', function() {
           }
         })
         .catch(function() {
+          delete window._commentSaveTimers[controlId];
           textarea.style.background = '#ffd8d8';
           if (feedback && feedback.classList.contains('comment-feedback')) {
             feedback.innerHTML = '<span style="color:red;font-weight:bold;">Error saving</span>';

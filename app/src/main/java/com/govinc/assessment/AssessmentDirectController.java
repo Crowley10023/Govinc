@@ -369,14 +369,15 @@ public class AssessmentDirectController {
             return dead;
         }
         Long assessmentId = maybeUrl.get().getAssessment().getId();
-        String sessionKey = session.getId();
+        // Use a per-connection UUID so multiple tabs in the same browser each get a distinct presence entry
+        String connectionKey = java.util.UUID.randomUUID().toString();
 
         // Register anonymous presence
-        assessmentPresenceService.register(assessmentId, sessionKey, "Anonymous");
+        assessmentPresenceService.register(assessmentId, connectionKey, "Anonymous");
 
         org.springframework.web.servlet.mvc.method.annotation.SseEmitter emitter =
                 assessmentSseService.subscribe(assessmentId, () -> {
-                    assessmentPresenceService.remove(assessmentId, sessionKey);
+                    assessmentPresenceService.remove(assessmentId, connectionKey);
                     assessmentSseService.broadcast(assessmentId, "presence",
                             assessmentPresenceService.getAllUsers(assessmentId));
                 });

@@ -62,6 +62,7 @@ public class AnsweringGuideController {
      * Generate answer proposal based on user's yes/no answers.
      * The proposal is constrained to maturity model answers provided in the request.
      * This ensures the proposed answer fits to the assessment's maturity model.
+     * The response also includes a pre-generated AI comment based on the Q&A answers.
      */
     @PostMapping("/generate-answer-from-guide")
     @ResponseBody
@@ -106,6 +107,7 @@ public class AnsweringGuideController {
         List<String> answers = (List<String>) request.get("answers");
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> maturityModelAnswers = (List<Map<String, Object>>) request.get("maturityModelAnswers");
+        String controlName = (String) request.get("controlName");
 
         if (controlId == null) {
             Map<String, Object> errorResponse = new HashMap<>();
@@ -115,8 +117,22 @@ public class AnsweringGuideController {
         }
 
         // Use service to analyze answers and propose maturity level
-        // The proposed answer will be constrained to the provided maturity model answers
-        return answeringGuideService.proposeAnswerFromGuide(controlId, securityCatalogId, questions, answers, maturityModelAnswers);
+        Map<String, Object> result = answeringGuideService.proposeAnswerFromGuide(controlId, securityCatalogId, questions, answers, maturityModelAnswers);
+
+        // Also generate a comment based on the Q&A answers and proposed answer, so the client
+        // can pre-populate the comment field without a separate round-trip.
+        if (Boolean.TRUE.equals(result.get("success"))
+                && controlName != null && !controlName.isBlank()
+                && questions != null && !questions.isEmpty()) {
+            String proposedAnswerText = result.get("proposedAnswer") != null ? result.get("proposedAnswer").toString() : null;
+            Map<String, Object> commentResult = answeringGuideService.generateAnswerSummary(
+                    controlName, questions, answers, proposedAnswerText);
+            if (Boolean.TRUE.equals(commentResult.get("success"))) {
+                result.put("comment", commentResult.get("summary"));
+            }
+        }
+
+        return result;
     }
 
     /**

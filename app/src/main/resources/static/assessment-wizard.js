@@ -576,6 +576,7 @@
             contentType: 'application/json',
             data: JSON.stringify({
                 controlId: ctrl.controlId,
+                controlName: ctrl.controlName,
                 securityCatalogId: wizardState.securityCatalogId,
                 questions: cache.questions,
                 answers: answers,
@@ -588,25 +589,33 @@
                     renderMaturityAnswerCards(ctrl);
                     $guide.find('.guide-submit-answers-btn').prop('disabled', true).text('Analyzed \u2713');
 
-                    // Also generate a summary for the comment
-                    $.ajax({
-                        url: '/assessment/generate-answer-summary',
-                        type: 'POST',
-                        contentType: 'application/json',
-                        data: JSON.stringify({
-                            controlName: ctrl.controlName,
-                            questions: cache.questions,
-                            answers: answers,
-                            proposedAnswer: resp.proposedAnswer
-                        }),
-                        success: function(summResp) {
-                            if (summResp && summResp.success && summResp.summary) {
-                                $('#wizard-comment-input').val(summResp.summary);
-                                ctrl.comment = summResp.summary;
-                                saveCurrentComment();
-                            }
+                    // Use the comment returned alongside the proposal (no extra round-trip needed).
+                    // Save immediately to server so the SSE broadcast triggered by the subsequent
+                    // answer save already contains the comment.
+                    if (resp.comment) {
+                        $('#wizard-comment-input').val(resp.comment);
+                        // Cancel any pending debounce timer so the immediate save wins
+                        if (window._commentSaveTimers && window._commentSaveTimers[ctrl.controlId]) {
+                            clearTimeout(window._commentSaveTimers[ctrl.controlId]);
+                            delete window._commentSaveTimers[ctrl.controlId];
                         }
-                    });
+                        var csrfMeta = document.querySelector('meta[name="_csrf"]');
+                        var csrfHeaderMeta = document.querySelector('meta[name="_csrf_header"]');
+                        var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+                        var csrfHeaderName = csrfHeaderMeta ? csrfHeaderMeta.getAttribute('content') : 'X-CSRF-TOKEN';
+                        var headers = { 'Content-Type': 'application/json' };
+                        headers[csrfHeaderName] = csrfToken;
+                        fetch('/assessment/' + wizardState.assessmentId + '/control/' + ctrl.controlId + '/comment', {
+                            method: 'PUT',
+                            headers: headers,
+                            body: JSON.stringify({ comment: resp.comment })
+                        }).then(function() {
+                            ctrl.comment = resp.comment;
+                            // Sync to main page textarea
+                            var $ta = $('textarea.comment-textarea[data-control-id="' + ctrl.controlId + '"]');
+                            if ($ta.length && !$ta.prop('disabled')) { $ta.val(resp.comment); }
+                        });
+                    }
                 }
             },
             error: function() {
