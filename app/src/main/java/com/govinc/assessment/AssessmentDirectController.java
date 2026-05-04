@@ -387,7 +387,7 @@ public class AssessmentDirectController {
                     .name("update")
                     .data(buildDirectUpdatePayload(assessmentId),
                             org.springframework.http.MediaType.APPLICATION_JSON));
-        } catch (java.io.IOException ignored) {}
+        } catch (Exception ignored) {}
 
         // Broadcast updated presence to all subscribers (including assessment-details viewers)
         assessmentSseService.broadcast(assessmentId, "presence",
