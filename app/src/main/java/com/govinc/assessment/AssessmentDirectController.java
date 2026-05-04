@@ -168,13 +168,17 @@ public class AssessmentDirectController {
     // Save/update answer for a single control (AJAX POST from assessment-direct UI)
     @org.springframework.web.bind.annotation.PostMapping("/assessment-direct/{id}/answer")
     @org.springframework.web.bind.annotation.ResponseBody
-    public String saveDirectAnswer(@PathVariable Long id, @org.springframework.web.bind.annotation.RequestParam Long controlId, @org.springframework.web.bind.annotation.RequestParam Long answerId) {
-        System.out.println("[DEBUG] Called /assessment-direct/" + id + "/answer with controlId=" + controlId + " answerId=" + answerId);
+    public org.springframework.http.ResponseEntity<String> saveDirectAnswer(@PathVariable Long id, @org.springframework.web.bind.annotation.RequestParam Long controlId, @org.springframework.web.bind.annotation.RequestParam Long answerId) {
+        // Tamper-safe: only allow writes when assessment is OPEN
+        Assessment assessmentCheck = assessmentRepository.findById(id).orElse(null);
+        if (assessmentCheck == null) return org.springframework.http.ResponseEntity.notFound().build();
+        if (assessmentCheck.getStatus() != AssessmentStatus.OPEN)
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.LOCKED).body("locked");
+
         Optional<AssessmentDetails> detailsOpt = detailsService.findById(id);
         AssessmentDetails details = null;
         if (!detailsOpt.isPresent()) {
-            System.out.println("[DEBUG] AssessmentDetails not found for id=" + id);
-            return "fail";
+            return org.springframework.http.ResponseEntity.badRequest().body("fail");
         } else {
             details = detailsOpt.get();
         }
@@ -198,32 +202,34 @@ public class AssessmentDirectController {
         } catch (Exception e) { System.out.println("[DEBUG] Exception initializing controlRepo: " + e); }
         MaturityAnswer maturityAnswer = maturityAnswerRepository.findById(answerId).orElse(null);
         if (control == null || maturityAnswer == null) {
-            System.out.println("[DEBUG] control or maturityAnswer not found: control=" + control + " maturityAnswer=" + maturityAnswer);
-            return "fail";
+            return org.springframework.http.ResponseEntity.badRequest().body("fail");
         }
         if (found == null) {
             found = new AssessmentControlAnswer(control, maturityAnswer);
             answers.add(found);
-            System.out.println("[DEBUG] New AssessmentControlAnswer created for controlId=" + controlId + " with answer=" + maturityAnswer.getAnswer());
         } else {
             found.setMaturityAnswer(maturityAnswer);
-            System.out.println("[DEBUG] Updated AssessmentControlAnswer for controlId=" + controlId + " to answer=" + maturityAnswer.getAnswer());
         }
         detailsService.save(details);
-        System.out.println("[DEBUG] detailsService.save(details) called for assessmentId=" + id);
         assessmentSseService.broadcast(id, "update", buildDirectUpdatePayload(id));
-        return "ok";
+        return org.springframework.http.ResponseEntity.ok("ok");
     }
 
     // Save/update comment for a single control (AJAX PUT from direct UI)
     @org.springframework.web.bind.annotation.PutMapping("/assessment-direct/{id}/control/{controlId}/comment")
     @org.springframework.web.bind.annotation.ResponseBody
-    public String saveDirectComment(@PathVariable Long id, @PathVariable Long controlId, @org.springframework.web.bind.annotation.RequestBody Map<String, String> body) {
+    public org.springframework.http.ResponseEntity<String> saveDirectComment(@PathVariable Long id, @PathVariable Long controlId, @org.springframework.web.bind.annotation.RequestBody Map<String, String> body) {
+        // Tamper-safe: only allow writes when assessment is OPEN
+        Assessment assessmentCheck = assessmentRepository.findById(id).orElse(null);
+        if (assessmentCheck == null) return org.springframework.http.ResponseEntity.notFound().build();
+        if (assessmentCheck.getStatus() != AssessmentStatus.OPEN)
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.LOCKED).body("locked");
+
         String comment = body.get("comment");
         Optional<AssessmentDetails> detailsOpt = detailsService.findById(id);
         AssessmentDetails details = null;
         if (!detailsOpt.isPresent()) {
-            return "fail";
+            return org.springframework.http.ResponseEntity.badRequest().body("fail");
         } else {
             details = detailsOpt.get();
         }
@@ -244,7 +250,7 @@ public class AssessmentDirectController {
             control = controlRepo.findById(controlId).orElse(null);
         } catch (Exception e) { }
         if (control == null)
-            return "fail";
+            return org.springframework.http.ResponseEntity.badRequest().body("fail");
         if (found == null) {
             // A comment with no answer yet
             found = new AssessmentControlAnswer(control, null, comment);
@@ -254,7 +260,7 @@ public class AssessmentDirectController {
         }
         detailsService.save(details);
         assessmentSseService.broadcast(id, "update", buildDirectUpdatePayload(id));
-        return "ok";
+        return org.springframework.http.ResponseEntity.ok("ok");
     }
 
     // Web page listing all Assessment URLs
@@ -347,13 +353,14 @@ public class AssessmentDirectController {
         return answeringGuideService.generateAnswerSummary(controlName, questions, answers, proposedAnswer);
     }
 
-    // ---- SSE live-update subscription (public, no presence) ----
+    // ---- SSE live-update subscription (public, with anonymous presence) ----
 
     @GetMapping(value = "/assessment-direct/{obfuscatedId}/events",
             produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)
     @org.springframework.web.bind.annotation.ResponseBody
     public org.springframework.web.servlet.mvc.method.annotation.SseEmitter subscribeDirectEvents(
-            @PathVariable String obfuscatedId) {
+            @PathVariable String obfuscatedId,
+            jakarta.servlet.http.HttpSession session) {
         Optional<AssessmentUrls> maybeUrl = assessmentUrlsService.findByObfuscated(obfuscatedId);
         if (!maybeUrl.isPresent()) {
             org.springframework.web.servlet.mvc.method.annotation.SseEmitter dead =
@@ -362,14 +369,29 @@ public class AssessmentDirectController {
             return dead;
         }
         Long assessmentId = maybeUrl.get().getAssessment().getId();
+        String sessionKey = session.getId();
+
+        // Register anonymous presence
+        assessmentPresenceService.register(assessmentId, sessionKey, "Anonymous");
+
         org.springframework.web.servlet.mvc.method.annotation.SseEmitter emitter =
-                assessmentSseService.subscribe(assessmentId, null);
+                assessmentSseService.subscribe(assessmentId, () -> {
+                    assessmentPresenceService.remove(assessmentId, sessionKey);
+                    assessmentSseService.broadcast(assessmentId, "presence",
+                            assessmentPresenceService.getAllUsers(assessmentId));
+                });
+
         try {
             emitter.send(org.springframework.web.servlet.mvc.method.annotation.SseEmitter.event()
                     .name("update")
                     .data(buildDirectUpdatePayload(assessmentId),
                             org.springframework.http.MediaType.APPLICATION_JSON));
         } catch (java.io.IOException ignored) {}
+
+        // Broadcast updated presence to all subscribers (including assessment-details viewers)
+        assessmentSseService.broadcast(assessmentId, "presence",
+                assessmentPresenceService.getAllUsers(assessmentId));
+
         return emitter;
     }
 
@@ -443,18 +465,34 @@ public class AssessmentDirectController {
 
     // Finalize assessment via assessment-direct (POST by obfuscated ID)
     @PostMapping("/assessment-direct/{obfuscatedId}/finalize")
-    public String finalizeAssessmentDirect(@PathVariable String obfuscatedId) {
+    @org.springframework.web.bind.annotation.ResponseBody
+    public org.springframework.http.ResponseEntity<Map<String, Object>> finalizeAssessmentDirect(@PathVariable String obfuscatedId) {
         Optional<AssessmentUrls> maybeUrl = assessmentUrlsService.findByObfuscated(obfuscatedId);
         if (!maybeUrl.isPresent()) {
-            return "redirect:/assessment-direct/" + obfuscatedId; // Invalid URL, stay on page
+            return org.springframework.http.ResponseEntity.notFound().build();
         }
 
         Assessment assessment = maybeUrl.get().getAssessment();
+
+        // Tamper-safe: only OPEN assessments can be moved to REVIEW
+        if (assessment.getStatus() != AssessmentStatus.OPEN) {
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.CONFLICT)
+                    .body(Map.of("success", false, "reason", "Assessment is not open (current status: " + assessment.getStatus() + ")"));
+        }
+
+        // Require at least one answered control before allowing review
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(assessment.getId());
+        long answeredControls = detailsOpt.map(d -> d.getControlAnswers().stream()
+                .filter(a -> a.getMaturityAnswer() != null).count()).orElse(0L);
+        if (answeredControls == 0) {
+            return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY)
+                    .body(Map.of("success", false, "reason", "Please answer at least one control before submitting for review."));
+        }
 
         // Move assessment to REVIEW state so the IS Manager can review before closing
         assessment.setStatus(AssessmentStatus.REVIEW);
         assessmentRepository.save(assessment);
 
-        return "redirect:/assessment-direct/" + obfuscatedId;
+        return org.springframework.http.ResponseEntity.ok(Map.of("success", true));
     }
 }

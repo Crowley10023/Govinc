@@ -657,11 +657,42 @@
     };
 
     window.closeAssessmentWizard = function() {
-        saveCurrentComment();
         wizardState.active = false;
-        $('#wizard-modal-bg').css('display', 'none');
-        // Reload to sync all changes
-        window.location.reload();
+
+        var ctrl = wizardState.controls[wizardState.currentIndex];
+        var comment = (ctrl && !ctrl.disabled) ? ($('#wizard-comment-input').val() || '') : null;
+        var commentChanged = ctrl && !ctrl.disabled && comment !== null && comment !== ctrl.comment;
+
+        if (commentChanged) {
+            ctrl.comment = comment;
+            // Update main page textarea immediately (visual sync)
+            var $textarea = $('textarea.comment-textarea[data-control-id="' + ctrl.controlId + '"]');
+            if ($textarea.length && !$textarea.prop('disabled')) {
+                $textarea.val(comment);
+            }
+            // Cancel any debounce timer for this control to avoid a double-save after reload
+            if (window._commentSaveTimers && window._commentSaveTimers[ctrl.controlId]) {
+                clearTimeout(window._commentSaveTimers[ctrl.controlId]);
+                delete window._commentSaveTimers[ctrl.controlId];
+            }
+            // Save directly (not via debounce) then reload
+            var csrfMeta = document.querySelector('meta[name="_csrf"]');
+            fetch('/assessment/' + wizardState.assessmentId + '/control/' + ctrl.controlId + '/comment', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfMeta ? csrfMeta.getAttribute('content') : ''
+                },
+                body: JSON.stringify({ comment: comment })
+            }).finally(function() {
+                $('#wizard-modal-bg').css('display', 'none');
+                window.location.reload();
+            });
+        } else {
+            $('#wizard-modal-bg').css('display', 'none');
+            // Reload to sync all changes
+            window.location.reload();
+        }
     };
 
     // ---- Save Logic ----
