@@ -3,6 +3,7 @@ package com.govinc;
 import com.govinc.entity.LayoutConfiguration;
 import com.govinc.entity.LayoutConfigurationRepository;
 import com.govinc.authorization.UnauthorizedException;
+import com.govinc.service.ErrorLogService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
@@ -24,10 +25,14 @@ public class GlobalExceptionHandler {
 
     private final Environment env;
     private final LayoutConfigurationRepository layoutConfigurationRepository;
+    private final ErrorLogService errorLogService;
 
-    public GlobalExceptionHandler(Environment env, LayoutConfigurationRepository layoutConfigurationRepository) {
+    public GlobalExceptionHandler(Environment env,
+                                  LayoutConfigurationRepository layoutConfigurationRepository,
+                                  ErrorLogService errorLogService) {
         this.env = env;
         this.layoutConfigurationRepository = layoutConfigurationRepository;
+        this.errorLogService = errorLogService;
     }
 
     /**
@@ -61,6 +66,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ModelAndView handleException(HttpServletRequest request, Exception ex) {
+        errorLogService.logException(ex, request);
         ex.printStackTrace();
         boolean showDetails = false;
         // You can configure this with a specific property or use Spring's built-in

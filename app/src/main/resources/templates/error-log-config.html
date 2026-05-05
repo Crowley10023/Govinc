@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <title>Error Log</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <th:block th:replace="~{navigation :: navHead}"></th:block>
+    <style>
+        .error-log-container {
+            max-width: 1100px;
+            margin: 1.5rem auto;
+            padding: 1.2rem;
+        }
+
+        .error-log-card {
+            background: #fff;
+            border: 1px solid #d9e1e8;
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 0.9rem;
+            box-shadow: 0 2px 6px rgba(12, 30, 45, 0.06);
+        }
+
+        .error-log-summary {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.6rem;
+            align-items: center;
+            cursor: pointer;
+            font-weight: 600;
+            color: #1f2d3d;
+        }
+
+        .error-log-time {
+            color: #61717f;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .error-log-pill {
+            background: #f0f4f8;
+            border: 1px solid #d7e0e8;
+            border-radius: 999px;
+            padding: 0.15rem 0.55rem;
+            font-size: 0.8rem;
+            color: #3a4e60;
+        }
+
+        .error-log-meta {
+            margin-top: 0.5rem;
+            color: #3f5264;
+            font-size: 0.9rem;
+        }
+
+        .error-log-details {
+            margin-top: 0.75rem;
+            background: #0f1b2a;
+            color: #d8e5f2;
+            border-radius: 8px;
+            padding: 0.8rem;
+            overflow: auto;
+            white-space: pre-wrap;
+            font-size: 0.86rem;
+            line-height: 1.4;
+        }
+
+        .empty-log {
+            padding: 1rem;
+            border-radius: 8px;
+            background: #f5f8fb;
+            border: 1px solid #dbe6ef;
+            color: #344a5d;
+        }
+    </style>
+</head>
+
+<body>
+<div th:replace="~{navigation :: mainNav}"></div>
+
+<div class="error-log-container">
+    <h1 class="page-title">Error Log</h1>
+    <p class="text-muted">All handled application exceptions are listed here. Expand an entry to inspect full stack details.</p>
+
+    <div class="empty-log" th:if="${entries == null or #lists.isEmpty(entries)}">
+        No exceptions recorded yet.
+    </div>
+
+    <details class="error-log-card" th:each="entry : ${entries}">
+        <summary class="error-log-summary">
+            <span class="error-log-time" th:text="${entry.timestamp}">2026-05-04 12:10:00</span>
+            <span th:text="${entry.message}">Example error message</span>
+            <span class="error-log-pill" th:text="${entry.exceptionClass}">java.lang.RuntimeException</span>
+        </summary>
+        <div class="error-log-meta">
+            Request:
+            <strong th:text="${entry.requestMethod}">GET</strong>
+            <span th:text="${entry.requestUri}">/example/path</span>
+        </div>
+        <pre class="error-log-details" th:text="${entry.details}">Stack trace details...</pre>
+    </details>
+</div>
+
+</body>
+</html>
