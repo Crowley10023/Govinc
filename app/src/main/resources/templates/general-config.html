@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <title>General Configuration</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <th:block th:replace="~{navigation :: navHead}"></th:block>
+</head>
+
+<body>
+    <div th:replace="~{navigation :: mainNav}"></div>
+
+    <div id="statusMessage" class="status-message-bar" style="display:none;"></div>
+
+    <div class="container">
+        <h1 class="page-title">General Configuration</h1>
+        <p class="text-muted">Global application settings that apply to all users.</p>
+
+        <div class="section-card" style="max-width:550px;">
+            <h3>&#9200; Session Settings</h3>
+            <p class="text-muted text-sm">
+                Controls how long a user session remains active after the last interaction.
+                A warning popup will appear 2 minutes before expiry.
+            </p>
+            <form id="generalConfigForm">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+
+                <div class="form-group">
+                    <label for="sessionTimeoutMinutes">Session Timeout (minutes)</label>
+                    <input type="number" id="sessionTimeoutMinutes" name="sessionTimeoutMinutes"
+                           class="form-control" min="1" max="1440" style="max-width:160px;"
+                           th:value="${config.sessionTimeoutMinutes}" />
+                    <span class="help-text">
+                        Minimum: 1 minute &nbsp;|&nbsp; Maximum: 1440 minutes (24 hours).
+                        Currently active: <strong th:text="${config.sessionTimeoutMinutes}"></strong> minutes.
+                    </span>
+                </div>
+
+                <div class="button-group" style="margin-top:1.5em;">
+                    <button type="button" class="btn-submit" onclick="saveGeneralConfig()">Save Configuration</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        /*<![CDATA[*/
+        var csrfToken = /*[[${_csrf.token}]]*/ '';
+        var csrfHeader = /*[[${_csrf.headerName}]]*/ 'X-CSRF-TOKEN';
+        /*]]>*/
+
+        function saveGeneralConfig() {
+            var minutes = parseInt(document.getElementById('sessionTimeoutMinutes').value, 10);
+            if (isNaN(minutes) || minutes < 1 || minutes > 1440) {
+                showBar('Please enter a value between 1 and 1440.', 'error');
+                return;
+            }
+            var payload = { sessionTimeoutMinutes: minutes };
+
+            fetch('/config/general', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    [csrfHeader]: csrfToken
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    showBar('Configuration saved. New timeout: ' + data.sessionTimeoutMinutes + ' minutes.', 'success');
+                } else {
+                    showBar('Error: ' + (data.error || 'Unknown error'), 'error');
+                }
+            })
+            .catch(function(err) {
+                showBar('Request failed: ' + err, 'error');
+            });
+        }
+
+        function showBar(msg, type) {
+            var bar = document.getElementById('statusMessage');
+            bar.textContent = msg;
+            bar.className = 'status-message-bar alert alert-' + type;
+            bar.style.display = 'block';
+            setTimeout(function() { bar.style.display = 'none'; }, 5000);
+        }
+    </script>
+</body>
+</html>

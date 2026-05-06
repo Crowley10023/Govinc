@@ -1,6 +1,7 @@
 package com.govinc;
 
 import com.govinc.authorization.AuthorizationService;
+import com.govinc.service.GeneralConfigService;
 import com.govinc.user.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
@@ -18,6 +19,9 @@ public class GlobalUserSessionAdvice {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private GeneralConfigService generalConfigService;
     
     @ModelAttribute("userName")
     public String addUserNameToModel() {
@@ -170,6 +174,18 @@ public class GlobalUserSessionAdvice {
             return role.getDisplayName();
         } catch (Throwable t) {
             return null;
+        }
+    }
+
+    /**
+     * Expose configured session timeout so templates can embed it for the frontend timer.
+     */
+    @ModelAttribute("sessionTimeoutMinutes")
+    public int addSessionTimeoutToModel() {
+        try {
+            return generalConfigService != null ? generalConfigService.getSessionTimeoutMinutes() : 30;
+        } catch (Throwable t) {
+            return 30;
         }
     }
     }

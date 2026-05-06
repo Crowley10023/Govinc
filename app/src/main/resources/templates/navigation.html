@@ -1,6 +1,7 @@
 <th:block th:fragment="navHead">
   <link rel="stylesheet" href="/style.css">
   <th:block th:replace="~{fragments/theme-css :: themeCss}" />
+  <meta name="session-timeout-minutes" th:content="${sessionTimeoutMinutes != null ? sessionTimeoutMinutes : 30}">
 </th:block>
 <div th:fragment="mainNav">
   <nav class="main-navigation fancy-shine">
@@ -21,6 +22,10 @@
       <a href="/" class="btn-nav shiny">Home</a>
       <a href="javascript:void(0)" class="btn-nav shiny" onclick="document.getElementById('logoutForm').submit()">Logout</a>
       <form id="logoutForm" th:action="@{/logout}" method="post" style="display:none;"></form>
+      <div class="session-timer-display" id="sessionTimerDisplay">
+        <span class="session-timer-icon">&#9201;</span>
+        <span id="sessionTimeRemaining" class="session-timer-value">--:--</span>
+      </div>
       <div class="user-section">
         <div class="user-info-card">
           <span class="nav-label">&#128100;</span>
@@ -111,13 +116,24 @@
           <a href="/config/email" class="dropdown-menu-btn">E-Mail Configuration</a>
           <a href="/users" class="dropdown-menu-btn">Users</a>
           <a href="/config/error-log" class="dropdown-menu-btn">Error Log</a>
+          <a href="/config/general" class="dropdown-menu-btn">General Config</a>
         </div>
       </div>
 
 
   </nav>
+  <!-- Session expiry warning overlay -->
+  <div id="sessionExpiryOverlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="sessionExpiryTitle">
+    <div id="sessionExpiryPopup">
+      <h3 id="sessionExpiryTitle">&#9888; Session Expiring</h3>
+      <p>Your session will expire in <span id="sessionExpiryCountdown" class="session-expiry-countdown">--</span> seconds.</p>
+      <p class="session-expiry-hint">Any unsaved changes may be lost.</p>
+      <button type="button" class="btn-submit" onclick="window._sessionTimer && window._sessionTimer.keepSession()">Keep Session</button>
+    </div>
+  </div>
   <script src="/general.js"></script>
   <script src="/authorization.js"></script>
+  <script src="/session-timer.js"></script>
   <script>
     // Click-based dropdown toggle
     document.querySelectorAll('.dropdown-button').forEach(function(btn) {

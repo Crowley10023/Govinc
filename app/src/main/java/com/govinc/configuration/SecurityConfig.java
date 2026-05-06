@@ -85,7 +85,9 @@ public class SecurityConfig {
             "/assessment-direct/*/finalize",
             "/assessment-direct/guide/questions",
             "/assessment-direct/guide/answer",
-            "/assessment-direct/guide/summary"
+            "/assessment-direct/guide/summary",
+            // Session keepalive is a pure ping (no state change) so CSRF is not needed
+            "/session/keepalive"
     };
 
     private static final Logger logger = LoggerFactory.getLogger(SecurityConfig.class);

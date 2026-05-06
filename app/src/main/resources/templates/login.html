@@ -28,6 +28,9 @@
             <div th:if="${param.error != null and errorMessage == null}" class="error-message">
                 Invalid username or password.
             </div>
+            <div th:if="${param.expired != null}" class="error-message" style="background:#fff3cd;border-color:#ffc107;color:#856404;">
+                &#9201; Your session has expired. Please log in again.
+            </div>
             <input type="text" name="username" placeholder="Username" required autofocus>
             <input type="password" name="password" placeholder="Password" required>
             <button type="submit" class="btn-submit">Login</button>

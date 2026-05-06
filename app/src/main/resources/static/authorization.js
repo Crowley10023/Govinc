@@ -95,12 +95,27 @@
     }
 
     /**
+     * URLs whose 403 responses are handled silently (no popup).
+     * These are internal ping/keepalive endpoints where a 403 is non-critical.
+     */
+    const SILENT_403_PATTERNS = [
+        '/session/keepalive'
+    ];
+
+    function isSilent403(url) {
+        if (!url) return false;
+        return SILENT_403_PATTERNS.some(function(p) { return url.indexOf(p) !== -1; });
+    }
+
+    /**
      * Intercept native fetch calls
      */
     const originalFetch = window.fetch;
     window.fetch = function(...args) {
+        const requestUrl = typeof args[0] === 'string' ? args[0]
+            : (args[0] && typeof args[0].url === 'string' ? args[0].url : '');
         return originalFetch.apply(this, args).then(response => {
-            if (response.status === 403) {
+            if (response.status === 403 && !isSilent403(requestUrl)) {
                 // Handle 403 Forbidden
                 response.clone().json().then(data => {
                     const message = data.message || "You do not have permission to perform this action.";
