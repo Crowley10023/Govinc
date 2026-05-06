@@ -95,12 +95,18 @@ public class GlobalExceptionHandler {
     
     /**
      * Add layout configuration to a view to avoid Thymeleaf binding errors.
+     * Falls back to safe defaults if the DB is unavailable (e.g. during a connection pool outage)
+     * so the error page itself can always be rendered.
      */
     private void addLayoutConfigToView(ModelAndView mav) {
-        LayoutConfiguration layoutConfig = layoutConfigurationRepository.findAll().stream()
-                .findFirst().orElse(new LayoutConfiguration());
-        
-        // Initialize with default values if null
+        LayoutConfiguration layoutConfig;
+        try {
+            layoutConfig = layoutConfigurationRepository.findAll().stream()
+                    .findFirst().orElse(new LayoutConfiguration());
+        } catch (Exception dbEx) {
+            layoutConfig = new LayoutConfiguration();
+        }
+
         if (layoutConfig != null) {
             if (layoutConfig.getPrimaryColor() == null) layoutConfig.setPrimaryColor("#2274A5");
             if (layoutConfig.getPrimaryColorDark() == null) layoutConfig.setPrimaryColorDark("#164666");

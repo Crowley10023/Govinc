@@ -32,11 +32,18 @@ public class AssessmentUrlsService {
      */
     @Transactional
     public AssessmentUrls createOrReplaceUrl(Long assessmentId) {
+        // Verify assessment exists before the delete
+        if (!assessmentRepository.existsById(assessmentId)) {
+            throw new IllegalArgumentException("Assessment not found");
+        }
+
+        // Bulk DELETE — executes immediately, bypassing Hibernate's insert-before-delete
+        // flush ordering, and clears the 1st-level cache so the assessment is re-fetched fresh.
+        urlsRepository.deleteByAssessmentId(assessmentId);
+
+        // Re-fetch after cache clear (clearAutomatically = true on deleteByAssessmentId)
         Assessment assessment = assessmentRepository.findById(assessmentId)
                 .orElseThrow(() -> new IllegalArgumentException("Assessment not found"));
-
-        // Remove any existing URL for this assessment (safer, atomic)
-        urlsRepository.deleteByAssessmentId(assessmentId);
 
         // Generate obfuscated string
         String obfuscated = generateObfuscatedUrl();

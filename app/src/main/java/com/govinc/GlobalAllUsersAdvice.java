@@ -15,6 +15,10 @@ public class GlobalAllUsersAdvice {
 
     @ModelAttribute("allUsers")
     public List<User> addAllUsersToModel() {
-        return userRepository.findAll();
+        try {
+            return userRepository.findAll();
+        } catch (Exception e) {
+            return java.util.Collections.emptyList();
+        }
     }
 }

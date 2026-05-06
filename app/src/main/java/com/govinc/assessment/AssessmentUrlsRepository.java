@@ -10,7 +10,10 @@ import java.util.Optional;
 public interface AssessmentUrlsRepository extends JpaRepository<AssessmentUrls, Long> {
     Optional<AssessmentUrls> findByUrl(String url);
     Optional<AssessmentUrls> findByAssessment_Id(Long assessmentId);
-    void deleteByAssessmentId(Long assessmentId);
+
+    @Modifying(clearAutomatically = true)
+    @Query("DELETE FROM AssessmentUrls a WHERE a.assessment.id = :assessmentId")
+    void deleteByAssessmentId(@Param("assessmentId") Long assessmentId);
 
     @Modifying
     @Query("update AssessmentUrls a set a.createdAt = :createdAt where a.id = :id")
