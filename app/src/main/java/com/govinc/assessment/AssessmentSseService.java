@@ -6,6 +6,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -17,6 +18,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
  */
 @Service
 public class AssessmentSseService {
+
+    private static final long SSE_TIMEOUT_MS = 5 * 60 * 1000L;
 
     /** assessmentId → list of active SSE connections */
     private final ConcurrentHashMap<Long, CopyOnWriteArrayList<SseEmitter>> emitters =
@@ -32,19 +35,26 @@ public class AssessmentSseService {
      * @return the SseEmitter to return from the controller method
      */
     public SseEmitter subscribe(Long assessmentId, Runnable onClose) {
-        SseEmitter emitter = new SseEmitter(0L); // 0 = never time out on the server
+        SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
         CopyOnWriteArrayList<SseEmitter> list =
                 emitters.computeIfAbsent(assessmentId, k -> new CopyOnWriteArrayList<>());
         list.add(emitter);
 
+        AtomicBoolean cleanedUp = new AtomicBoolean(false);
         Runnable cleanup = () -> {
+            if (!cleanedUp.compareAndSet(false, true)) {
+                return;
+            }
             list.remove(emitter);
             if (onClose != null) {
                 try { onClose.run(); } catch (Exception ignored) {}
             }
         };
         emitter.onCompletion(cleanup);
-        emitter.onTimeout(cleanup);
+        emitter.onTimeout(() -> {
+            cleanup.run();
+            try { emitter.complete(); } catch (Exception ignored) {}
+        });
         emitter.onError(e -> cleanup.run());
         return emitter;
     }
@@ -65,6 +75,10 @@ public class AssessmentSseService {
                         .data(data, MediaType.APPLICATION_JSON));
             } catch (Exception e) {
                 dead.add(emitter);
+                try {
+                    // Force-terminate stale/broken async connection immediately.
+                    emitter.complete();
+                } catch (Exception ignored) {}
             }
         }
         list.removeAll(dead);

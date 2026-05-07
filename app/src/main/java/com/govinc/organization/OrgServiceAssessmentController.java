@@ -131,7 +131,12 @@ public class OrgServiceAssessmentController {
             controlToUpdate.setPercent(Math.min(100, Math.max(0, percent)));
             
             assessmentService.saveAssessment(assessment);
-            propagationService.propagateControlChange(orgServiceId, controlId);
+            try {
+                // Propagation is best-effort and must never break the primary save flow.
+                propagationService.propagateControlChange(orgServiceId, controlId);
+            } catch (Exception propagationEx) {
+                response.put("warning", "Control saved, but propagation failed: " + propagationEx.getMessage());
+            }
 
             response.put("success", true);
             response.put("message", "Control saved successfully");
@@ -180,7 +185,12 @@ public class OrgServiceAssessmentController {
             controlToUpdate.setComment(comment != null ? comment : "");
             
             assessmentService.saveAssessment(assessment);
-            propagationService.propagateCommentChange(svcId, controlId);
+            try {
+                // Propagation is best-effort and must never break the primary save flow.
+                propagationService.propagateCommentChange(svcId, controlId);
+            } catch (Exception propagationEx) {
+                response.put("warning", "Comment saved, but propagation failed: " + propagationEx.getMessage());
+            }
 
             response.put("success", true);
             response.put("message", "Comment saved successfully");

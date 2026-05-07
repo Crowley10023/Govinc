@@ -1852,7 +1852,9 @@ public class AssessmentController {
         try {
             emitter.send(SseEmitter.event().name("update")
                     .data(buildUpdatePayload(assessmentId), org.springframework.http.MediaType.APPLICATION_JSON));
-        } catch (Exception ignored) {}
+        } catch (Exception ex) {
+            try { emitter.complete(); } catch (Exception ignored) {}
+        }
 
         // Broadcast updated presence list to ALL connected clients (including the new one)
         assessmentSseService.broadcast(assessmentId, "presence",

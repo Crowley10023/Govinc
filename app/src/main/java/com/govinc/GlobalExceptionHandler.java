@@ -15,8 +15,10 @@ import org.springframework.web.context.request.async.AsyncRequestNotUsableExcept
 import org.springframework.web.servlet.ModelAndView;
 
 import jakarta.servlet.http.HttpServletRequest;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.Locale;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -41,8 +43,19 @@ public class GlobalExceptionHandler {
      * causing a secondary "Response not usable after response errors" exception.
      */
     @ExceptionHandler(AsyncRequestNotUsableException.class)
-    public void handleAsyncRequestNotUsable(AsyncRequestNotUsableException ex) {
-        // intentionally empty — disconnect is expected and harmless
+    public ResponseEntity<Void> handleAsyncRequestNotUsable(AsyncRequestNotUsableException ex,
+                                                             HttpServletRequest request) {
+        completeAsyncRequest(request);
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+    }
+
+    @ExceptionHandler(IOException.class)
+    public Object handleIOException(IOException ex, HttpServletRequest request) {
+        if (isClientDisconnectException(ex)) {
+            completeAsyncRequest(request);
+            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+        }
+        return handleException(request, ex);
     }
 
     @ExceptionHandler(UnauthorizedException.class)
@@ -65,7 +78,13 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    public ModelAndView handleException(HttpServletRequest request, Exception ex) {
+    public Object handleException(HttpServletRequest request, Exception ex) {
+        if (isClientDisconnectException(ex)) {
+            // Connection closed by client while writing response (SSE/reload/tab close).
+            // This is expected and should not pollute error logs or trigger stack traces.
+            completeAsyncRequest(request);
+            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+        }
         errorLogService.logException(ex, request);
         ex.printStackTrace();
         boolean showDetails = false;
@@ -142,5 +161,41 @@ public class GlobalExceptionHandler {
                (contentType != null && contentType.contains("application/json")) ||
                (requestUri != null && requestUri.contains("/api/")) ||
                "XMLHttpRequest".equals(request.getHeader("X-Requested-With"));
+    }
+
+    private boolean isClientDisconnectException(Throwable ex) {
+        Throwable current = ex;
+        while (current != null) {
+            String className = current.getClass().getName();
+            if ("org.apache.catalina.connector.ClientAbortException".equals(className)
+                    || current instanceof AsyncRequestNotUsableException) {
+                return true;
+            }
+
+            String msg = current.getMessage();
+            if (msg != null) {
+                String lower = msg.toLowerCase(Locale.ROOT);
+                if (lower.contains("broken pipe")
+                        || lower.contains("connection reset")
+                        || lower.contains("forcibly closed by the remote host")
+                        || lower.contains("durch den hostcomputer abgebrochen")) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private void completeAsyncRequest(HttpServletRequest request) {
+        if (request == null) {
+            return;
+        }
+        try {
+            if (request.isAsyncStarted()) {
+                request.getAsyncContext().complete();
+            }
+        } catch (Exception ignored) {
+        }
     }
 }
