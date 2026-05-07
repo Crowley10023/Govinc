@@ -71,6 +71,33 @@
             border: 1px solid #dbe6ef;
             color: #344a5d;
         }
+
+        .error-log-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .error-log-count {
+            color: #4a5d70;
+            font-size: 0.95rem;
+        }
+
+        .error-log-success {
+            margin-bottom: 1rem;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            background: #edf8ef;
+            border: 1px solid #c8e6cc;
+            color: #1f6b2a;
+        }
+
+        .error-log-clear-form {
+            margin: 0;
+        }
     </style>
 </head>
 
@@ -80,6 +107,21 @@
 <div class="error-log-container">
     <h1 class="page-title">Error Log</h1>
     <p class="text-muted">All handled application exceptions are listed here. Expand an entry to inspect full stack details.</p>
+
+    <div class="error-log-success" th:if="${clearSuccess}">
+        Error log cleared.
+    </div>
+
+    <div class="error-log-toolbar">
+        <div class="error-log-count">
+            <strong th:text="${entries != null ? #lists.size(entries) : 0}">0</strong> recorded entries
+        </div>
+        <form class="error-log-clear-form" th:action="@{/config/error-log/clear}" method="post"
+              onsubmit="return confirm('Clear all persisted error log entries?');">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+            <button type="submit" class="btn-danger" th:disabled="${entries == null or #lists.isEmpty(entries)}">Clear</button>
+        </form>
+    </div>
 
     <div class="empty-log" th:if="${entries == null or #lists.isEmpty(entries)}">
         No exceptions recorded yet.
