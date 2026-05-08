@@ -18,6 +18,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -119,6 +120,10 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .authorizeHttpRequests(auth -> auth
+                // Async dispatches are internal Tomcat lifecycle events (e.g. SSE teardown);
+                // the security context is not propagated to async threads so we must not
+                // re-evaluate authorization on them.
+                .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                 .requestMatchers(PUBLIC_URLS).permitAll()
                 // CONFIG and admin areas must be ADMIN only per security architecture
                 .requestMatchers("/config/**").hasRole("ADMIN")
