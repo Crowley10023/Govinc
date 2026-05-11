@@ -2,6 +2,9 @@ package com.govinc.compliance;
 
 import com.govinc.catalog.SecurityCatalog;
 import com.govinc.organization.OrgUnit;
+import com.govinc.organization.OrgServiceAssessment;
+import com.govinc.organization.OrgServiceAssessmentControl;
+import com.govinc.organization.OrgServiceAssessmentRepository;
 import com.govinc.assessment.Assessment;
 import com.govinc.assessment.AssessmentRepository;
 import com.govinc.assessment.AssessmentDetails;
@@ -10,10 +13,12 @@ import com.govinc.assessment.AssessmentDetailsService;
 import com.govinc.assessment.AssessmentControlAnswer;
 import com.govinc.organization.OrgUnitService;
 import com.govinc.maturity.MaturityAnswer;
+import com.govinc.maturity.MaturityModel;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.stream.Collectors;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
@@ -32,6 +37,8 @@ public class ComplianceService {
     private AssessmentDetailsService assessmentDetailsService;
     @Autowired
     private OrgUnitService orgUnitService;
+    @Autowired
+    private OrgServiceAssessmentRepository orgServiceAssessmentRepository;
 
     // Get all ComplianceChecks
     public List<ComplianceCheck> findAll() { return complianceCheckRepository.findAll(); }
@@ -147,6 +154,59 @@ public class ComplianceService {
         return null;
     }
 
+    /**
+     * For open/review assessments, collect maturity answers inherited from the assessment's
+     * org services. Returns a map of controlId -> closest MaturityAnswer.
+     * First org service that provides an applicable answer for a control wins.
+     */
+    private Map<Long, MaturityAnswer> collectOrgServiceInheritedAnswers(Assessment assessment) {
+        Map<Long, MaturityAnswer> inherited = new HashMap<>();
+        if (assessment == null || assessment.getOrgServices() == null || assessment.getOrgServices().isEmpty()) {
+            return inherited;
+        }
+        if (assessment.getSecurityCatalog() == null || assessment.getSecurityCatalog().getMaturityModel() == null) {
+            return inherited;
+        }
+        List<Long> orgServiceIds = assessment.getOrgServices().stream()
+                .map(os -> os.getId())
+                .filter(id -> id != null)
+                .collect(Collectors.toList());
+        if (orgServiceIds.isEmpty()) return inherited;
+        List<OrgServiceAssessment> orgServiceAssessments =
+                orgServiceAssessmentRepository.findByOrgServiceIdIn(orgServiceIds);
+        MaturityModel maturityModel = assessment.getSecurityCatalog().getMaturityModel();
+        for (OrgServiceAssessment osa : orgServiceAssessments) {
+            if (osa.getControls() == null) continue;
+            for (OrgServiceAssessmentControl osac : osa.getControls()) {
+                if (!osac.isApplicable() || osac.getPercent() < 0 || osac.getSecurityControl() == null) continue;
+                Long ctrlId = osac.getSecurityControl().getId();
+                if (inherited.containsKey(ctrlId)) continue; // first org service wins
+                MaturityAnswer closest = findClosestMaturityAnswer(maturityModel, osac.getPercent());
+                if (closest != null) {
+                    inherited.put(ctrlId, closest);
+                }
+            }
+        }
+        return inherited;
+    }
+
+    private static MaturityAnswer findClosestMaturityAnswer(MaturityModel maturityModel, int percent) {
+        if (maturityModel == null || maturityModel.getMaturityAnswers() == null
+                || maturityModel.getMaturityAnswers().isEmpty()) {
+            return null;
+        }
+        MaturityAnswer closest = null;
+        int minDiff = Integer.MAX_VALUE;
+        for (MaturityAnswer ans : maturityModel.getMaturityAnswers()) {
+            int diff = Math.abs(ans.getRating() - percent);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closest = ans;
+            }
+        }
+        return closest;
+    }
+
     // Evaluate one threshold for a set of control answers
     private boolean evaluateThreshold(ComplianceThreshold t, List<AssessmentControlAnswer> answers) {
         if (t == null) return false;
@@ -226,23 +286,37 @@ public class ComplianceService {
             }
 
             AssessmentDetails details = (a != null) ? findAssessmentDetailsForAssessment(a.getId()) : null;
-            Set<Long> answeredControls = new HashSet<>();
-            List<Long> answeredControlList = new ArrayList<>();
-            double scoreSum = 0.0;
-            int scoreCount = 0;
 
-            int totalAnswersFound = 0; // number of answers anywhere in details
-            int catalogAnswersFound = 0; // number of answers that belong to selected catalog
+            // For open/review assessments, inherit answers from assigned org services for controls
+            // that do not have an explicit answer stored in AssessmentDetails.
+            // Closed assessments already have org-service answers frozen into controlAnswers via
+            // doFinalizeAssessment, so we do not re-apply live org-service data to them.
+            Map<Long, MaturityAnswer> inheritedOrgServiceAnswers = new HashMap<>();
+            if (a != null && !a.isClosed()) {
+                inheritedOrgServiceAnswers = collectOrgServiceInheritedAnswers(a);
+                if (!inheritedOrgServiceAnswers.isEmpty()) {
+                    System.out.println(String.format("Unit %s: found %d inherited org-service answers for open assessment %s",
+                            unit.getId(), inheritedOrgServiceAnswers.size(), a.getId()));
+                }
+            }
+
+            // Build effective answer map: explicit answers from AssessmentDetails take priority
+            // (whether they are direct answers or user overrides of inherited values);
+            // inherited org-service answers fill gaps for controls not yet explicitly answered.
+            Map<Long, MaturityAnswer> effectiveAnswersByControl = new HashMap<>();
+            // Seed with inherited (lower priority)
+            for (Map.Entry<Long, MaturityAnswer> e : inheritedOrgServiceAnswers.entrySet()) {
+                if (controlIds.contains(e.getKey())) {
+                    effectiveAnswersByControl.put(e.getKey(), e.getValue());
+                }
+            }
+            // Overlay with explicit answers (higher priority)
             if (details != null && details.getControlAnswers() != null) {
                 for (AssessmentControlAnswer ans : details.getControlAnswers()) {
-                    totalAnswersFound++;
                     if (ans.getSecurityControl() == null) continue;
                     Long ctrlId = ans.getSecurityControl().getId();
-                    // Determine if this control is part of the selected catalog
-                    boolean inCatalog = false;
-                    if (controlIds.contains(ctrlId)) {
-                        inCatalog = true;
-                    } else if (ans.getSecurityControl().getSecurityCatalogs() != null) {
+                    boolean inCatalog = controlIds.contains(ctrlId);
+                    if (!inCatalog && ans.getSecurityControl().getSecurityCatalogs() != null) {
                         for (SecurityCatalog sc : ans.getSecurityControl().getSecurityCatalogs()) {
                             if (sc != null && sc.getId() != null && catalog != null && sc.getId().equals(catalog.getId())) {
                                 inCatalog = true;
@@ -251,15 +325,28 @@ public class ComplianceService {
                         }
                     }
                     if (!inCatalog) continue;
-                    catalogAnswersFound++;
-                    // record answered control (with rating if available)
-                    answeredControls.add(ctrlId);
-                    answeredControlList.add(ctrlId);
-                    // Only add to score if maturityAnswer exists
                     if (ans.getMaturityAnswer() != null) {
-                        scoreSum += ans.getScore();
-                        scoreCount++;
+                        effectiveAnswersByControl.put(ctrlId, ans.getMaturityAnswer());
                     }
+                }
+            }
+
+            Set<Long> answeredControls = new HashSet<>();
+            List<Long> answeredControlList = new ArrayList<>();
+            double scoreSum = 0.0;
+            int scoreCount = 0;
+
+            int totalAnswersFound = details != null && details.getControlAnswers() != null ? details.getControlAnswers().size() : 0;
+            int catalogAnswersFound = 0;
+            for (Map.Entry<Long, MaturityAnswer> entry : effectiveAnswersByControl.entrySet()) {
+                Long ctrlId = entry.getKey();
+                MaturityAnswer ma = entry.getValue();
+                catalogAnswersFound++;
+                answeredControls.add(ctrlId);
+                answeredControlList.add(ctrlId);
+                if (ma != null) {
+                    scoreSum += ma.getRating();
+                    scoreCount++;
                 }
             }
             System.out.println(String.format("Unit %s: detailsTotalAnswers=%d (answered overall), catalogAnswers=%d (answered in catalog), answeredWithRating=%d, answeredList=%s", unit.getId(), totalAnswersFound, catalogAnswersFound, answeredControls.size(), answeredControlList));
@@ -276,13 +363,13 @@ public class ComplianceService {
                 for (ComplianceThreshold t : check.getThresholds()) {
                     boolean passed = false;
                     if (covered != 0) {
-                        // prepare control answers limited to catalog controls and to details
+                        // Build synthetic control-answer list from effective answers for threshold evaluation
                         List<AssessmentControlAnswer> controlAnswers = new ArrayList<>();
-                        if (details != null && details.getControlAnswers() != null) {
-                            for (AssessmentControlAnswer ca : details.getControlAnswers()) {
-                                if (ca.getSecurityControl() != null && controlIds.contains(ca.getSecurityControl().getId())) {
-                                    controlAnswers.add(ca);
-                                }
+                        for (Map.Entry<Long, MaturityAnswer> entry : effectiveAnswersByControl.entrySet()) {
+                            if (entry.getValue() != null) {
+                                AssessmentControlAnswer synthetic = new AssessmentControlAnswer();
+                                synthetic.setMaturityAnswer(entry.getValue());
+                                controlAnswers.add(synthetic);
                             }
                         }
                         passed = evaluateThreshold(t, controlAnswers);
@@ -303,35 +390,15 @@ public class ComplianceService {
 
             Map<String,Object> calcDetails = new HashMap<>();
             
-            // Build maturity distribution from latest assessment
+            // Build maturity distribution from effective answers
             Map<String, Integer> maturityDist = new HashMap<>();
-            if (details != null && details.getControlAnswers() != null) {
-                for (AssessmentControlAnswer ans : details.getControlAnswers()) {
-                    if (ans.getMaturityAnswer() != null) {
-                        String answerText = ans.getMaturityAnswer().getAnswer();
-                        maturityDist.put(answerText, maturityDist.getOrDefault(answerText, 0) + 1);
-                    }
+            for (MaturityAnswer ma : effectiveAnswersByControl.values()) {
+                if (ma != null && ma.getAnswer() != null) {
+                    maturityDist.put(ma.getAnswer(), maturityDist.getOrDefault(ma.getAnswer(), 0) + 1);
                 }
             }
             if (!maturityDist.isEmpty()) {
                 calcDetails.put("maturityDistribution", maturityDist);
-            }
-            
-            // Build list of latest assessment control answers
-            List<Map<String,Object>> assessmentAnswers = new ArrayList<>();
-            if (details != null && details.getControlAnswers() != null) {
-                for (AssessmentControlAnswer ans : details.getControlAnswers()) {
-                    if (ans.getSecurityControl() != null && controlIds.contains(ans.getSecurityControl().getId())) {
-                        Map<String,Object> answerMap = new HashMap<>();
-                        answerMap.put("controlName", ans.getSecurityControl().getName());
-                        answerMap.put("answerText", ans.getMaturityAnswer() != null ? ans.getMaturityAnswer().getAnswer() : "Not answered");
-                        answerMap.put("score", ans.getScore());
-                        assessmentAnswers.add(answerMap);
-                    }
-                }
-            }
-            if (!assessmentAnswers.isEmpty()) {
-                calcDetails.put("latestAssessmentAnswers", assessmentAnswers);
             }
             
             r.setCalculationDetails(calcDetails);
