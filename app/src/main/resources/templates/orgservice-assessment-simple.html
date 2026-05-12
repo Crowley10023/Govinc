@@ -8,6 +8,8 @@
     <meta name="_csrf_header" th:content="${_csrf.headerName}" />
     <title>Simple Assessment View</title>
     <th:block th:replace="~{navigation :: navHead}"></th:block>
+    <!-- Quill rich-text editor -->
+    <link rel="stylesheet" href="/webjars/quill/1.3.7/dist/quill.snow.css">
     <style>
         .simple-assessment-header { margin-bottom: 1.5em; }
         .simple-assessment-header h2 { font-size: 1.1em; color: #555; font-weight: normal; margin: 0.2em 0; }
@@ -27,6 +29,10 @@
         .simple-filter-bar label { font-size: 0.88em; display: block; margin-bottom: 2px; color: #555; }
         .simple-filter-bar input[type=search], .simple-filter-bar select { padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9em; }
         .no-controls-msg { padding: 2em; text-align: center; color: #888; }
+        /* Make Quill fill available height in OSA email modal */
+        #osa-email-body-editor { display: flex; flex-direction: column; }
+        #osa-email-body-editor .ql-container { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+        #osa-email-body-editor .ql-editor { flex: 1; min-height: 200px; overflow-y: auto; }
     </style>
 </head>
 
@@ -42,10 +48,10 @@
                     <p style="color:#888;font-size:0.88em;margin-top:0.2em;">Simple view &mdash; showing only applicable security controls</p>
                 </div>
                 <div style="flex-shrink:0;padding-top:0.3em;display:flex;gap:0.5em;flex-wrap:wrap;align-items:flex-start;">
-                    <button type="button" class="btn-action" onclick="copySimpleViewUrl()"
-                            title="Copy Simple View URL to clipboard"
+                    <button type="button" class="btn-action" onclick="openOsaEmailModal()"
+                            title="Send an e-mail to responsible persons"
                             style="display:inline-flex;align-items:center;gap:6px;font-size:0.88em;">
-                        &#128279; Copy Link
+                        &#9993; Send E-Mail
                     </button>
                 </div>
             </div>
@@ -339,16 +345,15 @@
         loadMaturityModels();
     </script>
 
-    <!-- Copy toast -->
-    <div id="copyToast" style="display:none;position:fixed;bottom:2em;left:50%;transform:translateX(-50%);background:#2563eb;color:#fff;padding:0.6em 1.4em;border-radius:24px;font-size:0.95em;box-shadow:0 4px 16px rgba(0,0,0,0.18);z-index:9999;align-items:center;gap:0.5em;"></div>
-    <style>
-        @keyframes copyToastIn  { from { opacity:0; transform:translateX(-50%) translateY(16px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
-        @keyframes copyToastOut { from { opacity:1; } to { opacity:0; transform:translateX(-50%) translateY(8px); } }
-        .copy-toast-in  { animation: copyToastIn  0.28s ease forwards; }
-        .copy-toast-out { animation: copyToastOut 0.32s ease forwards; }
-    </style>
 
-    <script>
+    <!-- Responsible Persons email candidate data -->
+    <div id="osa-email-candidate-data" style="display:none">
+        <span th:each="u : ${assessment.orgService.responsiblePersons}"
+              class="osa-email-cand"
+              th:attr="data-id=${u.id},data-name=${u.name},data-email=${u.email ?: ''}"></span>
+    </div>
+
+    <script th:inline="none">
         // =================== Answering Guide (same logic as orgservice-assessment.html) ===================
         function _orgGuideShowOverlay(label) {
             var el = document.getElementById('org-guide-overlay');
@@ -602,48 +607,411 @@
             if (bg) bg.addEventListener('mousedown', function(e) { if (e.target === this) closeOrgGuide(); });
         });
 
-        function copySimpleViewUrl() {
-            var url = window.location.origin + '/orgservice-assessment/simple/' + orgServiceId;
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(url).then(function() {
-                    showCopyToast('Link copied to clipboard!');
-                }).catch(function() {
-                    fallbackCopyUrl(url);
+        // ---- OSA E-Mail Modal ----
+        var osaEmailQuill = null;
+        var osaCorpDirResults = [];
+        var osaCorpDirPendingRecipients = [];
+
+        function openOsaEmailModal() {
+            document.getElementById('osa-email-modal-bg').style.display = 'flex';
+            document.getElementById('osa-email-modal-error').textContent = '';
+            document.getElementById('osa-email-modal-success').style.display = 'none';
+            document.getElementById('osa-email-recipients').innerHTML = '';
+            osaCorpDirPendingRecipients = [];
+            var quillIsNew = !osaEmailQuill;
+            if (!osaEmailQuill) {
+                osaEmailQuill = new Quill('#osa-email-body-editor', {
+                    theme: 'snow',
+                    modules: { toolbar: [['bold','italic','underline'],[{'list':'ordered'},{'list':'bullet'}],['link','clean']] }
                 });
+            }
+            // Pre-populate with the simple-view link if body is empty
+            var currentBody = osaEmailQuill.root.innerHTML.trim();
+            if (!currentBody || currentBody === '<p><br></p>') {
+                var simpleUrl = window.location.origin + '/orgservice-assessment/simple/' + orgServiceId;
+                var linkHtml = '<p>Please access the assessment here: <a href="' + simpleUrl + '">' + simpleUrl + '</a></p>';
+                osaEmailQuill.clipboard.dangerouslyPasteHTML(linkHtml);
+            }
+        }
+
+        function closeOsaEmailModal() {
+            document.getElementById('osa-email-modal-bg').style.display = 'none';
+        }
+
+        function sendOsaEmail() {
+            var errorEl   = document.getElementById('osa-email-modal-error');
+            var successEl = document.getElementById('osa-email-modal-success');
+            errorEl.textContent = '';
+            successEl.style.display = 'none';
+            var subject = document.getElementById('osa-email-subject').value.trim();
+            var body    = osaEmailQuill ? osaEmailQuill.root.innerHTML.trim() : '';
+            if (!subject) { errorEl.textContent = 'Subject must not be empty.'; return; }
+            if (!body || body === '<p><br></p>') { errorEl.textContent = 'E-mail body must not be empty.'; return; }
+            var select = document.getElementById('osa-email-recipients');
+            var recipientUserIds = [];
+            var corpDirRecipients = [];
+            Array.from(select.options).forEach(function(opt) {
+                if (opt.value.startsWith('cd:')) {
+                    var mail = opt.value.slice(3);
+                    var pending = osaCorpDirPendingRecipients.find(function(p) {
+                        return (p.mail || p.userPrincipalName || '').toLowerCase() === mail;
+                    });
+                    if (pending) corpDirRecipients.push(pending);
+                } else {
+                    recipientUserIds.push(parseInt(opt.value));
+                }
+            });
+            if (recipientUserIds.length === 0 && corpDirRecipients.length === 0) {
+                errorEl.textContent = 'No recipients selected.'; return;
+            }
+            var sendBtn = document.getElementById('osa-email-send-btn');
+            if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = 'Sending…'; }
+            fetch('/orgservice-assessment/' + orgServiceId + '/email/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', [csrfHeader]: csrfToken },
+                body: JSON.stringify({ recipientUserIds: recipientUserIds, corpDirRecipients: corpDirRecipients, subject: subject, body: body })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Send'; }
+                if (data.success) {
+                    successEl.textContent = data.message || 'E-mail sent successfully.';
+                    successEl.style.display = 'block';
+                    errorEl.textContent = '';
+                    setTimeout(function() { closeOsaEmailModal(); }, 2500);
+                } else {
+                    errorEl.textContent = data.error || 'Failed to send e-mail.';
+                }
+            })
+            .catch(function(err) {
+                if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Send'; }
+                errorEl.textContent = 'Request failed: ' + err;
+            });
+        }
+
+        function generateOsaEmailContent() {
+            var statusEl = document.getElementById('osa-email-gen-status');
+            var genBtn   = document.getElementById('osa-email-gen-btn');
+            statusEl.textContent = 'Generating…';
+            genBtn.disabled = true;
+            fetch('/orgservice-assessment/' + orgServiceId + '/email/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', [csrfHeader]: csrfToken },
+                body: JSON.stringify({ baseUrl: window.location.origin })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                genBtn.disabled = false;
+                statusEl.textContent = '';
+                if (data.error) { statusEl.textContent = 'Error: ' + data.error; return; }
+                if (data.subject) document.getElementById('osa-email-subject').value = data.subject;
+                if (data.body && osaEmailQuill) osaEmailQuill.clipboard.dangerouslyPasteHTML(data.body);
+            })
+            .catch(function() {
+                genBtn.disabled = false;
+                statusEl.textContent = 'Request failed.';
+            });
+        }
+
+        // ---- Responsible Persons Pick Modal ----
+        function openOsaEmailUserPickModal() {
+            var list = document.getElementById('osa-email-user-pick-list');
+            list.innerHTML = '';
+            var candidates = Array.from(document.querySelectorAll('#osa-email-candidate-data .osa-email-cand'))
+                .map(function(el) {
+                    return { id: el.getAttribute('data-id'), name: el.getAttribute('data-name') || '', email: el.getAttribute('data-email') || '' };
+                });
+            if (candidates.length === 0) {
+                list.innerHTML = '<p style="color:#888;">No responsible persons found for this org service.</p>';
             } else {
-                fallbackCopyUrl(url);
+                candidates.forEach(function(u) {
+                    var label = document.createElement('label');
+                    label.style.cssText = 'display:flex;align-items:center;gap:0.5em;margin-bottom:3px;cursor:pointer;';
+                    var cb = document.createElement('input');
+                    cb.type = 'checkbox';
+                    cb.className = 'osa-email-user-pick-cb';
+                    cb.setAttribute('data-id', u.id);
+                    cb.setAttribute('data-name', u.name);
+                    cb.setAttribute('data-email', u.email);
+                    var span = document.createElement('span');
+                    span.textContent = (u.name || '(unknown)') + (u.email ? ' (' + u.email + ')' : ' (no e-mail)');
+                    label.appendChild(cb);
+                    label.appendChild(span);
+                    list.appendChild(label);
+                });
+            }
+            document.getElementById('osa-email-user-pick-modal-bg').style.display = 'flex';
+        }
+
+        function closeOsaEmailUserPickModal() {
+            document.getElementById('osa-email-user-pick-modal-bg').style.display = 'none';
+        }
+
+        function osaAddPickedUsersToRecipients() {
+            var selectEl = document.getElementById('osa-email-recipients');
+            document.querySelectorAll('.osa-email-user-pick-cb:checked').forEach(function(cb) {
+                var uid   = String(cb.getAttribute('data-id'));
+                var name  = cb.getAttribute('data-name') || '';
+                var email = cb.getAttribute('data-email') || '';
+                var existing = Array.from(selectEl.options).find(function(o) { return String(o.value) === uid; });
+                if (!existing) {
+                    var opt = document.createElement('option');
+                    opt.value = uid;
+                    opt.textContent = name + (email ? ' (' + email + ')' : ' (no e-mail)');
+                    opt.selected = true;
+                    selectEl.appendChild(opt);
+                } else {
+                    existing.selected = true;
+                }
+            });
+            closeOsaEmailUserPickModal();
+        }
+
+        // ---- Corp Directory (OSA) ----
+        function openOsaCorpDirModal() {
+            document.getElementById('osa-corp-dir-modal-bg').style.display = 'flex';
+            document.getElementById('osa-corp-dir-query').value = '';
+            document.getElementById('osa-corp-dir-status').textContent = '';
+            document.getElementById('osa-corp-dir-import-status').textContent = '';
+            document.getElementById('osa-corp-dir-table').style.display = 'none';
+            document.getElementById('osa-corp-dir-no-results').style.display = 'none';
+            document.getElementById('osa-corp-dir-add-btn').disabled = true;
+            document.getElementById('osa-corp-dir-select-all').checked = false;
+            document.getElementById('osa-corp-dir-body').innerHTML = '';
+            osaCorpDirResults = [];
+            setTimeout(function() { document.getElementById('osa-corp-dir-query').focus(); }, 50);
+        }
+
+        function closeOsaCorpDirModal() {
+            document.getElementById('osa-corp-dir-modal-bg').style.display = 'none';
+        }
+
+        function osaCorpDirSearch() {
+            var query = document.getElementById('osa-corp-dir-query').value.trim();
+            if (!query) { document.getElementById('osa-corp-dir-status').textContent = 'Please enter a search term.'; return; }
+            var statusEl  = document.getElementById('osa-corp-dir-status');
+            var searchBtn = document.getElementById('osa-corp-dir-search-btn');
+            searchBtn.disabled = true;
+            statusEl.style.color = '#555';
+            statusEl.textContent = 'Searching\u2026';
+            document.getElementById('osa-corp-dir-table').style.display = 'none';
+            document.getElementById('osa-corp-dir-no-results').style.display = 'none';
+            document.getElementById('osa-corp-dir-add-btn').disabled = true;
+            document.getElementById('osa-corp-dir-import-status').textContent = '';
+            fetch('/users/azure/search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', [csrfHeader]: csrfToken },
+                body: JSON.stringify({ query: query })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                searchBtn.disabled = false;
+                if (data.error) { statusEl.style.color = '#c00'; statusEl.textContent = data.error; return; }
+                osaCorpDirResults = data.results || [];
+                statusEl.style.color = '#555';
+                statusEl.textContent = osaCorpDirResults.length + ' result(s) found.';
+                osaCorpDirRender(osaCorpDirResults);
+            })
+            .catch(function(err) {
+                searchBtn.disabled = false;
+                statusEl.style.color = '#c00';
+                statusEl.textContent = 'Request failed: ' + err;
+            });
+        }
+
+        function osaCorpDirRender(results) {
+            var tbody = document.getElementById('osa-corp-dir-body');
+            tbody.innerHTML = '';
+            document.getElementById('osa-corp-dir-select-all').checked = false;
+            if (!results || results.length === 0) {
+                document.getElementById('osa-corp-dir-no-results').style.display = 'block';
+                document.getElementById('osa-corp-dir-table').style.display = 'none';
+                return;
+            }
+            document.getElementById('osa-corp-dir-no-results').style.display = 'none';
+            document.getElementById('osa-corp-dir-table').style.display = '';
+            results.forEach(function(u, idx) {
+                var mail = u.mail || u.userPrincipalName || '\u2014';
+                var row = document.createElement('tr');
+                row.innerHTML =
+                    '<td><input type="checkbox" class="osa-corp-dir-cb" data-idx="' + idx + '" onchange="osaCorpDirUpdateBtn()" /></td>' +
+                    '<td>' + osaCorpDirEsc(u.displayName) + '</td>' +
+                    '<td>' + osaCorpDirEsc(mail) + '</td>';
+                tbody.appendChild(row);
+            });
+        }
+
+        function osaCorpDirToggleAll(cb) {
+            document.querySelectorAll('.osa-corp-dir-cb').forEach(function(el) { el.checked = cb.checked; });
+            osaCorpDirUpdateBtn();
+        }
+
+        function osaCorpDirUpdateBtn() {
+            var any = Array.from(document.querySelectorAll('.osa-corp-dir-cb')).some(function(el) { return el.checked; });
+            document.getElementById('osa-corp-dir-add-btn').disabled = !any;
+        }
+
+        function osaCorpDirAddSelected() {
+            var selected = Array.from(document.querySelectorAll('.osa-corp-dir-cb:checked'))
+                .map(function(el) { return osaCorpDirResults[parseInt(el.getAttribute('data-idx'))]; });
+            if (selected.length === 0) return;
+            var importStatusEl = document.getElementById('osa-corp-dir-import-status');
+            var selectEl = document.getElementById('osa-email-recipients');
+            var added = 0;
+            var errors = [];
+            selected.forEach(function(u) {
+                var mail = (u.mail || u.userPrincipalName || '').trim();
+                var displayName = u.displayName || mail;
+                if (!mail || !mail.includes('@')) { errors.push('"' + displayName + '" has no valid e-mail address.'); return; }
+                var marker = 'cd:' + mail.toLowerCase();
+                if (osaCorpDirPendingRecipients.some(function(p) { return (p.mail || p.userPrincipalName || '').toLowerCase() === mail.toLowerCase(); })) return;
+                if (Array.from(selectEl.options).find(function(o) { return o.value === marker; })) return;
+                osaCorpDirPendingRecipients.push(u);
+                var opt = document.createElement('option');
+                opt.value = marker;
+                opt.textContent = displayName + ' (' + mail + ') [new]';
+                opt.selected = true;
+                selectEl.appendChild(opt);
+                added++;
+            });
+            if (errors.length > 0) {
+                importStatusEl.style.color = '#c00';
+                importStatusEl.textContent = errors.join(' ');
+            } else if (added > 0) {
+                importStatusEl.style.color = 'green';
+                importStatusEl.textContent = added + ' user(s) added to recipients.';
+                setTimeout(function() { closeOsaCorpDirModal(); }, 800);
+            } else {
+                importStatusEl.style.color = '#555';
+                importStatusEl.textContent = 'Selected users already in recipients list.';
             }
         }
 
-        function fallbackCopyUrl(url) {
-            var ta = document.createElement('textarea');
-            ta.value = url;
-            ta.style.cssText = 'position:fixed;top:-999px;left:-999px;';
-            document.body.appendChild(ta);
-            ta.select();
-            try {
-                document.execCommand('copy');
-                showCopyToast('Link copied to clipboard!');
-            } catch (e) {
-                showCopyToast('Could not copy: ' + url, true);
-            }
-            document.body.removeChild(ta);
+        function osaCorpDirEsc(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
         }
 
-        function showCopyToast(msg, isError) {
-            var toast = document.getElementById('copyToast');
-            toast.textContent = msg;
-            toast.style.background = isError ? '#c0392b' : '#2563eb';
-            toast.style.display = 'flex';
-            toast.classList.remove('copy-toast-out');
-            toast.classList.add('copy-toast-in');
-            setTimeout(function() {
-                toast.classList.remove('copy-toast-in');
-                toast.classList.add('copy-toast-out');
-                setTimeout(function() { toast.style.display = 'none'; }, 350);
-            }, 2200);
-        }
+        document.addEventListener('DOMContentLoaded', function() {
+            var emailBg = document.getElementById('osa-email-modal-bg');
+            if (emailBg) emailBg.addEventListener('mousedown', function(e) { if (e.target === this) closeOsaEmailModal(); });
+            var pickBg = document.getElementById('osa-email-user-pick-modal-bg');
+            if (pickBg) pickBg.addEventListener('mousedown', function(e) { if (e.target === this) closeOsaEmailUserPickModal(); });
+            var corpBg = document.getElementById('osa-corp-dir-modal-bg');
+            if (corpBg) corpBg.addEventListener('mousedown', function(e) { if (e.target === this) closeOsaCorpDirModal(); });
+        });
     </script>
+
+    <!-- Send E-Mail Modal -->
+    <div class="modal-bg" id="osa-email-modal-bg" style="display:none;">
+        <div class="modal-popup" style="width:min(1300px,97vw);min-width:80vw;display:flex;flex-direction:column;max-height:95vh;height:95vh;">
+            <h3 style="flex-shrink:0;margin-bottom:0.6em;">&#9993; Send E-Mail</h3>
+
+            <!-- Two-column body -->
+            <div style="display:grid;grid-template-columns:220px 1fr;gap:1em;flex:1;min-height:0;overflow:hidden;">
+
+                <!-- LEFT: recipients + AI generate -->
+                <div style="display:flex;flex-direction:column;gap:0.6em;min-height:0;">
+                    <div class="form-group" style="flex:1;display:flex;flex-direction:column;min-height:0;">
+                        <label style="margin-bottom:2px;">Recipients</label>
+                        <select id="osa-email-recipients" multiple
+                                style="flex:1;min-height:80px;max-height:140px;border:1px solid #ccc;border-radius:4px;padding:4px;font-size:0.88em;"></select>
+                        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px;">
+                            <span class="help-text text-sm" style="width:100%;margin-bottom:1px;">Ctrl / Cmd for multiple. Select then click Remove to delete.</span>
+                            <button type="button" class="btn-action" style="font-size:0.78em;padding:2px 7px;"
+                                    onclick="openOsaEmailUserPickModal()">&#128101; Responsible Persons</button>
+                            <button type="button" class="btn-action" style="font-size:0.78em;padding:2px 7px;"
+                                    onclick="openOsaCorpDirModal()">&#9729; Corp Directory</button>
+                            <button type="button" class="btn-cancel" style="font-size:0.78em;padding:2px 7px;"
+                                    onclick="document.querySelectorAll('#osa-email-recipients option:checked').forEach(function(o){o.remove();})">&#10060; Remove</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="flex-shrink:0;">
+                        <label style="margin-bottom:4px;">Generate with AI</label>
+                        <div style="display:flex;flex-direction:column;gap:4px;">
+                            <button type="button" class="btn-action" style="width:100%;"
+                                    id="osa-email-gen-btn" onclick="generateOsaEmailContent()">&#9889; Generate E-Mail</button>
+                            <span id="osa-email-gen-status" class="text-muted text-sm"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RIGHT: subject + body -->
+                <div style="display:flex;flex-direction:column;gap:0.6em;min-height:0;">
+                    <div class="form-group" style="flex-shrink:0;">
+                        <label for="osa-email-subject" style="margin-bottom:2px;">Subject</label>
+                        <input type="text" id="osa-email-subject" class="form-control"
+                               placeholder="E-mail subject" style="width:100%;box-sizing:border-box;" />
+                    </div>
+                    <div class="form-group" style="flex:1;display:flex;flex-direction:column;min-height:0;">
+                        <label style="margin-bottom:2px;">Message</label>
+                        <div id="osa-email-body-editor" style="width:100%;box-sizing:border-box;flex:1;min-height:0;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div style="flex-shrink:0;margin-top:0.6em;">
+                <div id="osa-email-modal-error" style="color:#c00;font-size:0.9em;min-height:1.2em;"></div>
+                <div id="osa-email-modal-success" style="color:green;font-weight:600;display:none;"></div>
+                <div class="modal-btn-row" style="margin-top:0.4em;">
+                    <button type="button" class="btn-action" id="osa-email-send-btn" onclick="sendOsaEmail()">Send</button>
+                    <button type="button" class="btn-cancel" onclick="closeOsaEmailModal()">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Responsible Persons Pick Modal -->
+    <div class="modal-bg" id="osa-email-user-pick-modal-bg" style="display:none;z-index:10100;">
+        <div class="modal-popup" style="width:min(520px,96vw);display:flex;flex-direction:column;max-height:82vh;">
+            <h3 style="flex-shrink:0;margin-bottom:0.7em;">&#128101; Add Recipients</h3>
+            <div id="osa-email-user-pick-list" style="flex:1;overflow-y:auto;min-height:0;padding-right:4px;"></div>
+            <div style="flex-shrink:0;margin-top:0.7em;">
+                <div class="modal-btn-row">
+                    <button type="button" class="btn-action" onclick="osaAddPickedUsersToRecipients()">Add to Recipients</button>
+                    <button type="button" class="btn-cancel" onclick="closeOsaEmailUserPickModal()">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Corporate Directory sub-modal -->
+    <div class="modal-bg" id="osa-corp-dir-modal-bg" style="display:none;z-index:10100;">
+        <div class="modal-popup" style="width:min(680px,96vw);display:flex;flex-direction:column;max-height:82vh;">
+            <h3 style="flex-shrink:0;margin-bottom:0.7em;">&#9729; Select from Corporate Directory</h3>
+            <div style="display:flex;gap:0.5em;flex-shrink:0;margin-bottom:0.6em;">
+                <input type="text" id="osa-corp-dir-query" class="form-control"
+                       placeholder="Search by name or e-mail&hellip;" style="flex:1;"
+                       onkeydown="if(event.key==='Enter') osaCorpDirSearch()" />
+                <button type="button" class="btn-action" id="osa-corp-dir-search-btn" onclick="osaCorpDirSearch()">Search</button>
+            </div>
+            <div id="osa-corp-dir-status" style="font-size:0.88em;color:#555;min-height:1.1em;flex-shrink:0;"></div>
+            <div style="flex:1;overflow-y:auto;min-height:0;margin-top:0.4em;">
+                <table id="osa-corp-dir-table" class="table" style="display:none;width:100%;">
+                    <thead>
+                        <tr>
+                            <th style="width:2em;"><input type="checkbox" id="osa-corp-dir-select-all" onchange="osaCorpDirToggleAll(this)" title="Select all" /></th>
+                            <th>Name</th>
+                            <th>E-Mail</th>
+                        </tr>
+                    </thead>
+                    <tbody id="osa-corp-dir-body"></tbody>
+                </table>
+                <div id="osa-corp-dir-no-results" style="display:none;color:#888;padding:0.4em 0;">No users found.</div>
+            </div>
+            <div style="flex-shrink:0;margin-top:0.7em;">
+                <div id="osa-corp-dir-import-status" style="font-size:0.88em;min-height:1.1em;"></div>
+                <div class="modal-btn-row" style="margin-top:0.4em;">
+                    <button type="button" class="btn-action" id="osa-corp-dir-add-btn" onclick="osaCorpDirAddSelected()" disabled>Add to Recipients</button>
+                    <button type="button" class="btn-cancel" onclick="closeOsaCorpDirModal()">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/webjars/quill/1.3.7/dist/quill.min.js"></script>
 </body>
 
 </html>

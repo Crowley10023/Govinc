@@ -107,18 +107,28 @@ public class LandingController {
                 totalControls = a.getEffectiveControls().size();
                 int answered = 0;
                 try {
-                    // Collect directly-answered control IDs from pre-loaded assessment details
+                    // Collect directly-answered control IDs from pre-loaded assessment details.
+                    // Only count entries that actually have a maturity answer with rating > 0.
                     Set<Long> answeredIds = new HashSet<>();
                     AssessmentDetails details = detailsById.get(aid);
                     if (details != null && details.getControlAnswers() != null) {
                         for (com.govinc.assessment.AssessmentControlAnswer aca : details.getControlAnswers()) {
-                            if (aca != null && aca.getSecurityControl() != null && aca.getSecurityControl().getId() != null) {
+                            if (aca != null && aca.getSecurityControl() != null
+                                    && aca.getSecurityControl().getId() != null
+                                    && aca.getScore() > 0) {
                                 answeredIds.add(aca.getSecurityControl().getId());
                             }
                         }
                     }
-                    // Also count controls taken over by org services — use pre-loaded map
-                    if (a.getOrgServices() != null && !a.getOrgServices().isEmpty()) {
+                    // For open/review assessments, also pull answers from live org-service data.
+                    // For CLOSED assessments, org-service answers are already frozen into controlAnswers
+                    // above — adding them again would double-count.
+                    if (!a.isClosed() && a.getOrgServices() != null && !a.getOrgServices().isEmpty()) {
+                        // Only count org-service controls that are actually in this assessment's scope.
+                        Set<Long> effectiveControlIds = new HashSet<>();
+                        for (com.govinc.catalog.SecurityControl sc : a.getEffectiveControls()) {
+                            if (sc.getId() != null) effectiveControlIds.add(sc.getId());
+                        }
                         for (com.govinc.organization.OrgService orgService : a.getOrgServices()) {
                             List<OrgServiceAssessment> osaList = osaByOrgServiceId.get(orgService.getId());
                             if (osaList != null) {
@@ -127,7 +137,8 @@ public class LandingController {
                                         for (OrgServiceAssessmentControl osac : osa.getControls()) {
                                             if (osac.isApplicable() && osac.getPercent() > 0
                                                     && osac.getSecurityControl() != null
-                                                    && osac.getSecurityControl().getId() != null) {
+                                                    && osac.getSecurityControl().getId() != null
+                                                    && effectiveControlIds.contains(osac.getSecurityControl().getId())) {
                                                 answeredIds.add(osac.getSecurityControl().getId());
                                             }
                                         }

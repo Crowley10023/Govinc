@@ -2,7 +2,10 @@ package com.govinc.organization;
 
 import com.govinc.authorization.AuthorizationService;
 import com.govinc.authorization.UnauthorizedException;
+import com.govinc.service.EmailService;
 import com.govinc.user.User;
+import com.govinc.user.UserRepository;
+import com.govinc.util.OpenAIUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -11,6 +14,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/orgservice-assessment")
@@ -48,6 +53,15 @@ public class OrgServiceAssessmentController {
 
     @Autowired
     private OrgServiceAssessmentRepository orgServiceAssessmentRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private EmailService emailService;
+
+    @Autowired
+    private OpenAIUtil openAIUtil;
 
     @GetMapping("/list")
     public String listAssessments(Model model) {
@@ -218,6 +232,203 @@ public class OrgServiceAssessmentController {
             response.put("success", false);
             response.put("message", ex.getMessage());
             return ResponseEntity.status(500).body(response);
+        }
+    }
+
+    @PostMapping("/{orgServiceId}/email/generate")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> generateEmail(
+            @PathVariable Long orgServiceId,
+            @RequestBody Map<String, Object> payload) {
+
+        Map<String, Object> response = new HashMap<>();
+
+        if (!canAccessAssessmentFor(orgServiceId)) {
+            response.put("error", "You do not have permission.");
+            return ResponseEntity.status(403).body(response);
+        }
+
+        OrgService orgService = orgServiceRepository.findById(orgServiceId).orElse(null);
+        if (orgService == null) {
+            response.put("error", "Org service not found.");
+            return ResponseEntity.status(404).body(response);
+        }
+
+        String baseUrl = payload.containsKey("baseUrl") ? String.valueOf(payload.get("baseUrl")) : "";
+        if ("null".equals(baseUrl)) baseUrl = "";
+
+        String simpleLink = baseUrl.isBlank()
+                ? "/orgservice-assessment/simple/" + orgServiceId
+                : baseUrl.stripTrailing() + "/orgservice-assessment/simple/" + orgServiceId;
+        String htmlLink = "<a href=\"" + simpleLink + "\">Complete your part of the assessment</a>";
+
+        User currentUser = authorizationService.getCurrentUser();
+        String senderName = currentUser != null && currentUser.getName() != null ? currentUser.getName() : "";
+        String orgServiceName = orgService.getName() != null ? orgService.getName() : "Org Service #" + orgServiceId;
+
+        String prompt = "Write a professional and motivating e-mail inviting the recipient to complete a security assessment for the org service/application they are responsible for.\n" +
+                (senderName.isBlank() ? "" : "Sender name: " + senderName + "\n") +
+                "Org service name: " + orgServiceName + "\n\n" +
+                "The body must be valid HTML (use <p>, <br>, etc.). Include the assessment link exactly as this HTML anchor: " + htmlLink + "\n" +
+                "The e-mail should:\n" +
+                "- Explain the purpose of the assessment briefly\n" +
+                "- Ask the recipient to complete their part via the provided link\n" +
+                "- Mention the importance of timely completion\n" +
+                "- Be polite and professional\n\n" +
+                "Return ONLY a JSON object with two keys: \"subject\" and \"body\". No markdown, no code fences.";
+
+        String aiResponse = openAIUtil.askAI(prompt, false);
+
+        try {
+            String cleaned = aiResponse.trim();
+            if (cleaned.startsWith("```")) {
+                int start = cleaned.indexOf('\n') + 1;
+                int end = cleaned.lastIndexOf("```");
+                if (end > start) cleaned = cleaned.substring(start, end).trim();
+            }
+            org.json.JSONObject json = new org.json.JSONObject(cleaned);
+            Map<String, Object> result = new java.util.LinkedHashMap<>();
+            result.put("subject", json.optString("subject", "Security Assessment: Action Required"));
+            result.put("body", json.optString("body", aiResponse));
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            Map<String, Object> result = new java.util.LinkedHashMap<>();
+            result.put("subject", "Action Required: " + orgServiceName);
+            result.put("body", aiResponse);
+            return ResponseEntity.ok(result);
+        }
+    }
+
+    @PostMapping("/{orgServiceId}/email/send")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> sendEmail(
+            @PathVariable Long orgServiceId,
+            @RequestBody Map<String, Object> payload) {
+
+        Map<String, Object> response = new HashMap<>();
+
+        if (!canAccessAssessmentFor(orgServiceId)) {
+            response.put("error", "You do not have permission.");
+            return ResponseEntity.status(403).body(response);
+        }
+
+        OrgService orgService = orgServiceRepository.findById(orgServiceId).orElse(null);
+        if (orgService == null) {
+            response.put("error", "Org service not found.");
+            return ResponseEntity.status(404).body(response);
+        }
+
+        User currentUser = authorizationService.getCurrentUser();
+        if (currentUser == null || currentUser.getEmail() == null || currentUser.getEmail().isBlank()) {
+            response.put("error", "Your account does not have a valid e-mail address configured as sender.");
+            return ResponseEntity.badRequest().body(response);
+        }
+        String from = currentUser.getEmail();
+
+        @SuppressWarnings("unchecked")
+        List<Object> rawIds = (List<Object>) payload.get("recipientUserIds");
+        @SuppressWarnings("unchecked")
+        List<Map<String, String>> corpDirRecipients =
+                (List<Map<String, String>>) payload.getOrDefault("corpDirRecipients", java.util.Collections.emptyList());
+
+        boolean hasUserIds = rawIds != null && !rawIds.isEmpty();
+        boolean hasCorpDir = corpDirRecipients != null && !corpDirRecipients.isEmpty();
+
+        if (!hasUserIds && !hasCorpDir) {
+            response.put("error", "No recipients selected.");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        String subject = String.valueOf(payload.getOrDefault("subject", "")).trim();
+        String body = String.valueOf(payload.getOrDefault("body", "")).trim();
+
+        if (subject.isBlank()) {
+            response.put("error", "Subject must not be empty.");
+            return ResponseEntity.badRequest().body(response);
+        }
+        if (body.isBlank()) {
+            response.put("error", "E-mail body must not be empty.");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        if (orgService.getResponsiblePersons() == null) {
+            orgService.setResponsiblePersons(new java.util.HashSet<>());
+        }
+
+        java.util.List<String> recipientEmails = new java.util.ArrayList<>();
+        boolean serviceChanged = false;
+
+        if (hasUserIds) {
+            List<Long> userIds = rawIds.stream()
+                    .map(o -> o instanceof Number n ? n.longValue() : Long.parseLong(String.valueOf(o)))
+                    .collect(Collectors.toList());
+            for (Long uid : userIds) {
+                Optional<User> userOpt = userRepository.findById(uid);
+                if (userOpt.isEmpty()) continue;
+                User u = userOpt.get();
+                if (orgService.getResponsiblePersons().stream().noneMatch(rp -> rp.getId().equals(u.getId()))) {
+                    orgService.getResponsiblePersons().add(u);
+                    serviceChanged = true;
+                }
+                if (u.getEmail() != null && !u.getEmail().isBlank()
+                        && !recipientEmails.contains(u.getEmail())) {
+                    recipientEmails.add(u.getEmail());
+                }
+            }
+        }
+
+        if (hasCorpDir) {
+            for (Map<String, String> cdUser : corpDirRecipients) {
+                String emailRaw = cdUser.getOrDefault("mail", "").trim();
+                if (emailRaw.isBlank()) emailRaw = cdUser.getOrDefault("userPrincipalName", "").trim();
+                if (emailRaw.isBlank() || !emailRaw.contains("@")) continue;
+                final String cdEmail = emailRaw.toLowerCase();
+
+                String gn = cdUser.getOrDefault("givenName", "").trim();
+                String sn = cdUser.getOrDefault("surname", "").trim();
+                if (gn.isBlank() && sn.isBlank()) {
+                    String display = cdUser.getOrDefault("displayName", "").trim();
+                    int sp = display.lastIndexOf(' ');
+                    if (sp > 0) { gn = display.substring(0, sp); sn = display.substring(sp + 1); }
+                    else { gn = display; }
+                }
+                final String givenName = gn;
+                final String surname = sn;
+
+                User cdDbUser = userRepository.findByEmail(cdEmail).orElseGet(() -> {
+                    User nu = new User(givenName, surname, cdEmail);
+                    nu.setRole(com.govinc.user.Role.ASSESSOR);
+                    return userRepository.save(nu);
+                });
+
+                if (orgService.getResponsiblePersons().stream().noneMatch(rp -> rp.getId().equals(cdDbUser.getId()))) {
+                    orgService.getResponsiblePersons().add(cdDbUser);
+                    serviceChanged = true;
+                }
+                if (cdDbUser.getEmail() != null && !cdDbUser.getEmail().isBlank()
+                        && !recipientEmails.contains(cdDbUser.getEmail())) {
+                    recipientEmails.add(cdDbUser.getEmail());
+                }
+            }
+        }
+
+        if (serviceChanged) {
+            orgServiceRepository.save(orgService);
+        }
+
+        if (recipientEmails.isEmpty()) {
+            response.put("error", "None of the selected users have a valid e-mail address.");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        try {
+            emailService.sendEmail(from, recipientEmails, subject, body);
+            response.put("success", true);
+            response.put("message", "E-mail sent to " + recipientEmails.size() + " recipient(s).");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("error", "Failed to send e-mail: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
         }
     }
 }
