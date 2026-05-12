@@ -125,7 +125,8 @@ public class LandingController {
                                 for (OrgServiceAssessment osa : osaList) {
                                     if (osa.getControls() != null) {
                                         for (OrgServiceAssessmentControl osac : osa.getControls()) {
-                                            if (osac.isApplicable() && osac.getSecurityControl() != null
+                                            if (osac.isApplicable() && osac.getPercent() > 0
+                                                    && osac.getSecurityControl() != null
                                                     && osac.getSecurityControl().getId() != null) {
                                                 answeredIds.add(osac.getSecurityControl().getId());
                                             }

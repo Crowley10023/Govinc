@@ -56,6 +56,25 @@ public class OrgServiceAssessmentController {
         }
         List<OrgServiceAssessment> assessments = orgServiceAssessmentRepository.findAll();
         model.addAttribute("assessments", assessments);
+
+        // Compute completeness per assessment: % of applicable controls with a non-zero maturity answer
+        Map<Long, Integer> completenessMap = new HashMap<>();
+        for (OrgServiceAssessment osa : assessments) {
+            long applicable = 0;
+            long answered = 0;
+            if (osa.getControls() != null) {
+                for (OrgServiceAssessmentControl c : osa.getControls()) {
+                    if (c.isApplicable()) {
+                        applicable++;
+                        if (c.getPercent() > 0) answered++;
+                    }
+                }
+            }
+            int pct = applicable > 0 ? (int) Math.round((answered * 100.0) / applicable) : 0;
+            completenessMap.put(osa.getId(), pct);
+        }
+        model.addAttribute("completenessMap", completenessMap);
+
         return "orgservice-assessment-list";
     }
 

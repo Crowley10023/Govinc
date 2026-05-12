@@ -137,6 +137,80 @@ public class AssessmentController {
         return "create-assessment";
     }
 
+    @GetMapping("/create-campaign")
+    public String showCreateCampaignForm(Model model) {
+        if (!authorizationService.canCreateAssessment()) {
+            throw new UnauthorizedException("You do not have permission to create assessments.");
+        }
+        model.addAttribute("catalogs", securityCatalogService.findAll());
+        model.addAttribute("users", userRepository.findAll());
+        model.addAttribute("orgServices", orgServiceService.getAllOrgServices());
+        // Pass all org units as a flat list with id, name, parentId for client-side tree building
+        List<OrgUnit> allUnits = orgUnitService.getAllOrgUnits();
+        List<Map<String, Object>> orgUnitsJson = new ArrayList<>();
+        for (OrgUnit ou : allUnits) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", ou.getId());
+            m.put("name", ou.getName());
+            m.put("parentId", ou.getParent() != null ? ou.getParent().getId() : null);
+            orgUnitsJson.add(m);
+        }
+        model.addAttribute("orgUnitsJson", orgUnitsJson);
+        return "create-campaign";
+    }
+
+    @PostMapping("/create-campaign")
+    public String createCampaign(
+            @RequestParam("catalogId") Long catalogId,
+            @RequestParam(value = "namePrefix", required = false) String namePrefix,
+            @RequestParam(value = "orgUnitIds", required = false) List<Long> orgUnitIds,
+            @RequestParam(value = "orgServiceIds", required = false) List<Long> orgServiceIds,
+            @RequestParam(value = "userIds", required = false) List<Long> userIds,
+            @RequestParam(value = "guideVisibleInDirect", defaultValue = "false") boolean guideVisibleInDirect) {
+        if (!authorizationService.canCreateAssessment()) {
+            throw new UnauthorizedException("You do not have permission to create assessments.");
+        }
+        SecurityCatalog catalog = securityCatalogService.findById(catalogId).orElse(null);
+        if (catalog == null || orgUnitIds == null || orgUnitIds.isEmpty()) {
+            return "redirect:/assessment/list";
+        }
+        Set<OrgService> orgServices = new HashSet<>();
+        if (orgServiceIds != null && !orgServiceIds.isEmpty()) {
+            for (Long sid : orgServiceIds) {
+                orgServiceService.getOrgService(sid).ifPresent(orgServices::add);
+            }
+        }
+        Set<User> users = new HashSet<>();
+        if (userIds != null && !userIds.isEmpty()) {
+            for (Long uid : userIds) {
+                userRepository.findById(uid).ifPresent(users::add);
+            }
+        }
+        User currentUser = null;
+        try { currentUser = authorizationService.getCurrentUser(); } catch (Exception ignored) {}
+
+        String prefix = (namePrefix != null && !namePrefix.trim().isEmpty()) ? namePrefix.trim() : null;
+
+        for (Long ouId : orgUnitIds) {
+            OrgUnit orgUnit = orgUnitService.getOrgUnit(ouId).orElse(null);
+            if (orgUnit == null) continue;
+            Assessment a = new Assessment();
+            String aName = prefix != null
+                    ? prefix + " - " + orgUnit.getName()
+                    : orgUnit.getName().replaceAll("[^a-zA-Z0-9]+", "_") + "_Campaign_" + LocalDate.now();
+            a.setName(aName);
+            a.setSecurityCatalog(catalog);
+            a.setCreationDate(LocalDate.now());
+            a.setGuideVisibleInDirect(guideVisibleInDirect);
+            a.setCreatedBy(currentUser);
+            a.setOrgUnit(orgUnit);
+            if (!orgServices.isEmpty()) a.setOrgServices(new HashSet<>(orgServices));
+            if (!users.isEmpty()) a.setUsers(new HashSet<>(users));
+            assessmentRepository.save(a);
+        }
+        return "redirect:/assessment/list";
+    }
+
     // AJAX: get predecessor candidates for catalog + orgUnit combination
     @GetMapping("/predecessors")
     @ResponseBody

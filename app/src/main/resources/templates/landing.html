@@ -91,6 +91,9 @@
                                         th:style="'width:' + (${assessmentCompletionPercent[assessment.id] != null ? (assessmentCompletionPercent[assessment.id] > 100 ? 100 : assessmentCompletionPercent[assessment.id]) : 0}) + '%'">
                                     </div>
                                 </div>
+                                <span class="completion-bar-pct"
+                                    th:text="${(assessmentCompletionPercent[assessment.id] != null ? (assessmentCompletionPercent[assessment.id] > 100 ? 100 : assessmentCompletionPercent[assessment.id]) : 0)} + '%'">
+                                </span>
                             </div>
 
                         </div>

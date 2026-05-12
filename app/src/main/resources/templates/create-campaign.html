@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <title>Create Campaign</title>
+    <meta charset="UTF-8">
+    <th:block th:replace="~{navigation :: navHead}"></th:block>
+</head>
+<body>
+    <div th:replace="~{navigation :: mainNav}"></div>
+    <div class="container">
+        <h1 class="page-title">Create Campaign</h1>
+        <p class="text-muted" style="margin-bottom:1.5em;">
+            A campaign creates one assessment per selected org unit. Choose a root org unit to
+            expand its subtree, then select which units to include.
+        </p>
+
+        <form th:action="@{/assessment/create-campaign}" method="post" id="campaignForm">
+            <div style="max-width:800px;">
+
+                <!-- Name Prefix + Catalog -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="namePrefix">Assessment Name Prefix</label>
+                        <input type="text" id="namePrefix" name="namePrefix"
+                               placeholder="e.g. Q2 2026 Review">
+                        <span class="form-hint">Each assessment will be named &ldquo;Prefix - Org Unit Name&rdquo;.</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="catalog">Security Catalog <span class="required-star">*</span></label>
+                        <select id="catalog" name="catalogId" required>
+                            <option value="" disabled selected>-- Select a Catalog --</option>
+                            <option th:each="catalog: ${catalogs}"
+                                    th:value="${catalog.id}"
+                                    th:text="${catalog.name}"></option>
+                        </select>
+                        <span id="catalogError" class="form-error d-none">Please select a catalog.</span>
+                    </div>
+                </div>
+
+                <!-- Root Org Unit Selector -->
+                <div class="form-group">
+                    <label>Root Org Unit <span class="required-star">*</span></label>
+                    <div style="display:flex;gap:1em;align-items:center;">
+                        <button type="button" id="openRootOrgUnitModal" class="btn-action">Select Root Org Unit</button>
+                        <span id="selectedRootOrgUnitName" class="text-muted">No org unit selected</span>
+                    </div>
+                    <span id="orgUnitError" class="form-error d-none">Please select a root org unit.</span>
+                </div>
+
+                <!-- Org Unit Subtree Checkboxes (shown after root selection) -->
+                <div id="orgUnitSubtreeGroup" class="form-group" style="display:none;">
+                    <label>Select Org Units to Include <span class="required-star">*</span></label>
+                    <div style="display:flex;gap:0.7em;margin-bottom:0.5em;">
+                        <button type="button" id="selectAllUnits" class="btn-edit btn-sm">Select All</button>
+                        <button type="button" id="deselectAllUnits" class="btn-cancel btn-sm">Deselect All</button>
+                    </div>
+                    <div id="orgUnitCheckboxList" style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:0.7em 1em;background:#fff;">
+                    </div>
+                    <span id="orgUnitsSelectError" class="form-error d-none">Please select at least one org unit.</span>
+                </div>
+
+                <!-- Guide visibility -->
+                <div class="form-group">
+                    <label style="display:flex;align-items:center;gap:0.7em;cursor:pointer;">
+                        <input type="checkbox" name="guideVisibleInDirect" value="true" id="guideVisibleInDirect">
+                        <span>Show AI answering guide in direct assessment URL view</span>
+                    </label>
+                </div>
+
+                <!-- Org Services + Users -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="orgService">Organizational Services</label>
+                        <select name="orgServiceIds" id="orgService" multiple style="min-height:120px;">
+                            <option th:each="orgService : ${orgServices}"
+                                    th:value="${orgService.id}"
+                                    th:text="${orgService.name}"></option>
+                        </select>
+                        <span class="form-hint">Hold Ctrl/Cmd to select multiple</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="users">Assign IS Manager</label>
+                        <select name="userIds" id="users" multiple style="min-height:120px;">
+                            <option th:each="user : ${users}"
+                                    th:value="${user.id}"
+                                    th:text="${user.name + ' (' + user.email + ')'}"></option>
+                        </select>
+                        <span class="form-hint">Hold Ctrl/Cmd to select multiple</span>
+                    </div>
+                </div>
+
+                <div class="form-actions" style="display:flex;gap:1em;align-items:center;margin-top:1em;">
+                    <button type="submit" class="btn-submit">Create Campaign</button>
+                    <a href="/assessment/list" class="btn-cancel btn-sm" style="text-decoration:none;padding:0.38em 1.1em;">Cancel</a>
+                    <span id="campaignCountLabel" class="text-muted" style="font-size:0.9em;"></span>
+                </div>
+            </div>
+        </form>
+
+        <!-- Org Unit Modal -->
+        <div id="rootOrgUnitModal" class="modal-bg" style="display:none;" aria-hidden="true">
+            <div class="modal-popup ou-wizard-modal-inner">
+                <div class="modal-header-row">
+                    <h3 class="m-0">Choose Root Org Unit</h3>
+                    <button type="button" id="closeRootOrgUnitModal" class="btn-cancel">Close</button>
+                </div>
+                <div id="campaignOrgUnitWizardViewport" class="ou-wizard-viewport"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/org-unit-wizard.js"></script>
+    <script th:inline="javascript">
+        var allOrgUnits = /*[[${orgUnitsJson}]]*/ [];
+
+        (function () {
+            var selectedRootId = null;
+
+            // Build parent→children map
+            function buildChildrenMap(units) {
+                var map = {};
+                units.forEach(function (u) {
+                    var pid = u.parentId != null ? String(u.parentId) : null;
+                    if (!map[pid]) map[pid] = [];
+                    map[pid].push(u);
+                });
+                return map;
+            }
+
+            // Collect all descendants (inclusive) of rootId
+            function collectSubtree(rootId, childrenMap) {
+                var result = [];
+                var queue = [rootId];
+                while (queue.length > 0) {
+                    var id = queue.shift();
+                    var unit = allOrgUnits.find(function (u) { return String(u.id) === String(id); });
+                    if (unit) {
+                        result.push(unit);
+                        var kids = childrenMap[String(id)] || [];
+                        kids.forEach(function (k) { queue.push(k.id); });
+                    }
+                }
+                return result;
+            }
+
+            function renderSubtree(rootId) {
+                var childrenMap = buildChildrenMap(allOrgUnits);
+                var subtree = collectSubtree(rootId, childrenMap);
+                var container = document.getElementById('orgUnitCheckboxList');
+                container.innerHTML = '';
+                subtree.forEach(function (unit, idx) {
+                    var depth = 0;
+                    var pid = unit.parentId;
+                    while (pid != null) {
+                        depth++;
+                        var parentUnit = allOrgUnits.find(function (u) { return String(u.id) === String(pid); });
+                        pid = parentUnit ? parentUnit.parentId : null;
+                        if (depth > 20) break;
+                    }
+                    // Clamp depth relative to root
+                    var rootUnit = allOrgUnits.find(function (u) { return String(u.id) === String(rootId); });
+                    var rootDepth = 0;
+                    var rpid = rootUnit ? rootUnit.parentId : null;
+                    while (rpid != null) {
+                        rootDepth++;
+                        var rp = allOrgUnits.find(function (u) { return String(u.id) === String(rpid); });
+                        rpid = rp ? rp.parentId : null;
+                        if (rootDepth > 20) break;
+                    }
+                    var relDepth = depth - rootDepth;
+
+                    var label = document.createElement('label');
+                    label.style.cssText = 'display:flex;align-items:center;gap:0.5em;padding:0.3em 0;cursor:pointer;padding-left:' + (relDepth * 1.4) + 'em;';
+                    var cb = document.createElement('input');
+                    cb.type = 'checkbox';
+                    cb.name = 'orgUnitIds';
+                    cb.value = unit.id;
+                    cb.checked = true;
+                    cb.addEventListener('change', updateCountLabel);
+                    label.appendChild(cb);
+                    var nameSpan = document.createElement('span');
+                    nameSpan.textContent = unit.name;
+                    label.appendChild(nameSpan);
+                    container.appendChild(label);
+                });
+                document.getElementById('orgUnitSubtreeGroup').style.display = '';
+                updateCountLabel();
+            }
+
+            function updateCountLabel() {
+                var checked = document.querySelectorAll('#orgUnitCheckboxList input[type=checkbox]:checked').length;
+                var label = document.getElementById('campaignCountLabel');
+                label.textContent = checked > 0 ? checked + ' assessment(s) will be created' : '';
+            }
+
+            document.getElementById('selectAllUnits').addEventListener('click', function () {
+                document.querySelectorAll('#orgUnitCheckboxList input[type=checkbox]').forEach(function (cb) { cb.checked = true; });
+                updateCountLabel();
+            });
+
+            document.getElementById('deselectAllUnits').addEventListener('click', function () {
+                document.querySelectorAll('#orgUnitCheckboxList input[type=checkbox]').forEach(function (cb) { cb.checked = false; });
+                updateCountLabel();
+            });
+
+            // Org unit wizard
+            var modal = document.getElementById('rootOrgUnitModal');
+            if (window.createOrgUnitWizard && modal) {
+                window.createOrgUnitWizard({
+                    modalId: 'rootOrgUnitModal',
+                    viewportId: 'campaignOrgUnitWizardViewport',
+                    openButtonId: 'openRootOrgUnitModal',
+                    cancelButtonId: 'closeRootOrgUnitModal',
+                    closeOnSelect: true,
+                    selectedId: function () { return selectedRootId ? String(selectedRootId) : ''; },
+                    onSelect: function (unit) {
+                        selectedRootId = unit.id;
+                        document.getElementById('selectedRootOrgUnitName').textContent = unit.name;
+                        renderSubtree(unit.id);
+                    }
+                });
+            }
+
+            // Form validation
+            document.getElementById('campaignForm').addEventListener('submit', function (e) {
+                var valid = true;
+
+                var catalogErr = document.getElementById('catalogError');
+                catalogErr.classList.add('d-none');
+                if (!document.getElementById('catalog').value) {
+                    catalogErr.classList.remove('d-none');
+                    valid = false;
+                }
+
+                var ouErr = document.getElementById('orgUnitError');
+                ouErr.classList.add('d-none');
+                if (!selectedRootId) {
+                    ouErr.classList.remove('d-none');
+                    valid = false;
+                }
+
+                var selErr = document.getElementById('orgUnitsSelectError');
+                selErr.classList.add('d-none');
+                var anyChecked = Array.from(document.querySelectorAll('#orgUnitCheckboxList input[type=checkbox]')).some(function (cb) { return cb.checked; });
+                if (selectedRootId && !anyChecked) {
+                    selErr.classList.remove('d-none');
+                    valid = false;
+                }
+
+                if (!valid) e.preventDefault();
+            });
+        })();
+    </script>
+</body>
+</html>

@@ -66,16 +66,14 @@
         </div>
       </div>
       <!-- Assessment URLs: Only visible to ADMIN and ISM -->
-      <div class="nav-entry" th:if="${canAccessAssessmentUrls}">
-        <a href="/assessment-urls-list" class="entry-link btn-nav shiny">Assessment URLs</a>
-      </div>
-      <!-- Create Assessment: Visible to ADMIN and ISM -->
-      <div class="nav-entry" th:if="${canCreateAssessment}">
-        <a href="/assessment/create" class="entry-link btn-nav shiny">Create Assessment</a>
-      </div>
-      <!-- Assessments: Visible to all roles -->
-      <div class="nav-entry" th:if="${canViewAssessmentList}">
-        <a href="/assessment/list" class="entry-link btn-nav shiny">Assessments</a>
+      <div class="nav-entry dropdown" th:if="${canAccessAssessmentUrls or canCreateAssessment or canViewAssessmentList}">
+        <button type="button" class="dropdown-button btn-nav shiny">Assessments</button>
+        <div class="dropdown-content">
+          <a href="/assessment-urls-list" th:if="${canAccessAssessmentUrls}" class="dropdown-menu-btn">Assessment URLs</a>
+          <a href="/assessment/create" th:if="${canCreateAssessment}" class="dropdown-menu-btn">Create Assessment</a>
+          <a href="/assessment/list" th:if="${canViewAssessmentList}" class="dropdown-menu-btn">Assessment List</a>
+          <a href="/assessment/create-campaign" th:if="${canCreateAssessment}" class="dropdown-menu-btn">Create Campaign</a>
+        </div>
       </div>
       <!-- Reporting: Only visible to ADMIN and ISM -->
       <div class="nav-entry dropdown" th:if="${canAccessCompliance}">

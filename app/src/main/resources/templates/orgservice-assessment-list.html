@@ -26,6 +26,7 @@
                         <th>Service Name</th>
                         <th>Org Unit(s)</th>
                         <th>Assessment Date</th>
+                        <th>Completeness</th>
                         <th style="white-space:nowrap;">Actions</th>
                     </tr>
                 </thead>
@@ -39,6 +40,19 @@
                             </span>
                         </td>
                         <td th:text="${assessment.assessmentDate}"></td>
+                        <td style="white-space:nowrap;">
+                            <div class="completion-bar-wrapper" style="width:8em;"
+                                 th:title="${completenessMap[assessment.id] != null ? completenessMap[assessment.id] : 0} + '% complete'">
+                                <div class="completion-bar-container">
+                                    <div class="completion-bar-fill"
+                                         th:style="'width:' + (${completenessMap[assessment.id] != null ? completenessMap[assessment.id] : 0}) + '%'">
+                                    </div>
+                                </div>
+                                <span class="completion-bar-pct"
+                                      th:text="${completenessMap[assessment.id] != null ? completenessMap[assessment.id] : 0} + '%'">
+                                </span>
+                            </div>
+                        </td>
                         <td style="white-space:nowrap;">
                             <a th:href="@{/orgservice-assessment/simple/{id}(id=${assessment.orgService.id})}"
                                class="btn-action" style="text-decoration:none;font-size:0.88em;">

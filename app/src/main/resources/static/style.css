@@ -3856,15 +3856,19 @@ body::before {
 
 .completion-bar-wrapper {
     width: 10em;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
 }
 
 .completion-bar-container {
     background: #e9f4fb;
     border-radius: 6px;
-    height: 10px;
+    height: 14px;
     width: 100%;
     max-width: 100%;
     border: 1px solid rgba(34, 116, 165, 0.3);
+    overflow: hidden;
 }
 
 .completion-bar-fill {
@@ -3873,6 +3877,13 @@ body::before {
     border-radius: 6px;
     width: 0%;
     transition: width 0.35s ease;
+}
+
+.completion-bar-pct {
+    font-size: 0.78em;
+    color: var(--gray-777, #777);
+    text-align: right;
+    line-height: 1;
 }
 
 .filter-bar {
