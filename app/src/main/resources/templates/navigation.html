@@ -66,7 +66,7 @@
         </div>
       </div>
       <!-- Assessment URLs: Only visible to ADMIN and ISM -->
-      <div class="nav-entry dropdown" th:if="${canAccessAssessmentUrls or canCreateAssessment or canViewAssessmentList}">
+      <div class="nav-entry dropdown" th:if="${(canAccessAssessmentUrls ?: false) or (canCreateAssessment ?: false) or (canViewAssessmentList ?: false)}">
         <button type="button" class="dropdown-button btn-nav shiny">Assessments</button>
         <div class="dropdown-content">
           <a href="/assessment-urls-list" th:if="${canAccessAssessmentUrls}" class="dropdown-menu-btn">Assessment URLs</a>
