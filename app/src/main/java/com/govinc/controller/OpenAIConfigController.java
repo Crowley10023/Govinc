@@ -254,6 +254,14 @@ public class OpenAIConfigController {
                 );
             }
 
+            // Clear any reference from OpenAIConfiguration before deleting to avoid FK violation
+            openAIConfigurationRepository.findAll().stream().findFirst().ifPresent(config -> {
+                if (config.getActiveProvider() != null && config.getActiveProvider().getId().equals(id)) {
+                    config.setActiveProvider(null);
+                    openAIConfigurationRepository.save(config);
+                }
+            });
+
             providerRepository.deleteById(id);
             return ResponseEntity.ok(java.util.Map.of("success", true, "message", "Provider deleted"));
         } catch (Exception e) {

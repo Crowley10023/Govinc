@@ -83,13 +83,25 @@ class GovincConfigAndReportingTest {
         userId = userRepository.findAll().stream().map(User::getId).findFirst().orElse(null);
 
         List<OrgUnit> units = orgUnitRepository.findAll();
-        if (!units.isEmpty()) orgUnitId = units.get(0).getId();
+        if (!units.isEmpty()) {
+            orgUnitId = units.get(0).getId();
+        } else {
+            OrgUnit unit = new OrgUnit();
+            unit.setName("Config Test OrgUnit");
+            orgUnitId = orgUnitRepository.save(unit).getId();
+        }
 
         List<SecurityCatalog> catalogs = securityCatalogRepository.findAll();
         if (!catalogs.isEmpty()) securityCatalogId = catalogs.get(0).getId();
 
         List<CapabilityReport> reports = capabilityReportRepository.findAll();
-        if (!reports.isEmpty()) capabilityReportId = reports.get(0).getId();
+        if (!reports.isEmpty()) {
+            capabilityReportId = reports.get(0).getId();
+        } else {
+            CapabilityReport report = new CapabilityReport();
+            report.setName("Config Test Report");
+            capabilityReportId = capabilityReportRepository.save(report).getId();
+        }
     }
 
     private final java.io.PrintStream originalErr = System.err;
@@ -161,7 +173,7 @@ class GovincConfigAndReportingTest {
     @Order(7011)
     @WithMockUser(username = "admin", roles = {"ADMIN"})
     void openaiConfig_createProvider_returnsOk() throws Exception {
-        String json = "{\"name\":\"Test Provider\",\"type\":\"OPENAI\",\"apiKey\":\"test-key\",\"endpoint\":\"https://localhost\",\"model\":\"gpt-4\"}";
+        String json = "{\"name\":\"openai\",\"displayName\":\"Test OpenAI Provider Config\"}";
         mockMvc.perform(post("/config/openai/provider/create")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -198,7 +210,7 @@ class GovincConfigAndReportingTest {
     @WithMockUser(username = "admin", roles = {"ADMIN"})
     void openaiConfig_updateProvider_returnsOk() throws Exception {
         Assumptions.assumeTrue(createdProviderId != null, "Provider must have been created");
-        String json = "{\"name\":\"Updated Provider\",\"type\":\"OPENAI\",\"apiKey\":\"test-key-2\",\"endpoint\":\"https://localhost\",\"model\":\"gpt-4\"}";
+        String json = "{\"name\":\"openai\",\"displayName\":\"Test OpenAI Provider Config\",\"active\":false}";
         mockMvc.perform(put("/config/openai/provider/{id}", createdProviderId)
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -226,6 +238,12 @@ class GovincConfigAndReportingTest {
     @WithMockUser(username = "admin", roles = {"ADMIN"})
     void openaiConfig_deleteProvider_returnsOk() throws Exception {
         Assumptions.assumeTrue(createdProviderId != null, "Provider must have been created");
+        // Deactivate before deleting – the endpoint rejects active providers
+        mockMvc.perform(put("/config/openai/provider/{id}", createdProviderId)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"openai\",\"displayName\":\"Test OpenAI Provider Config\",\"active\":false}"))
+                .andExpect(result -> {});
         mockMvc.perform(delete("/config/openai/provider/{id}", createdProviderId)
                         .with(csrf()))
                 .andExpect(result -> assertThat(result.getResponse().getStatus()).isBetween(200, 299));
