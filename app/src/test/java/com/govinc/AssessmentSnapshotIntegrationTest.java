@@ -41,8 +41,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *   2.  Create an org unit and two users (ISM + assessor).
  *   3.  Create a ComplianceCheck with an AVERAGE_ABOVE=50 threshold linked to that catalog.
  *   4.  Create an assessment for that catalog, linked to the org unit.
- *   5.  Fill answers + comments for all 5 controls (rating=75 → "Managed" level).
- *   6.  Finalize the assessment via the HTTP endpoint → status becomes CLOSED and snapshot is populated.
+ *   5.  Fill answers + comments for all 5 controls (rating=75 â†’ "Managed" level).
+ *   6.  Finalize the assessment via the HTTP endpoint â†’ status becomes CLOSED and snapshot is populated.
  *   7.  Verify the snapshot contains exactly the 5 controls from the catalog.
  *   8.  Add a 6th control to the catalog AFTER finalization.
  *   9.  Verify the finalized assessment still shows only 5 controls (snapshot isolation).
@@ -59,7 +59,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class AssessmentSnapshotIntegrationTest {
 
-    // ── Spring-injected beans ───────────────────────────────────────────────
+    // â”€â”€ Spring-injected beans â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     @Autowired private MockMvc mockMvc;
     @Autowired private PlatformTransactionManager transactionManager;
@@ -83,7 +83,7 @@ class AssessmentSnapshotIntegrationTest {
     @Autowired private ComplianceService complianceService;
     @Autowired private CapabilityReportService capabilityReportService;
 
-    // ── State shared across ordered tests ──────────────────────────────────
+    // â”€â”€ State shared across ordered tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     private Long catalogId;
     private Long assessmentId;
@@ -93,13 +93,13 @@ class AssessmentSnapshotIntegrationTest {
     private Long capabilityReportId;
     private Long domainId;
 
-    /** Rating 75 → "Managed" level used for all answers */
+    /** Rating 75 â†’ "Managed" level used for all answers */
     private Long answerId75;
 
     private final List<Long> control5Ids = new ArrayList<>();
     private Long extraControlId; // added AFTER finalization
 
-    // ── Helpers ────────────────────────────────────────────────────────────
+    // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     private <T> T readInTx(java.util.function.Supplier<T> work) {
         TransactionTemplate tx = new TransactionTemplate(transactionManager);
@@ -111,7 +111,7 @@ class AssessmentSnapshotIntegrationTest {
         return new TransactionTemplate(transactionManager).execute(s -> work.get());
     }
 
-    // ── Setup ──────────────────────────────────────────────────────────────
+    // â”€â”€ Setup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     @BeforeAll
     void setUp() {
@@ -126,9 +126,9 @@ class AssessmentSnapshotIntegrationTest {
         });
     }
 
-    // ══════════════════════════════════════════════════════════════════════
-    // STEP 1 – Create security catalog with 5 controls
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // STEP 1 â€“ Create security catalog with 5 controls
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     @Test
     @Order(100)
@@ -183,9 +183,9 @@ class AssessmentSnapshotIntegrationTest {
         assertThat(catalogId).isNotNull();
     }
 
-    // ══════════════════════════════════════════════════════════════════════
-    // STEP 2 – Create org unit and users
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // STEP 2 â€“ Create org unit and users
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     @Test
     @Order(200)
@@ -215,9 +215,9 @@ class AssessmentSnapshotIntegrationTest {
                 .anyMatch(u -> "snap-ism@test.example".equals(u.getEmail()))).isTrue();
     }
 
-    // ══════════════════════════════════════════════════════════════════════
-    // STEP 3 – Create ComplianceCheck (AVERAGE_ABOVE 50 %)
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // STEP 3 â€“ Create ComplianceCheck (AVERAGE_ABOVE 50 %)
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     @Test
     @Order(300)
@@ -228,7 +228,7 @@ class AssessmentSnapshotIntegrationTest {
 
             ComplianceCheck check = new ComplianceCheck();
             check.setName("Snapshot Compliance Check");
-            check.setDescription("Requires average maturity ≥ 50%");
+            check.setDescription("Requires average maturity â‰¥ 50%");
             check.setSecurityCatalog(catalog);
             check = complianceCheckRepository.save(check);
 
@@ -246,9 +246,9 @@ class AssessmentSnapshotIntegrationTest {
         assertThat(complianceCheckId).isNotNull();
     }
 
-    // ══════════════════════════════════════════════════════════════════════
-    // STEP 4 – Create assessment via HTTP endpoint
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // STEP 4 â€“ Create assessment via HTTP endpoint
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     @Test
     @Order(400)
@@ -284,9 +284,9 @@ class AssessmentSnapshotIntegrationTest {
         assertThat(assessmentId).isNotNull();
     }
 
-    // ══════════════════════════════════════════════════════════════════════
-    // STEP 5 – Fill all 5 answers + comments via HTTP endpoints
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // STEP 5 â€“ Fill all 5 answers + comments via HTTP endpoints
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     @Test
     @Order(500)
@@ -322,15 +322,15 @@ class AssessmentSnapshotIntegrationTest {
 
         // Verify all 5 answers were persisted
         Integer answeredCount = readInTx(() -> {
-            Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(assessmentId);
+            Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findByAssessmentId(assessmentId);
             return detailsOpt.map(d -> d.getControlAnswers().size()).orElse(0);
         });
         assertThat(answeredCount).isEqualTo(5);
     }
 
-    // ══════════════════════════════════════════════════════════════════════
-    // STEP 6 – Finalize the assessment via HTTP endpoint
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // STEP 6 â€“ Finalize the assessment via HTTP endpoint
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     @Test
     @Order(600)
@@ -359,9 +359,9 @@ class AssessmentSnapshotIntegrationTest {
                 .containsExactlyInAnyOrderElementsOf(control5Ids);
     }
 
-    // ══════════════════════════════════════════════════════════════════════
-    // STEP 7a – Verify ComplianceCheck vs single assessment results match
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // STEP 7a â€“ Verify ComplianceCheck vs single assessment results match
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     @Test
     @Order(700)
@@ -412,9 +412,9 @@ class AssessmentSnapshotIntegrationTest {
                 .isEqualTo(complianceResult.isCompliant());
     }
 
-    // ══════════════════════════════════════════════════════════════════════
-    // STEP 7b – Assessment JSON endpoint agrees with compliance calculation
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // STEP 7b â€“ Assessment JSON endpoint agrees with compliance calculation
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     @Test
     @Order(710)
@@ -434,9 +434,9 @@ class AssessmentSnapshotIntegrationTest {
         }
     }
 
-    // ══════════════════════════════════════════════════════════════════════
-    // STEP 7c – Add a 6th control to the catalog; snapshot must stay frozen
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // STEP 7c â€“ Add a 6th control to the catalog; snapshot must stay frozen
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     @Test
     @Order(720)
@@ -478,15 +478,15 @@ class AssessmentSnapshotIntegrationTest {
         });
 
         assertThat(effectiveIds)
-                .as("Closed assessment must use frozen snapshot – 5 controls, NOT 6")
+                .as("Closed assessment must use frozen snapshot â€“ 5 controls, NOT 6")
                 .hasSize(5)
                 .doesNotContain(extraControlId)
                 .containsExactlyInAnyOrderElementsOf(control5Ids);
     }
 
-    // ══════════════════════════════════════════════════════════════════════
-    // STEP 8 – Create SecurityCapability and CapabilityReport, verify score
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // STEP 8 â€“ Create SecurityCapability and CapabilityReport, verify score
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     @Test
     @Order(800)
@@ -535,9 +535,9 @@ class AssessmentSnapshotIntegrationTest {
         assertThat(html).contains("Snapshot Test Capability");
     }
 
-    // ══════════════════════════════════════════════════════════════════════
-    // STEP 9 – Create CapabilityReport and calculate scores
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // STEP 9 â€“ Create CapabilityReport and calculate scores
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     @Test
     @Order(900)
@@ -601,7 +601,7 @@ class AssessmentSnapshotIntegrationTest {
 
         CapabilityReportService.CapabilityScore score = calcResult.capabilityScores.get(0);
 
-        // All 5 snapshot controls must be counted (NOT 6 – the extra control added post-finalization
+        // All 5 snapshot controls must be counted (NOT 6 â€“ the extra control added post-finalization
         // is in the catalog but NOT in the capability score because it is not in the snapshot)
         assertThat(score.answeredControls)
                 .as("Answered controls must be 5 (from the snapshot, all answered with rating=75)")
@@ -618,9 +618,9 @@ class AssessmentSnapshotIntegrationTest {
                 .isEqualTo(100.0);
     }
 
-    // ══════════════════════════════════════════════════════════════════════
-    // STEP 10 – Reopen, verify snapshot cleared, re-finalize, snapshot refreshed
-    // ══════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // STEP 10 â€“ Reopen, verify snapshot cleared, re-finalize, snapshot refreshed
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     @Test
     @Order(1000)

@@ -99,7 +99,7 @@ public class DeviationAnalysisService {
         for (Assessment assessment : latestAssessments.values()) {
             if (assessment == null) continue;
             Assessment freshAssessment = assessmentRepository.findById(assessment.getId()).orElse(assessment);
-            AssessmentDetails details = assessmentDetailsService.findById(freshAssessment.getId()).orElse(null);
+            AssessmentDetails details = assessmentDetailsService.findByAssessmentId(freshAssessment.getId()).orElse(null);
             if (details == null || details.getControlAnswers() == null) continue;
 
             for (AssessmentControlAnswer answer : details.getControlAnswers()) {

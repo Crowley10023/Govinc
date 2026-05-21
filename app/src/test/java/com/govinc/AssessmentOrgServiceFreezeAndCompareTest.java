@@ -78,7 +78,7 @@ class AssessmentOrgServiceFreezeAndCompareTest {
     private Long assessment1Id;                // freeze assessment (tests 1+2)
     private Long assessment2Id;                // override assessment (test 3, also used in test 5)
 
-    // ─── transaction helpers ──────────────────────────────────────────────────
+    // â”€â”€â”€ transaction helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     private <T> T readInTx(java.util.function.Supplier<T> work) {
         TransactionTemplate tx = new TransactionTemplate(transactionManager);
@@ -91,7 +91,7 @@ class AssessmentOrgServiceFreezeAndCompareTest {
         return tx.execute(status -> work.get());
     }
 
-    // ─── seed data ────────────────────────────────────────────────────────────
+    // â”€â”€â”€ seed data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     @BeforeAll
     void setUp() {
@@ -158,7 +158,7 @@ class AssessmentOrgServiceFreezeAndCompareTest {
             unit = orgUnitRepository.save(unit);
             orgUnitId = unit.getId();
 
-            // ── Org service 1 (freeze + stability tests) ──────────────────────
+            // â”€â”€ Org service 1 (freeze + stability tests) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             OrgService svc1 = new OrgService("FrzCmp Svc1", "Used in freeze/stability tests");
             svc1 = orgServiceRepository.save(svc1);
             orgServiceId1 = svc1.getId();
@@ -182,7 +182,7 @@ class AssessmentOrgServiceFreezeAndCompareTest {
             osac2.setOrgServiceAssessment(osa1);
             orgServiceAssessmentControlRepository.save(osac2);
 
-            // ── Org service 2 (override-preservation test) ────────────────────
+            // â”€â”€ Org service 2 (override-preservation test) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             OrgService svc2 = new OrgService("FrzCmp Svc2", "Used in override-preservation test");
             svc2 = orgServiceRepository.save(svc2);
             orgServiceId2 = svc2.getId();
@@ -202,9 +202,9 @@ class AssessmentOrgServiceFreezeAndCompareTest {
         });
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // Test 1 — Org-service answers are frozen into AssessmentDetails on close
-    // ══════════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // Test 1 â€” Org-service answers are frozen into AssessmentDetails on close
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     @Test
     @Order(100)
@@ -225,7 +225,7 @@ class AssessmentOrgServiceFreezeAndCompareTest {
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("FreezeTestAssessment not found")));
 
-        // Finalise — should freeze the org-service answer for ctrl1 (75 → "Managed") into details
+        // Finalise â€” should freeze the org-service answer for ctrl1 (75 â†’ "Managed") into details
         mockMvc.perform(post("/assessment/{id}/finalize", assessment1Id)
                         .with(csrf()))
                 .andExpect(status().is3xxRedirection());
@@ -237,7 +237,7 @@ class AssessmentOrgServiceFreezeAndCompareTest {
 
         // AssessmentDetails must contain a frozen answer for ctrl1 with rating = 75
         Integer storedRating = readInTx(() -> {
-            Optional<AssessmentDetails> detOpt = assessmentDetailsService.findById(assessment1Id);
+            Optional<AssessmentDetails> detOpt = assessmentDetailsService.findByAssessmentId(assessment1Id);
             if (detOpt.isEmpty()) return null;
             return detOpt.get().getControlAnswers().stream()
                     .filter(aca -> ctrl1Id.equals(aca.getSecurityControl().getId()))
@@ -251,15 +251,15 @@ class AssessmentOrgServiceFreezeAndCompareTest {
                 .isEqualTo(75);
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // Test 2 — Closed assessment is unaffected by subsequent org-service changes
-    // ══════════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // Test 2 â€” Closed assessment is unaffected by subsequent org-service changes
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     @Test
     @Order(200)
     @WithMockUser(username = "admin", roles = {"ADMIN"})
     void test2_closedAssessment_unaffectedByOrgServiceUpdate() {
-        // Mutate the OrgServiceAssessmentControl for ctrl1 from 75% → 25%
+        // Mutate the OrgServiceAssessmentControl for ctrl1 from 75% â†’ 25%
         writeInTx(() -> {
             OrgServiceAssessmentControl osac =
                     orgServiceAssessmentControlRepository.findById(osac1IdForSvc1).orElseThrow();
@@ -270,7 +270,7 @@ class AssessmentOrgServiceFreezeAndCompareTest {
 
         // The frozen answer in AssessmentDetails must still be 75 (snapshot taken at close)
         Integer frozenRating = readInTx(() -> {
-            Optional<AssessmentDetails> detOpt = assessmentDetailsService.findById(assessment1Id);
+            Optional<AssessmentDetails> detOpt = assessmentDetailsService.findByAssessmentId(assessment1Id);
             if (detOpt.isEmpty()) return null;
             return detOpt.get().getControlAnswers().stream()
                     .filter(aca -> ctrl1Id.equals(aca.getSecurityControl().getId()))
@@ -284,9 +284,9 @@ class AssessmentOrgServiceFreezeAndCompareTest {
                 .isEqualTo(75);
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // Test 3 — Manual override (isOverride=true) is preserved when closing
-    // ══════════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // Test 3 â€” Manual override (isOverride=true) is preserved when closing
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     @Test
     @Order(300)
@@ -316,14 +316,14 @@ class AssessmentOrgServiceFreezeAndCompareTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string("ok"));
 
-        // Finalise — the freeze loop must skip ctrl1 because it has isOverride=true
+        // Finalise â€” the freeze loop must skip ctrl1 because it has isOverride=true
         mockMvc.perform(post("/assessment/{id}/finalize", assessment2Id)
                         .with(csrf()))
                 .andExpect(status().is3xxRedirection());
 
         // The stored answer for ctrl1 must still be 25 (manual override), NOT the org-service 75
         Integer storedRating = readInTx(() -> {
-            Optional<AssessmentDetails> detOpt = assessmentDetailsService.findById(assessment2Id);
+            Optional<AssessmentDetails> detOpt = assessmentDetailsService.findByAssessmentId(assessment2Id);
             if (detOpt.isEmpty()) return null;
             return detOpt.get().getControlAnswers().stream()
                     .filter(aca -> ctrl1Id.equals(aca.getSecurityControl().getId()))
@@ -333,13 +333,13 @@ class AssessmentOrgServiceFreezeAndCompareTest {
         });
 
         assertThat(storedRating)
-                .as("Manual override (25) must be preserved — org-service value (75) must NOT overwrite it")
+                .as("Manual override (25) must be preserved â€” org-service value (75) must NOT overwrite it")
                 .isEqualTo(25);
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // Test 4 — Compare Assessments page loads successfully
-    // ══════════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // Test 4 â€” Compare Assessments page loads successfully
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     @Test
     @Order(400)
@@ -352,16 +352,16 @@ class AssessmentOrgServiceFreezeAndCompareTest {
                 .andExpect(content().string(Matchers.containsString("Freeze-Compare Catalog")));
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // Test 5 — Compare-data API returns correct side-by-side maturity answers
-    // ══════════════════════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // Test 5 â€” Compare-data API returns correct side-by-side maturity answers
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     @Test
     @Order(500)
     @WithMockUser(username = "admin", roles = {"ADMIN"})
     void test5_compareDataApi_returnsSideBySideAnswers() throws Exception {
-        // assessment1: ctrl1 frozen at 75 ("Managed")  — created and closed in test 1
-        // assessment2: ctrl1 overridden at 25 ("Initial") — created and closed in test 3
+        // assessment1: ctrl1 frozen at 75 ("Managed")  â€” created and closed in test 1
+        // assessment2: ctrl1 overridden at 25 ("Initial") â€” created and closed in test 3
         mockMvc.perform(get("/reporting/compare/data")
                         .param("a1", assessment1Id.toString())
                         .param("a2", assessment2Id.toString()))
@@ -373,7 +373,7 @@ class AssessmentOrgServiceFreezeAndCompareTest {
                 // Controls array must be non-empty (both assessments share the same 3-control catalog)
                 .andExpect(jsonPath("$.controls").isArray())
                 .andExpect(jsonPath("$.controls.length()").value(Matchers.greaterThanOrEqualTo(1)))
-                // ctrl1 (FRZ-CMP-01): assessment1=75 ("Managed"), assessment2=25 ("Initial") → same=false
+                // ctrl1 (FRZ-CMP-01): assessment1=75 ("Managed"), assessment2=25 ("Initial") â†’ same=false
                 .andExpect(jsonPath("$.controls[?(@.controlReference=='FRZ-CMP-01')].rating1")
                         .value(Matchers.hasItem(75)))
                 .andExpect(jsonPath("$.controls[?(@.controlReference=='FRZ-CMP-01')].rating2")

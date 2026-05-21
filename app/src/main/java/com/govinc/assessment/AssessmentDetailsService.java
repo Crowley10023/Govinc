@@ -17,6 +17,9 @@ public class AssessmentDetailsService {
     @Autowired
     private AssessmentDetailsRepository repository;
 
+    @Autowired
+    private AssessmentDetailsConsistencyService consistencyService;
+
     public List<AssessmentDetails> findAll() {
         return repository.findAll();
     }
@@ -44,18 +47,37 @@ public class AssessmentDetailsService {
     }
 
     /**
-     * Find AssessmentDetails by ID
-     * Works with both AssessmentDetails ID and Assessment ID (for backward compatibility)
+     * Find the AssessmentDetails belonging to a specific Assessment.
+     *
+     * <p>IMPORTANT: callers MUST pass an {@code Assessment.id}, never an
+     * {@code AssessmentDetails.id}. The previous implementation of this method
+     * accepted either and silently fell through, which caused cross-assessment
+     * contamination: when an Assessment's id happened to collide with an
+     * unrelated AssessmentDetails' id, edits/comments were written to (and
+     * SSE-broadcast for) the wrong assessment.</p>
+     *
+     * <p>For lookups by the AssessmentDetails' own primary key (only used by
+     * the legacy {@code /assessmentdetails/details|edit/{id}} endpoints), call
+     * {@link AssessmentDetailsRepository#findById(Object)} directly.</p>
      */
-    public Optional<AssessmentDetails> findById(Long id) {
-        // First try to find by AssessmentDetails ID
-        Optional<AssessmentDetails> byDetailsId = repository.findById(id);
-        if (byDetailsId.isPresent()) {
-            return byDetailsId;
+    public Optional<AssessmentDetails> findByAssessmentId(Long assessmentId) {
+        if (assessmentId == null) return Optional.empty();
+        // Use the list-returning query so we can detect (and trigger repair of)
+        // duplicate AssessmentDetails rows pointing at the same assessment, or
+        // rows whose assessment-link set is shared with other assessments.
+        // The Optional-returning JPQL would throw NonUniqueResultException in
+        // the duplicate case, masking the data corruption.
+        List<AssessmentDetails> matches = repository.findAllForAssessmentId(assessmentId);
+        if (matches.isEmpty()) return Optional.empty();
+        if (matches.size() == 1) {
+            AssessmentDetails ad = matches.get(0);
+            if (ad.getAssessments() != null && ad.getAssessments().size() > 1) {
+                return consistencyService.repairForAssessment(assessmentId);
+            }
+            return Optional.of(ad);
         }
-
-        // Fallback compatibility path: treat id as Assessment ID
-        return repository.findByAssessmentId(id);
+        // More than one details row for the same assessment — must repair.
+        return consistencyService.repairForAssessment(assessmentId);
     }
 
     /**

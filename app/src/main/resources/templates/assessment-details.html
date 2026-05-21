@@ -12,45 +12,51 @@
     <meta name="_csrf" th:content="${_csrf.token}" />
     <meta name="_csrf_header" th:content="${_csrf.headerName}" />
     <style>
-        /* Active users presence strip */
+        /* Active users presence strip — fixed overlay, never affects page flow */
         .presence-strip {
+            position: fixed;
+            bottom: 18px;
+            right: 18px;
             display: flex;
             align-items: center;
-            gap: 4px;
-            margin-left: auto;
+            gap: 5px;
+            z-index: 900;
+            pointer-events: none; /* let clicks pass through the gap between avatars */
         }
         .presence-avatar {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 22px;
-            height: 22px;
+            width: 28px;
+            height: 28px;
             border-radius: 50%;
             background: #2274a5;
             color: #fff;
-            font-size: 0.7em;
+            font-size: 0.72em;
             font-weight: 700;
             cursor: default;
             position: relative;
             border: 2px solid #fff;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.25);
             flex-shrink: 0;
+            pointer-events: auto; /* re-enable for individual avatars */
         }
         .presence-avatar .presence-tooltip {
             display: none;
             position: absolute;
-            bottom: calc(100% + 6px);
+            bottom: calc(100% + 7px);
             left: 50%;
             transform: translateX(-50%);
             white-space: nowrap;
             background: rgba(30,40,60,0.93);
             color: #fff;
-            font-size: 0.8em;
+            font-size: 0.82em;
             font-weight: 400;
-            padding: 3px 8px;
-            border-radius: 4px;
+            padding: 4px 10px;
+            border-radius: 5px;
             pointer-events: none;
-            z-index: 1000;
+            z-index: 9999;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
         }
         .presence-avatar:hover .presence-tooltip {
             display: block;
@@ -107,11 +113,11 @@
                 </div>
                 <span class="progress-percentage" id="completion-percentage">0%</span>
                 <span id="answered-count">0</span> / <span id="total-count">0</span>
-                <!-- Active users working on this assessment -->
-                <div class="presence-strip" id="presence-strip"></div>
             </div>
         </div>
     </div>
+    <!-- Active users presence strip — fixed overlay, outside the sticky bar -->
+    <div class="presence-strip" id="presence-strip"></div>
     <div class="container">
         <!-- Catalog Headline (if set) -->
         <h1 th:if="${assessment.securityCatalog != null and assessment.securityCatalog.headline != null and !#strings.isEmpty(assessment.securityCatalog.headline)}"

@@ -134,7 +134,7 @@ public class ComplianceService {
         System.out.println("DEBUG: Looking for AssessmentDetails for assessment id=" + assessmentId);
         
         // Use the service's findById which now handles Assessment ID lookup
-        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(assessmentId);
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findByAssessmentId(assessmentId);
         
         if (detailsOpt.isPresent()) {
             AssessmentDetails details = detailsOpt.get();

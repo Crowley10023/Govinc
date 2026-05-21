@@ -39,6 +39,8 @@ public class AssessmentDetailsController {
     @Autowired
     private AssessmentDetailsService assessmentDetailsService;
     @Autowired
+    private AssessmentDetailsRepository assessmentDetailsRepository;
+    @Autowired
     private AssessmentControlAnswerRepository assessmentControlAnswerRepository;
     @Autowired
     private UserRepository userRepository;
@@ -63,7 +65,9 @@ public class AssessmentDetailsController {
 
     @GetMapping("/details/{id}")
     public String details(@PathVariable Long id, Model model) {
-        Optional<AssessmentDetails> details = assessmentDetailsService.findById(id);
+        // Legacy endpoint: the {id} path variable is the AssessmentDetails primary key,
+        // not an Assessment id, so we must hit the repository directly.
+        Optional<AssessmentDetails> details = assessmentDetailsRepository.findById(id);
         if (details.isPresent()) {
             System.out.println("Details present");
             AssessmentDetails ad = details.get();
@@ -243,7 +247,8 @@ public class AssessmentDetailsController {
 
     @GetMapping("/edit/{id}")
     public String edit(@PathVariable Long id, Model model) {
-        Optional<AssessmentDetails> details = assessmentDetailsService.findById(id);
+        // Legacy endpoint: {id} is the AssessmentDetails primary key.
+        Optional<AssessmentDetails> details = assessmentDetailsRepository.findById(id);
         if (details.isPresent()) {
             model.addAttribute("assessment", details.get());
             return "assessmentdetails-edit";

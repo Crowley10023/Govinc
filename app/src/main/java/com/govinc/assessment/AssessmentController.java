@@ -332,7 +332,7 @@ public class AssessmentController {
 
         // Copy answers from predecessor if selected
         if (predecessor != null) {
-            Optional<AssessmentDetails> predDetailsOpt = assessmentDetailsService.findById(predecessor.getId());
+            Optional<AssessmentDetails> predDetailsOpt = assessmentDetailsService.findByAssessmentId(predecessor.getId());
             if (predDetailsOpt.isPresent()) {
                 AssessmentDetails predDetails = predDetailsOpt.get();
                 AssessmentDetails newDetails = new AssessmentDetails();
@@ -410,7 +410,7 @@ public class AssessmentController {
         model.addAttribute("answers", answers);
 
         // Add selected answers for each control
-        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findByAssessmentId(id);
         Map<Long, Long> controlAnswers = new HashMap<>();
         if (detailsOpt.isPresent()) {
             for (AssessmentControlAnswer aca : detailsOpt.get().getControlAnswers()) {
@@ -430,7 +430,7 @@ public class AssessmentController {
             throw new UnauthorizedException("You do not have permission to modify this assessment.");
         }
         // Find details or create new
-        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findByAssessmentId(id);
         AssessmentDetails details;
         if (!detailsOpt.isPresent()) {
             Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
@@ -586,7 +586,7 @@ public class AssessmentController {
             model.addAttribute("maturityAnswers", maturityAnswers);
 
             // Retrieve existing details/answers
-            Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
+            Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findByAssessmentId(id);
             AssessmentDetails details = detailsOpt.orElse(null);
             Map<Long, AssessmentControlAnswer> localControlAnswers = new HashMap<>();
             if (details != null && details.getControlAnswers() != null) {
@@ -920,7 +920,7 @@ public class AssessmentController {
         if (!authorizationService.canAnswerAssessment(id)) {
             return "forbidden";
         }
-        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findByAssessmentId(id);
         AssessmentDetails details = null;
         if (!detailsOpt.isPresent()) {
             // Try to find the assessment:
@@ -982,9 +982,9 @@ public class AssessmentController {
             return "forbidden";
         }
         String comment = body.get("comment");
-        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(assessmentId);
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findByAssessmentId(assessmentId);
         AssessmentDetails details = null;
-        if (!detailsOpt.isPresent()) {
+        if (!detailsOpt.isPresent() || !isOwnedByAssessment(detailsOpt.get(), assessmentId)) {
             // Try to find the assessment:
             Optional<Assessment> assessmentOpt = assessmentRepository.findById(assessmentId);
             if (!assessmentOpt.isPresent())
@@ -1051,7 +1051,7 @@ public class AssessmentController {
         }
         Map<Long, OrgServiceInheritance> inheritedAtClose = collectOrgServiceInheritance(assessment);
         if (!inheritedAtClose.isEmpty()) {
-            Optional<AssessmentDetails> closeDetailsOpt = assessmentDetailsService.findById(id);
+            Optional<AssessmentDetails> closeDetailsOpt = assessmentDetailsService.findByAssessmentId(id);
             AssessmentDetails closeDetails;
             if (closeDetailsOpt.isPresent()) {
                 closeDetails = closeDetailsOpt.get();
@@ -1098,7 +1098,7 @@ public class AssessmentController {
             }
         }
         assessmentRepository.save(assessment);
-        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findByAssessmentId(id);
         if (detailsOpt.isPresent()) {
             AssessmentDetails details = detailsOpt.get();
             details.setCompletedDate(LocalDate.now());
@@ -1107,7 +1107,7 @@ public class AssessmentController {
     }
 
 
-    // Change assessment status: OPEN→REVIEW (for creator/assigned ISM), REVIEW→CLOSED (full close)
+    // Change assessment status: OPENâ†’REVIEW (for creator/assigned ISM), REVIEWâ†’CLOSED (full close)
     @PostMapping("/{id}/change-status")
     public String changeAssessmentStatus(@PathVariable Long id,
                                          @RequestParam(value = "newStatus", required = false) String newStatus) {
@@ -1166,7 +1166,7 @@ public class AssessmentController {
         return "redirect:/assessment/" + id;
     }
 
-    // Ready for Review: interviewee-initiated OPEN→REVIEW
+    // Ready for Review: interviewee-initiated OPENâ†’REVIEW
     @PostMapping("/{id}/ready-for-review")
     public String readyForReview(@PathVariable Long id) {
         Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
@@ -1293,7 +1293,7 @@ public class AssessmentController {
         }
         
         Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
-        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findByAssessmentId(id);
         if (assessmentOpt.isEmpty() || detailsOpt.isEmpty()) {
             
             return ResponseEntity.notFound().build();
@@ -1347,7 +1347,7 @@ public class AssessmentController {
             throw new UnauthorizedException("You do not have permission to download this assessment report.");
         }
         Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
-        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findByAssessmentId(id);
         if (assessmentOpt.isEmpty() || detailsOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
@@ -1392,8 +1392,8 @@ public class AssessmentController {
             .thenComparing(sc -> sc.getReference() != null ? sc.getReference() : "",
                 Comparator.nullsLast(String::compareTo)));
 
-        // Local answers map: controlId → AssessmentControlAnswer
-        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
+        // Local answers map: controlId â†’ AssessmentControlAnswer
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findByAssessmentId(id);
         Map<Long, AssessmentControlAnswer> localAnswers = new HashMap<>();
         if (detailsOpt.isPresent() && detailsOpt.get().getControlAnswers() != null) {
             for (AssessmentControlAnswer aca : detailsOpt.get().getControlAnswers()) {
@@ -1696,7 +1696,7 @@ public class AssessmentController {
         if (!authorizationService.canAnswerAssessment(id)) {
             return "forbidden";
         }
-        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findByAssessmentId(id);
         AssessmentDetails details = null;
         if (!detailsOpt.isPresent()) {
             // Try to find the assessment:
@@ -1748,7 +1748,7 @@ public class AssessmentController {
         if (!authorizationService.canAnswerAssessment(id)) {
             return "forbidden";
         }
-        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findByAssessmentId(id);
         if (!detailsOpt.isPresent()) {
             return "fail";
         }
@@ -1817,7 +1817,7 @@ public class AssessmentController {
             return Map.of("error", "not_found");
         }
         Assessment assessment = assessmentOpt.get();
-        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findByAssessmentId(id);
         AssessmentDetails details = detailsOpt.orElse(null);
 
         // Build a comprehensive prompt for the AI
@@ -1936,11 +1936,30 @@ public class AssessmentController {
         return emitter;
     }
 
+    /**
+     * Sanity check: confirm the loaded AssessmentDetails really belongs to the assessment
+     * id passed in the request URL. Historical data may contain AssessmentDetails rows that
+     * were cross-linked (or whose assessment-link set was wiped) due to an earlier bug in
+     * {@code AssessmentDetailsService.findById}, which silently treated an Assessment id as
+     * an AssessmentDetails id when the two happened to collide. Without this check,
+     * answering or commenting a control on assessment A could still mutate the leftover
+     * details of assessment B.
+     */
+    private boolean isOwnedByAssessment(AssessmentDetails details, Long assessmentId) {
+        if (details == null || assessmentId == null) return false;
+        Set<Assessment> linked = details.getAssessments();
+        if (linked == null || linked.isEmpty()) return false;
+        for (Assessment a : linked) {
+            if (a != null && assessmentId.equals(a.getId())) return true;
+        }
+        return false;
+    }
+
     /** Builds the controlAnswers + comments payload used by SSE update events and the ping endpoint. */
     private Map<String, Object> buildUpdatePayload(Long assessmentId) {
         Map<String, Long> controlAnswersMap = new java.util.LinkedHashMap<>();
         Map<String, String> commentsMap = new java.util.LinkedHashMap<>();
-        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(assessmentId);
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findByAssessmentId(assessmentId);
         if (detailsOpt.isPresent()) {
             for (AssessmentControlAnswer a : detailsOpt.get().getControlAnswers()) {
                 if (a.getSecurityControl() != null && a.getMaturityAnswer() != null) {
@@ -1975,7 +1994,7 @@ public class AssessmentController {
         } catch (Exception ignored) {}
         assessmentPresenceService.register(id, session.getId(), displayName);
         // Build fingerprint + collect inline-update payload
-        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(id);
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findByAssessmentId(id);
         long answerCount = 0;
         long maxAnswerId = 0;
         long maturitySum = 0;

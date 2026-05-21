@@ -118,7 +118,7 @@ public class AssessmentDirectController {
             out.put("maturityAnswers", maturityList);
 
             // Control Answers (ctrlId -> answer text if answered)
-            Optional<AssessmentDetails> detailsOpt = detailsService.findById(assessment.getId());
+            Optional<AssessmentDetails> detailsOpt = detailsService.findByAssessmentId(assessment.getId());
             AssessmentDetails details = detailsOpt.orElse(null);
             Map<Long, String> controlAnswers = new HashMap<>();
             Map<Long, String> controlComments = new HashMap<>();
@@ -175,7 +175,7 @@ public class AssessmentDirectController {
         if (assessmentCheck.getStatus() != AssessmentStatus.OPEN)
             return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.LOCKED).body("locked");
 
-        Optional<AssessmentDetails> detailsOpt = detailsService.findById(id);
+        Optional<AssessmentDetails> detailsOpt = detailsService.findByAssessmentId(id);
         AssessmentDetails details = null;
         if (!detailsOpt.isPresent()) {
             return org.springframework.http.ResponseEntity.badRequest().body("fail");
@@ -226,7 +226,7 @@ public class AssessmentDirectController {
             return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.LOCKED).body("locked");
 
         String comment = body.get("comment");
-        Optional<AssessmentDetails> detailsOpt = detailsService.findById(id);
+        Optional<AssessmentDetails> detailsOpt = detailsService.findByAssessmentId(id);
         AssessmentDetails details = null;
         if (!detailsOpt.isPresent()) {
             return org.springframework.http.ResponseEntity.badRequest().body("fail");
@@ -401,7 +401,7 @@ public class AssessmentDirectController {
     private Map<String, Object> buildDirectUpdatePayload(Long assessmentId) {
         Map<String, Long> controlAnswersMap = new java.util.LinkedHashMap<>();
         Map<String, String> commentsMap = new java.util.LinkedHashMap<>();
-        Optional<AssessmentDetails> detailsOpt = detailsService.findById(assessmentId);
+        Optional<AssessmentDetails> detailsOpt = detailsService.findByAssessmentId(assessmentId);
         if (detailsOpt.isPresent()) {
             for (AssessmentControlAnswer a : detailsOpt.get().getControlAnswers()) {
                 if (a.getSecurityControl() != null && a.getMaturityAnswer() != null) {
@@ -432,7 +432,7 @@ public class AssessmentDirectController {
         Assessment assessment = maybeUrl.get().getAssessment();
         // Register presence as "Anonymous" keyed by session ID
         assessmentPresenceService.register(assessment.getId(), session.getId(), "Anonymous");
-        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(assessment.getId());
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findByAssessmentId(assessment.getId());
         long answerCount = 0;
         long maxAnswerId = 0;
         long maturitySum = 0;
@@ -484,7 +484,7 @@ public class AssessmentDirectController {
         }
 
         // Require at least one answered control before allowing review
-        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(assessment.getId());
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findByAssessmentId(assessment.getId());
         long answeredControls = detailsOpt.map(d -> d.getControlAnswers().stream()
                 .filter(a -> a.getMaturityAnswer() != null).count()).orElse(0L);
         if (answeredControls == 0) {

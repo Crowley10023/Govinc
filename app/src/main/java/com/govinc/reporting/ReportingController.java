@@ -77,7 +77,7 @@ public class ReportingController {
             // Use effective controls to respect snapshot for closed assessments
             int totalControls = a.getEffectiveControls().size();
 
-            Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findById(a.getId());
+            Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findByAssessmentId(a.getId());
             if (!detailsOpt.isPresent()) continue;
 
             AssessmentDetails details = detailsOpt.get();
@@ -178,8 +178,8 @@ public class ReportingController {
             result.put("error", "One or both assessments not found.");
             return result;
         }
-        Optional<AssessmentDetails> details1Opt = assessmentDetailsService.findById(a1);
-        Optional<AssessmentDetails> details2Opt = assessmentDetailsService.findById(a2);
+        Optional<AssessmentDetails> details1Opt = assessmentDetailsService.findByAssessmentId(a1);
+        Optional<AssessmentDetails> details2Opt = assessmentDetailsService.findByAssessmentId(a2);
         Map<Long, AssessmentControlAnswer> answers1 = new HashMap<>();
         Map<Long, AssessmentControlAnswer> answers2 = new HashMap<>();
         if (details1Opt.isPresent() && details1Opt.get().getControlAnswers() != null) {
