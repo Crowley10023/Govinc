@@ -104,6 +104,7 @@
                             <td th:text="${backup.createdAt}"></td>
                             <td th:text="${backup.sizeBytes}"></td>
                             <td class="actions-cell">
+                                <a class="btn-action" th:href="@{/config/database/download/{f}(f=${backup.fileName})}" download>Download</a>
                                 <button type="button" class="btn-action restore-btn" th:data-file-name="${backup.fileName}">Restore</button>
                             </td>
                         </tr>
@@ -303,6 +304,7 @@
                         <td>${escapeHtml(createdAt)}</td>
                         <td>${escapeHtml(size)}</td>
                         <td class="actions-cell">
+                            <a class="btn-action" href="/config/database/download/${escapeHtml(fileName)}" download>Download</a>
                             <button type="button" class="btn-action restore-btn" data-file-name="${escapeHtml(fileName)}">Restore</button>
                         </td>
                     </tr>

@@ -774,17 +774,19 @@ class GovincIntegrationTest {
     @Order(810)
     @WithMockUser(username = "delegate1", roles = {"ASSESSMENT_DELEGATE"})
     void delegate_cannotAccessUserManagement() throws Exception {
-        // Assessment delegates should not have access to user management (requires ADMIN or ISM role)
+        // Assessment delegates should not have access to user management (requires ADMIN or ISM role).
+        // The custom AccessDeniedHandler redirects page requests to /not-authorized (302).
         mockMvc.perform(get("/users"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().is3xxRedirection());
     }
 
     @Test
     @Order(820)
     @WithMockUser(username = "delegate1", roles = {"ASSESSMENT_DELEGATE"})
     void delegate_cannotAccessSecurityCatalog() throws Exception {
+        // The custom AccessDeniedHandler redirects page requests to /not-authorized (302).
         mockMvc.perform(get("/security-catalog/list"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().is3xxRedirection());
     }
 
     @Test

@@ -25,6 +25,7 @@ dependencies {
     implementation("com.github.librepdf:openpdf:1.3.30") // OpenPDF for PDF generation/processing
     implementation("com.itextpdf:itextpdf:5.5.13.3") // iText PDF library (classic open source)
     implementation("org.apache.poi:poi-ooxml:5.2.3") // Apache POI for Word/Excel processing
+    implementation("org.apache.poi:poi-scratchpad:5.2.3") // Legacy .doc (HWPF) support for assessment import
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-client")

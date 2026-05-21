@@ -526,6 +526,7 @@
 
         <section class="general-button-bar">
             <button th:if="${assessment.isOpen}" id="assessment-wizard-btn" type="button" class="btn-action wizard-launch-btn" onclick="openAssessmentWizard()">&#129302; Assessment Wizard</button>
+            <button th:if="${assessment.isOpen}" id="assessment-import-btn" type="button" class="btn-action" onclick="openAssessmentImport()" title="Import answers from a PDF, Word, Excel or text document">&#128229; Import Answers</button>
 
             <button th:if="${!assessment.isOpen and !assessment.isReview and isAdminOrISM}" id="reopen-assessment-btn" type="button" class="btn-action">Re-open Assessment</button>
             <form th:if="${isAdminOrISM}" id="deleteAssessmentForm" th:action="@{'/assessment/' + ${assessment.id} + '/delete'}" method="post" style="display:inline">
@@ -990,6 +991,62 @@
     <script src="/org-unit-wizard.js"></script>
     <script src="/assessment-details.js"></script>
     <script src="/assessment-wizard.js"></script>
+    <script src="/assessment-import.js"></script>
+
+    <!-- Import Answers Modal -->
+    <div id="assessment-import-modal" class="modal-bg">
+        <div class="modal-popup" style="width:min(960px,94vw);max-height:88vh;display:flex;flex-direction:column;">
+            <h3 style="flex-shrink:0;">&#128229; Import Answers from Document</h3>
+
+            <!-- Step 1: file upload -->
+            <div id="import-step-upload" class="modal-content" style="flex-shrink:0;">
+                <p class="text-muted text-sm">
+                    Upload a PDF, Word, Excel or plaintext document. The system will first try to
+                    find exact references to your security controls; controls that cannot be matched
+                    by name or reference are then assessed by AI based on the document text.
+                    Nothing is saved until you acknowledge the proposed answers.
+                </p>
+                <div style="display:flex;gap:0.6em;align-items:center;flex-wrap:wrap;margin-top:0.6em;">
+                    <input type="file" id="import-file-input"
+                           accept=".pdf,.docx,.doc,.xlsx,.xls,.txt,.md,.csv"
+                           style="flex:1;min-width:240px;" />
+                    <button type="button" class="btn-action" id="import-analyze-btn"
+                            onclick="runAssessmentImport()">Analyze</button>
+                </div>
+                <p id="import-status" class="text-sm" style="margin-top:0.6em;color:#555;"></p>
+            </div>
+
+            <!-- Step 2: proposals review -->
+            <div id="import-step-review" style="flex:1;overflow:auto;display:none;margin-top:0.6em;">
+                <div style="display:flex;gap:0.6em;align-items:center;margin-bottom:0.4em;flex-wrap:wrap;">
+                    <strong id="import-summary"></strong>
+                    <span style="flex:1;"></span>
+                    <button type="button" class="btn-secondary btn-sm" onclick="importToggleAll(true)">Accept all</button>
+                    <button type="button" class="btn-secondary btn-sm" onclick="importToggleAll(false)">Reject all</button>
+                </div>
+                <table class="assessment-import-table" style="width:100%;border-collapse:collapse;font-size:0.92em;">
+                    <thead>
+                        <tr style="background:#f5f5f5;border-bottom:1px solid #ddd;">
+                            <th style="width:38px;text-align:center;padding:0.3em;">&#10003;</th>
+                            <th style="width:70px;padding:0.3em;">Source</th>
+                            <th style="text-align:left;padding:0.3em;">Control</th>
+                            <th style="width:200px;padding:0.3em;">Proposed answer</th>
+                            <th style="padding:0.3em;">Comment / Evidence</th>
+                        </tr>
+                    </thead>
+                    <tbody id="import-proposals-body"></tbody>
+                </table>
+            </div>
+
+            <div class="modal-btn-row" style="flex-shrink:0;margin-top:0.8em;">
+                <button type="button" class="btn-cancel" onclick="closeAssessmentImport()">Close</button>
+                <button type="button" class="btn-action" id="import-apply-btn"
+                        onclick="applyAssessmentImport()" style="display:none;">
+                    Apply Selected
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- Global Variables and Finalize Modal Handler -->
     <script th:inline="javascript">

@@ -3,12 +3,17 @@ package com.govinc.controller;
 import com.govinc.entity.DatabaseConfig;
 import com.govinc.service.DatabaseMigrationService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.PathResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
@@ -122,6 +127,27 @@ public class DatabaseConfigController {
             return ResponseEntity.status(500).body(
                     Map.of("success", false, "error", "Database backup failed: " + e.getMessage())
             );
+        }
+    }
+
+    /**
+     * Download a backup file.
+     */
+    @GetMapping(path = "/download/{fileName}")
+    @ResponseBody
+    public ResponseEntity<Resource> downloadBackup(@PathVariable String fileName) {
+        try {
+            Path backupFile = databaseMigrationService.getBackupFilePath(fileName);
+            Resource resource = new PathResource(backupFile);
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentDisposition(
+                    ContentDisposition.attachment().filename(fileName).build());
+            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+            return ResponseEntity.ok().headers(headers).body(resource);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            return ResponseEntity.status(500).build();
         }
     }
 

@@ -528,6 +528,27 @@ public class DatabaseMigrationService {
         return result;
     }
 
+    /**
+     * Validate the given backup file name and return its resolved Path.
+     */
+    public Path getBackupFilePath(String fileName) {
+        if (fileName == null || fileName.isBlank()) {
+            throw new IllegalArgumentException("Backup file name is required.");
+        }
+        if (fileName.contains("/") || fileName.contains("\\") || fileName.contains("..")) {
+            throw new IllegalArgumentException("Invalid backup file name.");
+        }
+        Path backupDir = getBackupDirectoryPath();
+        Path backupFile = backupDir.resolve(fileName).normalize();
+        if (!backupFile.startsWith(backupDir)) {
+            throw new IllegalArgumentException("Invalid backup file path.");
+        }
+        if (!Files.exists(backupFile) || !Files.isRegularFile(backupFile)) {
+            throw new IllegalArgumentException("Backup file not found: " + fileName);
+        }
+        return backupFile;
+    }
+
     private Path getBackupDirectoryPath() {
         return Paths.get(databaseBackupDirectory).toAbsolutePath().normalize();
     }

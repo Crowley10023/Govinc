@@ -214,10 +214,11 @@ public class SecurityConfig {
                 return;
             }
 
-            // For page requests, set status and forward to the not-authorized view
-            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-            request.setAttribute("message", "You do not have the necessary permissions to access this page.");
-            request.getRequestDispatcher("/not-authorized").forward(request, response);
+            // For page requests, redirect to the not-authorized view.
+            // A forward would preserve the original HTTP method (e.g. POST); since the
+            // /not-authorized controller only handles GET, that causes a 405. Use a
+            // redirect so the browser issues a fresh GET instead.
+            response.sendRedirect(request.getContextPath() + "/not-authorized");
         }
 
         private boolean isApiCall(HttpServletRequest request) {
