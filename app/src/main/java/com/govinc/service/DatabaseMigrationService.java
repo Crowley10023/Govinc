@@ -4,17 +4,23 @@ import com.govinc.entity.DatabaseConfig;
 import com.govinc.repository.DatabaseConfigRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.jdbc.datasource.init.ScriptUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.persistence.EntityManagerFactory;
+import org.hibernate.SessionFactory;
 import javax.sql.DataSource;
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import org.springframework.web.multipart.MultipartFile;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
@@ -33,6 +39,8 @@ import java.util.stream.Stream;
 @Service
 public class DatabaseMigrationService {
     private static final Pattern VERSION_FROM_FILENAME_PATTERN = Pattern.compile("_v([A-Za-z0-9._-]+)_\\d{8}_\\d{6}\\.sql$");
+    private static final Pattern BACKUP_TABLE_SECTION = Pattern.compile("^--\\s*Table:\\s*`([^`]+)`.*$");
+    private static final Pattern BACKUP_VIEW_SECTION  = Pattern.compile("^--\\s*View:\\s*`([^`]+)`.*$");
 
     private static final class MigrationDefinition {
         private final String fromVersion;
@@ -49,15 +57,17 @@ public class DatabaseMigrationService {
     private final DatabaseConfigRepository databaseConfigRepository;
     private final JdbcTemplate jdbcTemplate;
     private final DataSource dataSource;
+    private final EntityManagerFactory entityManagerFactory;
 
     @org.springframework.beans.factory.annotation.Value("${app.database.backup-dir:backups/database}")
     private String databaseBackupDirectory;
 
     @Autowired
-    public DatabaseMigrationService(DatabaseConfigRepository databaseConfigRepository, JdbcTemplate jdbcTemplate, DataSource dataSource) {
+    public DatabaseMigrationService(DatabaseConfigRepository databaseConfigRepository, JdbcTemplate jdbcTemplate, DataSource dataSource, EntityManagerFactory entityManagerFactory) {
         this.databaseConfigRepository = databaseConfigRepository;
         this.jdbcTemplate = jdbcTemplate;
         this.dataSource = dataSource;
+        this.entityManagerFactory = entityManagerFactory;
     }
 
     /**
@@ -526,6 +536,142 @@ public class DatabaseMigrationService {
         result.put("restoredFile", fileName);
         result.put("currentVersion", getCurrentVersion());
         return result;
+    }
+
+    /**
+     * Upload a .sql file into the backup directory and restore the database from it.
+     * If {@code selectedEntities} is non-null and non-empty, only those tables/views are restored.
+     */
+    public Map<String, Object> importBackup(MultipartFile file, Set<String> selectedEntities) throws Exception {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("Backup file is required.");
+        }
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null || originalFilename.isBlank()) {
+            throw new IllegalArgumentException("Backup file name is required.");
+        }
+        // Strip any path components supplied by the browser
+        String fileName = Paths.get(originalFilename).getFileName().toString();
+        if (!fileName.toLowerCase(Locale.ROOT).endsWith(".sql")) {
+            throw new IllegalArgumentException("Only .sql backup files are accepted.");
+        }
+        if (fileName.contains("..")) {
+            throw new IllegalArgumentException("Invalid backup file name.");
+        }
+        Path backupDir = getBackupDirectoryPath();
+        Files.createDirectories(backupDir);
+        Path targetPath = backupDir.resolve(fileName).normalize();
+        if (!targetPath.startsWith(backupDir)) {
+            throw new IllegalArgumentException("Invalid backup file path.");
+        }
+        try (InputStream in = file.getInputStream()) {
+            Files.copy(in, targetPath, StandardCopyOption.REPLACE_EXISTING);
+        }
+
+        if (selectedEntities != null && !selectedEntities.isEmpty()) {
+            String fullSql = Files.readString(targetPath, StandardCharsets.UTF_8);
+            String filteredSql = filterSqlToEntities(fullSql, selectedEntities);
+            executeFilteredSql(filteredSql);
+        } else {
+            restoreFromDumpUsingJdbc(targetPath);
+        }
+
+        // Recreate any tables that were missing from the backup (e.g. join tables added in newer schema versions)
+        repairSchemaAfterRestore();
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("restoredFile", fileName);
+        result.put("currentVersion", getCurrentVersion());
+        return result;
+    }
+
+    private String filterSqlToEntities(String sql, Set<String> selectedEntities) {
+        StringBuilder result = new StringBuilder();
+        String[] lines = sql.split("\\r?\\n", -1);
+        boolean inSection = false;
+        boolean sectionSelected = false;
+        boolean isTableSection = false;
+        String currentTableName = null;
+        boolean inCreateBlock = false;  // tracking multi-line CREATE TABLE ... );
+
+        for (String line : lines) {
+            String trimmed = line.trim();
+
+            java.util.regex.Matcher tm = BACKUP_TABLE_SECTION.matcher(trimmed);
+            if (tm.matches()) {
+                inSection = true;
+                isTableSection = true;
+                inCreateBlock = false;
+                currentTableName = tm.group(1);
+                sectionSelected = selectedEntities.contains(currentTableName);
+                if (sectionSelected) {
+                    result.append(line).append('\n');
+                    // Wipe existing rows before inserting from backup, preserving current schema.
+                    result.append("DELETE FROM `").append(currentTableName).append("`;\n");
+                }
+                continue;
+            }
+            java.util.regex.Matcher vm = BACKUP_VIEW_SECTION.matcher(trimmed);
+            if (vm.matches()) {
+                inSection = true;
+                isTableSection = false;
+                inCreateBlock = false;
+                currentTableName = vm.group(1);
+                sectionSelected = selectedEntities.contains(currentTableName);
+                if (sectionSelected) result.append(line).append('\n');
+                continue;
+            }
+            // Header/footer infrastructure lines are always included
+            if (!inSection || trimmed.startsWith("SET FOREIGN_KEY_CHECKS")) {
+                result.append(line).append('\n');
+                continue;
+            }
+            if (!sectionSelected) continue;
+
+            if (isTableSection) {
+                // Skip DROP TABLE and the entire CREATE TABLE block — we keep the live schema
+                // intact and only replace the data via the DELETE above + INSERTs below.
+                if (trimmed.startsWith("DROP TABLE IF EXISTS")) {
+                    continue;
+                }
+                if (trimmed.startsWith("CREATE TABLE ")) {
+                    inCreateBlock = true;
+                    continue;
+                }
+                if (inCreateBlock) {
+                    // CREATE TABLE block ends at a line beginning with ")" (closing paren + ENGINE=...)
+                    if (trimmed.startsWith(")")) {
+                        inCreateBlock = false;
+                    }
+                    continue;
+                }
+            }
+
+            result.append(line).append('\n');
+        }
+        return result.toString();
+    }
+
+    private void executeFilteredSql(String sql) throws Exception {
+        try (Connection connection = dataSource.getConnection()) {
+            ScriptUtils.executeSqlScript(connection,
+                    new ByteArrayResource(sql.getBytes(StandardCharsets.UTF_8)));
+        }
+    }
+
+    /**
+     * After a restore, use Hibernate's schema export to recreate any tables that were absent
+     * from the backup file (e.g. join tables added after the backup was taken).
+     * Errors for tables that already exist are expected and ignored.
+     */
+    private void repairSchemaAfterRestore() {
+        try {
+            entityManagerFactory.unwrap(SessionFactory.class)
+                    .getSchemaManager()
+                    .exportMappedObjects(false);
+        } catch (Exception e) {
+            // Errors for already-existing tables are normal; just continue
+        }
     }
 
     /**

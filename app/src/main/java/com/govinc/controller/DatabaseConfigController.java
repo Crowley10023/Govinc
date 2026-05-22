@@ -1,6 +1,8 @@
 package com.govinc.controller;
 
 import com.govinc.entity.DatabaseConfig;
+import com.govinc.service.BackupExtractService;
+import com.govinc.service.BackupExtractService.BackupSnapshot;
 import com.govinc.service.DatabaseMigrationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.PathResource;
@@ -12,10 +14,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.file.Path;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Controller for database configuration and migrations.
@@ -24,10 +29,13 @@ import java.util.Map;
 @RequestMapping("/config/database")
 public class DatabaseConfigController {
     private final DatabaseMigrationService databaseMigrationService;
+    private final BackupExtractService backupExtractService;
 
     @Autowired
-    public DatabaseConfigController(DatabaseMigrationService databaseMigrationService) {
+    public DatabaseConfigController(DatabaseMigrationService databaseMigrationService,
+                                    BackupExtractService backupExtractService) {
         this.databaseMigrationService = databaseMigrationService;
+        this.backupExtractService = backupExtractService;
     }
 
     /**
@@ -131,6 +139,34 @@ public class DatabaseConfigController {
     }
 
     /**
+     * Import a backup .sql file uploaded from the browser and restore the database.
+     */
+    @PostMapping(path = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public ResponseEntity<?> importBackup(
+            @RequestPart("file") MultipartFile file,
+            @RequestParam(value = "tables", required = false) List<String> tables) {
+        try {
+            Set<String> selectedEntities = (tables != null && !tables.isEmpty())
+                    ? new LinkedHashSet<>(tables) : null;
+            Map<String, Object> result = databaseMigrationService.importBackup(file, selectedEntities);
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Backup imported and restored successfully",
+                    "result", result
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("success", false, "error", e.getMessage())
+            );
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(
+                    Map.of("success", false, "error", "Import failed: " + e.getMessage())
+            );
+        }
+    }
+
+    /**
      * Download a backup file.
      */
     @GetMapping(path = "/download/{fileName}")
@@ -168,6 +204,61 @@ public class DatabaseConfigController {
         } catch (Exception e) {
             return ResponseEntity.status(500).body(
                     Map.of("success", false, "error", "Database restore failed: " + e.getMessage())
+            );
+        }
+    }
+
+    /**
+     * List assessments contained in a backup file (without restoring it).
+     */
+    @GetMapping(path = "/backups/{fileName}/assessments", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public ResponseEntity<?> listAssessmentsInBackup(@PathVariable String fileName) {
+        try {
+            Path backupFile = databaseMigrationService.getBackupFilePath(fileName);
+            BackupSnapshot snap = backupExtractService.parseBackup(backupFile);
+            List<Map<String, Object>> assessments = backupExtractService.listAssessments(snap);
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "fileName", fileName,
+                    "assessments", assessments
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("success", false, "error", e.getMessage())
+            );
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(
+                    Map.of("success", false, "error", "Failed to parse backup: " + e.getMessage())
+            );
+        }
+    }
+
+    /**
+     * Extract a single assessment from a backup file as an Excel report.
+     */
+    @GetMapping(path = "/backups/{fileName}/assessments/{assessmentId}/excel")
+    @ResponseBody
+    public ResponseEntity<?> extractAssessmentExcel(@PathVariable String fileName,
+                                                    @PathVariable Long assessmentId) {
+        try {
+            Path backupFile = databaseMigrationService.getBackupFilePath(fileName);
+            BackupSnapshot snap = backupExtractService.parseBackup(backupFile);
+            byte[] excel = backupExtractService.extractAssessmentExcel(snap, assessmentId);
+            String safeBackup = fileName.replaceAll("\\.sql$", "");
+            String downloadName = "assessment_" + assessmentId + "_from_" + safeBackup + ".xlsx";
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentDisposition(ContentDisposition.attachment().filename(downloadName).build());
+            headers.setContentType(MediaType.parseMediaType(
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+            return ResponseEntity.ok().headers(headers).body(excel);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("success", false, "error", e.getMessage())
+            );
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(
+                    Map.of("success", false, "error", "Failed to extract assessment: " + e.getMessage())
             );
         }
     }

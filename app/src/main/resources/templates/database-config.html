@@ -76,6 +76,8 @@
         <div class="section-card backup-section">
             <div class="section-header-actions">
                 <h3>?? Database Backups</h3>
+                <button type="button" id="importBackupBtn" class="btn-action">Import Backup</button>
+                <button type="button" id="extractAssessmentBtn" class="btn-action">Extract Single Assessment</button>
                 <button type="button" id="createBackupBtn" class="btn-submit">Create Full Backup</button>
             </div>
 
@@ -134,8 +136,106 @@
         </div>
     </div>
 
+    <!-- Import Backup Modal -->
+    <div id="importBackupModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Import Backup from File</h2>
+                <button type="button" class="modal-close" onclick="closeImportBackupModal()">&#x2715;</button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    &#x26A0; <strong>Warning:</strong> The imported file will be saved and the database will be immediately overwritten with its contents.
+                </div>
+                <div id="importDropZone" class="import-drop-zone">
+                    <div class="import-drop-icon">&#x1F4C2;</div>
+                    <p class="import-drop-text">Drag &amp; drop a <strong>.sql</strong> backup file here, or</p>
+                    <label for="importFileInput" class="btn-action">Browse&hellip;</label>
+                    <input type="file" id="importFileInput" accept=".sql" style="display:none">
+                </div>
+                <div id="importPreviewSection" style="display:none">
+                    <div class="import-file-info">
+                        <span id="importFileName" class="import-file-name"></span>
+                        <span id="importFileSize" class="import-file-size"></span>
+                    </div>
+                    <div id="importOverview" class="import-overview"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-cancel" onclick="closeImportBackupModal()">Cancel</button>
+                <button type="button" id="importConfirmBtn" class="btn-danger" disabled>Import &amp; Restore</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Extract Single Assessment Wizard Modal -->
+    <div id="extractAssessmentModal" class="modal">
+        <div class="modal-content extract-wizard-modal">
+            <div class="modal-header">
+                <h2>Extract Single Assessment from Backup</h2>
+                <button type="button" class="modal-close" onclick="closeExtractAssessmentModal()">&#x2715;</button>
+            </div>
+            <div class="modal-body">
+                <ol class="extract-stepper">
+                    <li id="extractStepper1" class="active"><span class="step-num">1</span> Select Backup</li>
+                    <li id="extractStepper2"><span class="step-num">2</span> Choose Assessment</li>
+                    <li id="extractStepper3"><span class="step-num">3</span> Download Excel</li>
+                </ol>
+
+                <div id="extractStep1" class="extract-wizard-step active">
+                    <p class="text-14 my-15">Select a backup file to extract an assessment from. The live database is not modified.</p>
+                    <div id="extractBackupList" class="extract-list"></div>
+                </div>
+
+                <div id="extractStep2" class="extract-wizard-step">
+                    <p class="text-14 my-15">
+                        Backup: <strong id="extractSelectedBackup"></strong>
+                    </p>
+                    <div id="extractAssessmentLoading" class="text-14-muted">Loading assessments&hellip;</div>
+                    <div id="extractAssessmentList" class="extract-list" style="display:none"></div>
+                    <div id="extractAssessmentEmpty" class="alert alert-info" style="display:none">
+                        No assessments were found in this backup.
+                    </div>
+                </div>
+
+                <div id="extractStep3" class="extract-wizard-step">
+                    <div class="extract-summary-card">
+                        <div class="extract-summary-row">
+                            <span class="label">Backup:</span>
+                            <span id="extractSummaryBackup"></span>
+                        </div>
+                        <div class="extract-summary-row">
+                            <span class="label">Assessment:</span>
+                            <span id="extractSummaryName"></span>
+                        </div>
+                        <div class="extract-summary-row">
+                            <span class="label">Catalog:</span>
+                            <span id="extractSummaryCatalog"></span>
+                        </div>
+                        <div class="extract-summary-row">
+                            <span class="label">Org Unit:</span>
+                            <span id="extractSummaryOrgUnit"></span>
+                        </div>
+                        <div class="extract-summary-row">
+                            <span class="label">Status:</span>
+                            <span id="extractSummaryStatus"></span>
+                        </div>
+                    </div>
+                    <p class="text-14 my-15">Click <strong>Download Excel</strong> to generate and save the report.</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-cancel" onclick="closeExtractAssessmentModal()">Cancel</button>
+                <button type="button" id="extractBackBtn" class="btn-action" style="display:none">Back</button>
+                <button type="button" id="extractNextBtn" class="btn-submit" disabled>Next</button>
+                <button type="button" id="extractDownloadBtn" class="btn-submit" style="display:none">Download Excel</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let pendingMigrationVersion = null;
+        let pendingImportFile = null;
         let statusMessageTimeout = null;
 
         /**
@@ -363,6 +463,378 @@
                 });
         }
 
+        function openImportBackupModal() {
+            pendingImportFile = null;
+            document.getElementById('importDropZone').classList.remove('dragover');
+            document.getElementById('importPreviewSection').style.display = 'none';
+            document.getElementById('importOverview').innerHTML = '';
+            document.getElementById('importConfirmBtn').disabled = true;
+            document.getElementById('importFileInput').value = '';
+            document.getElementById('importBackupModal').classList.add('show');
+        }
+
+        function closeImportBackupModal() {
+            document.getElementById('importBackupModal').classList.remove('show');
+            pendingImportFile = null;
+        }
+
+        // ========== Extract Single Assessment Wizard ==========
+
+        let extractState = {
+            step: 1,
+            backupFile: null,
+            assessment: null
+        };
+
+        function openExtractAssessmentModal() {
+            extractState = { step: 1, backupFile: null, assessment: null };
+            renderExtractBackupList();
+            showExtractStep(1);
+            document.getElementById('extractAssessmentModal').classList.add('show');
+        }
+
+        function closeExtractAssessmentModal() {
+            document.getElementById('extractAssessmentModal').classList.remove('show');
+        }
+
+        function showExtractStep(step) {
+            extractState.step = step;
+            for (let i = 1; i <= 3; i++) {
+                const panel = document.getElementById('extractStep' + i);
+                const crumb = document.getElementById('extractStepper' + i);
+                if (panel) panel.classList.toggle('active', i === step);
+                if (crumb) {
+                    crumb.classList.toggle('active', i === step);
+                    crumb.classList.toggle('done', i < step);
+                }
+            }
+            const backBtn = document.getElementById('extractBackBtn');
+            const nextBtn = document.getElementById('extractNextBtn');
+            const dlBtn = document.getElementById('extractDownloadBtn');
+            backBtn.style.display = step === 1 ? 'none' : 'inline-block';
+            if (step < 3) {
+                nextBtn.style.display = 'inline-block';
+                dlBtn.style.display = 'none';
+                nextBtn.disabled = !(step === 1 ? extractState.backupFile : extractState.assessment);
+            } else {
+                nextBtn.style.display = 'none';
+                dlBtn.style.display = 'inline-block';
+            }
+        }
+
+        function renderExtractBackupList() {
+            const container = document.getElementById('extractBackupList');
+            const rows = document.querySelectorAll('#backupTableBody tr');
+            const items = [];
+            rows.forEach(tr => {
+                const tds = tr.querySelectorAll('td');
+                if (tds.length >= 4) {
+                    const name = (tds[0].textContent || '').trim();
+                    if (name && !name.toLowerCase().startsWith('no backups')) {
+                        items.push({
+                            name: name,
+                            version: (tds[1].textContent || '').trim(),
+                            createdAt: (tds[2].textContent || '').trim(),
+                            size: (tds[3].textContent || '').trim()
+                        });
+                    }
+                }
+            });
+            if (items.length === 0) {
+                container.innerHTML = '<div class="alert alert-info">No backups available.</div>';
+                return;
+            }
+            container.innerHTML = items.map(it => `
+                <label class="extract-row" data-file="${escapeHtmlAttr(it.name)}">
+                    <input type="radio" name="extractBackupChoice" value="${escapeHtmlAttr(it.name)}">
+                    <span class="extract-row-main">
+                        <span class="extract-row-title">${escapeHtml(it.name)}</span>
+                        <span class="extract-row-sub">v${escapeHtml(it.version)} &middot; ${escapeHtml(it.createdAt)} &middot; ${escapeHtml(it.size)} bytes</span>
+                    </span>
+                </label>
+            `).join('');
+            container.querySelectorAll('input[name="extractBackupChoice"]').forEach(input => {
+                input.addEventListener('change', function () {
+                    extractState.backupFile = this.value;
+                    container.querySelectorAll('.extract-row').forEach(r => {
+                        r.classList.toggle('selected', r.getAttribute('data-file') === extractState.backupFile);
+                    });
+                    document.getElementById('extractNextBtn').disabled = false;
+                });
+            });
+        }
+
+        function loadExtractAssessments() {
+            const fileName = extractState.backupFile;
+            document.getElementById('extractSelectedBackup').textContent = fileName;
+            const listEl = document.getElementById('extractAssessmentList');
+            const loadingEl = document.getElementById('extractAssessmentLoading');
+            const emptyEl = document.getElementById('extractAssessmentEmpty');
+            listEl.style.display = 'none';
+            listEl.innerHTML = '';
+            emptyEl.style.display = 'none';
+            loadingEl.style.display = 'block';
+            document.getElementById('extractNextBtn').disabled = true;
+
+            fetch('/config/database/backups/' + encodeURIComponent(fileName) + '/assessments', {
+                headers: { 'Accept': 'application/json' }
+            })
+                .then(r => r.json().then(d => ({ ok: r.ok, data: d })))
+                .then(({ ok, data }) => {
+                    loadingEl.style.display = 'none';
+                    if (!ok || !data.success) {
+                        showStatus('Failed to read backup: ' + (data.error || 'Unknown error'), 'error');
+                        return;
+                    }
+                    const assessments = data.assessments || [];
+                    if (assessments.length === 0) {
+                        emptyEl.style.display = 'block';
+                        return;
+                    }
+                    listEl.style.display = 'block';
+                    listEl.innerHTML = assessments.map(a => `
+                        <label class="extract-row" data-id="${a.id}">
+                            <input type="radio" name="extractAssessmentChoice" value="${a.id}">
+                            <span class="extract-row-main">
+                                <span class="extract-row-title">${escapeHtml(a.name || '(unnamed)')}</span>
+                                <span class="extract-row-sub">
+                                    ${escapeHtml(a.status || '-')}
+                                    &middot; ${escapeHtml(a.creationDate || '-')}
+                                    &middot; ${escapeHtml(a.catalogName || '-')}
+                                    &middot; ${escapeHtml(a.orgUnitName || '-')}
+                                </span>
+                            </span>
+                        </label>
+                    `).join('');
+                    listEl.querySelectorAll('input[name="extractAssessmentChoice"]').forEach(input => {
+                        input.addEventListener('change', function () {
+                            const id = parseInt(this.value, 10);
+                            extractState.assessment = assessments.find(a => a.id === id) || null;
+                            listEl.querySelectorAll('.extract-row').forEach(r => {
+                                r.classList.toggle('selected', r.getAttribute('data-id') === String(id));
+                            });
+                            document.getElementById('extractNextBtn').disabled = !extractState.assessment;
+                        });
+                    });
+                })
+                .catch(err => {
+                    loadingEl.style.display = 'none';
+                    showStatus('Failed to read backup: ' + err.message, 'error');
+                });
+        }
+
+        function showExtractSummary() {
+            const a = extractState.assessment || {};
+            document.getElementById('extractSummaryBackup').textContent = extractState.backupFile || '-';
+            document.getElementById('extractSummaryName').textContent = a.name || '-';
+            document.getElementById('extractSummaryCatalog').textContent = a.catalogName || '-';
+            document.getElementById('extractSummaryOrgUnit').textContent = a.orgUnitName || '-';
+            document.getElementById('extractSummaryStatus').textContent = a.status || '-';
+        }
+
+        function downloadExtractedAssessment() {
+            if (!extractState.backupFile || !extractState.assessment) return;
+            const url = '/config/database/backups/'
+                + encodeURIComponent(extractState.backupFile)
+                + '/assessments/' + encodeURIComponent(extractState.assessment.id)
+                + '/excel';
+            // Direct navigation triggers a browser download
+            window.location.href = url;
+        }
+
+        function wireExtractWizard() {
+            const nextBtn = document.getElementById('extractNextBtn');
+            const backBtn = document.getElementById('extractBackBtn');
+            const dlBtn = document.getElementById('extractDownloadBtn');
+            if (nextBtn) {
+                nextBtn.addEventListener('click', function () {
+                    if (extractState.step === 1) {
+                        showExtractStep(2);
+                        loadExtractAssessments();
+                    } else if (extractState.step === 2) {
+                        showExtractSummary();
+                        showExtractStep(3);
+                    }
+                });
+            }
+            if (backBtn) {
+                backBtn.addEventListener('click', function () {
+                    if (extractState.step > 1) showExtractStep(extractState.step - 1);
+                });
+            }
+            if (dlBtn) {
+                dlBtn.addEventListener('click', downloadExtractedAssessment);
+            }
+        }
+
+        function escapeHtml(s) {
+            if (s === null || s === undefined) return '';
+            return String(s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+        function escapeHtmlAttr(s) {
+            return escapeHtml(s);
+        }
+
+        function parseBackupMetadata(text) {
+            const meta = { generatedAt: null, database: null, tables: {}, views: [] };
+            const lines = text.split('\n');
+            let currentTable = null;
+            for (const line of lines) {
+                const t = line.trim();
+                if (!t) continue;
+                let m;
+                if ((m = t.match(/^--\s*Govinc database backup generated at (.+)$/))) {
+                    meta.generatedAt = m[1];
+                } else if ((m = t.match(/^--\s*Database:\s*(.+)$/))) {
+                    meta.database = m[1].trim();
+                } else if ((m = t.match(/^--\s*Table:\s*`([^`]+)`/))) {
+                    currentTable = m[1];
+                    meta.tables[currentTable] = 0;
+                } else if ((m = t.match(/^--\s*View:\s*`([^`]+)`/))) {
+                    meta.views.push(m[1]);
+                    currentTable = null;
+                } else if (currentTable && t.startsWith('INSERT INTO')) {
+                    meta.tables[currentTable]++;
+                }
+            }
+            return meta;
+        }
+
+        function renderImportOverview(meta) {
+            const tableNames = Object.keys(meta.tables);
+            const totalRows = Object.values(meta.tables).reduce((a, b) => a + b, 0);
+            const entityCount = tableNames.length + meta.views.length;
+            let html = '';
+
+            if (meta.generatedAt) {
+                html += '<div class="import-overview-row"><span class="import-meta-label">Generated</span><span>' + escapeHtml(meta.generatedAt) + '</span></div>';
+            }
+            if (meta.database) {
+                html += '<div class="import-overview-row"><span class="import-meta-label">Database</span><span>' + escapeHtml(meta.database) + '</span></div>';
+            }
+            if (entityCount > 0) {
+                const tLabel = tableNames.length === 1 ? 'table' : 'tables';
+                const rLabel = totalRows === 1 ? 'row' : 'rows';
+                let contentsText = tableNames.length + ' ' + tLabel + ', ' + totalRows.toLocaleString() + ' ' + rLabel + ' total';
+                if (meta.views.length > 0) contentsText += ', ' + meta.views.length + ' view' + (meta.views.length > 1 ? 's' : '');
+                html += '<div class="import-overview-row"><span class="import-meta-label">Contents</span><span>' + contentsText + '</span></div>';
+
+                html += '<div class="import-entity-select">';
+                html += '<div class="import-entity-header">';
+                html += '<label class="import-entity-all-label"><input type="checkbox" id="importSelectAll" checked onchange="toggleAllEntities(this.checked)"> Select all</label>';
+                html += '<span id="importEntityCount" class="import-entity-count-label">' + entityCount + ' / ' + entityCount + ' selected</span>';
+                html += '</div>';
+                html += '<div class="import-entity-list">';
+                tableNames.forEach(function(name) {
+                    const rows = meta.tables[name];
+                    html += '<div class="import-entity-item">';
+                    html += '<label class="import-entity-label"><input type="checkbox" class="import-entity-cb" value="' + escapeHtml(name) + '" checked onchange="onEntityCbChange()"> <span class="import-entity-name">' + escapeHtml(name) + '</span></label>';
+                    html += '<span class="import-entity-rows">' + rows + ' row' + (rows !== 1 ? 's' : '') + '</span>';
+                    html += '</div>';
+                });
+                meta.views.forEach(function(name) {
+                    html += '<div class="import-entity-item">';
+                    html += '<label class="import-entity-label"><input type="checkbox" class="import-entity-cb" value="' + escapeHtml(name) + '" checked onchange="onEntityCbChange()"> <span class="import-entity-name import-entity-view">' + escapeHtml(name) + '</span></label>';
+                    html += '<span class="import-entity-rows">view</span>';
+                    html += '</div>';
+                });
+                html += '</div>'; // import-entity-list
+                html += '</div>'; // import-entity-select
+            }
+            return html;
+        }
+
+        function toggleAllEntities(checked) {
+            document.querySelectorAll('.import-entity-cb').forEach(function(cb) { cb.checked = checked; });
+            onEntityCbChange();
+        }
+
+        function onEntityCbChange() {
+            const all = document.querySelectorAll('.import-entity-cb');
+            const checkedBoxes = document.querySelectorAll('.import-entity-cb:checked');
+            const total = all.length;
+            const count = checkedBoxes.length;
+            const countEl = document.getElementById('importEntityCount');
+            if (countEl) countEl.textContent = count + ' / ' + total + ' selected';
+            const selectAll = document.getElementById('importSelectAll');
+            if (selectAll) {
+                selectAll.checked = count === total;
+                selectAll.indeterminate = count > 0 && count < total;
+            }
+            // Disable button only if there are checkboxes and none are checked
+            document.getElementById('importConfirmBtn').disabled = total > 0 && count === 0;
+        }
+
+        function setImportFile(file) {
+            if (!file) return;
+            pendingImportFile = file;
+            document.getElementById('importFileName').textContent = file.name;
+            document.getElementById('importFileSize').textContent = '(' + formatBytes(file.size) + ')';
+            document.getElementById('importOverview').innerHTML = '<div class="import-parsing-msg">Analysing backup file\u2026</div>';
+            document.getElementById('importPreviewSection').style.display = 'block';
+            document.getElementById('importConfirmBtn').disabled = true;
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                try {
+                    const meta = parseBackupMetadata(e.target.result);
+                    document.getElementById('importOverview').innerHTML = renderImportOverview(meta);
+                } catch (err) {
+                    document.getElementById('importOverview').innerHTML = '<div class="import-parsing-msg">Could not parse file contents.</div>';
+                }
+                onEntityCbChange();
+            };
+            reader.onerror = function () {
+                document.getElementById('importOverview').innerHTML = '<div class="import-parsing-msg">Could not read file.</div>';
+                document.getElementById('importConfirmBtn').disabled = false;
+            };
+            reader.readAsText(file, 'UTF-8');
+        }
+
+        function confirmImportBackup() {
+            if (!pendingImportFile) return;
+            const fileToUpload = pendingImportFile; // capture before closeImportBackupModal resets it
+
+            const selectedEntities = Array.from(document.querySelectorAll('.import-entity-cb:checked'))
+                .map(function(cb) { return cb.value; });
+
+            closeImportBackupModal();
+            showStatus('Uploading and restoring backup...', 'info');
+
+            const csrf = getCsrfToken();
+            const formData = new FormData();
+            formData.append('file', fileToUpload);
+            selectedEntities.forEach(function(name) { formData.append('tables', name); });
+            const headers = {};
+            if (csrf.token) {
+                headers[csrf.header] = csrf.token;
+            }
+
+            fetch('/config/database/import', {
+                method: 'POST',
+                headers: headers,
+                body: formData
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.success) {
+                        showStatus('Import and restore completed successfully. Reloading page...', 'success');
+                        setTimeout(() => { window.location.href = '/config/database'; }, 1800);
+                    } else {
+                        throw new Error((data && data.error) ? data.error : 'Import failed');
+                    }
+                })
+                .catch(error => {
+                    console.error('Import error:', error);
+                    showStatus('Import failed: ' + error.message, 'error');
+                });
+        }
+
         function restoreBackup(fileName) {
             if (!fileName) return;
 
@@ -403,9 +875,13 @@
 
         // Close modal when clicking outside
         window.onclick = function(event) {
-            const modal = document.getElementById('migrationConfirmModal');
-            if (event.target === modal) {
+            const migrationModal = document.getElementById('migrationConfirmModal');
+            if (event.target === migrationModal) {
                 closeMigrationConfirmModal();
+            }
+            const importModal = document.getElementById('importBackupModal');
+            if (event.target === importModal) {
+                closeImportBackupModal();
             }
         }
 
@@ -425,6 +901,60 @@
             const createBackupBtn = document.getElementById('createBackupBtn');
             if (createBackupBtn) {
                 createBackupBtn.addEventListener('click', createBackup);
+            }
+
+            const importBackupBtn = document.getElementById('importBackupBtn');
+            if (importBackupBtn) {
+                importBackupBtn.addEventListener('click', openImportBackupModal);
+            }
+
+            const extractAssessmentBtn = document.getElementById('extractAssessmentBtn');
+            if (extractAssessmentBtn) {
+                extractAssessmentBtn.addEventListener('click', openExtractAssessmentModal);
+            }
+            wireExtractWizard();
+
+            const importFileInput = document.getElementById('importFileInput');
+            if (importFileInput) {
+                importFileInput.addEventListener('change', function () {
+                    if (this.files && this.files.length > 0) {
+                        setImportFile(this.files[0]);
+                    }
+                });
+            }
+
+            const importDropZone = document.getElementById('importDropZone');
+            if (importDropZone) {
+                importDropZone.addEventListener('click', function (e) {
+                    if (e.target.tagName !== 'LABEL' && e.target.tagName !== 'INPUT') {
+                        document.getElementById('importFileInput').click();
+                    }
+                });
+                importDropZone.addEventListener('dragover', function (e) {
+                    e.preventDefault();
+                    this.classList.add('dragover');
+                });
+                importDropZone.addEventListener('dragleave', function () {
+                    this.classList.remove('dragover');
+                });
+                importDropZone.addEventListener('drop', function (e) {
+                    e.preventDefault();
+                    this.classList.remove('dragover');
+                    const files = e.dataTransfer.files;
+                    if (files && files.length > 0) {
+                        const file = files[0];
+                        if (file.name.toLowerCase().endsWith('.sql')) {
+                            setImportFile(file);
+                        } else {
+                            showStatus('Only .sql backup files are accepted.', 'error');
+                        }
+                    }
+                });
+            }
+
+            const importConfirmBtn = document.getElementById('importConfirmBtn');
+            if (importConfirmBtn) {
+                importConfirmBtn.addEventListener('click', confirmImportBackup);
             }
 
             const backupTableBody = document.getElementById('backupTableBody');

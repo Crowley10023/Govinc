@@ -73,7 +73,7 @@
                         <td th:text="${assessment.creationDate != null ? #temporals.format(assessment.creationDate, 'dd MMM yyyy') : 'N/A'}" th:attr="data-iso-date=${assessment.creationDate != null ? #temporals.format(assessment.creationDate, 'yyyy-MM-dd') : ''}"></td>
                         <td th:text="${assessment.createdBy != null ? assessment.createdBy.name : 'N/A'}"></td>
                         <td th:text="${assessment.status}"></td>
-                        <td th:text="${assessment.securityCatalog.name}"></td>
+                        <td th:text="${assessment.securityCatalog != null ? assessment.securityCatalog.name : 'N/A'}"></td>
                         <td>
                             <button th:if="${isAdminOrISM}" class="btn-danger btn-sm delete-btn" type="button">Delete</button>
                         </td>
