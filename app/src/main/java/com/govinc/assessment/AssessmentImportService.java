@@ -63,6 +63,16 @@ public class AssessmentImportService {
     /** Half-width of the evidence snippet captured around an exact match. */
     private static final int EVIDENCE_RADIUS = 180;
 
+    /**
+     * Minimum AI-reported confidence required to actually propose a maturity
+     * answer for a control. Below this, the row is left as "not answered" so
+     * the user is not pushed toward a guess.
+     */
+    private static final double MIN_CONFIDENCE = 0.5;
+
+    /** Maximum number of evidence snippets collected per control. */
+    private static final int MAX_EVIDENCE_SNIPPETS = 3;
+
     @Autowired
     private OpenAIUtil openAIUtil;
 
@@ -150,21 +160,52 @@ public class AssessmentImportService {
     // ── Phase 1 — exact reference matching ───────────────────────────────
 
     /**
-     * Returns an evidence snippet if the control's reference literal appears in
-     * {@code text}, or {@code null} if there is no match.
+     * Returns an evidence snippet if the control's reference (or one of its
+     * tags) literally appears in {@code text}, or {@code null} if there is no
+     * match.
      *
-     * <p>Only the {@code reference} field is used as a needle (minimum 4 chars).
-     * Name and tag matching was removed because they are too short or too generic
-     * (e.g. "user", "risk", "iam") and produce large numbers of false positives
-     * on typical security documents.</p>
+     * <p>Needles considered:</p>
+     * <ul>
+     *   <li>{@code reference} when at least 4 chars long &mdash; primary signal.</li>
+     *   <li>each comma/whitespace-separated token of {@code tag} when at least
+     *       5 chars long &mdash; secondary signal.</li>
+     * </ul>
+     * <p>Name matching is intentionally excluded: control names are typically
+     * short generic phrases ("user access", "risk register") that produce a
+     * flood of false positives on real-world security documents.</p>
+     *
+     * <p>Up to {@link #MAX_EVIDENCE_SNIPPETS} non-overlapping occurrences are
+     * collected and concatenated so the AI auditor sees broader context.</p>
      */
     private String findExactEvidence(SecurityControl c, String text) {
+        java.util.LinkedHashSet<String> needles = new java.util.LinkedHashSet<>();
         String ref = c.getReference();
-        if (ref == null || ref.trim().length() < 4) return null;
-        String needle = ref.trim();
-        int idx = indexOfWord(text, needle);
-        if (idx < 0) return null;
-        return snippetAround(text, idx, needle.length());
+        if (ref != null && ref.trim().length() >= 4) {
+            needles.add(ref.trim());
+        }
+        String tag = c.getTag();
+        if (tag != null && !tag.isBlank()) {
+            for (String t : tag.split("[,;\\s]+")) {
+                String tt = t.trim();
+                if (tt.length() >= 5) needles.add(tt);
+            }
+        }
+        if (needles.isEmpty()) return null;
+
+        List<String> snippets = new ArrayList<>();
+        Set<Integer> seenBuckets = new HashSet<>();
+        for (String needle : needles) {
+            for (int idx : allIndicesOfWord(text, needle)) {
+                // De-duplicate overlapping windows: two hits within ~200 chars
+                // produce essentially the same snippet.
+                int bucket = idx / (EVIDENCE_RADIUS * 2);
+                if (!seenBuckets.add(bucket)) continue;
+                snippets.add(snippetAround(text, idx, needle.length()));
+                if (snippets.size() >= MAX_EVIDENCE_SNIPPETS) break;
+            }
+            if (snippets.size() >= MAX_EVIDENCE_SNIPPETS) break;
+        }
+        return snippets.isEmpty() ? null : String.join(" \u2014 ", snippets);
     }
 
     /**
@@ -196,13 +237,21 @@ public class AssessmentImportService {
 
         String prompt = "You are an experienced information security auditor.\n"
                 + "The document references the security controls listed below. For each control,\n"
-                + "the \"evidence_from_document\" field shows the text extracted from around that\n"
-                + "reference. Assess what maturity level the evidence actually demonstrates.\n"
-                + "Be conservative: choose a high rating ONLY if the evidence clearly shows\n"
-                + "the control is implemented, not just mentioned or planned.\n\n"
+                + "the \"evidence_from_document\" field shows one or more text snippets extracted\n"
+                + "from around that reference. Assess what maturity level the evidence actually\n"
+                + "demonstrates. Be conservative: choose a high rating ONLY if the evidence\n"
+                + "clearly shows the control is implemented, not just mentioned or planned.\n\n"
+                + "Calibrate the confidence score honestly:\n"
+                + "  - >= 0.8 when the evidence unambiguously describes implementation;\n"
+                + "  - 0.5 to 0.8 when the evidence is suggestive but not conclusive;\n"
+                + "  - <  0.5 when the reference is only mentioned or the evidence is too vague.\n"
+                + "If confidence would be < 0.5, return answerId=null \u2014 we will leave the row\n"
+                + "as \"not answered\" rather than guess.\n\n"
                 + "Return a JSON array; each entry MUST be a JSON object with EXACTLY these fields:\n"
-                + "  { \"controlId\": <number>, \"answerId\": <number>, \"comment\": <string>, \"confidence\": <number 0..1> }\n"
+                + "  { \"controlId\": <number>, \"answerId\": <number|null>, \"comment\": <string>, \"confidence\": <number 0..1> }\n"
                 + "The comment must be 1-2 sentences quoting or paraphrasing the relevant evidence.\n"
+                + "Leave the comment as an empty string \"\" if the evidence does not justify any\n"
+                + "statement \u2014 do NOT invent a rationale.\n"
                 + "Do not include any text outside the JSON array.\n\n"
                 + "MATURITY ANSWERS (choose answerId from this list only):\n" + answerList
                 + "\nCONTROLS WITH EVIDENCE:\n" + controlList;
@@ -250,35 +299,35 @@ public class AssessmentImportService {
                 p.controlId = c.getId();
                 p.controlName = c.getName();
                 p.controlReference = c.getReference();
-                p.matchType = MatchType.EXACT;
                 p.evidence = evidenceMap.get(c);
 
                 if (o != null) {
+                    double conf = o.optDouble("confidence", 0.0);
                     long aid = o.optLong("answerId", -1);
                     MaturityAnswer chosen = ansById.get(aid);
-                    if (chosen == null) {
-                        // AI returned an unknown answerId → conservative fallback.
-                        chosen = answers.isEmpty() ? null : answers.get(answers.size() - 1);
-                    }
-                    if (chosen != null) {
+
+                    // Use the AI-generated comment verbatim; an empty/missing
+                    // comment stays empty — never synthesise a rationale.
+                    String aiComment = o.optString("comment", "").trim();
+                    p.comment = aiComment;
+                    p.confidence = conf;
+
+                    if (chosen != null && conf >= MIN_CONFIDENCE) {
                         p.proposedAnswerId = chosen.getId();
                         p.proposedAnswerName = chosen.getAnswer();
                         p.proposedRating = chosen.getRating();
+                        p.matchType = MatchType.EXACT;
+                    } else {
+                        // Low confidence or AI declined to answer — leave as
+                        // "not answered". Comment (if any) and evidence are
+                        // still shown so the user can decide manually.
+                        p.matchType = MatchType.NONE;
                     }
-                    // Use the AI-generated comment; fall back to the raw evidence.
-                    String aiComment = o.optString("comment", "").trim();
-                    p.comment = aiComment.isEmpty() ? (p.evidence != null ? p.evidence : "") : aiComment;
-                    p.confidence = o.optDouble("confidence", 0.7);
                 } else {
                     // AI returned nothing for this control.
-                    MaturityAnswer fallback = answers.isEmpty() ? null : answers.get(answers.size() - 1);
-                    if (fallback != null) {
-                        p.proposedAnswerId = fallback.getId();
-                        p.proposedAnswerName = fallback.getAnswer();
-                        p.proposedRating = fallback.getRating();
-                    }
-                    p.comment = p.evidence != null ? p.evidence : "";
-                    p.confidence = 0.5;
+                    p.comment = "";
+                    p.confidence = 0.0;
+                    p.matchType = MatchType.NONE;
                 }
                 out.add(p);
             }
@@ -289,28 +338,26 @@ public class AssessmentImportService {
         return out;
     }
 
-    /** Conservative fallback when AI is not available for exact matches. */
+    /**
+     * Fallback when the AI call itself fails for the exact-match batch. We do
+     * NOT guess an answer: the row is surfaced as "not answered" so the user
+     * can decide. The evidence is still attached so they have context.
+     */
     private List<Proposal> fallbackExactProposals(
             List<SecurityControl> batch,
             Map<SecurityControl, String> evidenceMap,
             List<MaturityAnswer> answers) {
-        MaturityAnswer fallback = answers.isEmpty() ? null : answers.get(answers.size() - 1);
         List<Proposal> out = new ArrayList<>();
         for (SecurityControl c : batch) {
             Proposal p = new Proposal();
             p.controlId = c.getId();
             p.controlName = c.getName();
             p.controlReference = c.getReference();
-            p.matchType = MatchType.EXACT;
+            p.matchType = MatchType.NONE;
             p.evidence = evidenceMap.get(c);
-            if (fallback != null) {
-                p.proposedAnswerId = fallback.getId();
-                p.proposedAnswerName = fallback.getAnswer();
-                p.proposedRating = fallback.getRating();
-            }
-            // Use the raw evidence text as the comment; no synthetic text added.
-            p.comment = p.evidence != null ? p.evidence : "";
-            p.confidence = 0.5;
+            // No proposed answer, no synthesised comment.
+            p.comment = "";
+            p.confidence = 0.0;
             out.add(p);
         }
         return out;
@@ -323,6 +370,17 @@ public class AssessmentImportService {
                 + "(?![\\p{L}\\p{N}_-])";
         Matcher m = Pattern.compile(regex).matcher(haystack);
         return m.find() ? m.start() : -1;
+    }
+
+    /** Word-boundary, case-insensitive — returns every match index. */
+    private List<Integer> allIndicesOfWord(String haystack, String needle) {
+        String regex = "(?i)(?<![\\p{L}\\p{N}_-])"
+                + Pattern.quote(needle)
+                + "(?![\\p{L}\\p{N}_-])";
+        Matcher m = Pattern.compile(regex).matcher(haystack);
+        List<Integer> out = new ArrayList<>();
+        while (m.find()) out.add(m.start());
+        return out;
     }
 
     private String snippetAround(String text, int idx, int hitLen) {
@@ -370,12 +428,18 @@ public class AssessmentImportService {
         String prompt = "You are an experienced information security auditor.\n"
                 + "Below is the full text of a document a customer uploaded as evidence of their controls.\n"
                 + "For each security control listed, decide which maturity answer best reflects what the\n"
-                + "document actually demonstrates. Choose ONLY from the maturity answers listed.\n"
-                + "If the document gives no evidence one way or the other, choose the LOWEST-rated\n"
-                + "maturity answer (the most conservative).\n\n"
+                + "document actually demonstrates. Choose ONLY from the maturity answers listed.\n\n"
+                + "Calibrate confidence honestly:\n"
+                + "  - >= 0.8 only when the document clearly demonstrates the control;\n"
+                + "  - 0.5 to 0.8 when the document is suggestive but not conclusive;\n"
+                + "  - <  0.5 when the document gives no real evidence one way or the other.\n"
+                + "If confidence would be < 0.5, return answerId=null \u2014 we will leave the row\n"
+                + "as \"not answered\" rather than guess.\n\n"
                 + "Return a JSON array; each entry MUST be a JSON object with EXACTLY these fields:\n"
-                + "  { \"controlId\": <number>, \"answerId\": <number>, \"comment\": <string>, \"confidence\": <number 0..1> }\n"
+                + "  { \"controlId\": <number>, \"answerId\": <number|null>, \"comment\": <string>, \"confidence\": <number 0..1> }\n"
                 + "The comment should be at most 2 sentences and quote or paraphrase the relevant evidence.\n"
+                + "Leave the comment as an empty string \"\" if the document does not justify any\n"
+                + "statement \u2014 do NOT invent a rationale.\n"
                 + "Do not include any text outside the JSON array.\n\n"
                 + "MATURITY ANSWERS (choose answerId from here):\n" + answerList
                 + "\nSECURITY CONTROLS:\n" + controlList
@@ -417,28 +481,25 @@ public class AssessmentImportService {
                 p.controlName = c.getName();
                 p.controlReference = c.getReference();
                 if (o != null) {
+                    double conf = o.has("confidence") ? o.optDouble("confidence", 0.0) : 0.0;
                     long aid = o.optLong("answerId", -1);
                     MaturityAnswer chosen = ansById.get(aid);
-                    if (chosen == null) {
-                        // Fall back to the lowest-rated answer (last in our sort).
-                        chosen = answers.isEmpty() ? null : answers.get(answers.size() - 1);
-                    }
-                    if (chosen != null) {
+
+                    String aiComment = o.optString("comment", "").trim();
+                    p.comment = aiComment;     // empty if AI declined to comment
+                    p.confidence = conf;
+
+                    if (chosen != null && conf >= MIN_CONFIDENCE) {
                         p.proposedAnswerId = chosen.getId();
                         p.proposedAnswerName = chosen.getAnswer();
                         p.proposedRating = chosen.getRating();
+                        p.matchType = MatchType.AI;
+                    } else {
+                        // Low confidence or AI declined — leave "not answered".
+                        p.matchType = MatchType.NONE;
                     }
-                    p.comment = o.optString("comment", "");
-                    p.confidence = o.has("confidence") ? o.optDouble("confidence", 0.5) : 0.5;
-                    p.matchType = MatchType.AI;
                 } else {
-                    MaturityAnswer chosen = answers.isEmpty() ? null : answers.get(answers.size() - 1);
-                    if (chosen != null) {
-                        p.proposedAnswerId = chosen.getId();
-                        p.proposedAnswerName = chosen.getAnswer();
-                        p.proposedRating = chosen.getRating();
-                    }
-                    p.comment = "AI returned no response for this control.";
+                    p.comment = "";
                     p.matchType = MatchType.NONE;
                     p.confidence = 0.0;
                 }
@@ -452,19 +513,19 @@ public class AssessmentImportService {
     }
 
     private List<Proposal> fallbackProposals(List<SecurityControl> batch, List<MaturityAnswer> answers, String note) {
-        MaturityAnswer fallback = answers.isEmpty() ? null : answers.get(answers.size() - 1);
+        // No guess: leave each row as "not answered" with an empty comment.
+        // The {@code note} parameter is retained for call-site compatibility
+        // and logged below for diagnostics, but never surfaces to the user.
+        if (note != null && !note.isBlank()) {
+            log.debug("[import] fallbackProposals reason: {}", note);
+        }
         List<Proposal> out = new ArrayList<>();
         for (SecurityControl c : batch) {
             Proposal p = new Proposal();
             p.controlId = c.getId();
             p.controlName = c.getName();
             p.controlReference = c.getReference();
-            if (fallback != null) {
-                p.proposedAnswerId = fallback.getId();
-                p.proposedAnswerName = fallback.getAnswer();
-                p.proposedRating = fallback.getRating();
-            }
-            p.comment = note;
+            p.comment = "";
             p.matchType = MatchType.NONE;
             p.confidence = 0.0;
             out.add(p);

@@ -139,11 +139,16 @@
             }
 
             // Build dropdown of all maturity answers, pre-selecting the proposed one.
-            var optsHtml = maturityAnswers.map(function (a) {
-                var sel = (a.id === p.proposedAnswerId) ? ' selected' : '';
-                return '<option value="' + a.id + '"' + sel + '>'
-                    + escapeHtml(a.name) + ' (' + a.rating + '%)</option>';
-            }).join('');
+            // First option is "— not answered —" with empty value; selected when no
+            // answer was proposed (low confidence or no match) so the row will not
+            // overwrite an existing answer unless the user explicitly picks one.
+            var noneSel = (p.proposedAnswerId === null || p.proposedAnswerId === undefined) ? ' selected' : '';
+            var optsHtml = '<option value=""' + noneSel + '>&mdash; not answered &mdash;</option>'
+                + maturityAnswers.map(function (a) {
+                    var sel = (a.id === p.proposedAnswerId) ? ' selected' : '';
+                    return '<option value="' + a.id + '"' + sel + '>'
+                        + escapeHtml(a.name) + ' (' + a.rating + '%)</option>';
+                }).join('');
 
             // Default: accept rows with an answer proposed, leave NONE rows unchecked.
             var checked = (p.matchType !== 'NONE') ? 'checked' : '';
@@ -205,9 +210,12 @@
             if (!cb || !cb.checked) return;
             var sel = tr.querySelector('.import-row-answer');
             var cmt = tr.querySelector('.import-row-comment');
+            var raw = sel ? sel.value : '';
+            var ansId = (raw === '' || raw === null) ? null : parseInt(raw, 10);
+            if (isNaN(ansId)) ansId = null;
             items.push({
                 controlId: parseInt(tr.dataset.controlId, 10),
-                answerId: sel ? parseInt(sel.value, 10) : null,
+                answerId: ansId,
                 comment: cmt ? cmt.value : ''
             });
         });
