@@ -49,6 +49,7 @@ public class AssessmentImportController {
     // ── Upload + propose ──────────────────────────────────────────────────
 
     @PostMapping(path = "/upload")
+    @Transactional
     public ResponseEntity<?> upload(@PathVariable Long id,
                                     @RequestParam("file") MultipartFile file) {
         if (!authorizationService.canAnswerAssessment(id)) {
@@ -62,6 +63,35 @@ public class AssessmentImportController {
         if (catalog == null || catalog.getMaturityModel() == null) {
             return ResponseEntity.badRequest().body(Map.of(
                     "error", "Assessment has no catalog or maturity model attached."));
+        }
+
+        // Round-trip path: when the user uploads the workbook produced by the
+        // assessment Excel export, write the answers/comments back verbatim
+        // without a proposal review step.
+        try {
+            AssessmentImportService.ExportImportData exportData =
+                    importService.tryParseExportFormat(file, catalog);
+            if (exportData.detected) {
+                int[] result = applyExportRows(id, aOpt.get(), exportData.rows);
+                int applied = result[0];
+                int skipped = result[1];
+                try {
+                    assessmentSseService.broadcast(id, "import",
+                            Map.of("applied", applied, "skipped", skipped));
+                } catch (Exception ignored) { /* SSE is best-effort */ }
+                Map<String, Object> body = new LinkedHashMap<>();
+                body.put("ok", true);
+                body.put("directApply", true);
+                body.put("fileName", file.getOriginalFilename());
+                body.put("applied", applied);
+                body.put("skipped", skipped);
+                body.put("totalRows", exportData.totalRows);
+                return ResponseEntity.ok(body);
+            }
+        } catch (Exception e) {
+            // Failure here means the workbook was not a Govinc export — fall
+            // through to the AI proposal flow rather than aborting the upload.
+            log.debug("[import] export-format probe failed for assessment {}: {}", id, e.getMessage());
         }
 
         try {
@@ -82,6 +112,7 @@ public class AssessmentImportController {
 
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("ok", true);
+            body.put("directApply", false);
             body.put("fileName", file.getOriginalFilename());
             body.put("proposalCount", proposals.size());
             body.put("maturityAnswers", maturityAnswers);
@@ -117,49 +148,16 @@ public class AssessmentImportController {
             return ResponseEntity.badRequest().body(Map.of("error", "No items to apply."));
         }
 
-        // Load-or-create the AssessmentDetails for this assessment.
-        AssessmentDetails details = assessmentDetailsService.findByAssessmentId(id).orElse(null);
-        if (details == null) {
-            details = new AssessmentDetails();
-            Set<Assessment> link = new HashSet<>();
-            link.add(aOpt.get());
-            details.setAssessments(link);
-            details.setDate(LocalDate.now());
-        }
-
         int applied = 0;
         int skipped = 0;
+        AssessmentDetails details = loadOrCreateDetails(id, aOpt.get());
         for (Map<String, Object> item : items) {
             Long controlId = toLong(item.get("controlId"));
             Long answerId  = toLong(item.get("answerId"));
             String comment = item.get("comment") == null ? null : String.valueOf(item.get("comment"));
-            if (controlId == null || answerId == null) { skipped++; continue; }
-
-            SecurityControl control = securityControlRepository.findById(controlId).orElse(null);
-            MaturityAnswer ma = maturityAnswerRepository.findById(answerId).orElse(null);
-            if (control == null || ma == null) { skipped++; continue; }
-
-            // Find existing answer-row for this control inside the details set.
-            AssessmentControlAnswer existing = null;
-            for (AssessmentControlAnswer aca : details.getControlAnswers()) {
-                if (aca.getSecurityControl() != null
-                        && Objects.equals(aca.getSecurityControl().getId(), controlId)) {
-                    existing = aca;
-                    break;
-                }
-            }
-            if (existing == null) {
-                existing = new AssessmentControlAnswer(control, ma, comment);
-                existing = answerRepository.save(existing);
-                details.getControlAnswers().add(existing);
-            } else {
-                existing.setMaturityAnswer(ma);
-                if (comment != null) existing.setComment(comment);
-                answerRepository.save(existing);
-            }
-            applied++;
+            if (applyOne(details, controlId, answerId, comment)) applied++;
+            else skipped++;
         }
-
         assessmentDetailsService.save(details);
         try {
             // Notify other viewers that this assessment changed; payload kept
@@ -169,6 +167,69 @@ public class AssessmentImportController {
         } catch (Exception ignored) { /* SSE is best-effort */ }
 
         return ResponseEntity.ok(Map.of("ok", true, "applied", applied, "skipped", skipped));
+    }
+
+    // ── Shared write-path used by both /apply and the round-trip /upload ─
+
+    /** Load (or create) the AssessmentDetails row that holds the answer set. */
+    private AssessmentDetails loadOrCreateDetails(Long id, Assessment assessment) {
+        AssessmentDetails details = assessmentDetailsService.findByAssessmentId(id).orElse(null);
+        if (details == null) {
+            details = new AssessmentDetails();
+            Set<Assessment> link = new HashSet<>();
+            link.add(assessment);
+            details.setAssessments(link);
+            details.setDate(LocalDate.now());
+        }
+        return details;
+    }
+
+    /**
+     * Upserts the answer + comment for a single control inside {@code details}.
+     * Returns {@code true} when a row was written, {@code false} when the
+     * input was incomplete or referenced an unknown control/answer.
+     */
+    private boolean applyOne(AssessmentDetails details, Long controlId, Long answerId, String comment) {
+        if (controlId == null || answerId == null) return false;
+        SecurityControl control = securityControlRepository.findById(controlId).orElse(null);
+        MaturityAnswer ma = maturityAnswerRepository.findById(answerId).orElse(null);
+        if (control == null || ma == null) return false;
+
+        AssessmentControlAnswer existing = null;
+        for (AssessmentControlAnswer aca : details.getControlAnswers()) {
+            if (aca.getSecurityControl() != null
+                    && Objects.equals(aca.getSecurityControl().getId(), controlId)) {
+                existing = aca;
+                break;
+            }
+        }
+        if (existing == null) {
+            existing = new AssessmentControlAnswer(control, ma, comment);
+            existing = answerRepository.save(existing);
+            details.getControlAnswers().add(existing);
+        } else {
+            existing.setMaturityAnswer(ma);
+            if (comment != null) existing.setComment(comment);
+            answerRepository.save(existing);
+        }
+        return true;
+    }
+
+    /**
+     * Writes back all rows resolved from a Govinc Excel re-import.
+     * Returns {@code int[]{applied, skipped}}.
+     */
+    private int[] applyExportRows(Long id, Assessment assessment,
+                                  List<AssessmentImportService.ExportRow> rows) {
+        AssessmentDetails details = loadOrCreateDetails(id, assessment);
+        int applied = 0;
+        int skipped = 0;
+        for (AssessmentImportService.ExportRow r : rows) {
+            if (applyOne(details, r.controlId, r.answerId, r.comment)) applied++;
+            else skipped++;
+        }
+        assessmentDetailsService.save(details);
+        return new int[]{applied, skipped};
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────

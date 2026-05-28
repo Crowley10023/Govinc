@@ -101,6 +101,17 @@
                 statusEl.textContent = 'Failed: ' + (res.body && res.body.error ? res.body.error : 'unknown error');
                 return;
             }
+            // Round-trip Govinc Excel export: answers are written back on the
+            // server without any review step — just show a confirmation and
+            // reload the page so the new values appear.
+            if (res.body.directApply) {
+                statusEl.style.color = '#1a6b2b';
+                statusEl.textContent = 'Detected Govinc export "' + res.body.fileName
+                    + '". Applied ' + res.body.applied
+                    + ', skipped ' + res.body.skipped + '. Reloading…';
+                setTimeout(function () { window.location.reload(); }, 800);
+                return;
+            }
             maturityAnswers = res.body.maturityAnswers || [];
             renderProposals(res.body.proposals || []);
             statusEl.textContent = 'Read ' + res.body.proposalCount + ' control(s) from "' + res.body.fileName + '".';

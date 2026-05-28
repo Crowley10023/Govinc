@@ -11,6 +11,8 @@ import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.poi.hwpf.HWPFDocument;
 import org.apache.poi.hwpf.extractor.WordExtractor;
 import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -28,29 +30,25 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Parses a user-supplied document (PDF/DOCX/DOC/XLSX/XLS/TXT) and proposes
  * answers and comments for every {@link SecurityControl} of the assessment's
  * catalog.
  *
- * <p>Matching runs in two stages:</p>
+ * <p>Two import paths are supported:</p>
  * <ol>
- *   <li><b>Exact match</b> &mdash; literal occurrences of the control's
- *       reference, tag(s) or name are located in the extracted text. When
- *       found, a context window around the hit is extracted as evidence and
- *       the highest-rated maturity answer is proposed. The user remains the
- *       final arbiter.</li>
- *   <li><b>AI fallback</b> &mdash; controls for which no exact match was
- *       found are sent in a single batched prompt to {@link OpenAIUtil},
- *       which returns a JSON array of proposed answers with brief comments.</li>
+ *   <li><b>Round-trip Govinc Excel re-import</b> &mdash; see
+ *       {@link #tryParseExportFormat}. When the uploaded workbook matches
+ *       the exact column layout produced by the assessment Excel export,
+ *       answers and comments are read verbatim and written back without
+ *       a review step.</li>
+ *   <li><b>AI proposal</b> &mdash; for every other document type the full
+ *       extracted text is sent to {@link OpenAIUtil} in batched prompts;
+ *       the model returns a JSON array of proposed answers with brief
+ *       comments. Persistence happens only after the user acknowledges
+ *       the proposals via {@code AssessmentImportController#apply}.</li>
  * </ol>
- *
- * <p>The service never writes anything to the database &mdash; it only
- * <i>proposes</i>. Persistence happens after the user acknowledges the
- * proposals via {@code AssessmentImportController#apply}.</p>
  */
 @Service
 public class AssessmentImportService {
@@ -60,9 +58,6 @@ public class AssessmentImportService {
     /** Hard cap on prompt size so we don't blow past provider context limits. */
     private static final int MAX_AI_TEXT_CHARS = 14_000;
 
-    /** Half-width of the evidence snippet captured around an exact match. */
-    private static final int EVIDENCE_RADIUS = 180;
-
     /**
      * Minimum AI-reported confidence required to actually propose a maturity
      * answer for a control. Below this, the row is left as "not answered" so
@@ -70,13 +65,29 @@ public class AssessmentImportService {
      */
     private static final double MIN_CONFIDENCE = 0.5;
 
-    /** Maximum number of evidence snippets collected per control. */
-    private static final int MAX_EVIDENCE_SNIPPETS = 3;
-
     @Autowired
     private OpenAIUtil openAIUtil;
 
     public enum MatchType { EXACT, AI, NONE }
+
+    /** One row of a re-imported Govinc export workbook, already resolved
+     *  to catalog ids. Consumed by the controller to write back answers
+     *  without going through the proposal review UI. */
+    public static class ExportRow {
+        public Long controlId;
+        public Long answerId;     // may be null when the export row had no answer
+        public String comment;    // never null; empty string clears any existing
+    }
+
+    /** Result of attempting to read a file as a Govinc Excel export. */
+    public static class ExportImportData {
+        /** True if the workbook contains the export's header row. */
+        public boolean detected;
+        /** Rows that resolved to a catalog control + maturity answer. */
+        public List<ExportRow> rows = new ArrayList<>();
+        /** Total non-empty data rows seen (including unresolved ones). */
+        public int totalRows;
+    }
 
     /** Proposal for one security control. */
     public static class Proposal {
@@ -112,40 +123,18 @@ public class AssessmentImportService {
         // Sort answers by rating descending so answers.get(0) is the highest maturity.
         answers.sort(Comparator.comparingInt(MaturityAnswer::getRating).reversed());
 
-        // Phase 1: find controls whose reference literal appears in the document.
-        // Only the control's reference field is used (≥4 chars) to avoid the false
-        // positives that name/tag matching causes on generic security documents.
-        Map<SecurityControl, String> exactEvidence = new LinkedHashMap<>();
-        List<SecurityControl> needsAi = new ArrayList<>();
-        for (SecurityControl c : controls) {
-            String ev = findExactEvidence(c, text);
-            if (ev != null) {
-                exactEvidence.put(c, ev);
-            } else {
-                needsAi.add(c);
-            }
-        }
-
+        // AI-only: hand every control + the document text to the model and let
+        // it decide the maturity answer and a justifying comment. Exact-token
+        // reference matching is intentionally not used here — that path is
+        // reserved for the Govinc Excel export re-import (see
+        // {@link #tryParseExportFormat}). For arbitrary user-supplied
+        // documents we rely solely on the AI auditor.
         List<Proposal> proposals = new ArrayList<>();
-
-        // Phase 1b: for exact reference matches, ask AI to assess the maturity level
-        // from the evidence snippet and generate a comment.  This prevents blindly
-        // assigning the highest-rated answer whenever a reference is mentioned.
-        if (!exactEvidence.isEmpty()) {
-            int batchSize = 10;
-            List<SecurityControl> matched = new ArrayList<>(exactEvidence.keySet());
-            for (int i = 0; i < matched.size(); i += batchSize) {
-                List<SecurityControl> batch = matched.subList(i, Math.min(i + batchSize, matched.size()));
-                proposals.addAll(aiAssessExactBatch(batch, exactEvidence, answers));
-            }
-        }
-
-        // Phase 2: AI fallback for controls with no reference match.
-        if (!needsAi.isEmpty()) {
+        if (!controls.isEmpty()) {
             String trimmedText = truncate(text, MAX_AI_TEXT_CHARS);
             int batchSize = 10;
-            for (int i = 0; i < needsAi.size(); i += batchSize) {
-                List<SecurityControl> batch = needsAi.subList(i, Math.min(i + batchSize, needsAi.size()));
+            for (int i = 0; i < controls.size(); i += batchSize) {
+                List<SecurityControl> batch = controls.subList(i, Math.min(i + batchSize, controls.size()));
                 proposals.addAll(aiMatch(batch, trimmedText, answers));
             }
         }
@@ -157,242 +146,152 @@ public class AssessmentImportService {
         return proposals;
     }
 
-    // ── Phase 1 — exact reference matching ───────────────────────────────
+    // ── Round-trip re-import of the Govinc Excel export ──────────────────
 
     /**
-     * Returns an evidence snippet if the control's reference (or one of its
-     * tags) literally appears in {@code text}, or {@code null} if there is no
-     * match.
-     *
-     * <p>Needles considered:</p>
-     * <ul>
-     *   <li>{@code reference} when at least 4 chars long &mdash; primary signal.</li>
-     *   <li>each comma/whitespace-separated token of {@code tag} when at least
-     *       5 chars long &mdash; secondary signal.</li>
-     * </ul>
-     * <p>Name matching is intentionally excluded: control names are typically
-     * short generic phrases ("user access", "risk register") that produce a
-     * flood of false positives on real-world security documents.</p>
-     *
-     * <p>Up to {@link #MAX_EVIDENCE_SNIPPETS} non-overlapping occurrences are
-     * collected and concatenated so the AI auditor sees broader context.</p>
+     * Header labels that identify the Govinc Excel export. When all of these
+     * appear in a single row of the workbook, the file is treated as a
+     * round-trip re-import and answers/comments are written verbatim — no
+     * AI fallback, no review step.
      */
-    private String findExactEvidence(SecurityControl c, String text) {
-        java.util.LinkedHashSet<String> needles = new java.util.LinkedHashSet<>();
-        String ref = c.getReference();
-        if (ref != null && ref.trim().length() >= 4) {
-            needles.add(ref.trim());
-        }
-        String tag = c.getTag();
-        if (tag != null && !tag.isBlank()) {
-            for (String t : tag.split("[,;\\s]+")) {
-                String tt = t.trim();
-                if (tt.length() >= 5) needles.add(tt);
-            }
-        }
-        if (needles.isEmpty()) return null;
-
-        List<String> snippets = new ArrayList<>();
-        Set<Integer> seenBuckets = new HashSet<>();
-        for (String needle : needles) {
-            for (int idx : allIndicesOfWord(text, needle)) {
-                // De-duplicate overlapping windows: two hits within ~200 chars
-                // produce essentially the same snippet.
-                int bucket = idx / (EVIDENCE_RADIUS * 2);
-                if (!seenBuckets.add(bucket)) continue;
-                snippets.add(snippetAround(text, idx, needle.length()));
-                if (snippets.size() >= MAX_EVIDENCE_SNIPPETS) break;
-            }
-            if (snippets.size() >= MAX_EVIDENCE_SNIPPETS) break;
-        }
-        return snippets.isEmpty() ? null : String.join(" \u2014 ", snippets);
-    }
+    private static final String[] EXPORT_HEADERS = {
+            "Domain", "Reference", "Control Name", "Answer", "Score (%)", "Source", "Comment"
+    };
 
     /**
-     * For controls whose reference was found in the document, send the evidence
-     * snippets to AI so it can assess the actual maturity level demonstrated by
-     * the document — rather than blindly assigning the highest-rated answer.
-     * Falls back to the lowest-rated answer (conservative) when AI is unavailable.
+     * Inspects {@code file} and, when it matches the Govinc Excel export
+     * layout, resolves every data row to a catalog control + maturity answer.
+     *
+     * <p>The returned {@link ExportImportData#rows} contain only rows that
+     * successfully resolved against {@code catalog} — unknown controls,
+     * unknown maturity answers and rows with no answer cell are skipped.
+     * The caller is expected to write them back through the same answer
+     * persistence path the apply endpoint uses.</p>
+     *
+     * <p>If the file is not an .xlsx/.xls or no header row is found,
+     * {@link ExportImportData#detected} is {@code false} and the caller
+     * should fall back to the AI proposal flow.</p>
      */
-    private List<Proposal> aiAssessExactBatch(
-            List<SecurityControl> batch,
-            Map<SecurityControl, String> evidenceMap,
-            List<MaturityAnswer> answers) {
-
-        StringBuilder answerList = buildAnswerList(answers);
-
-        StringBuilder controlList = new StringBuilder();
-        for (SecurityControl c : batch) {
-            String ev = evidenceMap.getOrDefault(c, "");
-            controlList.append("- id=").append(c.getId())
-                    .append(" | ref=").append(nullSafe(c.getReference()))
-                    .append(" | name=").append(nullSafe(c.getName()));
-            if (c.getDetail() != null && !c.getDetail().isBlank()) {
-                String detail = c.getDetail().replaceAll("\\s+", " ").trim();
-                if (detail.length() > 200) detail = detail.substring(0, 200) + "…";
-                controlList.append(" | detail=").append(detail);
-            }
-            controlList.append("\n  evidence_from_document: \"").append(ev).append("\"\n");
+    public ExportImportData tryParseExportFormat(MultipartFile file, SecurityCatalog catalog) throws IOException {
+        ExportImportData out = new ExportImportData();
+        if (file == null || file.isEmpty()) return out;
+        String name = file.getOriginalFilename();
+        String lower = name == null ? "" : name.toLowerCase(Locale.ROOT);
+        if (!(lower.endsWith(".xlsx") || lower.endsWith(".xls"))) {
+            return out;
         }
+        try (InputStream in = file.getInputStream();
+             Workbook wb = WorkbookFactory.create(in)) {
+            if (wb.getNumberOfSheets() == 0) return out;
+            Sheet sheet = wb.getSheetAt(0);
+            DataFormatter fmt = new DataFormatter();
 
-        String prompt = "You are an experienced information security auditor.\n"
-                + "The document references the security controls listed below. For each control,\n"
-                + "the \"evidence_from_document\" field shows one or more text snippets extracted\n"
-                + "from around that reference. Assess what maturity level the evidence actually\n"
-                + "demonstrates. Be conservative: choose a high rating ONLY if the evidence\n"
-                + "clearly shows the control is implemented, not just mentioned or planned.\n\n"
-                + "Calibrate the confidence score honestly:\n"
-                + "  - >= 0.8 when the evidence unambiguously describes implementation;\n"
-                + "  - 0.5 to 0.8 when the evidence is suggestive but not conclusive;\n"
-                + "  - <  0.5 when the reference is only mentioned or the evidence is too vague.\n"
-                + "If confidence would be < 0.5, return answerId=null \u2014 we will leave the row\n"
-                + "as \"not answered\" rather than guess.\n\n"
-                + "Return a JSON array; each entry MUST be a JSON object with EXACTLY these fields:\n"
-                + "  { \"controlId\": <number>, \"answerId\": <number|null>, \"comment\": <string>, \"confidence\": <number 0..1> }\n"
-                + "The comment must be 1-2 sentences quoting or paraphrasing the relevant evidence.\n"
-                + "Leave the comment as an empty string \"\" if the evidence does not justify any\n"
-                + "statement \u2014 do NOT invent a rationale.\n"
-                + "Do not include any text outside the JSON array.\n\n"
-                + "MATURITY ANSWERS (choose answerId from this list only):\n" + answerList
-                + "\nCONTROLS WITH EVIDENCE:\n" + controlList;
-
-        String aiResponse;
-        try {
-            aiResponse = openAIUtil.askAI(prompt);
-        } catch (Exception e) {
-            log.warn("[import] AI exact-match assessment failed: {}", e.getMessage());
-            return fallbackExactProposals(batch, evidenceMap, answers);
-        }
-
-        return parseAiExactResponse(aiResponse, batch, evidenceMap, answers);
-    }
-
-    private List<Proposal> parseAiExactResponse(
-            String aiResponse,
-            List<SecurityControl> batch,
-            Map<SecurityControl, String> evidenceMap,
-            List<MaturityAnswer> answers) {
-
-        List<Proposal> out = new ArrayList<>();
-        try {
-            String json = aiResponse == null ? "" : aiResponse.trim();
-            int s = json.indexOf('[');
-            int en = json.lastIndexOf(']');
-            if (s < 0 || en < 0 || en < s) {
-                log.warn("[import] AI exact-match returned no JSON array: {}", json);
-                return fallbackExactProposals(batch, evidenceMap, answers);
-            }
-            JSONArray arr = new JSONArray(json.substring(s, en + 1));
-            Map<Long, JSONObject> byControl = new HashMap<>();
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject o = arr.optJSONObject(i);
-                if (o == null) continue;
-                long cid = o.optLong("controlId", -1);
-                if (cid > 0) byControl.put(cid, o);
-            }
-            Map<Long, MaturityAnswer> ansById = new HashMap<>();
-            for (MaturityAnswer a : answers) ansById.put(a.getId(), a);
-
-            for (SecurityControl c : batch) {
-                JSONObject o = byControl.get(c.getId());
-                Proposal p = new Proposal();
-                p.controlId = c.getId();
-                p.controlName = c.getName();
-                p.controlReference = c.getReference();
-                p.evidence = evidenceMap.get(c);
-
-                if (o != null) {
-                    double conf = o.optDouble("confidence", 0.0);
-                    long aid = o.optLong("answerId", -1);
-                    MaturityAnswer chosen = ansById.get(aid);
-
-                    // Use the AI-generated comment verbatim; an empty/missing
-                    // comment stays empty — never synthesise a rationale.
-                    String aiComment = o.optString("comment", "").trim();
-                    p.comment = aiComment;
-                    p.confidence = conf;
-
-                    if (chosen != null && conf >= MIN_CONFIDENCE) {
-                        p.proposedAnswerId = chosen.getId();
-                        p.proposedAnswerName = chosen.getAnswer();
-                        p.proposedRating = chosen.getRating();
-                        p.matchType = MatchType.EXACT;
-                    } else {
-                        // Low confidence or AI declined to answer — leave as
-                        // "not answered". Comment (if any) and evidence are
-                        // still shown so the user can decide manually.
-                        p.matchType = MatchType.NONE;
+            // Locate the header row by matching all seven export labels.
+            int headerRowIdx = -1;
+            Map<String, Integer> colByLabel = new HashMap<>();
+            for (Row r : sheet) {
+                Map<String, Integer> found = new HashMap<>();
+                for (Cell c : r) {
+                    String v = fmt.formatCellValue(c);
+                    if (v == null) continue;
+                    String s = v.trim();
+                    for (String h : EXPORT_HEADERS) {
+                        if (s.equalsIgnoreCase(h)) {
+                            found.put(h, c.getColumnIndex());
+                            break;
+                        }
                     }
-                } else {
-                    // AI returned nothing for this control.
-                    p.comment = "";
-                    p.confidence = 0.0;
-                    p.matchType = MatchType.NONE;
                 }
-                out.add(p);
+                if (found.size() == EXPORT_HEADERS.length) {
+                    headerRowIdx = r.getRowNum();
+                    colByLabel = found;
+                    break;
+                }
             }
-        } catch (Exception ex) {
-            log.warn("[import] failed to parse AI exact-match JSON: {}", ex.getMessage());
-            return fallbackExactProposals(batch, evidenceMap, answers);
+            if (headerRowIdx < 0) return out;
+            out.detected = true;
+
+            // Build lookup maps from the catalog so each export row resolves
+            // to a known control + maturity answer.
+            Map<String, SecurityControl> ctlByRef = new HashMap<>();
+            Map<String, SecurityControl> ctlByName = new HashMap<>();
+            for (SecurityControl c : catalog.getSecurityControls()) {
+                if (c.getReference() != null && !c.getReference().isBlank()) {
+                    ctlByRef.put(c.getReference().trim().toLowerCase(Locale.ROOT), c);
+                }
+                if (c.getName() != null && !c.getName().isBlank()) {
+                    ctlByName.put(c.getName().trim().toLowerCase(Locale.ROOT), c);
+                }
+            }
+            Map<String, MaturityAnswer> ansByName = new HashMap<>();
+            for (MaturityAnswer a : catalog.getMaturityModel().getMaturityAnswers()) {
+                if (a.getAnswer() != null && !a.getAnswer().isBlank()) {
+                    ansByName.put(a.getAnswer().trim().toLowerCase(Locale.ROOT), a);
+                }
+            }
+
+            int refCol  = colByLabel.get("Reference");
+            int nameCol = colByLabel.get("Control Name");
+            int ansCol  = colByLabel.get("Answer");
+            int cmtCol  = colByLabel.get("Comment");
+
+            for (Row r : sheet) {
+                if (r.getRowNum() <= headerRowIdx) continue;
+                String ref  = cellText(r, refCol, fmt);
+                String cn   = cellText(r, nameCol, fmt);
+                String ans  = cellText(r, ansCol, fmt);
+                String cmt  = cellText(r, cmtCol, fmt);
+
+                boolean hasAnyKey = (ref != null && !ref.isBlank())
+                        || (cn != null && !cn.isBlank());
+                if (!hasAnyKey) continue;
+                out.totalRows++;
+
+                // Skip rows that were "Not answered" on export.
+                if (ans == null || ans.isBlank()) continue;
+
+                SecurityControl ctl = null;
+                if (ref != null && !ref.isBlank()) {
+                    ctl = ctlByRef.get(ref.trim().toLowerCase(Locale.ROOT));
+                }
+                if (ctl == null && cn != null && !cn.isBlank()) {
+                    ctl = ctlByName.get(cn.trim().toLowerCase(Locale.ROOT));
+                }
+                if (ctl == null) continue;
+
+                MaturityAnswer ma = ansByName.get(ans.trim().toLowerCase(Locale.ROOT));
+                if (ma == null) continue;
+
+                ExportRow er = new ExportRow();
+                er.controlId = ctl.getId();
+                er.answerId  = ma.getId();
+                er.comment   = cmt == null ? "" : cmt;
+                out.rows.add(er);
+            }
+        } catch (Exception e) {
+            // If reading the workbook fails for any reason, treat it as a
+            // non-export file and let the caller fall back to AI parsing.
+            log.debug("[import] not an export workbook ({}): {}", name, e.getMessage());
+            ExportImportData empty = new ExportImportData();
+            return empty;
         }
         return out;
     }
 
-    /**
-     * Fallback when the AI call itself fails for the exact-match batch. We do
-     * NOT guess an answer: the row is surfaced as "not answered" so the user
-     * can decide. The evidence is still attached so they have context.
-     */
-    private List<Proposal> fallbackExactProposals(
-            List<SecurityControl> batch,
-            Map<SecurityControl, String> evidenceMap,
-            List<MaturityAnswer> answers) {
-        List<Proposal> out = new ArrayList<>();
-        for (SecurityControl c : batch) {
-            Proposal p = new Proposal();
-            p.controlId = c.getId();
-            p.controlName = c.getName();
-            p.controlReference = c.getReference();
-            p.matchType = MatchType.NONE;
-            p.evidence = evidenceMap.get(c);
-            // No proposed answer, no synthesised comment.
-            p.comment = "";
-            p.confidence = 0.0;
-            out.add(p);
+    private static String cellText(Row row, int col, DataFormatter fmt) {
+        if (row == null || col < 0) return "";
+        Cell c = row.getCell(col);
+        if (c == null) return "";
+        if (c.getCellType() == CellType.NUMERIC) {
+            // Numeric cells (e.g. Score column) — format without trailing .0
+            double d = c.getNumericCellValue();
+            if (d == Math.floor(d) && !Double.isInfinite(d)) return Long.toString((long) d);
+            return Double.toString(d);
         }
-        return out;
+        return fmt.formatCellValue(c);
     }
 
-    private int indexOfWord(String haystack, String needle) {
-        // Word-boundary, case-insensitive match — keeps "AC-1" from matching "AC-10".
-        String regex = "(?i)(?<![\\p{L}\\p{N}_-])"
-                + Pattern.quote(needle)
-                + "(?![\\p{L}\\p{N}_-])";
-        Matcher m = Pattern.compile(regex).matcher(haystack);
-        return m.find() ? m.start() : -1;
-    }
-
-    /** Word-boundary, case-insensitive — returns every match index. */
-    private List<Integer> allIndicesOfWord(String haystack, String needle) {
-        String regex = "(?i)(?<![\\p{L}\\p{N}_-])"
-                + Pattern.quote(needle)
-                + "(?![\\p{L}\\p{N}_-])";
-        Matcher m = Pattern.compile(regex).matcher(haystack);
-        List<Integer> out = new ArrayList<>();
-        while (m.find()) out.add(m.start());
-        return out;
-    }
-
-    private String snippetAround(String text, int idx, int hitLen) {
-        int start = Math.max(0, idx - EVIDENCE_RADIUS);
-        int end = Math.min(text.length(), idx + hitLen + EVIDENCE_RADIUS);
-        String s = text.substring(start, end).replaceAll("\\s+", " ").trim();
-        if (start > 0) s = "…" + s;
-        if (end < text.length()) s = s + "…";
-        return s;
-    }
-
-    // ── Phase 2 — AI matching ─────────────────────────────────────────────
+    // ── AI matching ───────────────────────────────────────────────────────
 
     /** Shared helper: renders the list of maturity answers for prompt construction. */
     private StringBuilder buildAnswerList(List<MaturityAnswer> answers) {

@@ -1001,10 +1001,11 @@
             <!-- Step 1: file upload -->
             <div id="import-step-upload" class="modal-content" style="flex-shrink:0;">
                 <p class="text-muted text-sm">
-                    Upload a PDF, Word, Excel or plaintext document. The system will first try to
-                    find exact references to your security controls; controls that cannot be matched
-                    by name or reference are then assessed by AI based on the document text.
-                    Nothing is saved until you acknowledge the proposed answers.
+                    Upload a PDF, Word, Excel or plaintext document. If you upload a workbook
+                    produced by this assessment's <em>Export to Excel</em>, answers and comments
+                    are written back verbatim without a review step. For every other document,
+                    the AI auditor reads the full text and proposes an answer for each control;
+                    nothing is saved until you acknowledge the proposals.
                 </p>
                 <div style="display:flex;gap:0.6em;align-items:center;flex-wrap:wrap;margin-top:0.6em;">
                     <input type="file" id="import-file-input"
