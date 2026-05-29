@@ -68,6 +68,9 @@ public class AssessmentImportService {
     @Autowired
     private OpenAIUtil openAIUtil;
 
+    @Autowired
+    private AssessmentRepository assessmentRepository;
+
     public enum MatchType { EXACT, AI, NONE }
 
     /** One row of a re-imported Govinc export workbook, already resolved
@@ -77,6 +80,8 @@ public class AssessmentImportService {
         public Long controlId;
         public Long answerId;     // may be null when the export row had no answer
         public String comment;    // never null; empty string clears any existing
+        /** Mirrors the workbook's Source column: true for Override rows, false for Direct rows. Inherited rows are filtered out. */
+        public boolean isOverride;
     }
 
     /** Result of attempting to read a file as a Govinc Excel export. */
@@ -104,6 +109,34 @@ public class AssessmentImportService {
     }
 
     // ── Public API ─────────────────────────────────────────────────────────
+
+    /** Loads the assessment and returns its associated SecurityCatalog, or
+     *  {@code null} if the assessment does not exist or has no catalog with
+     *  a maturity model attached. Centralised here so the controller does
+     *  not need its own AssessmentRepository dependency. */
+    public SecurityCatalog loadCatalogForAssessment(Long assessmentId) {
+        if (assessmentId == null) return null;
+        return assessmentRepository.findById(assessmentId)
+                .map(Assessment::getSecurityCatalog)
+                .filter(c -> c != null && c.getMaturityModel() != null)
+                .orElse(null);
+    }
+
+    /** True when an Assessment with the given id exists. */
+    public boolean assessmentExists(Long assessmentId) {
+        return assessmentId != null && assessmentRepository.existsById(assessmentId);
+    }
+
+    /**
+     * Convenience wrapper around {@link #tryParseExportFormat(MultipartFile, SecurityCatalog)}
+     * that loads the catalog itself from the assessment id. Returns an empty
+     * (non-detected) result when the assessment or its catalog is missing.
+     */
+    public ExportImportData parseExportForAssessment(Long assessmentId, MultipartFile file) throws IOException {
+        SecurityCatalog catalog = loadCatalogForAssessment(assessmentId);
+        if (catalog == null) return new ExportImportData();
+        return tryParseExportFormat(file, catalog);
+    }
 
     /**
      * Extract text from {@code file} and propose answers/comments for every
@@ -154,8 +187,21 @@ public class AssessmentImportService {
      * round-trip re-import and answers/comments are written verbatim — no
      * AI fallback, no review step.
      */
+    /**
+     * Header labels that the Govinc Excel export writes. The detection
+     * routine only requires the subset listed in {@link #EXPORT_REQUIRED_HEADERS};
+     * the rest are recognised when present.
+     */
     private static final String[] EXPORT_HEADERS = {
-            "Domain", "Reference", "Control Name", "Answer", "Score (%)", "Source", "Comment"
+            "Domain", "Reference", "Control Name", "Description",
+            "Answer", "Score (%)", "Source", "Comment"
+    };
+
+    /** Columns whose joint presence in a single row marks the workbook as
+     *  a Govinc export (and triggers the round-trip re-import). Kept small
+     *  on purpose so manually-edited exports still match. */
+    private static final String[] EXPORT_REQUIRED_HEADERS = {
+            "Domain", "Reference", "Control Name", "Answer", "Source"
     };
 
     /**
@@ -186,7 +232,10 @@ public class AssessmentImportService {
             Sheet sheet = wb.getSheetAt(0);
             DataFormatter fmt = new DataFormatter();
 
-            // Locate the header row by matching all seven export labels.
+            // Locate the header row. We require Domain + Reference +
+            // Control Name + Description (see EXPORT_REQUIRED_HEADERS);
+            // any other recognised labels we encounter are remembered so
+            // we can read Answer / Comment columns from rows below.
             int headerRowIdx = -1;
             Map<String, Integer> colByLabel = new HashMap<>();
             for (Row r : sheet) {
@@ -197,12 +246,16 @@ public class AssessmentImportService {
                     String s = v.trim();
                     for (String h : EXPORT_HEADERS) {
                         if (s.equalsIgnoreCase(h)) {
-                            found.put(h, c.getColumnIndex());
+                            found.putIfAbsent(h, c.getColumnIndex());
                             break;
                         }
                     }
                 }
-                if (found.size() == EXPORT_HEADERS.length) {
+                boolean hasAllRequired = true;
+                for (String required : EXPORT_REQUIRED_HEADERS) {
+                    if (!found.containsKey(required)) { hasAllRequired = false; break; }
+                }
+                if (hasAllRequired) {
                     headerRowIdx = r.getRowNum();
                     colByLabel = found;
                     break;
@@ -211,61 +264,142 @@ public class AssessmentImportService {
             if (headerRowIdx < 0) return out;
             out.detected = true;
 
-            // Build lookup maps from the catalog so each export row resolves
-            // to a known control + maturity answer.
-            Map<String, SecurityControl> ctlByRef = new HashMap<>();
-            Map<String, SecurityControl> ctlByName = new HashMap<>();
+            // Build catalog lookup maps. Many catalogs (e.g. NIS2) share the
+            // same Reference and Control Name across many SecurityControls
+            // and only the Description (= SecurityControl.detail) is unique
+            // per row. So we:
+            //   1. Index by Description as the PRIMARY key (most specific).
+            //   2. Index by a composite "ref || name || desc" key for
+            //      tie-breaking when descriptions differ in whitespace etc.
+            //   3. Only fall back to Reference / Name when they are unique
+            //      across the catalog \u2014 otherwise we would silently
+            //      collapse N export rows onto the same SecurityControl,
+            //      which is exactly the 161-matched/60-written bug.
+            Map<String, SecurityControl> ctlByDesc     = new HashMap<>();
+            Map<String, SecurityControl> ctlByCompound = new HashMap<>();
+            Map<String, SecurityControl> ctlByRef      = new HashMap<>();
+            Map<String, SecurityControl> ctlByName     = new HashMap<>();
+            Set<String> ambiguousRefs  = new HashSet<>();
+            Set<String> ambiguousNames = new HashSet<>();
+            Set<String> ambiguousDescs = new HashSet<>();
             for (SecurityControl c : catalog.getSecurityControls()) {
-                if (c.getReference() != null && !c.getReference().isBlank()) {
-                    ctlByRef.put(c.getReference().trim().toLowerCase(Locale.ROOT), c);
+                String kRef  = normaliseKey(c.getReference());
+                String kName = normaliseKey(c.getName());
+                String kDesc = normaliseKey(c.getDetail());
+                if (!kDesc.isEmpty()) {
+                    if (ctlByDesc.putIfAbsent(kDesc, c) != null) {
+                        ambiguousDescs.add(kDesc);
+                    }
                 }
-                if (c.getName() != null && !c.getName().isBlank()) {
-                    ctlByName.put(c.getName().trim().toLowerCase(Locale.ROOT), c);
+                String kCompound = kRef + "||" + kName + "||" + kDesc;
+                if (!kCompound.equals("||||")) {
+                    ctlByCompound.putIfAbsent(kCompound, c);
+                }
+                if (!kRef.isEmpty()) {
+                    if (ctlByRef.putIfAbsent(kRef, c) != null) {
+                        ambiguousRefs.add(kRef);
+                    }
+                }
+                if (!kName.isEmpty()) {
+                    if (ctlByName.putIfAbsent(kName, c) != null) {
+                        ambiguousNames.add(kName);
+                    }
                 }
             }
+            // Purge ambiguous single-field keys so they cannot be used to
+            // resolve a row \u2014 the compound key (or description) must
+            // win in that case.
+            for (String k : ambiguousRefs)  ctlByRef.remove(k);
+            for (String k : ambiguousNames) ctlByName.remove(k);
+            for (String k : ambiguousDescs) ctlByDesc.remove(k);
             Map<String, MaturityAnswer> ansByName = new HashMap<>();
             for (MaturityAnswer a : catalog.getMaturityModel().getMaturityAnswers()) {
-                if (a.getAnswer() != null && !a.getAnswer().isBlank()) {
-                    ansByName.put(a.getAnswer().trim().toLowerCase(Locale.ROOT), a);
-                }
+                String k = normaliseKey(a.getAnswer());
+                if (!k.isEmpty()) ansByName.putIfAbsent(k, a);
             }
 
-            int refCol  = colByLabel.get("Reference");
-            int nameCol = colByLabel.get("Control Name");
-            int ansCol  = colByLabel.get("Answer");
-            int cmtCol  = colByLabel.get("Comment");
+            int refCol  = colByLabel.getOrDefault("Reference", -1);
+            int nameCol = colByLabel.getOrDefault("Control Name", -1);
+            int descCol = colByLabel.getOrDefault("Description", -1);
+            int ansCol  = colByLabel.getOrDefault("Answer", -1);
+            int srcCol  = colByLabel.getOrDefault("Source", -1);
+            int cmtCol  = colByLabel.getOrDefault("Comment", -1);
+
+            // Track which catalog controls we have already resolved during
+            // this import. The Govinc export writes one row per
+            // SecurityControl, so a second row hitting the same controlId
+            // means we just resolved two distinct export rows to the same
+            // catalog entry (typically because Description matching failed
+            // and the row collapsed onto a duplicate Reference / Name).
+            // Counting that as "matched" would reproduce the historical
+            // 161-matched / 60-written discrepancy, so we skip it instead
+            // and surface it as totalRows - rows.size().
+            Set<Long> seenControlIds = new HashSet<>();
 
             for (Row r : sheet) {
                 if (r.getRowNum() <= headerRowIdx) continue;
                 String ref  = cellText(r, refCol, fmt);
                 String cn   = cellText(r, nameCol, fmt);
+                String desc = cellText(r, descCol, fmt);
                 String ans  = cellText(r, ansCol, fmt);
+                String src  = cellText(r, srcCol, fmt);
                 String cmt  = cellText(r, cmtCol, fmt);
 
-                boolean hasAnyKey = (ref != null && !ref.isBlank())
-                        || (cn != null && !cn.isBlank());
+                boolean hasAnyKey = !normaliseKey(ref).isEmpty()
+                        || !normaliseKey(cn).isEmpty()
+                        || !normaliseKey(desc).isEmpty();
                 if (!hasAnyKey) continue;
                 out.totalRows++;
 
                 // Skip rows that were "Not answered" on export.
                 if (ans == null || ans.isBlank()) continue;
 
+                // Skip controls inherited from an org service. The org-service
+                // supplies the value at runtime; writing a local row would
+                // silently flip "taken over" to "direct".
+                String srcNorm = normaliseKey(src);
+                if (srcNorm.startsWith("inherited from")) continue;
+
                 SecurityControl ctl = null;
-                if (ref != null && !ref.isBlank()) {
-                    ctl = ctlByRef.get(ref.trim().toLowerCase(Locale.ROOT));
+                String kRef  = normaliseKey(ref);
+                String kName = normaliseKey(cn);
+                String kDesc = normaliseKey(desc);
+                // 1) Description is the most specific row identifier in
+                //    Govinc exports \u2014 try it first.
+                if (!kDesc.isEmpty()) ctl = ctlByDesc.get(kDesc);
+                // 2) Composite key disambiguates the (common) case where
+                //    Description duplicates exist but the full triple is
+                //    unique.
+                if (ctl == null) {
+                    String kCompound = kRef + "||" + kName + "||" + kDesc;
+                    if (!kCompound.equals("||||")) ctl = ctlByCompound.get(kCompound);
                 }
-                if (ctl == null && cn != null && !cn.isBlank()) {
-                    ctl = ctlByName.get(cn.trim().toLowerCase(Locale.ROOT));
-                }
+                // 3) Reference / Name only when they are globally unique
+                //    in the catalog (ambiguous ones were purged above).
+                if (ctl == null && !kRef.isEmpty())  ctl = ctlByRef.get(kRef);
+                if (ctl == null && !kName.isEmpty()) ctl = ctlByName.get(kName);
                 if (ctl == null) continue;
 
-                MaturityAnswer ma = ansByName.get(ans.trim().toLowerCase(Locale.ROOT));
+                MaturityAnswer ma = ansByName.get(normaliseKey(ans));
                 if (ma == null) continue;
+
+                if (!seenControlIds.add(ctl.getId())) {
+                    // Two rows resolved to the same catalog control \u2014
+                    // do not overwrite the first one. The discrepancy
+                    // shows up in the modal as (totalRows - matched).
+                    log.debug("[import] duplicate row collapsed onto control id={} (ref='{}', desc='{}')",
+                            ctl.getId(), ref, desc);
+                    continue;
+                }
 
                 ExportRow er = new ExportRow();
                 er.controlId = ctl.getId();
                 er.answerId  = ma.getId();
                 er.comment   = cmt == null ? "" : cmt;
+                // Source column "Override (overriding: â€¦)" â†’ isOverride=true.
+                // "Direct" / blank / anything else â†’ isOverride=false.
+                // ("Inherited from: â€¦" rows were already filtered out above.)
+                er.isOverride = srcNorm.startsWith("override");
                 out.rows.add(er);
             }
         } catch (Exception e) {
@@ -289,6 +423,19 @@ public class AssessmentImportService {
             return Double.toString(d);
         }
         return fmt.formatCellValue(c);
+    }
+
+    /**
+     * Normalises a string for lenient matching: Unicode NFKC, replaces
+     * non-breaking spaces, collapses whitespace, trims, lower-cases.
+     * Returns {@code ""} for null/blank input.
+     */
+    private static String normaliseKey(String s) {
+        if (s == null) return "";
+        String n = java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFKC);
+        n = n.replace('\u00A0', ' ');
+        n = n.replaceAll("\\s+", " ").trim();
+        return n.toLowerCase(Locale.ROOT);
     }
 
     // ── AI matching ───────────────────────────────────────────────────────

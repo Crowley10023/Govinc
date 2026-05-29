@@ -2,33 +2,37 @@ package com.govinc.assessment;
 
 import com.govinc.authorization.AuthorizationService;
 import com.govinc.catalog.SecurityCatalog;
-import com.govinc.catalog.SecurityControl;
-import com.govinc.catalog.SecurityControlRepository;
 import com.govinc.maturity.MaturityAnswer;
-import com.govinc.maturity.MaturityAnswerRepository;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.time.LocalDate;
 import java.util.*;
 
 /**
  * HTTP entry point for the "import answers from document" feature.
  *
- * <p>Two endpoints:</p>
+ * <p>The controller deliberately performs <b>no database access of its own</b>.
+ * All reads go through {@link AssessmentImportService} and all writes go
+ * through the standard {@link AssessmentController#saveAnswer} /
+ * {@link AssessmentController#saveComment} endpoints, so the import inherits
+ * exactly the same persistence, authorization, inheritance and SSE-broadcast
+ * behaviour as the manual UI.</p>
+ *
+ * <p>Endpoints:</p>
  * <ul>
- *   <li>{@code POST /assessment/{id}/import/upload} &mdash; accepts a multipart
- *       file, returns a JSON list of proposals (one per control). No data is
- *       written to the database.</li>
- *   <li>{@code POST /assessment/{id}/import/apply} &mdash; accepts a JSON body
- *       describing which proposals the user acknowledged; applies them via the
- *       same answer/comment write path the UI normally uses.</li>
+ *   <li>{@code POST /assessment/{id}/import/upload} — accepts a multipart
+ *       file. If it is a Govinc Excel export, answers + comments are written
+ *       back row-by-row and the response carries {@code matched / written /
+ *       skipped} counts that the modal renders verbatim. Otherwise the file
+ *       is parsed by the AI auditor and a list of per-control proposals is
+ *       returned for review.</li>
+ *   <li>{@code POST /assessment/{id}/import/apply} — applies acknowledged
+ *       proposals via the same per-row write path.</li>
  * </ul>
  */
 @RestController
@@ -38,29 +42,23 @@ public class AssessmentImportController {
     private static final Logger log = LoggerFactory.getLogger(AssessmentImportController.class);
 
     @Autowired private AssessmentImportService importService;
-    @Autowired private AssessmentRepository assessmentRepository;
-    @Autowired private AssessmentDetailsService assessmentDetailsService;
-    @Autowired private AssessmentControlAnswerRepository answerRepository;
-    @Autowired private SecurityControlRepository securityControlRepository;
-    @Autowired private MaturityAnswerRepository maturityAnswerRepository;
     @Autowired private AuthorizationService authorizationService;
     @Autowired private AssessmentSseService assessmentSseService;
+    @Autowired private AssessmentController assessmentController;
 
     // ── Upload + propose ──────────────────────────────────────────────────
 
     @PostMapping(path = "/upload")
-    @Transactional
     public ResponseEntity<?> upload(@PathVariable Long id,
                                     @RequestParam("file") MultipartFile file) {
         if (!authorizationService.canAnswerAssessment(id)) {
             return ResponseEntity.status(403).body(Map.of("error", "forbidden"));
         }
-        Optional<Assessment> aOpt = assessmentRepository.findById(id);
-        if (aOpt.isEmpty()) {
+        if (!importService.assessmentExists(id)) {
             return ResponseEntity.status(404).body(Map.of("error", "Assessment not found"));
         }
-        SecurityCatalog catalog = aOpt.get().getSecurityCatalog();
-        if (catalog == null || catalog.getMaturityModel() == null) {
+        SecurityCatalog catalog = importService.loadCatalogForAssessment(id);
+        if (catalog == null) {
             return ResponseEntity.badRequest().body(Map.of(
                     "error", "Assessment has no catalog or maturity model attached."));
         }
@@ -70,22 +68,35 @@ public class AssessmentImportController {
         // without a proposal review step.
         try {
             AssessmentImportService.ExportImportData exportData =
-                    importService.tryParseExportFormat(file, catalog);
+                    importService.parseExportForAssessment(id, file);
             if (exportData.detected) {
-                int[] result = applyExportRows(id, aOpt.get(), exportData.rows);
-                int applied = result[0];
-                int skipped = result[1];
+                ImportSummary summary = applyExportRows(id, exportData.rows);
                 try {
                     assessmentSseService.broadcast(id, "import",
-                            Map.of("applied", applied, "skipped", skipped));
+                            Map.of("answers", summary.answers,
+                                   "comments", summary.comments));
                 } catch (Exception ignored) { /* SSE is best-effort */ }
+                log.info("[import] excel apply for assessment {} → rows={}, matched={}, written={}, skipped={}",
+                        id, exportData.totalRows, exportData.rows.size(),
+                        summary.answers, summary.skipped);
                 Map<String, Object> body = new LinkedHashMap<>();
                 body.put("ok", true);
                 body.put("directApply", true);
                 body.put("fileName", file.getOriginalFilename());
-                body.put("applied", applied);
-                body.put("skipped", skipped);
+                // Counters surfaced to the modal:
+                //   rows     – non-empty data rows in the workbook
+                //   matched  – rows that resolved to a unique catalog control + maturity answer
+                //   written  – rows actually persisted via saveAnswer/saveComment
+                //   skipped  – matched - written (writes that returned non-"ok")
+                body.put("rows", exportData.totalRows);
+                body.put("matched", exportData.rows.size());
+                body.put("written", summary.answers);
+                body.put("skipped", summary.skipped);
+                body.put("comments", summary.comments);
                 body.put("totalRows", exportData.totalRows);
+                // backwards-compat aliases
+                body.put("answers", summary.answers);
+                body.put("applied", summary.answers);
                 return ResponseEntity.ok(body);
             }
         } catch (Exception e) {
@@ -98,8 +109,8 @@ public class AssessmentImportController {
             List<AssessmentImportService.Proposal> proposals =
                     importService.proposeFromFile(file, catalog);
 
-            // Also return the catalog's maturity answers so the UI can let the
-            // user change the proposed answer per row.
+            // Also return the catalog's maturity answers so the UI can let
+            // the user change the proposed answer per row.
             List<Map<String, Object>> maturityAnswers = new ArrayList<>();
             for (MaturityAnswer ma : catalog.getMaturityModel().getMaturityAnswers()) {
                 Map<String, Object> m = new LinkedHashMap<>();
@@ -133,13 +144,11 @@ public class AssessmentImportController {
      * clears any existing comment.
      */
     @PostMapping(path = "/apply")
-    @Transactional
     public ResponseEntity<?> apply(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         if (!authorizationService.canAnswerAssessment(id)) {
             return ResponseEntity.status(403).body(Map.of("error", "forbidden"));
         }
-        Optional<Assessment> aOpt = assessmentRepository.findById(id);
-        if (aOpt.isEmpty()) {
+        if (!importService.assessmentExists(id)) {
             return ResponseEntity.status(404).body(Map.of("error", "Assessment not found"));
         }
         @SuppressWarnings("unchecked")
@@ -148,88 +157,97 @@ public class AssessmentImportController {
             return ResponseEntity.badRequest().body(Map.of("error", "No items to apply."));
         }
 
-        int applied = 0;
-        int skipped = 0;
-        AssessmentDetails details = loadOrCreateDetails(id, aOpt.get());
+        ImportSummary s = new ImportSummary();
+        int matched = 0;
         for (Map<String, Object> item : items) {
             Long controlId = toLong(item.get("controlId"));
             Long answerId  = toLong(item.get("answerId"));
             String comment = item.get("comment") == null ? null : String.valueOf(item.get("comment"));
-            if (applyOne(details, controlId, answerId, comment)) applied++;
-            else skipped++;
+            if (controlId != null && answerId != null) matched++;
+            writeOneRow(id, controlId, answerId, comment, s);
         }
-        assessmentDetailsService.save(details);
         try {
-            // Notify other viewers that this assessment changed; payload kept
-            // tiny — the UI re-fetches its full state on this signal.
             assessmentSseService.broadcast(id, "import",
-                    Map.of("applied", applied, "skipped", skipped));
+                    Map.of("applied", s.answers, "comments", s.comments, "skipped", s.skipped));
         } catch (Exception ignored) { /* SSE is best-effort */ }
 
-        return ResponseEntity.ok(Map.of("ok", true, "applied", applied, "skipped", skipped));
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("ok", true);
+        resp.put("matched", matched);
+        resp.put("written", s.answers);
+        resp.put("skipped", s.skipped);
+        resp.put("comments", s.comments);
+        // backwards-compat alias
+        resp.put("applied", s.answers);
+        return ResponseEntity.ok(resp);
     }
 
-    // ── Shared write-path used by both /apply and the round-trip /upload ─
-
-    /** Load (or create) the AssessmentDetails row that holds the answer set. */
-    private AssessmentDetails loadOrCreateDetails(Long id, Assessment assessment) {
-        AssessmentDetails details = assessmentDetailsService.findByAssessmentId(id).orElse(null);
-        if (details == null) {
-            details = new AssessmentDetails();
-            Set<Assessment> link = new HashSet<>();
-            link.add(assessment);
-            details.setAssessments(link);
-            details.setDate(LocalDate.now());
-        }
-        return details;
-    }
+    // ── Shared write path: delegate to the standard AssessmentController ──
 
     /**
-     * Upserts the answer + comment for a single control inside {@code details}.
-     * Returns {@code true} when a row was written, {@code false} when the
-     * input was incomplete or referenced an unknown control/answer.
+     * Writes back all rows resolved from a Govinc Excel re-import by
+     * delegating each row to the same controller methods the manual UI
+     * uses ({@code POST /{id}/answer} and
+     * {@code PUT /{id}/control/{cid}/comment}). The import therefore
+     * inherits exactly the persistence, authorization, inheritance and
+     * SSE-broadcast behaviour of the regular write path.
+     *
+     * <p><b>Override flag policy:</b> the import passes {@code isOverride=null}
+     * so {@link AssessmentController#saveAnswer} preserves whatever flag the
+     * row already has. Re-importing therefore cannot flip a control's
+     * "taken over from org service" status — only its answer and comment
+     * values are touched.</p>
      */
-    private boolean applyOne(AssessmentDetails details, Long controlId, Long answerId, String comment) {
-        if (controlId == null || answerId == null) return false;
-        SecurityControl control = securityControlRepository.findById(controlId).orElse(null);
-        MaturityAnswer ma = maturityAnswerRepository.findById(answerId).orElse(null);
-        if (control == null || ma == null) return false;
-
-        AssessmentControlAnswer existing = null;
-        for (AssessmentControlAnswer aca : details.getControlAnswers()) {
-            if (aca.getSecurityControl() != null
-                    && Objects.equals(aca.getSecurityControl().getId(), controlId)) {
-                existing = aca;
-                break;
-            }
-        }
-        if (existing == null) {
-            existing = new AssessmentControlAnswer(control, ma, comment);
-            existing = answerRepository.save(existing);
-            details.getControlAnswers().add(existing);
-        } else {
-            existing.setMaturityAnswer(ma);
-            if (comment != null) existing.setComment(comment);
-            answerRepository.save(existing);
-        }
-        return true;
-    }
-
-    /**
-     * Writes back all rows resolved from a Govinc Excel re-import.
-     * Returns {@code int[]{applied, skipped}}.
-     */
-    private int[] applyExportRows(Long id, Assessment assessment,
-                                  List<AssessmentImportService.ExportRow> rows) {
-        AssessmentDetails details = loadOrCreateDetails(id, assessment);
-        int applied = 0;
-        int skipped = 0;
+    private ImportSummary applyExportRows(Long id,
+                                          List<AssessmentImportService.ExportRow> rows) {
+        ImportSummary s = new ImportSummary();
         for (AssessmentImportService.ExportRow r : rows) {
-            if (applyOne(details, r.controlId, r.answerId, r.comment)) applied++;
-            else skipped++;
+            writeOneRow(id, r.controlId, r.answerId, r.comment, s);
         }
-        assessmentDetailsService.save(details);
-        return new int[]{applied, skipped};
+        return s;
+    }
+
+    /**
+     * Persists one (controlId, answerId, comment) tuple via the standard
+     * AssessmentController endpoints and updates {@code s}. No direct
+     * repository access — the controller does not own any JPA dependencies.
+     */
+    private void writeOneRow(Long assessmentId, Long controlId, Long answerId,
+                             String comment, ImportSummary s) {
+        if (controlId == null || answerId == null) { s.skipped++; return; }
+
+        // 1) Answer — isOverride=null preserves the existing override flag,
+        //    so the import never alters "taken over" status.
+        String res;
+        try {
+            res = assessmentController.saveAnswer(assessmentId, controlId, answerId, null);
+        } catch (Exception e) {
+            log.warn("[import] saveAnswer failed for assessment {} control {}: {}",
+                    assessmentId, controlId, e.toString());
+            res = "fail";
+        }
+        if (!"ok".equals(res)) { s.skipped++; return; }
+        s.answers++;
+
+        // 2) Comment — only when non-blank. We never blank existing comments.
+        if (comment != null && !comment.isBlank()) {
+            String cres;
+            try {
+                cres = assessmentController.saveComment(assessmentId, controlId,
+                        Map.of("comment", comment));
+            } catch (Exception e) {
+                log.warn("[import] saveComment failed for assessment {} control {}: {}",
+                        assessmentId, controlId, e.toString());
+                cres = "fail";
+            }
+            if ("ok".equals(cres)) s.comments++;
+        }
+    }
+
+    private static final class ImportSummary {
+        int answers;
+        int comments;
+        int skipped;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────

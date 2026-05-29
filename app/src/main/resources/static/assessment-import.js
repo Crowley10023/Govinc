@@ -55,6 +55,8 @@
         // Reset state on each open.
         $('import-step-upload').style.display = 'block';
         $('import-step-review').style.display = 'none';
+        var result = $('import-step-result');
+        if (result) result.style.display = 'none';
         applyBtn.style.display = 'none';
         statusEl.textContent = '';
         proposalsBody.innerHTML = '';
@@ -101,15 +103,13 @@
                 statusEl.textContent = 'Failed: ' + (res.body && res.body.error ? res.body.error : 'unknown error');
                 return;
             }
-            // Round-trip Govinc Excel export: answers are written back on the
-            // server without any review step — just show a confirmation and
-            // reload the page so the new values appear.
+            // Round-trip Govinc Excel export: answers are written back on
+            // the server row-by-row via the standard saveAnswer/saveComment
+            // endpoints. The modal then shows matched / written / skipped
+            // counts and exposes only a Close button — SSE has already
+            // pushed the new answers into the page in the background.
             if (res.body.directApply) {
-                statusEl.style.color = '#1a6b2b';
-                statusEl.textContent = 'Detected Govinc export "' + res.body.fileName
-                    + '". Applied ' + res.body.applied
-                    + ', skipped ' + res.body.skipped + '. Reloading…';
-                setTimeout(function () { window.location.reload(); }, 800);
+                showDirectApplyResult(res.body);
                 return;
             }
             maturityAnswers = res.body.maturityAnswers || [];
@@ -121,6 +121,55 @@
             statusEl.textContent = 'Upload failed: ' + err;
         });
     };
+
+    /**
+     * After the Excel round-trip apply, replace the upload step with a
+     * read-only summary panel listing matched / written / skipped counts.
+     * The Apply button is hidden — only Close remains in the button row.
+     */
+    function showDirectApplyResult(body) {
+        ensureRefs();
+        var rows = (body.rows != null) ? body.rows : (body.totalRows || 0);
+        var matched = (body.matched != null) ? body.matched
+            : ((body.answers != null) ? body.answers : (body.applied || 0));
+        var written = (body.written != null) ? body.written
+            : ((body.answers != null) ? body.answers : (body.applied || 0));
+        var skipped = body.skipped || 0;
+        var comments = body.comments || 0;
+        var fileName = body.fileName || '';
+
+        $('import-step-upload').style.display = 'none';
+        $('import-step-review').style.display = 'none';
+        if (applyBtn) applyBtn.style.display = 'none';
+
+        var panel = $('import-step-result');
+        if (!panel) {
+            panel = document.createElement('div');
+            panel.id = 'import-step-result';
+            panel.style.cssText = 'margin-top:0.6em;padding:0.8em 1em;border:1px solid #cfe3d3;'
+                + 'background:#f4faf5;border-radius:6px;';
+            var review = $('import-step-review');
+            review.parentNode.insertBefore(panel, review);
+        }
+        panel.style.display = 'block';
+        panel.innerHTML =
+              '<div style="font-weight:600;margin-bottom:0.4em;">Import finished</div>'
+            + '<div style="color:#555;margin-bottom:0.6em;font-size:0.92em;">'
+            + 'File: ' + escapeHtml(fileName) + '</div>'
+            + '<table style="border-collapse:collapse;">'
+            + '<tr><td style="padding:2px 14px 2px 0;">Rows read</td>'
+            +   '<td style="text-align:right;font-weight:600;">' + rows + '</td></tr>'
+            + '<tr><td style="padding:2px 14px 2px 0;">Matched in catalog</td>'
+            +   '<td style="text-align:right;font-weight:600;">' + matched + '</td></tr>'
+            + '<tr><td style="padding:2px 14px 2px 0;">Written to database</td>'
+            +   '<td style="text-align:right;font-weight:600;color:#1a6b2b;">' + written + '</td></tr>'
+            + '<tr><td style="padding:2px 14px 2px 0;">Comments saved</td>'
+            +   '<td style="text-align:right;font-weight:600;">' + comments + '</td></tr>'
+            + '<tr><td style="padding:2px 14px 2px 0;">Skipped</td>'
+            +   '<td style="text-align:right;font-weight:600;color:#a05;">' + skipped + '</td></tr>'
+            + '</table>';
+        if (statusEl) statusEl.textContent = '';
+    }
 
     function renderProposals(proposals) {
         ensureRefs();

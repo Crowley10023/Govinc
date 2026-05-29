@@ -911,6 +911,26 @@ public class AssessmentController {
         return date != null ? date.format(FRIENDLY_DATE_FORMATTER) : "";
     }
 
+    /** Public wrapper around the private {@link #buildUpdatePayload(Long)} so
+     *  the bulk Excel-import path can broadcast one SSE update at the end of
+     *  the run instead of paying for one per row. */
+    public Map<String, Object> buildUpdatePayloadPublic(Long assessmentId) {
+        return buildUpdatePayload(assessmentId);
+    }
+
+    /** Public accessor for the set of SecurityControl IDs that are currently
+     *  inherited (taken-over) from an assigned org service in the given
+     *  assessment. Used by the Excel-import path to decide whether an imported
+     *  row must be flagged {@code isOverride=true} so the view-time
+     *  inheritance auto-reset does not silently revert the imported answer
+     *  back to the org-service value. */
+    public Set<Long> inheritedControlIds(Long assessmentId) {
+        if (assessmentId == null) return java.util.Collections.emptySet();
+        Optional<Assessment> aOpt = assessmentRepository.findById(assessmentId);
+        if (aOpt.isEmpty()) return java.util.Collections.emptySet();
+        return new HashSet<>(collectOrgServiceInheritance(aOpt.get()).keySet());
+    }
+
     // Save/update answer for a single control (AJAX POST from UI)
     @PostMapping("/{id}/answer")
     @ResponseBody
@@ -1449,7 +1469,7 @@ public class AssessmentController {
             rowIdx++; // blank separator
 
             // ---- Header row ----
-            String[] headers = { "Domain", "Reference", "Control Name", "Answer", "Score (%)", "Source", "Comment" };
+            String[] headers = { "Domain", "Reference", "Control Name", "Description", "Answer", "Score (%)", "Source", "Comment" };
             Row headerRow = sheet.createRow(rowIdx++);
             for (int i = 0; i < headers.length; i++) {
                 Cell cell = headerRow.createCell(i);
@@ -1507,14 +1527,17 @@ public class AssessmentController {
                 row.createCell(0).setCellValue(sc.getSecurityControlDomain() != null ? sc.getSecurityControlDomain().getName() : "");
                 row.createCell(1).setCellValue(sc.getReference() != null ? sc.getReference() : "");
                 row.createCell(2).setCellValue(sc.getName() != null ? sc.getName() : "");
-                row.createCell(3).setCellValue(answerText);
+                Cell descCell = row.createCell(3);
+                descCell.setCellValue(sc.getDetail() != null ? sc.getDetail() : "");
+                if (sc.getDetail() != null && !sc.getDetail().isEmpty()) descCell.setCellStyle(wrapStyle);
+                row.createCell(4).setCellValue(answerText);
                 if (!answerText.isEmpty()) {
-                    row.createCell(4).setCellValue(score);
+                    row.createCell(5).setCellValue(score);
                 } else {
-                    row.createCell(4).setCellValue("");
+                    row.createCell(5).setCellValue("");
                 }
-                row.createCell(5).setCellValue(source);
-                Cell commentCell = row.createCell(6);
+                row.createCell(6).setCellValue(source);
+                Cell commentCell = row.createCell(7);
                 commentCell.setCellValue(comment);
                 if (!comment.isEmpty()) commentCell.setCellStyle(wrapStyle);
             }
@@ -1523,10 +1546,11 @@ public class AssessmentController {
             sheet.setColumnWidth(0, 6000);   // Domain
             sheet.setColumnWidth(1, 3500);   // Reference
             sheet.setColumnWidth(2, 12000);  // Control Name
-            sheet.setColumnWidth(3, 6000);   // Answer
-            sheet.setColumnWidth(4, 3000);   // Score
-            sheet.setColumnWidth(5, 8000);   // Source
-            sheet.setColumnWidth(6, 14000);  // Comment
+            sheet.setColumnWidth(3, 14000);  // Description
+            sheet.setColumnWidth(4, 6000);   // Answer
+            sheet.setColumnWidth(5, 3000);   // Score
+            sheet.setColumnWidth(6, 8000);   // Source
+            sheet.setColumnWidth(7, 14000);  // Comment
 
             // Freeze panes above data rows
             int dataStartRow = metaRows.length + 2; // meta + blank separator + header
@@ -1901,7 +1925,23 @@ public class AssessmentController {
 
     @GetMapping(value = "/{id}/events", produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)
     @ResponseBody
-    public SseEmitter subscribeEvents(@PathVariable Long id, jakarta.servlet.http.HttpSession session) {
+    public SseEmitter subscribeEvents(@PathVariable Long id,
+                                      jakarta.servlet.http.HttpSession session,
+                                      jakarta.servlet.http.HttpServletRequest request) {
+        // Tomcat re-dispatches a broken async (SSE) request back to its
+        // original handler with DispatcherType.ERROR. In that mode the
+        // response is no longer async-capable, and returning a fresh
+        // SseEmitter would blow up inside ResponseBodyEmitterReturnValueHandler
+        // with "Cannot start async: [ERROR]". Detect that here and return a
+        // pre-completed emitter so the framework just closes the response
+        // cleanly.
+        if (request != null
+                && request.getDispatcherType() != jakarta.servlet.DispatcherType.REQUEST
+                && request.getDispatcherType() != jakarta.servlet.DispatcherType.ASYNC) {
+            SseEmitter done = new SseEmitter(0L);
+            try { done.complete(); } catch (Exception ignored) {}
+            return done;
+        }
         if (!authorizationService.canAccessAssessment(id)) {
             throw new com.govinc.authorization.UnauthorizedException("You do not have permission to access this assessment.");
         }

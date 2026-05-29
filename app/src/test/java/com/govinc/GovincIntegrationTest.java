@@ -97,6 +97,12 @@ class GovincIntegrationTest {
     private com.govinc.compliance.ComplianceService complianceService;
 
     @Autowired
+    private AssessmentControlAnswerRepository assessmentControlAnswerRepository;
+
+    @Autowired
+    private AssessmentDetailsService assessmentDetailsService;
+
+    @Autowired
     private PlatformTransactionManager transactionManager;
 
     /**
@@ -1660,6 +1666,153 @@ class GovincIntegrationTest {
         boolean hasAllAboveKey = result.getThresholdsDetails().keySet().stream()
                 .anyMatch(k -> k.contains("ALL_ABOVE") && k.contains("50"));
         assertThat(hasAllAboveKey).isTrue();
+    }
+
+    // ──────────────────────────────────────────────
+    // 16b. Excel Export/Import Round-Trip
+    // ──────────────────────────────────────────────
+
+    /**
+     * Exports an assessment to Excel, then imports the exact same workbook
+     * back. The import must:
+     *   - be detected as a Govinc export (directApply = true)
+     *   - not alter any existing maturity answer
+     *   - not alter any existing "taken over" (isOverride) flag
+     *   - preserve existing comments unchanged
+     */
+    @Test
+    @Order(1700)
+    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    void excelExport_importRoundTrip_preservesAnswersAndOverrideFlag() throws Exception {
+        Assessment assessment = assessmentRepository.findAll().get(0);
+        Long assessmentId = assessment.getId();
+
+        // Add comments to the first few answered controls + flip isOverride on
+        // one of them so we can verify it survives the round-trip.
+        List<SecurityControl> controls = securityControlRepository.findAll();
+        List<MaturityAnswer> answers = maturityAnswerRepository.findAll();
+        MaturityAnswer firstAnswer = answers.get(0);
+
+        // Re-answer the first three controls explicitly via the AJAX endpoint
+        // so we have known maturity values and (for control #1) isOverride=true.
+        for (int i = 0; i < 3; i++) {
+            SecurityControl c = controls.get(i);
+            MaturityAnswer a = answers.get(i % answers.size());
+            var req = post("/assessment/" + assessmentId + "/answer")
+                    .with(csrf())
+                    .param("controlId", c.getId().toString())
+                    .param("answerId", a.getId().toString());
+            if (i == 0) {
+                req = req.param("isOverride", "true");
+            }
+            mockMvc.perform(req)
+                    .andExpect(status().isOk())
+                    .andExpect(content().string("ok"));
+        }
+
+        // Add comments to those three controls
+        String[] comments = {
+                "Round-trip test comment for control 1",
+                "Comment with special chars: ä ö ü ß € — line2",
+                "Plain comment 3"
+        };
+        for (int i = 0; i < 3; i++) {
+            SecurityControl c = controls.get(i);
+            String body = "{\"comment\":\"" + comments[i].replace("\"", "\\\"") + "\"}";
+            mockMvc.perform(put("/assessment/" + assessmentId
+                            + "/control/" + c.getId() + "/comment")
+                            .with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string("ok"));
+        }
+
+        // Capture the pre-import state for every control the assessment has
+        // answered so far.
+        record AnswerSnapshot(Long maturityAnswerId, String comment, boolean isOverride) {}
+        Map<Long, AnswerSnapshot> before = readInTx(() -> {
+            Map<Long, AnswerSnapshot> m = new LinkedHashMap<>();
+            AssessmentDetails d = assessmentDetailsService.findByAssessmentId(assessmentId).orElseThrow();
+            for (AssessmentControlAnswer aca : d.getControlAnswers()) {
+                if (aca.getMaturityAnswer() == null || aca.getSecurityControl() == null) continue;
+                m.put(aca.getSecurityControl().getId(),
+                        new AnswerSnapshot(
+                                aca.getMaturityAnswer().getId(),
+                                aca.getComment(),
+                                Boolean.TRUE.equals(aca.getIsOverride())));
+            }
+            return m;
+        });
+        assertThat(before).isNotEmpty();
+        assertThat(before.get(controls.get(0).getId()).maturityAnswerId()).isEqualTo(firstAnswer.getId());
+        assertThat(before.get(controls.get(0).getId()).isOverride()).isTrue();
+        assertThat(before.get(controls.get(0).getId()).comment()).isEqualTo(comments[0]);
+
+        // Export the workbook
+        MvcResult export = mockMvc.perform(get("/assessment/" + assessmentId + "/excel"))
+                .andExpect(status().isOk())
+                .andReturn();
+        byte[] xlsx = export.getResponse().getContentAsByteArray();
+        assertThat(xlsx).isNotEmpty();
+
+        // Re-import the same workbook
+        org.springframework.mock.web.MockMultipartFile upload =
+                new org.springframework.mock.web.MockMultipartFile(
+                        "file",
+                        "assessment_" + assessmentId + ".xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        xlsx);
+
+        MvcResult importResult = mockMvc.perform(multipart("/assessment/" + assessmentId + "/import/upload")
+                        .file(upload)
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ok").value(true))
+                .andExpect(jsonPath("$.directApply").value(true))
+                .andReturn();
+
+        String responseBody = importResult.getResponse().getContentAsString();
+        assertThat(responseBody).contains("\"answers\"");
+        assertThat(responseBody).contains("\"comments\"");
+
+        // Capture the post-import state
+        Map<Long, AnswerSnapshot> after = readInTx(() -> {
+            Map<Long, AnswerSnapshot> m = new LinkedHashMap<>();
+            AssessmentDetails d = assessmentDetailsService.findByAssessmentId(assessmentId).orElseThrow();
+            for (AssessmentControlAnswer aca : d.getControlAnswers()) {
+                if (aca.getMaturityAnswer() == null || aca.getSecurityControl() == null) continue;
+                m.put(aca.getSecurityControl().getId(),
+                        new AnswerSnapshot(
+                                aca.getMaturityAnswer().getId(),
+                                aca.getComment(),
+                                Boolean.TRUE.equals(aca.getIsOverride())));
+            }
+            return m;
+        });
+
+        // Every control that existed before must still exist with identical
+        // maturity, identical comment, identical override flag.
+        assertThat(after.keySet()).containsAll(before.keySet());
+        for (Map.Entry<Long, AnswerSnapshot> e : before.entrySet()) {
+            AnswerSnapshot b = e.getValue();
+            AnswerSnapshot a = after.get(e.getKey());
+            assertThat(a)
+                    .as("control %s must be unchanged by Excel round-trip", e.getKey())
+                    .isNotNull();
+            assertThat(a.maturityAnswerId())
+                    .as("maturity answer for control %s preserved", e.getKey())
+                    .isEqualTo(b.maturityAnswerId());
+            assertThat(a.isOverride())
+                    .as("isOverride (taken-over) flag for control %s preserved", e.getKey())
+                    .isEqualTo(b.isOverride());
+            // Comments: null and empty string both mean "no comment"; normalise
+            String bc = b.comment() == null ? "" : b.comment();
+            String ac = a.comment() == null ? "" : a.comment();
+            assertThat(ac)
+                    .as("comment for control %s preserved", e.getKey())
+                    .isEqualTo(bc);
+        }
     }
 
     // ──────────────────────────────────────────────

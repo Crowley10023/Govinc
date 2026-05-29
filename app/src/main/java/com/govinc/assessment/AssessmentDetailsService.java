@@ -153,7 +153,6 @@ public class AssessmentDetailsService {
             : allowedMaturityAnswerIds.stream().filter(id -> id != null).collect(Collectors.toSet());
 
         if (details != null && details.getControlAnswers() != null) {
-            System.out.println(details);
             for (AssessmentControlAnswer ans : details.getControlAnswers()) {                
                 MaturityAnswer ma = ans.getMaturityAnswer();
                 if (ma != null && ma.getAnswer() != null) {
