@@ -289,6 +289,42 @@ public class AssessmentDirectController {
         return "assessment-urls-list";
     }
 
+    // Password validation endpoint for assessment-direct
+    @PostMapping("/assessment-direct/{obfuscatedId}/validate-password")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public org.springframework.http.ResponseEntity<?> validatePassword(
+            @PathVariable String obfuscatedId,
+            @org.springframework.web.bind.annotation.RequestBody Map<String, String> body) {
+        String providedPassword = body.get("password");
+        
+        // Check if URL exists
+        Optional<AssessmentUrls> maybeUrl = assessmentUrlsService.findByObfuscated(obfuscatedId);
+        if (!maybeUrl.isPresent()) {
+            return org.springframework.http.ResponseEntity.status(404).body(java.util.Map.of("error", "URL not found"));
+        }
+        
+        // Check if password matches
+        boolean isValid = assessmentUrlsService.validatePassword(obfuscatedId, providedPassword);
+        if (isValid) {
+            return org.springframework.http.ResponseEntity.ok(java.util.Map.of("success", true));
+        } else {
+            return org.springframework.http.ResponseEntity.status(401).body(java.util.Map.of("error", "Invalid password"));
+        }
+    }
+
+    // Check if password is required for this assessment URL
+    @GetMapping("/assessment-direct/{obfuscatedId}/password-required")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public org.springframework.http.ResponseEntity<?> checkPasswordRequired(@PathVariable String obfuscatedId) {
+        Optional<AssessmentUrls> maybeUrl = assessmentUrlsService.findByObfuscated(obfuscatedId);
+        if (!maybeUrl.isPresent()) {
+            return org.springframework.http.ResponseEntity.status(404).body(java.util.Map.of("error", "URL not found"));
+        }
+        
+        boolean hasPassword = assessmentUrlsService.hasPassword(obfuscatedId);
+        return org.springframework.http.ResponseEntity.ok(java.util.Map.of("passwordRequired", hasPassword));
+    }
+
     // Public summary JSON endpoint for assessment-direct
     @GetMapping("/assessment-direct/{obfuscatedId}/data")
     @org.springframework.web.bind.annotation.ResponseBody

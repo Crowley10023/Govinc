@@ -33,6 +33,7 @@
                         <th class="sortable-th" data-col="2">Security Catalog<span class="sort-arrow"></span></th>
                         <th class="sortable-th" data-col="3">Remaining Days<span class="sort-arrow"></span></th>
                         <th class="sortable-th" data-col="4">Expiration Date<span class="sort-arrow"></span></th>
+                        <th class="sortable-th" data-col="5">Password<span class="sort-arrow"></span></th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -56,11 +57,19 @@
                             th:classappend="${url.assessment != null and url.assessment.urlExpirationDate != null and url.assessment.daysUntilUrlExpiration <= 3} ? 'text-danger' : ''"></td>
                         <td th:text="${url.assessment != null and url.assessment.urlExpirationDate != null ? #temporals.format(url.assessment.urlExpirationDate, 'dd MMM yyyy') : 'N/A'}"></td>
                         <td>
+                            <span th:if="${url.password != null and url.password != ''}" class="badge-success" style="display:inline-block;padding:0.3em 0.6em;background:#d8ffd8;color:#2d7a2d;border-radius:3px;font-size:0.85em;font-weight:600;">Protected</span>
+                            <span th:if="${url.password == null or url.password == ''}" class="text-muted" style="font-size:0.85em;">No password</span>
+                        </td>
+                        <td>
                             <form th:action="@{'/assessment-direct/urls/' + ${url.id} + '/prolong'}" method="post"
                                 style="display:inline;">
                                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <button type="submit" class="btn-submit">Prolong</button>
                             </form>
+                            <button type="button" class="btn-action" 
+                                th:data-id="${url.id}"
+                                th:data-has-password="${url.password != null and url.password != ''}"
+                                onclick="openPasswordModal(this)">🔐 Password</button>
                             <button type="button" class="btn-danger"
                                 th:data-id="${url.id}"
                                 th:data-name="${url.assessment != null ? url.assessment.name : 'this entry'}"
@@ -86,6 +95,295 @@
             </div>
         </div>
     </div>
+
+    <!-- Password Management Modal -->
+    <div id="passwordModal" class="modal-bg" style="display:none;">
+        <div class="modal-popup" style="max-width:450px;">
+            <h3>Manage Password Protection</h3>
+            <div class="password-modal-content">
+                <p id="passwordStatus" style="margin-bottom:1.5em;color:#666;font-size:0.95em;"></p>
+                
+                <div style="margin-bottom:1.5em;">
+                    <label for="passwordInput" style="display:block;font-weight:600;margin-bottom:0.6em;">Password:</label>
+                    <div style="display:flex;gap:0.5em;">
+                        <input type="password" id="passwordInput" placeholder="Enter or generate password" 
+                               style="flex:1;padding:0.7em;border:1px solid #ccc;border-radius:4px;font-family:monospace;font-size:0.95em;">
+                        <button type="button" id="togglePasswordBtn" style="padding:0.7em 1em;background:#f0f0f0;border:1px solid #ddd;border-radius:4px;cursor:pointer;white-space:nowrap;" 
+                                onclick="togglePasswordVisibility()">Show</button>
+                    </div>
+                </div>
+
+                <div id="passwordStrength" style="margin-bottom:1.5em;padding:0.6em;background:#f5f5f5;border-radius:4px;display:none;">
+                    <div style="display:flex;gap:0.3em;align-items:center;">
+                        <span style="font-weight:600;font-size:0.9em;min-width:80px;">Strength:</span>
+                        <div style="flex:1;height:6px;background:#ddd;border-radius:3px;overflow:hidden;">
+                            <div id="strengthBar" style="height:100%;width:0%;background:#ff0000;transition:all 0.3s;"></div>
+                        </div>
+                        <span id="strengthText" style="font-size:0.85em;font-weight:600;min-width:60px;">Weak</span>
+                    </div>
+                </div>
+
+                <div style="display:flex;gap:0.5em;flex-wrap:wrap;">
+                    <button type="button" class="btn-action" onclick="generateRandomPassword()" 
+                        style="flex:0 1 auto;padding:0.6em 1em;">🎲 Generate</button>
+                    <button type="button" class="btn-secondary" onclick="copyPasswordToClipboard()" 
+                        style="flex:0 1 auto;padding:0.6em 1em;">📋 Copy</button>
+                </div>
+            </div>
+
+            <div class="modal-btn-row">
+                <button type="button" class="btn-cancel" onclick="closePasswordModal()">Cancel</button>
+                <button type="button" class="btn-danger" id="clearPasswordBtn" onclick="clearPassword()" style="display:none;">Remove Password</button>
+                <button type="button" class="btn-primary" onclick="savePassword()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var currentPasswordUrlId = null;
+        var currentPasswordHasPassword = false;
+
+        function openPasswordModal(btn) {
+            currentPasswordUrlId = btn.getAttribute('data-id');
+            var hasPassword = btn.getAttribute('data-has-password') === 'true';
+            currentPasswordHasPassword = hasPassword;
+            
+            var passwordInput = document.getElementById('passwordInput');
+            var clearBtn = document.getElementById('clearPasswordBtn');
+            
+            passwordInput.value = '';
+            passwordInput.type = 'password';
+            document.getElementById('togglePasswordBtn').textContent = 'Show';
+            document.getElementById('passwordStatus').textContent = hasPassword ? '🔒 A password is currently set' : '🔓 No password protection';
+            clearBtn.style.display = hasPassword ? 'block' : 'none';
+            document.getElementById('passwordStrength').style.display = 'none';
+            
+            document.getElementById('passwordModal').style.display = 'flex';
+            passwordInput.focus();
+
+            if (hasPassword) {
+                retrieveExistingPassword();
+            }
+        }
+
+        function closePasswordModal() {
+            document.getElementById('passwordModal').style.display = 'none';
+            currentPasswordUrlId = null;
+            currentPasswordHasPassword = false;
+        }
+
+        document.getElementById('passwordModal').addEventListener('click', function(e) {
+            if (e.target === this) closePasswordModal();
+        });
+
+        function togglePasswordVisibility() {
+            var input = document.getElementById('passwordInput');
+            var btn = document.getElementById('togglePasswordBtn');
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.textContent = 'Hide';
+            } else {
+                input.type = 'password';
+                btn.textContent = 'Show';
+            }
+        }
+
+        function generateRandomPassword() {
+            var charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+            var password = '';
+            for (var i = 0; i < 16; i++) {
+                password += charset.charAt(Math.floor(Math.random() * charset.length));
+            }
+            document.getElementById('passwordInput').value = password;
+            document.getElementById('passwordInput').type = 'text';
+            document.getElementById('togglePasswordBtn').textContent = 'Hide';
+            updatePasswordStrength();
+            document.getElementById('passwordStrength').style.display = 'block';
+        }
+
+        function copyPasswordToClipboard() {
+            var passwordInput = document.getElementById('passwordInput');
+            var password = passwordInput.value;
+            var btn = document.querySelector('button[onclick="copyPasswordToClipboard()"]');
+
+            if (!password && currentPasswordHasPassword) {
+                retrieveExistingPassword().then(function(loadedPassword) {
+                    if (loadedPassword) {
+                        navigator.clipboard.writeText(loadedPassword).then(function() {
+                            if (btn) {
+                                var originalText = btn.textContent;
+                                btn.textContent = '✓ Copied!';
+                                setTimeout(function() {
+                                    btn.textContent = originalText;
+                                }, 2000);
+                            }
+                        }).catch(function(err) {
+                            console.error('Failed to copy:', err);
+                        });
+                    }
+                });
+                return;
+            }
+
+            if (password && btn) {
+                navigator.clipboard.writeText(password).then(function() {
+                    var originalText = btn.textContent;
+                    btn.textContent = '✓ Copied!';
+                    setTimeout(function() {
+                        btn.textContent = originalText;
+                    }, 2000);
+                }).catch(function(err) {
+                    console.error('Failed to copy:', err);
+                });
+            }
+        }
+
+        function updatePasswordStrength() {
+            var password = document.getElementById('passwordInput').value;
+            if (!password) {
+                document.getElementById('passwordStrength').style.display = 'none';
+                return;
+            }
+            
+            document.getElementById('passwordStrength').style.display = 'block';
+            var strength = 0;
+            if (password.length >= 8) strength += 20;
+            if (password.length >= 12) strength += 20;
+            if (password.length >= 16) strength += 20;
+            if (/[a-z]/.test(password)) strength += 10;
+            if (/[A-Z]/.test(password)) strength += 10;
+            if (/[0-9]/.test(password)) strength += 5;
+            if (/[!@#$%^&*]/.test(password)) strength += 15;
+            
+            var strengthBar = document.getElementById('strengthBar');
+            var strengthText = document.getElementById('strengthText');
+            strengthBar.style.width = strength + '%';
+            
+            if (strength < 30) {
+                strengthBar.style.background = '#ff0000';
+                strengthText.textContent = 'Weak';
+            } else if (strength < 60) {
+                strengthBar.style.background = '#ffcc00';
+                strengthText.textContent = 'Fair';
+            } else if (strength < 85) {
+                strengthBar.style.background = '#ccff00';
+                strengthText.textContent = 'Good';
+            } else {
+                strengthBar.style.background = '#00cc00';
+                strengthText.textContent = 'Strong';
+            }
+        }
+
+        document.getElementById('passwordInput').addEventListener('input', function() {
+            if (this.value) {
+                updatePasswordStrength();
+            } else {
+                document.getElementById('passwordStrength').style.display = 'none';
+            }
+        });
+
+        function retrieveExistingPassword() {
+            var urlId = currentPasswordUrlId;
+            if (!urlId) {
+                return Promise.resolve('');
+            }
+            
+            var csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+            var csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+            
+            var headers = {};
+            headers[csrfHeader] = csrfToken;
+            
+            return fetch('/assessment-direct/urls/' + urlId + '/get-password?_t=' + Date.now(), {
+                method: 'GET',
+                headers: headers,
+                cache: 'no-store'
+            })
+            .then(function(response) {
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    throw new Error('Could not retrieve password');
+                }
+            })
+            .then(function(data) {
+                if (data.password) {
+                    document.getElementById('passwordInput').value = data.password;
+                    document.getElementById('passwordInput').type = 'text';
+                    document.getElementById('togglePasswordBtn').textContent = 'Hide';
+                    updatePasswordStrength();
+                    document.getElementById('passwordStrength').style.display = 'block';
+                }
+                return data.password || '';
+            })
+            .catch(function(err) {
+                alert('Error retrieving password: ' + err);
+                return '';
+            });
+        }
+
+        function savePassword() {
+            var password = document.getElementById('passwordInput').value;
+            var urlId = currentPasswordUrlId;
+            
+            if (!urlId) return;
+            
+            var csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+            var csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+            
+            var headers = {};
+            headers[csrfHeader] = csrfToken;
+            headers['Content-Type'] = 'application/json';
+            
+            var payload = { password: password };
+            
+            fetch('/assessment-direct/urls/' + urlId + '/set-password', {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify(payload)
+            })
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                if (data.status === 'success') {
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.message || 'Could not save password'));
+                }
+            })
+            .catch(function(err) {
+                alert('Error saving password: ' + err);
+            });
+        }
+
+        function clearPassword() {
+            if (confirm('Are you sure you want to remove the password protection?')) {
+                var urlId = currentPasswordUrlId;
+                if (!urlId) return;
+                
+                var csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+                var csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+                
+                var headers = {};
+                headers[csrfHeader] = csrfToken;
+                
+                fetch('/assessment-direct/urls/' + urlId + '/clear-password', {
+                    method: 'POST',
+                    headers: headers
+                })
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    if (data.status === 'success') {
+                        location.reload();
+                    } else {
+                        alert('Error: ' + (data.message || 'Could not clear password'));
+                    }
+                })
+                .catch(function(err) {
+                    alert('Error clearing password: ' + err);
+                });
+            }
+        }
+    </script>
 
     <script>
         function openUrlDeleteModal(btn) {

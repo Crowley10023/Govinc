@@ -40,7 +40,31 @@
             </div>
         </div>
     </nav>
-    <div class="container">
+    
+    <!-- Full-Page Password Gate -->
+    <div id="passwordGatePage" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);align-items:center;justify-content:center;">
+        <div style="background:white;border-radius:8px;box-shadow:0 10px 40px rgba(0,0,0,0.2);padding:2.5em;max-width:420px;width:90%;text-align:center;">
+            <h2 style="margin:0 0 1em 0;color:#333;font-size:1.8em;">Password Protected Assessment</h2>
+            <p style="color:#666;margin:0 0 2em 0;font-size:1em;line-height:1.5;">This assessment requires a password to access. Please enter it below.</p>
+            
+            <div style="margin:2em 0;">
+                <label for="passwordGateInput" style="display:block;font-weight:600;margin-bottom:0.75em;color:#333;text-align:left;">Password:</label>
+                <div style="display:flex;gap:0.5em;">
+                    <input type="password" id="passwordGateInput" placeholder="Enter password" 
+                           style="flex:1;padding:0.75em;border:2px solid #ddd;border-radius:4px;font-size:1em;transition:border-color 0.3s;" 
+                           onkeypress="if(event.key==='Enter') submitPasswordGate()">
+                    <button type="button" id="toggleGatePasswordBtn" class="btn-secondary" 
+                            style="padding:0.75em 1em;white-space:nowrap;background:#f0f0f0;border:1px solid #ddd;border-radius:4px;cursor:pointer;" 
+                            onclick="toggleGatePasswordVisibility()">Show</button>
+                </div>
+                <p id="passwordGateError" style="color:#cc0000;font-size:0.9em;margin:0.5em 0 0 0;display:none;text-align:left;"></p>
+            </div>
+            
+            <button type="button" class="btn-primary" onclick="submitPasswordGate()" style="padding:0.85em 2em;font-size:1em;cursor:pointer;background:#2274a5;color:white;border:none;border-radius:4px;width:100%;">Unlock Assessment</button>
+        </div>
+    </div>
+
+    <div class="container" id="mainContainer" style="display:none;">
         <!-- Filter and Progress Bar (Sticky at Top) -->
         <div class="controls-filter-bar sticky-filter-bar" id="progress-bar-sticky">
             <div class="progress-section">
@@ -288,43 +312,99 @@
             });
             return answers;
         }
-        
-        document.addEventListener('DOMContentLoaded', function () {
-            var adBody = document.querySelector('.assessment-details-body');
-            if (adBody) adBody.style.display = 'none';
-        });
-        
-        function checkDomainCompleteness() {
-            document.querySelectorAll(".domain-checkmark").forEach(function (checkmarkSpan) {
-                var domainId = checkmarkSpan.getAttribute("data-domain-id");
-                var selects = document.querySelectorAll('.answer-select[data-domain-id="' + domainId + '"]');
-                var allAnswered = true;
-                var applicableCount = 0;
-                selects.forEach(function (select) {
-                    if (isDirectRowNotApplicable(select.closest('tr'))) return;
-                    applicableCount++;
-                    if (!select.value) allAnswered = false;
-                });
-                if (applicableCount === 0) allAnswered = false;
-                checkmarkSpan.innerHTML = allAnswered ? CHECKMARK_SVG : "";
-            });
-        }
-        
-        document.addEventListener("DOMContentLoaded", function () {
-            var pathMatch = window.location.pathname.match(/\/assessment-direct\/([^/]+)/);
-            var obfuscatedId = null;
-            if (pathMatch && pathMatch[1]) {
-                obfuscatedId = pathMatch[1];
+
+        // --- PASSWORD GATE FUNCTIONS ---
+        function toggleGatePasswordVisibility() {
+            var input = document.getElementById('passwordGateInput');
+            var btn = document.getElementById('toggleGatePasswordBtn');
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.textContent = 'Hide';
             } else {
-                var urlSearch = new URLSearchParams(window.location.search);
-                if (urlSearch.has('id')) {
-                    obfuscatedId = urlSearch.get('id');
-                }
+                input.type = 'password';
+                btn.textContent = 'Show';
             }
-            if (!obfuscatedId) {
-                document.getElementById('ad-date').innerHTML = '<h1>Invalid assessment link</h1>';
+        }
+
+        function checkPasswordRequirement(obfuscatedId) {
+            fetch('/assessment-direct/' + obfuscatedId + '/password-required')
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    if (data.passwordRequired === true) {
+                        // Show full-page password gate, hide everything else
+                        document.getElementById('passwordGatePage').style.display = 'flex';
+                        document.querySelector('nav').style.display = 'none';
+                        document.getElementById('mainContainer').style.display = 'none';
+                        document.getElementById('passwordGateInput').focus();
+                    } else {
+                        // Load assessment directly
+                        document.getElementById('passwordGatePage').style.display = 'none';
+                        loadAssessmentData(obfuscatedId);
+                        document.getElementById('mainContainer').style.display = '';
+                    }
+                })
+                .catch(function(err) {
+                    console.error('Error checking password requirement:', err);
+                    document.getElementById('passwordGatePage').style.display = 'none';
+                    loadAssessmentData(obfuscatedId);
+                    document.getElementById('mainContainer').style.display = '';
+                });
+        }
+
+        function submitPasswordGate() {
+            var obfuscatedId = window._obfuscatedId;
+            var password = document.getElementById('passwordGateInput').value;
+            var errorDiv = document.getElementById('passwordGateError');
+            
+            if (!password.trim()) {
+                errorDiv.textContent = 'Please enter a password';
+                errorDiv.style.display = 'block';
                 return;
             }
+            
+            fetch('/assessment-direct/' + obfuscatedId + '/validate-password', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ password: password })
+            })
+            .then(function(response) {
+                if (response.ok) {
+                    return response.json();
+                } else if (response.status === 401) {
+                    throw new Error('Invalid password');
+                } else if (response.status === 403) {
+                    throw new Error('Request blocked by security policy');
+                } else {
+                    throw new Error('Validation request failed (' + response.status + ')');
+                }
+            })
+            .then(function(data) {
+                if (data.success) {
+                    // Hide password gate page, show nav and assessment
+                    document.getElementById('passwordGatePage').style.display = 'none';
+                    document.querySelector('nav').style.display = '';
+                    loadAssessmentData(obfuscatedId);
+                    document.getElementById('mainContainer').style.display = '';
+                } else {
+                    errorDiv.textContent = 'Invalid password';
+                    errorDiv.style.display = 'block';
+                }
+            })
+            .catch(function(err) {
+                if (err && err.message === 'Invalid password') {
+                    errorDiv.textContent = 'Invalid password';
+                } else {
+                    errorDiv.textContent = 'Could not validate password. Please reload and try again.';
+                }
+                errorDiv.style.display = 'block';
+            });
+        }
+
+
+
+        function loadAssessmentData(obfuscatedId) {
             fetch('/assessment-direct/' + obfuscatedId + '/alldata')
                 .then(function(response) { return response.json(); })
                 .then(function(data) {
@@ -529,6 +609,43 @@
                 .catch(function() {
                     document.getElementById('ad-date').innerHTML = '<h1>Failed to load assessment</h1>';
                 });
+        }
+        
+        function checkDomainCompleteness() {
+            document.querySelectorAll(".domain-checkmark").forEach(function (checkmarkSpan) {
+                var domainId = checkmarkSpan.getAttribute("data-domain-id");
+                var selects = document.querySelectorAll('.answer-select[data-domain-id="' + domainId + '"]');
+                var allAnswered = true;
+                var applicableCount = 0;
+                selects.forEach(function (select) {
+                    if (isDirectRowNotApplicable(select.closest('tr'))) return;
+                    applicableCount++;
+                    if (!select.value) allAnswered = false;
+                });
+                if (applicableCount === 0) allAnswered = false;
+                checkmarkSpan.innerHTML = allAnswered ? CHECKMARK_SVG : "";
+            });
+        }
+        
+        document.addEventListener("DOMContentLoaded", function () {
+            var pathMatch = window.location.pathname.match(/\/assessment-direct\/([^/]+)/);
+            var obfuscatedId = null;
+            if (pathMatch && pathMatch[1]) {
+                obfuscatedId = pathMatch[1];
+            } else {
+                var urlSearch = new URLSearchParams(window.location.search);
+                if (urlSearch.has('id')) {
+                    obfuscatedId = urlSearch.get('id');
+                }
+            }
+            if (!obfuscatedId) {
+                document.getElementById('ad-date').innerHTML = '<h1>Invalid assessment link</h1>';
+                return;
+            }
+            
+            // Check if password is required
+            window._obfuscatedId = obfuscatedId;
+            checkPasswordRequirement(obfuscatedId);
         });
 
         // Finalize Modal Handler

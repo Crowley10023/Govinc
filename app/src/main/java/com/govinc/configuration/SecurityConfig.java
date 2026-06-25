@@ -81,6 +81,7 @@ public class SecurityConfig {
     // because they are used without authentication. All other state-changing
     // endpoints must require a CSRF token.
     private static final String[] CSRF_IGNORED_URLS = {
+            "/assessment-direct/*/validate-password",
             "/assessment-direct/*/answer",
             "/assessment-direct/*/control/*/comment",
             "/assessment-direct/*/finalize",

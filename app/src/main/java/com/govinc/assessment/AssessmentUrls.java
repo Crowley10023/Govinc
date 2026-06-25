@@ -20,6 +20,10 @@ public class AssessmentUrls {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    // Optional password for protecting the assessment URL
+    @Column(nullable = true)
+    private String password;
+
     // Removed assessmentDetails link
     
     @OneToOne(fetch = FetchType.EAGER)
@@ -88,5 +92,13 @@ public class AssessmentUrls {
         if (assessment != null && assessment.getAssessmentUrls() != this) {
             assessment.setAssessmentUrls(this);
         }
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
     }
 }

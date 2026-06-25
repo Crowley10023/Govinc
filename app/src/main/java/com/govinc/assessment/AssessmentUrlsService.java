@@ -25,6 +25,10 @@ public class AssessmentUrlsService {
     private static final SecureRandom random = new SecureRandom();
     /** Default lifetime (days) for a newly created direct URL. */
     private static final int DEFAULT_URL_LIFETIME_DAYS = 30;
+    
+    // Password generation constants
+    private static final String PASSWORD_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
+    private static final int DEFAULT_PASSWORD_LENGTH = 16;
 
     /**
      * Generate new obfuscated url, removing previous for this assessment if present.
@@ -125,5 +129,70 @@ public class AssessmentUrlsService {
             deleteUrl(urlId);
         }
         return toDelete.size();
+    }
+
+    /**
+     * Generate a random password (16 characters by default)
+     */
+    public String generatePassword() {
+        StringBuilder sb = new StringBuilder(DEFAULT_PASSWORD_LENGTH);
+        for (int i = 0; i < DEFAULT_PASSWORD_LENGTH; i++) {
+            int idx = random.nextInt(PASSWORD_CHARS.length());
+            sb.append(PASSWORD_CHARS.charAt(idx));
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Set a password for a given assessment URL
+     */
+    @Transactional
+    public void setPassword(Long urlId, String password) {
+        Optional<AssessmentUrls> optionalUrl = urlsRepository.findById(urlId);
+        if (optionalUrl.isPresent()) {
+            AssessmentUrls url = optionalUrl.get();
+            url.setPassword(password);
+            urlsRepository.save(url);
+        }
+    }
+
+    /**
+     * Validate password for a given assessment URL
+     * Returns true if no password is set or if the provided password matches
+     */
+    public boolean validatePassword(String obfuscatedUrl, String providedPassword) {
+        Optional<AssessmentUrls> optionalUrl = urlsRepository.findByUrl(obfuscatedUrl);
+        if (!optionalUrl.isPresent()) {
+            return false; // URL not found
+        }
+        AssessmentUrls url = optionalUrl.get();
+        String storedPassword = url.getPassword();
+        
+        // If no password is set, validation passes
+        if (storedPassword == null || storedPassword.trim().isEmpty()) {
+            return true;
+        }
+        
+        // If password is set, check if provided password matches
+        return storedPassword.equals(providedPassword);
+    }
+
+    /**
+     * Check if a password is set for a given assessment URL
+     */
+    public boolean hasPassword(String obfuscatedUrl) {
+        Optional<AssessmentUrls> optionalUrl = urlsRepository.findByUrl(obfuscatedUrl);
+        if (!optionalUrl.isPresent()) {
+            return false;
+        }
+        AssessmentUrls url = optionalUrl.get();
+        return url.getPassword() != null && !url.getPassword().trim().isEmpty();
+    }
+
+    /**
+     * Find an AssessmentUrls by ID
+     */
+    public AssessmentUrls findById(Long id) {
+        return urlsRepository.findById(id).orElse(null);
     }
 }
