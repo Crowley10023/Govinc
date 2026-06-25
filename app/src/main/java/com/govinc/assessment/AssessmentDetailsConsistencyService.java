@@ -269,6 +269,7 @@ public class AssessmentDetailsConsistencyService {
                             src.getMaturityAnswer(),
                             src.getComment());
                     clone.setIsOverride(src.getIsOverride());
+                    clone.setIsNotApplicable(src.getIsNotApplicable());
                     clonedAnswers.add(answerRepository.save(clone));
                 }
             }
@@ -336,6 +337,7 @@ public class AssessmentDetailsConsistencyService {
                                 candidate.getMaturityAnswer(),
                                 candidate.getComment());
                         moved.setIsOverride(candidate.getIsOverride());
+                        moved.setIsNotApplicable(candidate.getIsNotApplicable());
                         moved = answerRepository.save(moved);
                         survivor.getControlAnswers().add(moved);
                         bySc.put(scId, moved);
@@ -344,6 +346,7 @@ public class AssessmentDetailsConsistencyService {
                         current.setMaturityAnswer(candidate.getMaturityAnswer());
                         current.setComment(candidate.getComment());
                         current.setIsOverride(candidate.getIsOverride());
+                        current.setIsNotApplicable(candidate.getIsNotApplicable());
                         answerRepository.save(current);
                     }
                 }

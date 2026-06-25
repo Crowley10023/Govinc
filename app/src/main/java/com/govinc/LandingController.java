@@ -110,9 +110,16 @@ public class LandingController {
                     // Collect directly-answered control IDs from pre-loaded assessment details.
                     // Only count entries that actually have a maturity answer with rating > 0.
                     Set<Long> answeredIds = new HashSet<>();
+                    Set<Long> excludedIds = new HashSet<>();
                     AssessmentDetails details = detailsById.get(aid);
                     if (details != null && details.getControlAnswers() != null) {
                         for (com.govinc.assessment.AssessmentControlAnswer aca : details.getControlAnswers()) {
+                            if (aca != null && aca.getSecurityControl() != null
+                                    && aca.getSecurityControl().getId() != null
+                                    && Boolean.TRUE.equals(aca.getIsNotApplicable())) {
+                                excludedIds.add(aca.getSecurityControl().getId());
+                                continue;
+                            }
                             if (aca != null && aca.getSecurityControl() != null
                                     && aca.getSecurityControl().getId() != null
                                     && aca.getScore() > 0) {
@@ -138,6 +145,7 @@ public class LandingController {
                                             if (osac.isApplicable() && osac.getPercent() > 0
                                                     && osac.getSecurityControl() != null
                                                     && osac.getSecurityControl().getId() != null
+                                                    && !excludedIds.contains(osac.getSecurityControl().getId())
                                                     && effectiveControlIds.contains(osac.getSecurityControl().getId())) {
                                                 answeredIds.add(osac.getSecurityControl().getId());
                                             }
@@ -147,6 +155,7 @@ public class LandingController {
                             }
                         }
                     }
+                    totalControls = Math.max(0, totalControls - excludedIds.size());
                     answered = answeredIds.size();
                 } catch (Exception e) {
                     // swallow any errors retrieving details

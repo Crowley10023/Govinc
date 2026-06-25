@@ -448,15 +448,42 @@ class GovincLifecycleTest {
         void assessment_detailsPage_provisionsInheritedAnswerIntoAssessmentDetails() throws Exception {
         Assumptions.assumeTrue(controlId != null, "Control must exist");
         Assumptions.assumeTrue(maturityAnswerId != null, "Maturity answer must exist");
+        Assumptions.assumeTrue(orgServiceId != null, "OrgService must exist");
+
+        Integer targetPercent = readInTx(() -> maturityAnswerRepository.findById(maturityAnswerId)
+            .map(MaturityAnswer::getRating)
+            .orElse(null));
+        Assumptions.assumeTrue(targetPercent != null, "Maturity answer rating must exist");
 
         writeInTx(() -> {
             Assessment assessment = assessmentRepository.findById(assessmentId).orElseThrow();
-            Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findByAssessmentId(assessmentId);
-            if (detailsOpt.isEmpty()) {
+            OrgService orgService = orgServiceRepository.findById(orgServiceId).orElseThrow();
+            SecurityControl control = securityControlRepository.findById(controlId).orElseThrow();
+
+            // (Re-)establish org-service inheritance for controlId so this test
+            // is self-contained and not dependent on @Order(2026) running first.
+            assessment.setOrgServices(new LinkedHashSet<>(Collections.singletonList(orgService)));
+            assessmentRepository.save(assessment);
+
+            orgServiceAssessmentRepository.findByOrgServiceId(orgServiceId)
+                .forEach(orgServiceAssessmentRepository::delete);
+
+            OrgServiceAssessment osa = new OrgServiceAssessment(orgService, LocalDate.now());
+            OrgServiceAssessmentControl osac = new OrgServiceAssessmentControl(control, true, targetPercent,
+                "Inherited comment from org service");
+            osac.setOrgServiceAssessment(osa);
+            osa.setControls(new ArrayList<>(Collections.singletonList(osac)));
+            orgServiceAssessmentRepository.save(osa);
+
+            // Drop any pre-existing AssessmentDetails (including stale override
+            // answers persisted by earlier @Order tests) so the controller's
+            // inheritance branch is the one that fires on the GET below.
+            assessmentDetailsService.findByAssessmentId(assessmentId)
+                .ifPresent(d -> assessmentDetailsService.deleteById(d.getId()));
+
             AssessmentDetails details = new AssessmentDetails();
             details.setAssessments(new LinkedHashSet<>(Collections.singletonList(assessment)));
             assessmentDetailsService.save(details);
-            }
             return null;
         });
 

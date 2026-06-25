@@ -118,6 +118,7 @@ public class AssessmentDetailsService {
                     if (match != null) {
                         // Update the answer value (MaturityAnswer)
                         match.setMaturityAnswer(incoming.getMaturityAnswer());
+                        match.setIsNotApplicable(incoming.getIsNotApplicable());
                     } else {
                         // Add new answer
                         currentAnswers.add(incoming);
@@ -154,6 +155,9 @@ public class AssessmentDetailsService {
 
         if (details != null && details.getControlAnswers() != null) {
             for (AssessmentControlAnswer ans : details.getControlAnswers()) {                
+                if (Boolean.TRUE.equals(ans.getIsNotApplicable())) {
+                    continue;
+                }
                 MaturityAnswer ma = ans.getMaturityAnswer();
                 if (ma != null && ma.getAnswer() != null) {
                     if (allowed != null && (ma.getId() == null || !allowed.contains(ma.getId()))) {

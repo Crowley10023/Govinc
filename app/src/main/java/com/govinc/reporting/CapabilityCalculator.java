@@ -54,6 +54,7 @@ public final class CapabilityCalculator {
         Map<Long, List<Integer>> scoresByControl = new LinkedHashMap<>();
         if (allAnswers != null) {
             for (AssessmentControlAnswer aca : allAnswers) {
+                if (Boolean.TRUE.equals(aca.getIsNotApplicable())) continue;
                 if (aca.getSecurityControl() == null || aca.getMaturityAnswer() == null) continue;
                 Long cid = aca.getSecurityControl().getId();
                 scoresByControl.computeIfAbsent(cid, k -> new ArrayList<>()).add(aca.getScore());
@@ -114,6 +115,7 @@ public final class CapabilityCalculator {
         if (allAnswers == null) return effective;
 
         for (AssessmentControlAnswer aca : allAnswers) {
+            if (Boolean.TRUE.equals(aca.getIsNotApplicable())) continue;
             if (aca.getSecurityControl() == null) continue;
             Long controlId = aca.getSecurityControl().getId();
             AssessmentControlAnswer existing = effective.get(controlId);

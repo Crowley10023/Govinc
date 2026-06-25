@@ -1,6 +1,6 @@
 {
   "keycloak" : {
-    "redirectUri" : "http://192.168.1.165:8080/login/oauth2/code/keycloak",
+    "redirectUri" : null,
     "clientId" : "Govinc",
     "issuerUri" : "http://kezz:8080/realms/mutti",
     "displayName" : "Keycloak",

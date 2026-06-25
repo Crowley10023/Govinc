@@ -304,6 +304,7 @@ public class ComplianceService {
             // (whether they are direct answers or user overrides of inherited values);
             // inherited org-service answers fill gaps for controls not yet explicitly answered.
             Map<Long, MaturityAnswer> effectiveAnswersByControl = new HashMap<>();
+            Set<Long> excludedNotApplicableControls = new HashSet<>();
             // Seed with inherited (lower priority)
             for (Map.Entry<Long, MaturityAnswer> e : inheritedOrgServiceAnswers.entrySet()) {
                 if (controlIds.contains(e.getKey())) {
@@ -325,11 +326,22 @@ public class ComplianceService {
                         }
                     }
                     if (!inCatalog) continue;
+                    if (Boolean.TRUE.equals(ans.getIsNotApplicable())) {
+                        excludedNotApplicableControls.add(ctrlId);
+                        effectiveAnswersByControl.remove(ctrlId);
+                        continue;
+                    }
                     if (ans.getMaturityAnswer() != null) {
                         effectiveAnswersByControl.put(ctrlId, ans.getMaturityAnswer());
                     }
                 }
             }
+
+            for (Long excludedId : excludedNotApplicableControls) {
+                effectiveAnswersByControl.remove(excludedId);
+            }
+
+            int unitTotalControls = Math.max(0, totalControls - excludedNotApplicableControls.size());
 
             Set<Long> answeredControls = new HashSet<>();
             List<Long> answeredControlList = new ArrayList<>();
@@ -352,7 +364,7 @@ public class ComplianceService {
             System.out.println(String.format("Unit %s: detailsTotalAnswers=%d (answered overall), catalogAnswers=%d (answered in catalog), answeredWithRating=%d, answeredList=%s", unit.getId(), totalAnswersFound, catalogAnswersFound, answeredControls.size(), answeredControlList));
 
             int covered = answeredControls.size();
-            double coveragePercent = (totalControls == 0) ? 0.0 : ((double) covered * 100.0) / (double) totalControls;
+            double coveragePercent = (unitTotalControls == 0) ? 0.0 : ((double) covered * 100.0) / (double) unitTotalControls;
             double averagePercent = (scoreCount == 0) ? 0.0 : scoreSum / (double) scoreCount;
 
             int checked = assessmentsCount.getOrDefault(unit.getId(), 0);
@@ -384,7 +396,7 @@ public class ComplianceService {
 
             ComplianceResult r = new ComplianceResult(compliant, thresholdDetails, checked);
             r.setControlsAnswered(covered);
-            r.setControlsTotal(totalControls);
+            r.setControlsTotal(unitTotalControls);
             r.setCoveragePercent(round(coveragePercent,2));
             r.setAveragePercent(round(averagePercent,2));
 
@@ -403,16 +415,16 @@ public class ComplianceService {
             
             r.setCalculationDetails(calcDetails);
             r.setCalculationSummary(String.format("Latest assessment=%s; answered=%d/%d; coverage=%.2f%%; avg=%.2f",
-                    a != null ? a.getId() : null, covered, totalControls, r.getCoveragePercent(), r.getAveragePercent()));
+                    a != null ? a.getId() : null, covered, unitTotalControls, r.getCoveragePercent(), r.getAveragePercent()));
 
             System.out.println(String.format("Unit %s: covered=%d, totalControls=%d, coveragePercent=%.2f, avg=%.2f, checkedAssessments=%d",
-                    unit.getId(), covered, totalControls, r.getCoveragePercent(), r.getAveragePercent(), checked));
+                    unit.getId(), covered, unitTotalControls, r.getCoveragePercent(), r.getAveragePercent(), checked));
 
             resultMap.put(unit, r);
 
             // totals accumulation
             totalControlsAnswered += covered;
-            totalControlsPossible += totalControls;
+            totalControlsPossible += unitTotalControls;
             totalAvgSum += r.getAveragePercent();
             totalAvgCount++;
             totalAssessmentsCount += checked;

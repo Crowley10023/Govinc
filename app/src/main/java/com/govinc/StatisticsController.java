@@ -38,7 +38,9 @@ public class StatisticsController {
         // Total security controls
         long totalControls = securityControlRepository.count();
         // Total controls answered
-        long totalAnswered = assessmentControlAnswerRepository.count();
+        long totalAnswered = assessmentControlAnswerRepository.findAll().stream()
+            .filter(a -> !Boolean.TRUE.equals(a.getIsNotApplicable()) && a.getMaturityAnswer() != null)
+            .count();
 
         model.addAttribute("assessmentsPerYear", assessmentsPerYear);
         model.addAttribute("totalControls", totalControls);

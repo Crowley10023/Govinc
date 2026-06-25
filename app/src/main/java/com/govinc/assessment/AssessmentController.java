@@ -347,6 +347,7 @@ public class AssessmentController {
                             orig.getMaturityAnswer(),
                             orig.getComment());
                     copy.setIsOverride(orig.getIsOverride());
+                        copy.setIsNotApplicable(orig.getIsNotApplicable());
                     copy = assessmentControlAnswerRepository.save(copy);
                     copiedAnswers.add(copy);
                 }
@@ -596,6 +597,7 @@ public class AssessmentController {
                     }
                 }
             }
+            Map<Long, Boolean> controlNotApplicable = buildNotApplicableLookup(details);
 
             // Prepare output maps
             Map<Long, String> controlAnswers = new HashMap<>();
@@ -626,6 +628,17 @@ public class AssessmentController {
 
             for (SecurityControl control : controls) {
                 Long ctrlId = control.getId();
+
+                if (isControlNotApplicable(controlNotApplicable, ctrlId)) {
+                    controlAnswers.put(ctrlId, null);
+                    controlAnswerIsTakenOver.put(ctrlId, Boolean.FALSE);
+                    controlAnswerIsOverridden.put(ctrlId, Boolean.FALSE);
+                    AssessmentControlAnswer aca = localControlAnswers.get(ctrlId);
+                    if (aca != null && aca.getComment() != null) {
+                        controlComments.put(ctrlId, aca.getComment());
+                    }
+                    continue;
+                }
                 
                 // Check if there's an override for this control
                 boolean hasOverride = localControlAnswers.containsKey(ctrlId) && localControlAnswers.get(ctrlId).getIsOverride();
@@ -750,6 +763,7 @@ public class AssessmentController {
             model.addAttribute("answers", answers);
             model.addAttribute("controlAnswers", controlAnswers);
             model.addAttribute("controlComments", controlComments);
+                model.addAttribute("controlNotApplicable", controlNotApplicable);
             model.addAttribute("controlAnswerIsTakenOver", controlAnswerIsTakenOver);
             model.addAttribute("controlTakenOverOrgServiceName", controlTakenOverOrgServiceName);
             model.addAttribute("controlAnswerIsOverridden", controlAnswerIsOverridden);
@@ -787,6 +801,7 @@ public class AssessmentController {
             model.addAttribute("isAdminOrISM", isAdminOrISM);
             model.addAttribute("isAssessor", currentRole == Role.ASSESSOR);
             model.addAttribute("canManageAssessors", canManageAssessors);
+            model.addAttribute("canSetNotApplicable", isStrictInformationSecurityManager() && assessment.isOpen());
 
             // Pass governance projects for task creation and all users for interviewee modal
             model.addAttribute("governanceProjects", governanceProjectRepository.findAll());
@@ -842,13 +857,24 @@ public class AssessmentController {
                 for (SecurityControl sc : assessment.getEffectiveControls()) {
                     catalogControlIds.add(sc.getId());
                 }
+                Set<Long> excludedControlIds = new java.util.LinkedHashSet<>();
+                if (details.getControlAnswers() != null) {
+                    for (AssessmentControlAnswer aca : details.getControlAnswers()) {
+                        if (aca.getSecurityControl() != null
+                                && Boolean.TRUE.equals(aca.getIsNotApplicable())) {
+                            excludedControlIds.add(aca.getSecurityControl().getId());
+                        }
+                    }
+                }
                 List<AssessmentControlAnswer> answerList = new ArrayList<>();
                 int answered = 0;
                 double scoreSum = 0;
                 int scoreCount = 0;
                 if (details.getControlAnswers() != null) {
                     for (AssessmentControlAnswer aca : details.getControlAnswers()) {
-                        if (aca.getSecurityControl() != null && catalogControlIds.contains(aca.getSecurityControl().getId())) {
+                        if (aca.getSecurityControl() != null
+                                && catalogControlIds.contains(aca.getSecurityControl().getId())
+                                && !Boolean.TRUE.equals(aca.getIsNotApplicable())) {
                             answerList.add(aca);
                             answered++;
                             if (aca.getMaturityAnswer() != null) {
@@ -859,7 +885,8 @@ public class AssessmentController {
                     }
                 }
                 double avgScore = scoreCount > 0 ? scoreSum / scoreCount : 0.0;
-                double coverage = catalogControlIds.isEmpty() ? 0.0 : (answered * 100.0 / catalogControlIds.size());
+                int applicableControls = Math.max(0, catalogControlIds.size() - excludedControlIds.size());
+                double coverage = applicableControls == 0 ? 0.0 : (answered * 100.0 / applicableControls);
                 // Evaluate thresholds
                 boolean compliant = !answerList.isEmpty();
                 List<Map<String, Object>> thresholdResults = new ArrayList<>();
@@ -909,6 +936,32 @@ public class AssessmentController {
 
     private String formatFriendlyDate(LocalDate date) {
         return date != null ? date.format(FRIENDLY_DATE_FORMATTER) : "";
+    }
+
+    private boolean isStrictInformationSecurityManager() {
+        return authorizationService.getCurrentUserRole() == Role.INFORMATION_SECURITY_MANAGER;
+    }
+
+    private Map<Long, Boolean> buildNotApplicableLookup(AssessmentDetails details) {
+        Map<Long, Boolean> map = new HashMap<>();
+        if (details == null || details.getControlAnswers() == null) {
+            return map;
+        }
+        for (AssessmentControlAnswer a : details.getControlAnswers()) {
+            if (a.getSecurityControl() == null || a.getSecurityControl().getId() == null) {
+                continue;
+            }
+            if (Boolean.TRUE.equals(a.getIsNotApplicable())) {
+                map.put(a.getSecurityControl().getId(), true);
+            }
+        }
+        return map;
+    }
+
+    private boolean isControlNotApplicable(Map<Long, Boolean> notApplicableByControl, Long controlId) {
+        return controlId != null
+                && notApplicableByControl != null
+                && Boolean.TRUE.equals(notApplicableByControl.get(controlId));
     }
 
     /** Public wrapper around the private {@link #buildUpdatePayload(Long)} so
@@ -976,14 +1029,19 @@ public class AssessmentController {
             if (Boolean.TRUE.equals(isOverride)) {
                 found.setIsOverride(true);
             }
+            found.setIsNotApplicable(false);
             found = assessmentControlAnswerRepository.save(found);
             answers.add(found);
         } else {
+            if (Boolean.TRUE.equals(found.getIsNotApplicable())) {
+                return "not_applicable";
+            }
             found.setMaturityAnswer(maturityAnswer);
             // Only update override flag if caller provided it, otherwise keep existing
             if (isOverride != null) {
                 found.setIsOverride(Boolean.TRUE.equals(isOverride));
             }
+            found.setIsNotApplicable(false);
             found = assessmentControlAnswerRepository.save(found);
         }
         // Only update the modified/new answer, do NOT replace the set with only one
@@ -1035,6 +1093,9 @@ public class AssessmentController {
             found = assessmentControlAnswerRepository.save(found);
             answers.add(found);
         } else {
+            if (Boolean.TRUE.equals(found.getIsNotApplicable())) {
+                return "not_applicable";
+            }
             found.setComment(comment);
             found = assessmentControlAnswerRepository.save(found);
         }
@@ -1094,6 +1155,9 @@ public class AssessmentController {
                 OrgServiceInheritance inh = entry.getValue();
                 AssessmentControlAnswer existing = closeAnswersMap.get(ctrlId);
                 if (existing != null && Boolean.TRUE.equals(existing.getIsOverride())) {
+                    continue;
+                }
+                if (existing != null && Boolean.TRUE.equals(existing.getIsNotApplicable())) {
                     continue;
                 }
                 if (existing != null) {
@@ -1487,6 +1551,16 @@ public class AssessmentController {
 
                 boolean hasOverride = localAnswers.containsKey(ctrlId)
                     && Boolean.TRUE.equals(localAnswers.get(ctrlId).getIsOverride());
+                boolean isNotApplicable = localAnswers.containsKey(ctrlId)
+                    && Boolean.TRUE.equals(localAnswers.get(ctrlId).getIsNotApplicable());
+
+                if (isNotApplicable) {
+                    source = "Not Applicable";
+                    AssessmentControlAnswer aca = localAnswers.get(ctrlId);
+                    if (aca != null && aca.getComment() != null) {
+                        comment = aca.getComment();
+                    }
+                } else
 
                 if (hasOverride) {
                     AssessmentControlAnswer aca = localAnswers.get(ctrlId);
@@ -1753,11 +1827,16 @@ public class AssessmentController {
         if (found == null) {
             found = new AssessmentControlAnswer(control, maturityAnswer);
             found.setIsOverride(true);
+            found.setIsNotApplicable(false);
             found = assessmentControlAnswerRepository.save(found);
             answers.add(found);
         } else {
+            if (Boolean.TRUE.equals(found.getIsNotApplicable())) {
+                return "not_applicable";
+            }
             found.setMaturityAnswer(maturityAnswer);
             found.setIsOverride(true);
+            found.setIsNotApplicable(false);
             found = assessmentControlAnswerRepository.save(found);
         }
         assessmentDetailsService.save(details);
@@ -1787,6 +1866,9 @@ public class AssessmentController {
             }
         }
         if (toRemove != null) {
+            if (Boolean.TRUE.equals(toRemove.getIsNotApplicable())) {
+                return "not_applicable";
+            }
             answers.remove(toRemove);
             assessmentControlAnswerRepository.delete(toRemove);
             assessmentDetailsService.save(details);
@@ -1825,8 +1907,87 @@ public class AssessmentController {
         if (inherited != null && inherited.comment != null) {
             state.put("orgServiceComment", inherited.comment);
         }
+
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findByAssessmentId(id);
+        if (detailsOpt.isPresent() && detailsOpt.get().getControlAnswers() != null) {
+            for (AssessmentControlAnswer a : detailsOpt.get().getControlAnswers()) {
+                if (a.getSecurityControl() != null
+                        && controlId.equals(a.getSecurityControl().getId())
+                        && Boolean.TRUE.equals(a.getIsNotApplicable())) {
+                    state.put("isNotApplicable", true);
+                    break;
+                }
+            }
+        }
         
         return state;
+    }
+
+    @PostMapping("/{id}/control/{controlId}/not-applicable")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> setNotApplicable(
+            @PathVariable Long id,
+            @PathVariable Long controlId,
+            @RequestBody Map<String, Object> body) {
+        if (!authorizationService.canAccessAssessment(id)) {
+            return ResponseEntity.status(403).body(Map.of("error", "forbidden"));
+        }
+        if (!isStrictInformationSecurityManager()) {
+            return ResponseEntity.status(403).body(Map.of("error", "forbidden"));
+        }
+
+        Optional<Assessment> assessmentOpt = assessmentRepository.findById(id);
+        if (assessmentOpt.isEmpty()) {
+            return ResponseEntity.status(404).body(Map.of("error", "not_found"));
+        }
+        Assessment assessment = assessmentOpt.get();
+        if (!assessment.isOpen()) {
+            return ResponseEntity.status(423).body(Map.of("error", "locked"));
+        }
+
+        SecurityControl control = securityControlRepository.findById(controlId).orElse(null);
+        if (control == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "invalid_control"));
+        }
+
+        boolean notApplicable = Boolean.TRUE.equals(body.get("notApplicable"));
+
+        Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findByAssessmentId(id);
+        AssessmentDetails details;
+        if (detailsOpt.isEmpty() || !isOwnedByAssessment(detailsOpt.get(), id)) {
+            details = new AssessmentDetails();
+            Set<Assessment> assessmentSet = new HashSet<>();
+            assessmentSet.add(assessment);
+            details.setAssessments(assessmentSet);
+            details.setDate(LocalDate.now());
+        } else {
+            details = detailsOpt.get();
+        }
+
+        Set<AssessmentControlAnswer> answers = details.getControlAnswers();
+        AssessmentControlAnswer found = null;
+        for (AssessmentControlAnswer aca : answers) {
+            if (aca.getSecurityControl() != null && controlId.equals(aca.getSecurityControl().getId())) {
+                found = aca;
+                break;
+            }
+        }
+
+        if (found == null) {
+            found = new AssessmentControlAnswer(control, null);
+            answers.add(found);
+        }
+
+        found.setIsNotApplicable(notApplicable);
+        if (notApplicable) {
+            found.setMaturityAnswer(null);
+            found.setIsOverride(false);
+        }
+        assessmentControlAnswerRepository.save(found);
+        assessmentDetailsService.save(details);
+        assessmentSseService.broadcast(id, "update", buildUpdatePayload(id));
+
+        return ResponseEntity.ok(Map.of("ok", true, "notApplicable", notApplicable));
     }
 
     // Generate AI management summary for an assessment
@@ -1865,6 +2026,9 @@ public class AssessmentController {
             double scoreSum = 0;
             int scoreCount = 0;
             for (AssessmentControlAnswer aca : details.getControlAnswers()) {
+                if (Boolean.TRUE.equals(aca.getIsNotApplicable())) {
+                    continue;
+                }
                 totalControls++;
                 if (aca.getMaturityAnswer() != null) {
                     totalAnswered++;
@@ -1999,9 +2163,14 @@ public class AssessmentController {
     private Map<String, Object> buildUpdatePayload(Long assessmentId) {
         Map<String, Long> controlAnswersMap = new java.util.LinkedHashMap<>();
         Map<String, String> commentsMap = new java.util.LinkedHashMap<>();
+        Map<String, Boolean> notApplicableMap = new java.util.LinkedHashMap<>();
         Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findByAssessmentId(assessmentId);
         if (detailsOpt.isPresent()) {
             for (AssessmentControlAnswer a : detailsOpt.get().getControlAnswers()) {
+                if (a.getSecurityControl() != null && Boolean.TRUE.equals(a.getIsNotApplicable())) {
+                    notApplicableMap.put(String.valueOf(a.getSecurityControl().getId()), true);
+                    continue;
+                }
                 if (a.getSecurityControl() != null && a.getMaturityAnswer() != null) {
                     controlAnswersMap.put(String.valueOf(a.getSecurityControl().getId()),
                             a.getMaturityAnswer().getId());
@@ -2014,6 +2183,7 @@ public class AssessmentController {
         Map<String, Object> payload = new java.util.LinkedHashMap<>();
         payload.put("controlAnswers", controlAnswersMap);
         payload.put("comments", commentsMap);
+        payload.put("notApplicable", notApplicableMap);
         return payload;
     }
 
@@ -2040,11 +2210,16 @@ public class AssessmentController {
         long maturitySum = 0;
         Map<String, Long> controlAnswersMap = new java.util.LinkedHashMap<>();
         Map<String, String> commentsMap = new java.util.LinkedHashMap<>();
+        Map<String, Boolean> notApplicableMap = new java.util.LinkedHashMap<>();
         if (detailsOpt.isPresent()) {
             Set<AssessmentControlAnswer> answers = detailsOpt.get().getControlAnswers();
             answerCount = answers.size();
             for (AssessmentControlAnswer a : answers) {
                 if (a.getId() != null && a.getId() > maxAnswerId) maxAnswerId = a.getId();
+                if (a.getSecurityControl() != null && Boolean.TRUE.equals(a.getIsNotApplicable())) {
+                    notApplicableMap.put(String.valueOf(a.getSecurityControl().getId()), true);
+                    continue;
+                }
                 if (a.getMaturityAnswer() != null && a.getMaturityAnswer().getId() != null) {
                     maturitySum += a.getMaturityAnswer().getId();
                 }
@@ -2065,6 +2240,7 @@ public class AssessmentController {
         result.put("activeUsers", others);
         result.put("controlAnswers", controlAnswersMap);
         result.put("comments", commentsMap);
+        result.put("notApplicable", notApplicableMap);
         return result;
     }
 

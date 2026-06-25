@@ -24,6 +24,9 @@ public class AssessmentControlAnswer {
     @Column(name = "is_override", nullable = false)
     private Boolean isOverride = false; // Indicates if this answer overrides an org service answer
 
+    @Column(name = "is_not_applicable", nullable = false)
+    private Boolean isNotApplicable = false;
+
     public AssessmentControlAnswer() {}
 
     public AssessmentControlAnswer(SecurityControl securityControl, MaturityAnswer maturityAnswer) {
@@ -79,11 +82,19 @@ public class AssessmentControlAnswer {
         this.isOverride = isOverride != null ? isOverride : false;
     }
 
+    public Boolean getIsNotApplicable() {
+        return isNotApplicable != null ? isNotApplicable : false;
+    }
+
+    public void setIsNotApplicable(Boolean isNotApplicable) {
+        this.isNotApplicable = isNotApplicable != null ? isNotApplicable : false;
+    }
+
     /**
      * Returns the rating (score 0-100) of the maturity answer for this control (or 0 if missing)
      */
     public int getScore() {
-        if (maturityAnswer != null) {
+        if (!getIsNotApplicable() && maturityAnswer != null) {
             return maturityAnswer.getRating();
         }
         return 0;

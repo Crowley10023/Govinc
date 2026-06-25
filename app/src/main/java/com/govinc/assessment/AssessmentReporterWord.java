@@ -374,9 +374,17 @@ public class AssessmentReporterWord {
             // Build answer map indexed by control id
             Map<Long, AssessmentControlAnswer> answerMap = new LinkedHashMap<>();
             for (AssessmentControlAnswer a : answers) {
-                if (a.getSecurityControl() != null) answerMap.put(a.getSecurityControl().getId(), a);
+                if (a.getSecurityControl() != null && !Boolean.TRUE.equals(a.getIsNotApplicable())) {
+                    answerMap.put(a.getSecurityControl().getId(), a);
+                }
             }
-            List<SecurityControl> allControls = assessment.getEffectiveControls();
+            Set<Long> excludedControls = answers.stream()
+                    .filter(a -> a != null && a.getSecurityControl() != null && Boolean.TRUE.equals(a.getIsNotApplicable()))
+                    .map(a -> a.getSecurityControl().getId())
+                    .collect(Collectors.toSet());
+            List<SecurityControl> allControls = assessment.getEffectiveControls().stream()
+                    .filter(sc -> sc != null && sc.getId() != null && !excludedControls.contains(sc.getId()))
+                    .collect(Collectors.toList());
             List<Object> elements = new ArrayList<>();
 
             // Title — only add programmatically if the template has no {{TITLE}} placeholder
@@ -664,13 +672,23 @@ public class AssessmentReporterWord {
         for (SecurityControl sc : assessment.getEffectiveControls()) {
             catalogControlIds.add(sc.getId());
         }
+        Set<Long> excludedControlIds = new LinkedHashSet<>();
+        if (details != null && details.getControlAnswers() != null) {
+            for (AssessmentControlAnswer aca : details.getControlAnswers()) {
+                if (aca.getSecurityControl() != null && Boolean.TRUE.equals(aca.getIsNotApplicable())) {
+                    excludedControlIds.add(aca.getSecurityControl().getId());
+                }
+            }
+        }
         List<AssessmentControlAnswer> answerList = new ArrayList<>();
         int answered = 0;
         double scoreSum = 0;
         int scoreCount = 0;
         if (details != null && details.getControlAnswers() != null) {
             for (AssessmentControlAnswer aca : details.getControlAnswers()) {
-                if (aca.getSecurityControl() != null && catalogControlIds.contains(aca.getSecurityControl().getId())) {
+                if (aca.getSecurityControl() != null
+                        && catalogControlIds.contains(aca.getSecurityControl().getId())
+                        && !Boolean.TRUE.equals(aca.getIsNotApplicable())) {
                     answerList.add(aca);
                     answered++;
                     if (aca.getMaturityAnswer() != null) {
@@ -681,7 +699,8 @@ public class AssessmentReporterWord {
             }
         }
         double avgScore = scoreCount > 0 ? scoreSum / scoreCount : 0.0;
-        double coverage = catalogControlIds.isEmpty() ? 0.0 : (answered * 100.0 / catalogControlIds.size());
+        int applicableControls = Math.max(0, catalogControlIds.size() - excludedControlIds.size());
+        double coverage = applicableControls == 0 ? 0.0 : (answered * 100.0 / applicableControls);
         boolean compliant = !answerList.isEmpty();
         List<String[]> thresholdRows = new ArrayList<>();
         if (cc.getThresholds() != null) {
@@ -705,7 +724,7 @@ public class AssessmentReporterWord {
             }
         }
         Tbl tbl = factory.createTbl();
-        addDetailRow(tbl, factory, "Controls Answered", answered + " / " + catalogControlIds.size());
+        addDetailRow(tbl, factory, "Controls Answered", answered + " / " + applicableControls);
         addDetailRow(tbl, factory, "Coverage", String.format("%.1f%%", coverage));
         addDetailRow(tbl, factory, "Average Score", String.format("%.1f", Math.round(avgScore * 10.0) / 10.0));
         addDetailRow(tbl, factory, "Result", compliant ? "Compliant" : "Not Compliant");

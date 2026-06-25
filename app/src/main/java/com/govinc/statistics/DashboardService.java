@@ -34,7 +34,9 @@ public class DashboardService {
         long assessmentsCount = assessmentRepository.count();
 
         // "Maturity answers" as the answers given in assessments (AssessmentControlAnswer with maturityAnswer)
-        long maturityAnswers = assessmentControlAnswerRepository.countByMaturityAnswerIsNotNull();
+        long maturityAnswers = assessmentControlAnswerRepository.findAll().stream()
+            .filter(a -> !Boolean.TRUE.equals(a.getIsNotApplicable()) && a.getMaturityAnswer() != null)
+            .count();
 
         // Distribution per catalog (uses countBySecurityCatalogId to avoid loading all assessments twice)
         List<DashboardResponse.CatalogDistribution> distribution = securityCatalogRepository.findAll().stream()

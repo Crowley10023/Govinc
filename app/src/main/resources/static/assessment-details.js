@@ -9,6 +9,78 @@ $(function () {
     }
 });
 
+function isRowNotApplicable(row) {
+    return row && row.getAttribute('data-not-applicable') === 'true';
+}
+
+function captureBaseDisabledState(row) {
+    if (!row) return;
+    var elements = row.querySelectorAll('.answer-select, .comment-textarea, .answering-guide-btn, .override-slider-checkbox');
+    elements.forEach(function(el) {
+        if (!el.hasAttribute('data-base-disabled')) {
+            el.setAttribute('data-base-disabled', el.disabled ? 'true' : 'false');
+        }
+    });
+}
+
+function setRowNotApplicableState(row, isNotApplicable) {
+    if (!row) return;
+    captureBaseDisabledState(row);
+    row.setAttribute('data-not-applicable', isNotApplicable ? 'true' : 'false');
+    row.classList.toggle('na-control-row', !!isNotApplicable);
+
+    var select = row.querySelector('.answer-select');
+    var comment = row.querySelector('.comment-textarea');
+    var guideBtn = row.querySelector('.answering-guide-btn');
+    var overrideCheckbox = row.querySelector('.override-slider-checkbox');
+
+    if (isNotApplicable && select) {
+        select.value = '';
+        row.setAttribute('data-selected-answer', '');
+    }
+
+    if (select) {
+        var selectBaseDisabled = select.getAttribute('data-base-disabled') === 'true';
+        select.disabled = !!isNotApplicable || selectBaseDisabled;
+    }
+    if (comment) {
+        var commentBaseDisabled = comment.getAttribute('data-base-disabled') === 'true';
+        comment.disabled = !!isNotApplicable || commentBaseDisabled;
+    }
+    if (guideBtn) {
+        var guideBaseDisabled = guideBtn.getAttribute('data-base-disabled') === 'true';
+        guideBtn.disabled = !!isNotApplicable || guideBaseDisabled;
+    }
+    if (overrideCheckbox) {
+        var overrideBaseDisabled = overrideCheckbox.getAttribute('data-base-disabled') === 'true';
+        overrideCheckbox.disabled = !!isNotApplicable || overrideBaseDisabled;
+    }
+}
+
+function persistNotApplicable(controlId, assessmentId, isNotApplicable) {
+    var csrfMeta = document.querySelector('meta[name="_csrf"]');
+    var csrfHeaderMeta = document.querySelector('meta[name="_csrf_header"]');
+    var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+    var csrfHeaderName = csrfHeaderMeta ? csrfHeaderMeta.getAttribute('content') : 'X-CSRF-TOKEN';
+    var headers = {
+        'Content-Type': 'application/json'
+    };
+    if (csrfToken) {
+        headers[csrfHeaderName] = csrfToken;
+    }
+
+    return fetch('/assessment/' + assessmentId + '/control/' + controlId + '/not-applicable', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({ notApplicable: !!isNotApplicable })
+    }).then(function(response) {
+        if (!response.ok) {
+            throw new Error('Failed to update Not Applicable state');
+        }
+        return response.json();
+    });
+}
+
 // =================== Override Functions ===================
 // Toggle override function - handles slider toggle
 function toggleOverride(checkbox) {
@@ -102,12 +174,14 @@ function updateControlAfterOverride(controlId, answerId) {
             
             // Enable the dropdown again
             $dropdown.prop('disabled', false);
+            $dropdown.attr('data-base-disabled', 'false');
             $dropdown.removeClass('taken-over');
             
             // Enable comment textarea
             var $textarea = $controlRow.find('textarea[data-control-id="' + controlId + '"]');
             if ($textarea.length > 0) {
                 $textarea.prop('disabled', false);
+                $textarea.attr('data-base-disabled', 'false');
                 $textarea.prop('placeholder', 'Add comment (optional)');
             }
             
@@ -115,6 +189,7 @@ function updateControlAfterOverride(controlId, answerId) {
             var $guideBtn = $controlRow.find('.answering-guide-btn[data-control-id="' + controlId + '"]');
             if ($guideBtn.length > 0) {
                 $guideBtn.prop('disabled', false);
+                $guideBtn.attr('data-base-disabled', 'false');
                 $guideBtn.prop('title', 'Get AI-powered answering guide');
             }
         },
@@ -158,6 +233,7 @@ function updateControlAfterRemoveOverride(controlId, assessmentId) {
             
             // Disable the dropdown
             $dropdown.prop('disabled', true);
+            $dropdown.attr('data-base-disabled', 'true');
             $dropdown.addClass('taken-over');
             
             // Restore org service comment in textarea
@@ -170,6 +246,7 @@ function updateControlAfterRemoveOverride(controlId, assessmentId) {
                     $textarea.val('');
                 }
                 $textarea.prop('disabled', true);
+                $textarea.attr('data-base-disabled', 'true');
                 $textarea.prop('placeholder', 'No comment from Org Service');
             }
             
@@ -177,6 +254,7 @@ function updateControlAfterRemoveOverride(controlId, assessmentId) {
             var $guideBtn = $controlRow.find('.answering-guide-btn[data-control-id="' + controlId + '"]');
             if ($guideBtn.length > 0) {
                 $guideBtn.prop('disabled', true);
+                $guideBtn.attr('data-base-disabled', 'true');
                 $guideBtn.prop('title', 'Disabled for taken-over answers');
             }
         },
@@ -605,6 +683,22 @@ $(document).ready(function () {
                         try {
                             if (jqXHR && jqXHR.responseText) msg = jqXHR.responseText;
                         } catch (e) {}
+                        if ((msg || '').trim().toLowerCase() === 'not_applicable') {
+                            var $trNa = select.closest('tr');
+                            if ($trNa.length > 0) {
+                                setRowNotApplicableState($trNa.get(0), true);
+                                var naCheckbox = $trNa.find('.not-applicable-checkbox');
+                                if (naCheckbox.length > 0) {
+                                    naCheckbox.prop('checked', true);
+                                }
+                                updateAnsweredCount();
+                                checkDomainCompleteness();
+                                debouncedUpdateMaturityChart();
+                                debouncedUpdatePieChart();
+                                applyFilters();
+                            }
+                            msg = 'This control is marked as Not Applicable.';
+                        }
                         $feedbackIcon.html('<span class="answer-error" title="Error saving">' + $('<span/>').text(msg).html() + '</span>');
                     }
                 });
@@ -613,6 +707,37 @@ $(document).ready(function () {
             // Prevent any unexpected errors from breaking other UI behavior
             console.error('Error in answer-select change handler', e);
         }
+    });
+
+    $(document).on('change', '.not-applicable-checkbox', function () {
+        var checkbox = this;
+        var controlId = checkbox.getAttribute('data-control-id');
+        var assessmentId = checkbox.getAttribute('data-assessment-id');
+        var isNotApplicable = checkbox.checked;
+        var row = checkbox.closest('tr');
+
+        if (!controlId || !assessmentId || !row) {
+            checkbox.checked = !isNotApplicable;
+            return;
+        }
+
+        setRowNotApplicableState(row, isNotApplicable);
+        updateAnsweredCount();
+        checkDomainCompleteness();
+        debouncedUpdateMaturityChart();
+        debouncedUpdatePieChart();
+        applyFilters();
+
+        persistNotApplicable(controlId, assessmentId, isNotApplicable).catch(function () {
+            checkbox.checked = !isNotApplicable;
+            setRowNotApplicableState(row, !isNotApplicable);
+            updateAnsweredCount();
+            checkDomainCompleteness();
+            debouncedUpdateMaturityChart();
+            debouncedUpdatePieChart();
+            applyFilters();
+            alert('Could not update Not Applicable state.');
+        });
     });
 
     // Word Report Progress Handler with real-time polling
@@ -1123,10 +1248,14 @@ function checkDomainCompleteness() {
         const domainId = checkmarkSpan.getAttribute("data-domain-id");
         const selects = document.querySelectorAll(`.answer-select[data-domain-id='${domainId}']`);
         let allAnswered = true;
-        if (selects.length === 0) allAnswered = false;
+        let applicableCount = 0;
         selects.forEach(select => {
+            var row = select.closest('tr');
+            if (isRowNotApplicable(row)) return;
+            applicableCount++;
             if (!select.value) allAnswered = false;
         });
+        if (applicableCount === 0) allAnswered = false;
         checkmarkSpan.innerHTML = allAnswered ? CHECKMARK_SVG : "";
     });
 }
@@ -1143,7 +1272,9 @@ let filterState = {
 function initializeFilterBar() {
     // Get all answer selects to determine total and answered counts
     var allSelects = document.querySelectorAll('.answer-select');
-    filterState.totalControls = allSelects.length;
+    filterState.totalControls = Array.from(allSelects).filter(function(select) {
+        return !isRowNotApplicable(select.closest('tr'));
+    }).length;
 
     // Calculate initial answered count
     updateAnsweredCount();
@@ -1217,9 +1348,15 @@ function populateMaturityFilter() {
 
 function updateAnsweredCount() {
     var allSelects = document.querySelectorAll('.answer-select');
+    filterState.totalControls = 0;
     filterState.answeredControls = 0;
     
     allSelects.forEach(function(select) {
+        var row = select.closest('tr');
+        if (isRowNotApplicable(row)) {
+            return;
+        }
+        filterState.totalControls++;
         if (select.value && select.value.trim() !== '') {
             filterState.answeredControls++;
         }
@@ -1283,6 +1420,14 @@ function applyFilters() {
         var showRow = true;
 
         if (!select) return;
+
+        var isNotApplicable = isRowNotApplicable(row);
+
+        if (isNotApplicable) {
+            row.style.display = filterState.showUnansweredOnly ? 'none' : '';
+            if (!filterState.showUnansweredOnly) visibleCount++;
+            return;
+        }
 
         // Check if control is unanswered (filter for unanswered)
         if (filterState.showUnansweredOnly) {
@@ -1409,6 +1554,7 @@ function updatePieChart() {
     var selects = Array.from(document.querySelectorAll('.answer-select'));
     var counts = {};
     selects.forEach(function(sel) {
+        if (isRowNotApplicable(sel.closest('tr'))) return;
         var selected = sel.options[sel.selectedIndex];
         if (!selected || !selected.value || selected.value === '') return;
         var label = (selected.textContent || selected.text || '').trim();
@@ -1446,6 +1592,11 @@ function updatePieChart() {
 var debouncedUpdatePieChart = debounce(updatePieChart, 300);
 
 document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll('tr[data-control-id]').forEach(function(row) {
+        captureBaseDisabledState(row);
+        setRowNotApplicableState(row, isRowNotApplicable(row));
+    });
+
     // Initialize filter bar first
     initializeFilterBar();
 

@@ -122,9 +122,14 @@ public class AssessmentDirectController {
             AssessmentDetails details = detailsOpt.orElse(null);
             Map<Long, String> controlAnswers = new HashMap<>();
             Map<Long, String> controlComments = new HashMap<>();
+            Map<Long, Boolean> controlNotApplicable = new HashMap<>();
             if (details != null && details.getControlAnswers() != null) {
                 for (AssessmentControlAnswer aca : details.getControlAnswers()) {
                     if (aca.getSecurityControl() != null) {
+                        if (Boolean.TRUE.equals(aca.getIsNotApplicable())) {
+                            controlNotApplicable.put(aca.getSecurityControl().getId(), true);
+                            continue;
+                        }
                         if (aca.getMaturityAnswer() != null)
                             controlAnswers.put(aca.getSecurityControl().getId(), aca.getMaturityAnswer().getAnswer());
                         if (aca.getComment() != null)
@@ -134,6 +139,7 @@ public class AssessmentDirectController {
             }
             out.put("controlAnswers", controlAnswers);
             out.put("controlComments", controlComments);
+            out.put("notApplicable", controlNotApplicable);
 
             // answerSummary filtered to maturity answers of this assessment's catalog model
             Set<Long> catalogMaturityAnswerIds = maturityAnswers.stream()
@@ -208,7 +214,11 @@ public class AssessmentDirectController {
             found = new AssessmentControlAnswer(control, maturityAnswer);
             answers.add(found);
         } else {
+            if (Boolean.TRUE.equals(found.getIsNotApplicable())) {
+                return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.CONFLICT).body("not_applicable");
+            }
             found.setMaturityAnswer(maturityAnswer);
+            found.setIsNotApplicable(false);
         }
         detailsService.save(details);
         assessmentSseService.broadcast(id, "update", buildDirectUpdatePayload(id));
@@ -256,6 +266,9 @@ public class AssessmentDirectController {
             found = new AssessmentControlAnswer(control, null, comment);
             answers.add(found);
         } else {
+            if (Boolean.TRUE.equals(found.getIsNotApplicable())) {
+                return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.CONFLICT).body("not_applicable");
+            }
             found.setComment(comment);
         }
         detailsService.save(details);
@@ -401,9 +414,14 @@ public class AssessmentDirectController {
     private Map<String, Object> buildDirectUpdatePayload(Long assessmentId) {
         Map<String, Long> controlAnswersMap = new java.util.LinkedHashMap<>();
         Map<String, String> commentsMap = new java.util.LinkedHashMap<>();
+        Map<String, Boolean> notApplicableMap = new java.util.LinkedHashMap<>();
         Optional<AssessmentDetails> detailsOpt = detailsService.findByAssessmentId(assessmentId);
         if (detailsOpt.isPresent()) {
             for (AssessmentControlAnswer a : detailsOpt.get().getControlAnswers()) {
+                if (a.getSecurityControl() != null && Boolean.TRUE.equals(a.getIsNotApplicable())) {
+                    notApplicableMap.put(String.valueOf(a.getSecurityControl().getId()), true);
+                    continue;
+                }
                 if (a.getSecurityControl() != null && a.getMaturityAnswer() != null) {
                     controlAnswersMap.put(String.valueOf(a.getSecurityControl().getId()),
                             a.getMaturityAnswer().getId());
@@ -416,6 +434,7 @@ public class AssessmentDirectController {
         Map<String, Object> payload = new java.util.LinkedHashMap<>();
         payload.put("controlAnswers", controlAnswersMap);
         payload.put("comments", commentsMap);
+        payload.put("notApplicable", notApplicableMap);
         return payload;
     }
 
@@ -438,11 +457,16 @@ public class AssessmentDirectController {
         long maturitySum = 0;
         java.util.Map<String, Long> controlAnswersMap = new java.util.LinkedHashMap<>();
         java.util.Map<String, String> commentsMap = new java.util.LinkedHashMap<>();
+        java.util.Map<String, Boolean> notApplicableMap = new java.util.LinkedHashMap<>();
         if (detailsOpt.isPresent()) {
             Set<AssessmentControlAnswer> answers = detailsOpt.get().getControlAnswers();
             answerCount = answers.size();
             for (AssessmentControlAnswer a : answers) {
                 if (a.getId() != null && a.getId() > maxAnswerId) maxAnswerId = a.getId();
+                if (a.getSecurityControl() != null && Boolean.TRUE.equals(a.getIsNotApplicable())) {
+                    notApplicableMap.put(String.valueOf(a.getSecurityControl().getId()), true);
+                    continue;
+                }
                 if (a.getMaturityAnswer() != null && a.getMaturityAnswer().getId() != null) {
                     maturitySum += a.getMaturityAnswer().getId();
                 }
@@ -463,6 +487,7 @@ public class AssessmentDirectController {
         result.put("activeUsers", others);
         result.put("controlAnswers", controlAnswersMap);
         result.put("comments", commentsMap);
+        result.put("notApplicable", notApplicableMap);
         return org.springframework.http.ResponseEntity.ok(result);
     }
 
@@ -486,7 +511,7 @@ public class AssessmentDirectController {
         // Require at least one answered control before allowing review
         Optional<AssessmentDetails> detailsOpt = assessmentDetailsService.findByAssessmentId(assessment.getId());
         long answeredControls = detailsOpt.map(d -> d.getControlAnswers().stream()
-                .filter(a -> a.getMaturityAnswer() != null).count()).orElse(0L);
+            .filter(a -> !Boolean.TRUE.equals(a.getIsNotApplicable()) && a.getMaturityAnswer() != null).count()).orElse(0L);
         if (answeredControls == 0) {
             return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY)
                     .body(Map.of("success", false, "reason", "Please answer at least one control before submitting for review."));

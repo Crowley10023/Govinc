@@ -56,6 +56,7 @@ public final class ReportingCalculator {
         Map<Long, AssessmentControlAnswer> effective = new LinkedHashMap<>();
         for (AssessmentControlAnswer aca : controlAnswers) {
             if (aca.getSecurityControl() == null) continue;
+            if (Boolean.TRUE.equals(aca.getIsNotApplicable())) continue;
             Long controlId = aca.getSecurityControl().getId();
             AssessmentControlAnswer existing = effective.get(controlId);
             if (existing == null) {
@@ -68,6 +69,17 @@ public final class ReportingCalculator {
                     effective.put(controlId, aca);
                 }
             }
+        }
+
+        int applicableControls = totalControls;
+        if (controlAnswers != null) {
+            Set<Long> excluded = new HashSet<>();
+            for (AssessmentControlAnswer aca : controlAnswers) {
+                if (aca.getSecurityControl() != null && Boolean.TRUE.equals(aca.getIsNotApplicable())) {
+                    excluded.add(aca.getSecurityControl().getId());
+                }
+            }
+            applicableControls = Math.max(0, totalControls - excluded.size());
         }
 
         int ratingSum = 0;
@@ -85,7 +97,9 @@ public final class ReportingCalculator {
         }
 
         double avg = Math.round((double) ratingSum / answeredCount * 10.0) / 10.0;
-        double rawCoverage = (double) answeredCount / totalControls * 100.0;
+        double rawCoverage = applicableControls > 0
+            ? (double) answeredCount / applicableControls * 100.0
+            : 0.0;
         double coverage = Math.min(100.0, Math.round(rawCoverage * 10.0) / 10.0);
 
         return new AssessmentStats(avg, answeredCount, coverage);

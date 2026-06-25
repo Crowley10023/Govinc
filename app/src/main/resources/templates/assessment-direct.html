@@ -6,6 +6,20 @@
     <meta charset="UTF-8">
     <title>Assessment Direct Link</title>
     <link rel="stylesheet" type="text/css" href="/style.css">    <th:block th:replace="~{fragments/theme-css :: themeCss}" />
+    <style>
+        .na-control-row {
+            background: #f2f2f2;
+            color: #7a7a7a;
+        }
+        .na-control-row * {
+            color: #7a7a7a !important;
+        }
+        .na-control-row .answer-select,
+        .na-control-row .comment-textarea,
+        .na-control-row .answering-guide-btn {
+            opacity: 0.7;
+        }
+    </style>
 </head>
 
 <body>
@@ -186,6 +200,31 @@
         function escapeAttr(str) {
             return (str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         }
+        function isDirectNotApplicable(notApplicableMap, controlId) {
+            if (!notApplicableMap || controlId == null) return false;
+            return !!(notApplicableMap[controlId] || notApplicableMap[String(controlId)]);
+        }
+        function isDirectRowNotApplicable(row) {
+            return row && row.getAttribute('data-not-applicable') === 'true';
+        }
+        function setDirectRowNotApplicableState(row, isNotApplicable) {
+            if (!row) return;
+            row.setAttribute('data-not-applicable', isNotApplicable ? 'true' : 'false');
+            row.classList.toggle('na-control-row', !!isNotApplicable);
+            var select = row.querySelector('.answer-select');
+            var textarea = row.querySelector('.comment-textarea');
+            var guideBtn = row.querySelector('.answering-guide-btn');
+            if (select) {
+                if (isNotApplicable) select.value = '';
+                select.disabled = !!isNotApplicable || !window._directIsOpen;
+            }
+            if (textarea) {
+                textarea.disabled = !!isNotApplicable || !window._directIsOpen;
+            }
+            if (guideBtn) {
+                guideBtn.disabled = !!isNotApplicable || !window._directIsOpen;
+            }
+        }
         var CHECKMARK_SVG = '<svg width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" stroke="#22b573" stroke-width="2" fill="#fff"/><polyline points="6,12 10,16 16,7" stroke="#22b573" stroke-width="2.5" fill="none"/></svg>';
         function toggleDomain(header) {
             var controlsDiv = header.nextElementSibling;
@@ -219,16 +258,18 @@
         }
         
         // Helper function to update completion bar
-        function updateCompletionBar(controls, controlAnswers) {
+        function updateCompletionBar(controls, controlAnswers, notApplicableMap) {
             var answered = 0;
-            if (controlAnswers) {
-                for (var ctrlId in controlAnswers) {
-                    if (controlAnswers[ctrlId]) {
+            var total = 0;
+            if (controls && controlAnswers) {
+                controls.forEach(function(ctrl) {
+                    if (isDirectNotApplicable(notApplicableMap, ctrl.id)) return;
+                    total++;
+                    if (controlAnswers[ctrl.id] || controlAnswers[String(ctrl.id)]) {
                         answered++;
                     }
-                }
+                });
             }
-            var total = controls ? controls.length : 0;
             var percent = total > 0 ? Math.round((answered / total) * 100) : 0;
             
             document.getElementById('completion-percentage').textContent = percent + '%';
@@ -241,6 +282,7 @@
         function getUpdatedControlAnswers() {
             var answers = {};
             document.querySelectorAll('.answer-select').forEach(function(select) {
+                if (isDirectRowNotApplicable(select.closest('tr'))) return;
                 var controlId = select.getAttribute('data-control-id');
                 answers[controlId] = select.value || null;
             });
@@ -257,8 +299,13 @@
                 var domainId = checkmarkSpan.getAttribute("data-domain-id");
                 var selects = document.querySelectorAll('.answer-select[data-domain-id="' + domainId + '"]');
                 var allAnswered = true;
-                if (selects.length === 0) allAnswered = false;
-                selects.forEach(function (select) { if (!select.value) allAnswered = false; });
+                var applicableCount = 0;
+                selects.forEach(function (select) {
+                    if (isDirectRowNotApplicable(select.closest('tr'))) return;
+                    applicableCount++;
+                    if (!select.value) allAnswered = false;
+                });
+                if (applicableCount === 0) allAnswered = false;
                 checkmarkSpan.innerHTML = allAnswered ? CHECKMARK_SVG : "";
             });
         }
@@ -313,8 +360,11 @@
                 var answers = Array.isArray(data.maturityAnswers) ? data.maturityAnswers : [];
                 var controlAnswers = data.controlAnswers || {};
                 var comments = data.controlComments || {};
+                var notApplicable = data.notApplicable || {};
                 var isOpen = data.isOpen;
                 var guideVisible = data.guideVisibleInDirect === true;
+                window._directNotApplicable = notApplicable;
+                window._directIsOpen = !!isOpen;
                 window._directCatalogId = data.securityCatalogId || 0;
                 window._directMaturityAnswers = answers;
                 window._directControls = controls; // used by inline update
@@ -345,11 +395,12 @@
                         '<div class="domain-controls d-none"><div class="domain-controls-tbl">';
                     controlsHtml += '<table class="table card controls-table"><thead><tr><th class="control-col-wide">Control</th><th>Answer & Comment</th></tr></thead><tbody>';
                     controls.filter(function (ctrl) { return ctrl.domainId === domain.id; }).forEach(function (ctrl) {
+                        var isNotApplicable = isDirectNotApplicable(notApplicable, ctrl.id);
                         var ansCell = '';
                         var selectId = 'select-control-' + ctrl.id;
-                        var disabledAttr = isOpen ? '' : ' disabled';
+                        var disabledAttr = (isOpen && !isNotApplicable) ? '' : ' disabled';
                         var guideBtnHtml = '';
-                        if (guideVisible && isOpen) {
+                        if (guideVisible && isOpen && !isNotApplicable) {
                             guideBtnHtml = '<div class="answering-guide-row">' +
                                 '<button type="button" class="answering-guide-btn" ' +
                                 'data-control-id="' + ctrl.id + '" ' +
@@ -370,7 +421,7 @@
                             '<textarea class="comment-textarea comment-textarea-sized" name="comment_' + ctrl.id + '" data-control-id="' + ctrl.id + '" placeholder="Add comment (optional)"' + disabledAttr + '>' + (comments && comments[ctrl.id] ? comments[ctrl.id] : '') + '</textarea><span class="comment-feedback"></span>' +
                             '</div>' +
                             '</div>';
-                        controlsHtml += '<tr><td class="ctrl-name-col"><div class="ctrl-desc-wrap"><span class="text-bold">' + (ctrl.name != null ? ctrl.name : '-') + '</span>' +
+                        controlsHtml += '<tr data-control-id="' + ctrl.id + '" data-not-applicable="' + (isNotApplicable ? 'true' : 'false') + '"' + (isNotApplicable ? ' class="na-control-row"' : '') + '><td class="ctrl-name-col"><div class="ctrl-desc-wrap"><span class="text-bold">' + (ctrl.name != null ? ctrl.name : '-') + '</span>' +
                             '<div>' + ((ctrl.detail && ctrl.detail !== '') ? ctrl.detail : 'No detail') + '</div></div></td>' +
                             '<td>' + ansCell + '</td></tr>';
                     });
@@ -397,11 +448,21 @@
                                 body: 'controlId=' + controlId + '&answerId=' + answerId
                             })
                             .then(function(resp) {
+                                if (!resp.ok) {
+                                    return resp.text().then(function(msg) {
+                                        throw new Error(msg || 'save_failed');
+                                    });
+                                }
                                 select.style.background = '#d8ffd8';
                                 showSuccessIcon(feedbackIcon);
                                 setTimeout(function() { clearIcon(feedbackIcon); select.style.background = ''; }, 1500);
                             })
-                            .catch(function() {
+                            .catch(function(err) {
+                                if (err && err.message === 'not_applicable') {
+                                    var row = select.closest('tr');
+                                    setDirectRowNotApplicableState(row, true);
+                                    window._directNotApplicable[String(controlId)] = true;
+                                }
                                 select.style.background = '#ffd8d8';
                                 showErrorIcon(feedbackIcon);
                             });
@@ -423,7 +484,12 @@
                                     },
                                     body: JSON.stringify({ comment: comment })
                                 })
-                                .then(function() {
+                                .then(function(resp) {
+                                    if (!resp.ok) {
+                                        return resp.text().then(function(msg) {
+                                            throw new Error(msg || 'comment_save_failed');
+                                        });
+                                    }
                                     textarea.style.background = '#d8ffd8';
                                     feedback.innerHTML = '<span class="answer-success text-bold">Saved</span>';
                                     setTimeout(function() {
@@ -431,7 +497,12 @@
                                         textarea.style.background = '';
                                     }, 1400);
                                 })
-                                .catch(function() {
+                                .catch(function(err) {
+                                    if (err && err.message === 'not_applicable') {
+                                        var row = textarea.closest('tr');
+                                        setDirectRowNotApplicableState(row, true);
+                                        window._directNotApplicable[String(controlId)] = true;
+                                    }
                                     textarea.style.background = '#ffd8d8';
                                     feedback.innerHTML = '<span class="answer-error text-bold">Error saving</span>';
                                 });
@@ -440,12 +511,12 @@
                     });
                 }
                 checkDomainCompleteness();
-                updateCompletionBar(controls, controlAnswers);
+                updateCompletionBar(controls, controlAnswers, notApplicable);
                 if (isOpen) {
                     document.body.addEventListener("change", function (e) {
                         if (e.target.classList.contains("answer-select")) {
                             checkDomainCompleteness();
-                            updateCompletionBar(controls, getUpdatedControlAnswers());
+                            updateCompletionBar(controls, getUpdatedControlAnswers(), window._directNotApplicable || {});
                         }
                     });
                 }
@@ -757,9 +828,27 @@
             function applyInlineUpdate(data) {
                 var answers = data.controlAnswers || {};
                 var comments = data.comments || {};
+                var notApplicable = data.notApplicable || {};
+                window._directNotApplicable = notApplicable;
+
+                Object.keys(notApplicable).forEach(function(cid) {
+                    var row = document.querySelector('tr[data-control-id="' + cid + '"]');
+                    if (row) setDirectRowNotApplicableState(row, true);
+                });
+                document.querySelectorAll('tr[data-control-id]').forEach(function(row) {
+                    var cid = row.getAttribute('data-control-id');
+                    if (!cid) return;
+                    if (!isDirectNotApplicable(notApplicable, cid)) {
+                        setDirectRowNotApplicableState(row, false);
+                    }
+                });
                 // Update answer selects (skip focused element to avoid disrupting live editing)
                 document.querySelectorAll('select.answer-select').forEach(function(sel) {
                     var cid = sel.getAttribute('data-control-id');
+                    if (isDirectRowNotApplicable(sel.closest('tr'))) {
+                        if (sel.value !== '') sel.value = '';
+                        return;
+                    }
                     if (!cid || document.activeElement === sel) return;
                     var newVal = answers[cid] != null ? String(answers[cid]) : '';
                     if (sel.value !== newVal) sel.value = newVal;
@@ -773,7 +862,10 @@
                 });
                 // Refresh completion bar
                 if (typeof updateCompletionBar === 'function' && typeof getUpdatedControlAnswers === 'function') {
-                    updateCompletionBar(window._directControls || [], getUpdatedControlAnswers());
+                    updateCompletionBar(window._directControls || [], getUpdatedControlAnswers(), notApplicable);
+                }
+                if (typeof checkDomainCompleteness === 'function') {
+                    checkDomainCompleteness();
                 }
             }
 

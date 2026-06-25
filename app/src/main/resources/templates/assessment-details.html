@@ -73,6 +73,32 @@
         .sse-updated {
             animation: sseFlash 1.5s ease-out;
         }
+
+        .na-control-row {
+            background: #f2f2f2;
+            color: #7a7a7a;
+        }
+        .na-control-row * {
+            color: #7a7a7a !important;
+        }
+        .na-control-row .answer-select,
+        .na-control-row .comment-textarea,
+        .na-control-row .answering-guide-btn,
+        .na-control-row .override-slider-checkbox {
+            opacity: 0.7;
+        }
+        .not-applicable-row {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 0.25em;
+        }
+        .not-applicable-label {
+            display: inline-flex;
+            gap: 0.4em;
+            align-items: center;
+            font-size: 0.9em;
+            user-select: none;
+        }
     </style>
 </head>
 
@@ -423,7 +449,8 @@
                             <tbody>
                                 <tr th:each="ctrl : ${controlsByReference}"
                                     th:if="${ctrl.securityControlDomain != null && domain != null && ctrl.securityControlDomain.id == domain.id}"
-                                    th:attr="data-control-id=${ctrl.id},data-control-name=${ctrl.name},data-control-reference=${ctrl.reference},data-control-tag=${ctrl.tag},data-selected-answer=${controlAnswers != null and controlAnswers[ctrl.id] != null ? controlAnswers[ctrl.id] : ''},data-display-answer-id=${controlDisplayAnswers != null and controlDisplayAnswers.containsKey(ctrl.id) ? controlDisplayAnswers[ctrl.id] : ''}">
+                                    th:classappend="${controlNotApplicable != null and controlNotApplicable.containsKey(ctrl.id)} ? 'na-control-row' : ''"
+                                    th:attr="data-control-id=${ctrl.id},data-control-name=${ctrl.name},data-control-reference=${ctrl.reference},data-control-tag=${ctrl.tag},data-selected-answer=${controlAnswers != null and controlAnswers[ctrl.id] != null ? controlAnswers[ctrl.id] : ''},data-display-answer-id=${controlDisplayAnswers != null and controlDisplayAnswers.containsKey(ctrl.id) ? controlDisplayAnswers[ctrl.id] : ''},data-not-applicable=${controlNotApplicable != null and controlNotApplicable.containsKey(ctrl.id)}">
                                         <td class="ctrl-name-col">
                                             <div class="ctrl-desc-wrap">
                                                 
@@ -460,7 +487,7 @@
                                                             th:data-control-id="${ctrl.id}"
                                                             th:data-control-name="${ctrl.name}"
                                                             th:data-control-detail="${ctrl.detail}"
-                                                            th:disabled="${!canEditControls} or (${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])})"
+                                                            th:disabled="${!canEditControls or (T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])) or (controlNotApplicable != null and controlNotApplicable.containsKey(ctrl.id))}"
                                                             th:title="${!canEditControls} ? 'Disabled on locked assessments' : (${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])} ? 'Disabled for taken-over answers' : 'Get AI-powered answering guide')">
                                                             💡 Guide
                                                         </button>
@@ -470,7 +497,7 @@
                                                             th:data-control-id="${ctrl.id}"
                                                             th:data-domain-id="${domain.id}"
                                                             class="answer-select"
-                                                            th:disabled="${!canEditControls} or (${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])})"
+                                                            th:disabled="${!canEditControls or (T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])) or (controlNotApplicable != null and controlNotApplicable.containsKey(ctrl.id))}"
                                                             th:classappend="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])} ? 'taken-over' : ''">
                                                             <option value="">-- select an answer --</option>
                                                             <option th:each="ans : ${maturityAnswers}"
@@ -491,7 +518,7 @@
                                                                 th:data-control-id="${ctrl.id}"
                                                                 th:data-assessment-id="${assessment.id}"
                                                                 th:checked="${T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])}"
-                                                                th:disabled="${!canEditControls}"
+                                                                th:disabled="${!canEditControls or (controlNotApplicable != null and controlNotApplicable.containsKey(ctrl.id))}"
                                                                 onchange="toggleOverride(this)"
                                                                 title="Toggle override of org service answer">
                                                             <span class="override-slider"></span>
@@ -509,10 +536,21 @@
                                                     <textarea class="comment-textarea"
                                                         th:name="${'comment_' + ctrl.id}"
                                                         th:data-control-id="${ctrl.id}"
-                                                        th:disabled="${!canEditControls} or (${T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])})"
+                                                        th:disabled="${!canEditControls or (T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id])) or (controlNotApplicable != null and controlNotApplicable.containsKey(ctrl.id))}"
                                                         th:placeholder="${(T(java.lang.Boolean).TRUE.equals(controlAnswerIsTakenOver[ctrl.id]) and !T(java.lang.Boolean).TRUE.equals(controlAnswerIsOverridden[ctrl.id]))} ? 'No comment from Org Service' : 'Add comment (optional)'"
                                                         th:text="${controlComments != null && controlComments[ctrl.id] != null ? controlComments[ctrl.id] : (orgServiceControlComments != null && orgServiceControlComments[ctrl.id] != null ? orgServiceControlComments[ctrl.id] : '')}"
                                                         th:inline="text"></textarea>
+                                                </div>
+
+                                                <div class="not-applicable-row" th:if="${canSetNotApplicable}">
+                                                    <label class="not-applicable-label">
+                                                        <input type="checkbox"
+                                                               class="not-applicable-checkbox"
+                                                               th:data-control-id="${ctrl.id}"
+                                                               th:data-assessment-id="${assessment.id}"
+                                                               th:checked="${controlNotApplicable != null and controlNotApplicable.containsKey(ctrl.id)}">
+                                                        <span>Not Applicable</span>
+                                                    </label>
                                                 </div>
                                             </div>
                                         </td>
@@ -1266,6 +1304,10 @@
             var ratingToLabel = {}; // numeric rating -> answer label text
 
             selects.forEach(function(sel) {
+                var row = sel.closest('tr');
+                if (row && row.getAttribute('data-not-applicable') === 'true') {
+                    return;
+                }
                 // Build ratingToLabel from all options (same for all selects)
                 Array.from(sel.options).forEach(function(opt) {
                     var r = parseFloat(opt.getAttribute('data-rating'));
@@ -2075,7 +2117,16 @@
             function applyInlineUpdate(data) {
                 var answers = data.controlAnswers || {};
                 var comments = data.comments || {};
+                var notApplicable = data.notApplicable || {};
                 var changed = false;
+
+                Object.keys(notApplicable).forEach(function(cid) {
+                    var row = document.querySelector('tr[data-control-id="' + cid + '"]');
+                    if (!row) return;
+                    if (typeof setRowNotApplicableState === 'function') {
+                        setRowNotApplicableState(row, !!notApplicable[cid]);
+                    }
+                });
                 // Update answer selects — skip focused or disabled (org-service inherited) ones
                 document.querySelectorAll('select.answer-select').forEach(function(sel) {
                     var cid = sel.getAttribute('data-control-id');

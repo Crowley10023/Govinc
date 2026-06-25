@@ -213,7 +213,15 @@ public class AssessmentReporter {
 
             // Gather all control answers, including per-service
             java.util.List<SecurityControl> allControls = assessment.getEffectiveControls();
+                java.util.Set<Long> notApplicableControlIds = answers.stream()
+                    .filter(a -> a != null && a.getSecurityControl() != null && Boolean.TRUE.equals(a.getIsNotApplicable()))
+                    .map(a -> a.getSecurityControl().getId())
+                    .collect(Collectors.toSet());
+                java.util.List<SecurityControl> applicableControls = allControls.stream()
+                    .filter(c -> c != null && c.getId() != null && !notApplicableControlIds.contains(c.getId()))
+                    .collect(Collectors.toList());
             java.util.Map<Long, AssessmentControlAnswer> answerMap = answers.stream()
+                    .filter(a -> a != null && a.getSecurityControl() != null && !Boolean.TRUE.equals(a.getIsNotApplicable()))
                     .collect(Collectors.toMap(
                             a -> a.getSecurityControl().getId(),
                             a -> a,
@@ -241,7 +249,7 @@ public class AssessmentReporter {
             java.util.Map<Long, Integer> scoresByControl = new java.util.HashMap<>();
             java.util.Map<Long, String> labelByControl = new java.util.HashMap<>(); // For org service answers
 
-            for (SecurityControl ctrl : allControls) {
+            for (SecurityControl ctrl : applicableControls) {
                 if (answerMap.containsKey(ctrl.getId())) {
                     AssessmentControlAnswer aca = answerMap.get(ctrl.getId());
                     int score = aca.getScore();
@@ -271,7 +279,7 @@ public class AssessmentReporter {
             summaryTable.addCell(h1);
             summaryTable.addCell(h2);
             summaryTable.addCell(h3);
-            summaryTable.addCell(new Phrase(String.valueOf(allControls.size()), tableCellFont));
+            summaryTable.addCell(new Phrase(String.valueOf(applicableControls.size()), tableCellFont));
             summaryTable.addCell(new Phrase(String.format("%.1f", avgScore), tableCellFont));
             summaryTable.addCell(new Phrase(orgUnit != null ? orgUnit.getName() : "-", tableCellFont));
             doc.add(summaryTable);
@@ -284,7 +292,7 @@ public class AssessmentReporter {
             ovwSection.setSpacingBefore(15);
             doc.add(ovwSection);
             doc.add(Chunk.NEWLINE);
-            Map<String, java.util.List<SecurityControl>> controlsPerDomain = allControls.stream()
+            Map<String, java.util.List<SecurityControl>> controlsPerDomain = applicableControls.stream()
                     .collect(Collectors.groupingBy(
                             ctrl -> ctrl.getSecurityControlDomain() != null ? ctrl.getSecurityControlDomain().getName()
                                     : "Unknown"));

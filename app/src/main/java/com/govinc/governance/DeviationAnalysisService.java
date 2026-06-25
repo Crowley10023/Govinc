@@ -104,6 +104,7 @@ public class DeviationAnalysisService {
 
             for (AssessmentControlAnswer answer : details.getControlAnswers()) {
                 if (answer.getSecurityControl() == null) continue;
+                if (Boolean.TRUE.equals(answer.getIsNotApplicable())) continue;
                 Long ctrlId = answer.getSecurityControl().getId();
                 if (!controlMap.containsKey(ctrlId)) continue;
 

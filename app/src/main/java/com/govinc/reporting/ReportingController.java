@@ -81,6 +81,15 @@ public class ReportingController {
             if (!detailsOpt.isPresent()) continue;
 
             AssessmentDetails details = detailsOpt.get();
+            Set<Long> excludedControls = new HashSet<>();
+            if (details.getControlAnswers() != null) {
+                for (AssessmentControlAnswer aca : details.getControlAnswers()) {
+                    if (aca.getSecurityControl() != null && Boolean.TRUE.equals(aca.getIsNotApplicable())) {
+                        excludedControls.add(aca.getSecurityControl().getId());
+                    }
+                }
+            }
+            int applicableTotalControls = Math.max(0, totalControls - excludedControls.size());
             ReportingCalculator.AssessmentStats stats =
                     ReportingCalculator.compute(details.getControlAnswers(), totalControls);
 
@@ -93,7 +102,7 @@ public class ReportingController {
             point.put("dateLabel", dateLabel);
             point.put("averageRating", stats.averageRating);
             point.put("answeredCount", stats.answeredControls);
-            point.put("totalControls", totalControls);
+            point.put("totalControls", applicableTotalControls);
             point.put("coveragePercent", stats.coveragePercent);
 
             catalogMap.computeIfAbsent(catalogId, k -> {
