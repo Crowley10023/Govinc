@@ -182,9 +182,11 @@ public class AssessmentDirectController {
             return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.LOCKED).body("locked");
 
         Optional<AssessmentDetails> detailsOpt = detailsService.findByAssessmentId(id);
-        AssessmentDetails details = null;
+        AssessmentDetails details;
         if (!detailsOpt.isPresent()) {
-            return org.springframework.http.ResponseEntity.badRequest().body("fail");
+            details = new AssessmentDetails();
+            details.getAssessments().add(assessmentCheck);
+            details = detailsService.save(details);
         } else {
             details = detailsOpt.get();
         }
@@ -237,9 +239,11 @@ public class AssessmentDirectController {
 
         String comment = body.get("comment");
         Optional<AssessmentDetails> detailsOpt = detailsService.findByAssessmentId(id);
-        AssessmentDetails details = null;
+        AssessmentDetails details;
         if (!detailsOpt.isPresent()) {
-            return org.springframework.http.ResponseEntity.badRequest().body("fail");
+            details = new AssessmentDetails();
+            details.getAssessments().add(assessmentCheck);
+            details = detailsService.save(details);
         } else {
             details = detailsOpt.get();
         }

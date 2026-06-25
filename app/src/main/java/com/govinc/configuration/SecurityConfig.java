@@ -125,6 +125,9 @@ public class SecurityConfig {
                 // re-evaluate authorization on them.
                 .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                 .requestMatchers(PUBLIC_URLS).permitAll()
+                // Corp-dir lookup used from assessment-details e-mail flow.
+                // Keep narrow scope: allow only this endpoint for assessor role.
+                .requestMatchers("/users/api/find-by-email").hasAnyRole("ADMIN", "INFORMATION_SECURITY_MANAGER", "ASSESSOR")
                 // CONFIG and admin areas must be ADMIN only per security architecture
                 .requestMatchers("/config/**").hasRole("ADMIN")
                 .requestMatchers("/admin/**").hasRole("ADMIN")

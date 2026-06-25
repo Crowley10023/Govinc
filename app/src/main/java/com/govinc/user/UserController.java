@@ -291,7 +291,9 @@ public class UserController {
     @GetMapping("/api/find-by-email")
     @ResponseBody
     public Map<String, Object> apiFindByEmail(@RequestParam("email") String email) {
-        if (!authorizationService.canAccessOrganization()) {
+        if (!(authorizationService.isAdmin()
+                || authorizationService.isInformationSecurityManager()
+                || authorizationService.isAssessor())) {
             throw new UnauthorizedException("You do not have permission to look up users.");
         }
         Optional<User> found = userRepository.findByEmail(email.trim().toLowerCase());
