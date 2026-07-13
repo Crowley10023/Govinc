@@ -345,7 +345,29 @@ PREVIEW="$(run_sql_table "SELECT id, first_name, last_name, email, role FROM \`u
 
 if [ -z "$PREVIEW" ]; then
   echo "No user found matching: $IDENTITY"
-  exit 1
+  echo "Creating user first..."
+
+  if echo "$IDENTITY" | grep -q "@"; then
+    local_part="${IDENTITY%%@*}"
+    derived_fn="$(echo "$local_part" | sed 's/[._+\-]/ /g' | awk '{print $1}')"
+    derived_ln="$(echo "$local_part" | sed 's/[._+\-]/ /g' | awk '{$1=""; sub(/^ /, ""); print}')"
+    derived_fn="$(echo "$derived_fn" | awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) tolower(substr($i,2)); print}')"
+    derived_ln="$(echo "$derived_ln" | awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) tolower(substr($i,2)); print}')"
+
+    ESC_EMAIL="$(esc_sql "$IDENTITY")"
+    ESC_FN="$(esc_sql "$derived_fn")"
+    ESC_LN="$(esc_sql "$derived_ln")"
+    run_sql "INSERT INTO \`user\` (email, first_name, last_name, role) VALUES ('${ESC_EMAIL}', '${ESC_FN}', '${ESC_LN}', 'ADMIN');"
+  else
+    fn_part="${IDENTITY%% *}"
+    ln_part="${IDENTITY#* }"
+    [ "$ln_part" = "$IDENTITY" ] && ln_part=""
+    ESC_FN="$(esc_sql "$fn_part")"
+    ESC_LN="$(esc_sql "$ln_part")"
+    run_sql "INSERT INTO \`user\` (first_name, last_name, role) VALUES ('${ESC_FN}', '${ESC_LN}', 'ADMIN');"
+  fi
+
+  PREVIEW="$(run_sql_table "SELECT id, first_name, last_name, email, role FROM \`user\` WHERE ${WHERE};")"
 fi
 
 echo "User(s) to be promoted:"
