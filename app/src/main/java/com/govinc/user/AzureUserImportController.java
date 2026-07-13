@@ -37,7 +37,9 @@ public class AzureUserImportController {
 
     @PostMapping("/search")
     public ResponseEntity<Map<String, Object>> search(@RequestBody Map<String, String> body) {
-        if (!authorizationService.isAdmin()) throw new UnauthorizedException("Admin required");
+        if (!authorizationService.isInformationSecurityManager()) {
+            throw new UnauthorizedException("Admin or Information Security Manager required");
+        }
 
         AuthConfigService.AuthProvider azure = authConfigService.getProvider("azure");
         if (azure == null || !azure.isConfigured()) {
@@ -62,7 +64,9 @@ public class AzureUserImportController {
 
     @PostMapping("/import")
     public ResponseEntity<Map<String, Object>> importUsers(@RequestBody List<Map<String, String>> users) {
-        if (!authorizationService.isAdmin()) throw new UnauthorizedException("Admin required");
+        if (!authorizationService.isInformationSecurityManager()) {
+            throw new UnauthorizedException("Admin or Information Security Manager required");
+        }
 
         int imported = 0;
         int skipped = 0;
@@ -119,7 +123,9 @@ public class AzureUserImportController {
      */
     @PostMapping("/resolve")
     public ResponseEntity<Map<String, Object>> resolveUsers(@RequestBody List<Map<String, String>> users) {
-        if (!authorizationService.isAdmin()) throw new UnauthorizedException("Admin required");
+        if (!authorizationService.isInformationSecurityManager()) {
+            throw new UnauthorizedException("Admin or Information Security Manager required");
+        }
 
         List<Map<String, Object>> resolved = new ArrayList<>();
 
