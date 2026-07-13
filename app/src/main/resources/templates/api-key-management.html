@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>API Key Management</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <th:block th:replace="~{navigation :: navHead}"></th:block>
+</head>
+<body>
+<div th:replace="~{navigation :: mainNav}"></div>
+
+<div id="statusMessage" class="status-message-bar" style="display:none;"></div>
+
+<div class="container">
+    <h1 class="page-title">API Key Management</h1>
+    <p class="text-muted">Create and manage API keys for external systems using the assessment export API.</p>
+
+    <div class="section-card" style="max-width:900px; margin-bottom:1.5em;">
+        <h3>Create API Key</h3>
+        <div style="display:flex; gap:0.6em; align-items:flex-end; flex-wrap:wrap;">
+            <div class="form-group" style="min-width:320px; margin:0;">
+                <label for="keyName">Name</label>
+                <input id="keyName" class="form-control" type="text" maxlength="120" placeholder="Example: PowerBI Integration">
+            </div>
+            <button type="button" class="btn-submit" onclick="createApiKey()">Generate API Key</button>
+        </div>
+
+        <div id="newKeyPanel" style="display:none; margin-top:1em; padding:1em; background:#eef8ff; border:1px solid #b7dfff; border-radius:6px;">
+            <div style="font-weight:700; margin-bottom:0.4em;">New API key generated (shown only once)</div>
+            <div style="display:flex; gap:0.5em; align-items:center; flex-wrap:wrap;">
+                <input id="newKeyValue" class="form-control" type="text" readonly style="font-family:monospace; min-width:360px;">
+                <button type="button" class="btn-action" onclick="copyNewKey()">Copy</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="section-card" style="max-width:900px; margin-bottom:1.5em;">
+        <h3>Existing API Keys</h3>
+        <table class="table card">
+            <thead>
+            <tr>
+                <th>Name</th>
+                <th>Prefix</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Last Used</th>
+                <th>Actions</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:if="${#lists.isEmpty(apiKeys)}">
+                <td colspan="6" class="text-muted">No API keys created yet.</td>
+            </tr>
+            <tr th:each="k : ${apiKeys}">
+                <td th:text="${k.name}"></td>
+                <td><code th:text="${k.keyPrefix}"></code></td>
+                <td>
+                    <span th:if="${k.active}" class="badge-success" style="display:inline-block;padding:0.25em 0.55em;border-radius:4px;">Active</span>
+                    <span th:unless="${k.active}" class="text-muted">Revoked</span>
+                </td>
+                <td th:text="${k.createdAt != null ? #temporals.format(k.createdAt, 'yyyy-MM-dd HH:mm') : '-'}"></td>
+                <td th:text="${k.lastUsedAt != null ? #temporals.format(k.lastUsedAt, 'yyyy-MM-dd HH:mm') : 'Never'}"></td>
+                <td>
+                    <button type="button" class="btn-secondary" th:if="${k.active}" th:attr="data-id=${k.id}" onclick="revokeKey(this)">Revoke</button>
+                    <button type="button" class="btn-danger" th:attr="data-id=${k.id}" onclick="deleteKey(this)">Delete</button>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section-card" style="max-width:900px;">
+        <h3>External API Description</h3>
+        <p class="text-muted">Authentication for all endpoints:</p>
+        <pre style="overflow:auto;"><code>X-API-Key: &lt;your generated api key&gt;</code></pre>
+
+        <p class="text-muted">1) List available security catalogs</p>
+        <pre style="overflow:auto;"><code>GET /public-api/v1/catalogs</code></pre>
+
+        <p class="text-muted">2) List assessments for one security catalog</p>
+        <pre style="overflow:auto;"><code>GET /public-api/v1/catalogs/{catalogId}/assessments</code></pre>
+
+        <p class="text-muted">3) Get all control answers for one assessment</p>
+        <pre style="overflow:auto;"><code>GET /public-api/v1/assessments/{assessmentId}/answers</code></pre>
+
+        <p class="text-muted">Example curl call:</p>
+        <pre style="overflow:auto;"><code>curl -H "X-API-Key: YOUR_KEY" http://localhost:8080/public-api/v1/catalogs</code></pre>
+
+        <p>Detailed documentation file: <a href="/docs/external-assessment-api.md" target="_blank">external-assessment-api.md</a></p>
+    </div>
+</div>
+
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    var csrfToken = /*[[${_csrf.token}]]*/ '';
+    var csrfHeader = /*[[${_csrf.headerName}]]*/ 'X-CSRF-TOKEN';
+    /*]]>*/
+
+    function createApiKey() {
+        var name = document.getElementById('keyName').value || '';
+        fetch('/config/api-keys/create', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                [csrfHeader]: csrfToken
+            },
+            body: JSON.stringify({ name: name })
+        })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            if (data.success) {
+                document.getElementById('newKeyPanel').style.display = 'block';
+                document.getElementById('newKeyValue').value = data.apiKey;
+                showBar('API key created successfully.', 'success');
+                setTimeout(function() { window.location.reload(); }, 1100);
+            } else {
+                showBar('Failed to create API key.', 'error');
+            }
+        })
+        .catch(function(err) {
+            showBar('Request failed: ' + err, 'error');
+        });
+    }
+
+    function revokeKey(btn) {
+        var id = btn.getAttribute('data-id');
+        fetch('/config/api-keys/' + id + '/revoke', {
+            method: 'POST',
+            headers: {
+                [csrfHeader]: csrfToken
+            }
+        })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            if (data.success) {
+                showBar('API key revoked.', 'success');
+                setTimeout(function() { window.location.reload(); }, 800);
+            } else {
+                showBar(data.error || 'Failed to revoke API key.', 'error');
+            }
+        })
+        .catch(function(err) {
+            showBar('Request failed: ' + err, 'error');
+        });
+    }
+
+    function deleteKey(btn) {
+        if (!confirm('Delete this API key? This cannot be undone.')) {
+            return;
+        }
+        var id = btn.getAttribute('data-id');
+        fetch('/config/api-keys/' + id, {
+            method: 'DELETE',
+            headers: {
+                [csrfHeader]: csrfToken
+            }
+        })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            if (data.success) {
+                showBar('API key deleted.', 'success');
+                setTimeout(function() { window.location.reload(); }, 800);
+            } else {
+                showBar(data.error || 'Failed to delete API key.', 'error');
+            }
+        })
+        .catch(function(err) {
+            showBar('Request failed: ' + err, 'error');
+        });
+    }
+
+    function copyNewKey() {
+        var key = document.getElementById('newKeyValue').value;
+        if (!key) {
+            return;
+        }
+        navigator.clipboard.writeText(key).then(function() {
+            showBar('API key copied to clipboard.', 'success');
+        }).catch(function() {
+            showBar('Copy failed. Please copy manually.', 'error');
+        });
+    }
+
+    function showBar(msg, type) {
+        var bar = document.getElementById('statusMessage');
+        bar.textContent = msg;
+        bar.className = 'status-message-bar alert alert-' + type;
+        bar.style.display = 'block';
+        setTimeout(function() { bar.style.display = 'none'; }, 5000);
+    }
+</script>
+</body>
+</html>

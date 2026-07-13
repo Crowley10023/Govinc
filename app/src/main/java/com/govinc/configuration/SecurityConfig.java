@@ -59,6 +59,9 @@ public class SecurityConfig {
             "/assessment-direct/guide/answer",
             "/assessment-direct/guide/summary",
 
+            // External integration API (authenticated with API key header)
+            "/public-api/**",
+
             // Static assets and theme
             "/static/**",
             "/favicon.ico",

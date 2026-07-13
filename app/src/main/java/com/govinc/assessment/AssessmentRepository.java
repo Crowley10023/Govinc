@@ -18,6 +18,8 @@ public interface AssessmentRepository extends JpaRepository<Assessment, Long> {
 
     List<Assessment> findByCreatedById(Long userId);
 
+    List<Assessment> findBySecurityCatalogId(Long catalogId);
+
     List<Assessment> findBySecurityCatalogIdAndOrgUnitId(Long catalogId, Long orgUnitId);
 
     @Query("SELECT DISTINCT a FROM Assessment a JOIN a.orgServices s WHERE s.id = :orgServiceId AND a.status = com.govinc.assessment.AssessmentStatus.OPEN")

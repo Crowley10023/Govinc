@@ -97,6 +97,25 @@ run_sql_table() {
   "$MYSQL_CMD" --defaults-extra-file="$TEMP_CFG" "$DB_NAME" -e "$1"
 }
 
+# Create user table when running against a fresh database.
+# Keep it compatible with both current entity fields and legacy columns
+# found in historical backups.
+ensure_user_table_exists() {
+  run_sql "
+    CREATE TABLE IF NOT EXISTS \`user\` (
+      \`id\` bigint(20) NOT NULL AUTO_INCREMENT,
+      \`email\` varchar(255) DEFAULT NULL,
+      \`name\` varchar(255) DEFAULT NULL,
+      \`role\` varchar(64) DEFAULT 'ASSESSMENT_DELEGATE',
+      \`organisation_unit_id\` bigint(20) DEFAULT NULL,
+      \`first_name\` varchar(255) DEFAULT NULL,
+      \`surname\` varchar(255) DEFAULT NULL,
+      \`last_name\` varchar(255) DEFAULT NULL,
+      PRIMARY KEY (\`id\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+  "
+}
+
 esc_sql() {
   printf "%s" "$1" | sed "s/'/''/g"
 }
@@ -119,6 +138,8 @@ reassign_and_delete() {
 }
 
 # ── 1. Derive missing names from e-mail ──────────────────────────────────────
+
+ensure_user_table_exists
 
 echo "=== Checking for users with missing first/last name ==="
 echo ""
