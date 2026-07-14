@@ -8,12 +8,14 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.govinc.organization.OrgUnit;
 import java.util.HashSet;
 import java.util.Set;
 
 @Entity
+@Table(name = "`user`")
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

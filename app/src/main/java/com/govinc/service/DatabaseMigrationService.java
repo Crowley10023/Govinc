@@ -38,6 +38,8 @@ import java.util.stream.Stream;
  */
 @Service
 public class DatabaseMigrationService {
+    public static final String CURRENT_SCHEMA_VERSION = "1.5";
+
     private static final Pattern VERSION_FROM_FILENAME_PATTERN = Pattern.compile("_v([A-Za-z0-9._-]+)_\\d{8}_\\d{6}\\.sql$");
     private static final Pattern BACKUP_TABLE_SECTION = Pattern.compile("^--\\s*Table:\\s*`([^`]+)`.*$");
     private static final Pattern BACKUP_VIEW_SECTION  = Pattern.compile("^--\\s*View:\\s*`([^`]+)`.*$");
@@ -79,6 +81,10 @@ public class DatabaseMigrationService {
             return config.get().getCurrentVersion();
         }
         return "0.9"; // Default version before versioning was introduced
+    }
+
+    public String getLatestKnownVersion() {
+        return CURRENT_SCHEMA_VERSION;
     }
 
     /**

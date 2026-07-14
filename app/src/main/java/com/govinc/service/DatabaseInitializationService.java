@@ -13,10 +13,13 @@ import org.springframework.stereotype.Service;
 @Service
 public class DatabaseInitializationService {
     private final DatabaseConfigRepository databaseConfigRepository;
+    private final DatabaseMigrationService databaseMigrationService;
 
     @Autowired
-    public DatabaseInitializationService(DatabaseConfigRepository databaseConfigRepository) {
+    public DatabaseInitializationService(DatabaseConfigRepository databaseConfigRepository,
+                                         DatabaseMigrationService databaseMigrationService) {
         this.databaseConfigRepository = databaseConfigRepository;
+        this.databaseMigrationService = databaseMigrationService;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -29,11 +32,11 @@ public class DatabaseInitializationService {
                 // Create default database config
                 DatabaseConfig config = new DatabaseConfig();
                 config.setVersionKey("schema_version");
-                config.setCurrentVersion("0.9");
-                config.setDescription("Initial database version");
+                config.setCurrentVersion(databaseMigrationService.getLatestKnownVersion());
+                config.setDescription("Initialized database at current schema version");
                 databaseConfigRepository.save(config);
                 
-                System.out.println("✓ Database configuration initialized with version 0.9");
+                System.out.println("✓ Database configuration initialized at current schema version " + config.getCurrentVersion());
             }
         } catch (Exception e) {
             System.err.println("⚠ Warning: Could not initialize database config: " + e.getMessage());
