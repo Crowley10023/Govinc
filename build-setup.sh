@@ -24,6 +24,12 @@ MARIADB_PORT=3306
 APPLICATION_PROPS="app/src/main/resources/application.properties"
 BUILD_CONFIG_FILE=".build-setup.local"  # Git ignored file for storing user entries
 
+# Runtime flags set during setup flow
+LAST_DB_TYPE=""
+AUTO_SCHEMA_UPDATE="false"
+DETECTED_SCHEMA_VERSION=""
+LATEST_SCHEMA_VERSION=""
+
 # Function to check if running with sudo
 check_sudo() {
     if [ "$EUID" -ne 0 ]; then
@@ -135,6 +141,103 @@ execute_mysql_with_config() {
     # Return result
     echo "$result"
     return $exit_code
+}
+
+extract_latest_schema_version() {
+    local migration_service_file="app/src/main/java/com/govinc/service/DatabaseMigrationService.java"
+    if [ -f "$migration_service_file" ]; then
+        local parsed
+        parsed=$(grep -E 'CURRENT_SCHEMA_VERSION\s*=\s*"[0-9.]+"' "$migration_service_file" | head -1 | sed -E 's/.*"([0-9.]+)".*/\1/')
+        if [ -n "$parsed" ]; then
+            echo "$parsed"
+            return
+        fi
+    fi
+    echo "1.5"
+}
+
+version_lt() {
+    local left="$1"
+    local right="$2"
+    if [ "$left" = "$right" ]; then
+        return 1
+    fi
+    local sorted
+    sorted=$(printf '%s\n%s\n' "$left" "$right" | sort -V | head -1)
+    [ "$sorted" = "$left" ]
+}
+
+set_app_property() {
+    local key="$1"
+    local value="$2"
+
+    if grep -q "^${key}=" "$APPLICATION_PROPS"; then
+        sed -i.tmp -e "s|^${key}=.*|${key}=${value}|" "$APPLICATION_PROPS"
+        rm -f "$APPLICATION_PROPS.tmp"
+    else
+        echo "${key}=${value}" >> "$APPLICATION_PROPS"
+    fi
+}
+
+configure_auto_migration_properties() {
+    local enabled="$1"
+    local target_version="$2"
+
+    set_app_property "app.database.auto-migrate" "$enabled"
+    set_app_property "app.database.auto-migrate.target-version" "$target_version"
+}
+
+check_database_version_and_prompt_update() {
+    local host="$1"
+    local port="$2"
+    local user="$3"
+    local password="$4"
+    local database="$5"
+
+    LATEST_SCHEMA_VERSION="$(extract_latest_schema_version)"
+    DETECTED_SCHEMA_VERSION=""
+
+    echo -e "${BLUE}Checking database schema version...${NC}"
+
+    local temp_config
+    temp_config=$(mktemp -t mysql_config_XXXXXX.cnf)
+    trap "cleanup_mysql_config '$temp_config'" RETURN EXIT INT TERM
+    create_mysql_config_file "$user" "$password" "$host" "$port" "$temp_config"
+
+    local has_table
+    has_table=$(mysql --defaults-file="$temp_config" --batch --skip-column-names "$database" -e "SHOW TABLES LIKE 'database_config';" 2>/dev/null | head -1)
+
+    if [ "$has_table" = "database_config" ]; then
+        DETECTED_SCHEMA_VERSION=$(mysql --defaults-file="$temp_config" --batch --skip-column-names "$database" -e "SELECT current_version FROM database_config WHERE version_key='schema_version' LIMIT 1;" 2>/dev/null | head -1)
+    fi
+
+    cleanup_mysql_config "$temp_config"
+
+    if [ -z "$DETECTED_SCHEMA_VERSION" ]; then
+        DETECTED_SCHEMA_VERSION="0.9"
+    fi
+
+    echo -e "${BLUE}  Detected schema version: $DETECTED_SCHEMA_VERSION${NC}"
+    echo -e "${BLUE}  Latest schema version:   $LATEST_SCHEMA_VERSION${NC}"
+
+    if version_lt "$DETECTED_SCHEMA_VERSION" "$LATEST_SCHEMA_VERSION"; then
+        echo -e "${YELLOW}Database schema is behind the application version.${NC}"
+        read -p "Enable automatic migration to $LATEST_SCHEMA_VERSION on next startup? (Y/n): " auto_migrate
+        auto_migrate=${auto_migrate:-Y}
+        if [[ $auto_migrate =~ ^[Yy]$ ]]; then
+            AUTO_SCHEMA_UPDATE="true"
+            configure_auto_migration_properties "true" "$LATEST_SCHEMA_VERSION"
+            echo -e "${GREEN}✓ Automatic schema migration enabled${NC}"
+        else
+            AUTO_SCHEMA_UPDATE="false"
+            configure_auto_migration_properties "false" "$LATEST_SCHEMA_VERSION"
+            echo -e "${YELLOW}Automatic migration disabled. You can run migration later from /admin/database-config.${NC}"
+        fi
+    else
+        AUTO_SCHEMA_UPDATE="false"
+        configure_auto_migration_properties "false" "$LATEST_SCHEMA_VERSION"
+        echo -e "${GREEN}✓ Database schema is up to date${NC}"
+    fi
 }
 
 # Function to test if MySQL server is reachable
@@ -483,6 +586,9 @@ setup_h2_fallback() {
     
     # Remove temporary file
     rm -f "$APPLICATION_PROPS.tmp"
+
+    LAST_DB_TYPE="h2"
+    AUTO_SCHEMA_UPDATE="false"
     
     # Add H2 dependency to build.gradle.kts if not present
     if ! grep -q "com.h2database:h2" app/build.gradle.kts; then
@@ -569,6 +675,7 @@ setup_database() {
                 if [ $conn_result -eq 0 ]; then
                     update_application_properties "$db_host" "$db_port" "$db_user" "$db_password" "$db_name"
                     connection_successful=true
+                    LAST_DB_TYPE="mariadb"
                     echo -e "${GREEN}✓ Using verified database credentials${NC}"
                 elif [ $conn_result -eq 2 ]; then
                     echo -e "${YELLOW}Database connection works, but database is not accessible.${NC}"
@@ -586,6 +693,7 @@ setup_database() {
                             if create_database "$db_host" "$db_port" "$root_password" "$db_password"; then
                                 update_application_properties "$db_host" "$db_port" "$db_user" "$db_password" "$db_name"
                                 connection_successful=true
+                                LAST_DB_TYPE="mariadb"
                             else
                                 retry_count=$((retry_count + 1))
                             fi
@@ -622,6 +730,7 @@ setup_database() {
                 
                 if create_database "localhost" "$MARIADB_PORT" "" "$db_password"; then
                     update_application_properties "localhost" "$MARIADB_PORT" "$DB_USER" "$db_password" "$DB_NAME"
+                    LAST_DB_TYPE="mariadb"
                 else
                     echo -e "${YELLOW}Initial setup failed. Using H2 fallback.${NC}"
                     setup_h2_fallback
@@ -876,6 +985,7 @@ main() {
         db_user="$DB_USER"
         db_password="$DB_PASSWORD"
         update_application_properties "$DB_HOST" "$DB_PORT" "$DB_USER" "$DB_PASSWORD" "$DB_NAME"
+        LAST_DB_TYPE="mariadb"
     fi
     
     echo
@@ -894,6 +1004,14 @@ main() {
             echo -e "${RED}Failed to configure test properties${NC}"
             return 1
         fi
+    fi
+
+    if [ "$LAST_DB_TYPE" = "mariadb" ]; then
+        echo
+        echo -e "${BLUE}Step 3b: Database Schema Version Check${NC}"
+        check_database_version_and_prompt_update "$db_host" "$db_port" "$db_user" "$db_password" "$db_name"
+    else
+        configure_auto_migration_properties "false" "$(extract_latest_schema_version)"
     fi
     
     echo
