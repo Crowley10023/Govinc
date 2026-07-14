@@ -348,21 +348,19 @@ public class SecurityConfig {
                 String value = entry.getValue();
                 String[] parts = value.split(",", 2);
                 String password = parts[0].trim();
+                String email = parts.length > 1 ? parts[1].trim() : null;
 
                 var userBuilder = User.withUsername(username)
                     .password(passwordEncoder().encode(password));
 
-                if (parts.length > 1) {
-                    String[] roles = parts[1].split(",");
-                    for (String role : roles) {
-                        userBuilder.roles(role.trim());
-                    }
-                } else {
+                if ("admin".equalsIgnoreCase(username)) {
                     userBuilder.roles("ADMIN");
+                } else {
+                    userBuilder.roles("ASSESSOR");
                 }
 
                 users.add(userBuilder.build());
-                logger.debug("Loaded local user: " + username);
+                logger.debug("Loaded local user: " + username + (email != null ? " <" + email + ">" : ""));
             }
         }
 

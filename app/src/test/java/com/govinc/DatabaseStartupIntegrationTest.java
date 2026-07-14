@@ -7,6 +7,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -20,6 +23,9 @@ class DatabaseStartupIntegrationTest {
     @Autowired
     private DatabaseConfigRepository databaseConfigRepository;
 
+    @Autowired
+    private UserDetailsService userDetailsService;
+
     @Test
     void freshInstallBootstrapsQuotedUserTableAndCurrentSchemaVersion() {
         Integer userCount = jdbcTemplate.queryForObject("select count(*) from \"user\"", Integer.class);
@@ -30,5 +36,14 @@ class DatabaseStartupIntegrationTest {
                 .get()
                 .extracting(config -> config.getCurrentVersion())
                 .isEqualTo(DatabaseMigrationService.CURRENT_SCHEMA_VERSION);
+    }
+
+    @Test
+    void builtInAdminUserHasAdminAuthorityInTestProfile() {
+        UserDetails admin = userDetailsService.loadUserByUsername("admin");
+
+        assertThat(admin.getAuthorities())
+                .extracting(GrantedAuthority::getAuthority)
+                .contains("ROLE_ADMIN");
     }
 }
