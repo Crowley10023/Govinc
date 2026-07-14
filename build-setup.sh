@@ -675,6 +675,50 @@ configure_production_properties() {
     fi
 }
 
+# Function to configure application.properties for test
+configure_test_properties() {
+    echo -e "${YELLOW}Configuring application.properties for test...${NC}"
+
+    if [ ! -f "$APPLICATION_PROPS" ]; then
+        echo -e "${RED}✗ application.properties not found at $APPLICATION_PROPS${NC}"
+        return 1
+    fi
+
+    # Create backup
+    local backup_file="$APPLICATION_PROPS.backup.$(date +%Y%m%d_%H%M%S)"
+    cp "$APPLICATION_PROPS" "$backup_file"
+    echo -e "${BLUE}  Backup created: $backup_file${NC}"
+
+    local temp_file
+    temp_file=$(mktemp)
+
+    cp "$APPLICATION_PROPS" "$temp_file"
+
+    if grep -q '^app\.production=' "$temp_file"; then
+        sed -i.tmp -e 's|^app\.production=.*|app.production=false|' "$temp_file"
+        rm -f "$temp_file.tmp"
+    else
+        echo "" >> "$temp_file"
+        echo "# Production Mode Flag" >> "$temp_file"
+        echo "app.production=false" >> "$temp_file"
+    fi
+
+    if grep -q '^users\.admin=' "$temp_file"; then
+        sed -i.tmp -e 's|^users\.admin=.*|users.admin=admin,admin@example.com|' "$temp_file"
+        rm -f "$temp_file.tmp"
+    else
+        echo "" >> "$temp_file"
+        echo "# -------------- LOCAL AUTHENTICATION USERS --------------" >> "$temp_file"
+        echo "# Configure local users for form-based authentication" >> "$temp_file"
+        echo "# Format: users.<username>=<password>[,<email>]" >> "$temp_file"
+        echo "users.admin=admin,admin@example.com" >> "$temp_file"
+    fi
+
+    mv "$temp_file" "$APPLICATION_PROPS"
+    echo -e "${GREEN}✓ Test mode enabled and built-in admin restored${NC}"
+    return 0
+}
+
 # Function to build the application
 build_application() {
     echo -e "${BLUE}Building the application...${NC}"
@@ -845,7 +889,11 @@ main() {
             return 1
         fi
     else
-        echo -e "${GREEN}✓ Application properties configured for test deployment${NC}"
+        echo -e "${YELLOW}Configuring application.properties for test mode...${NC}"
+        if ! configure_test_properties; then
+            echo -e "${RED}Failed to configure test properties${NC}"
+            return 1
+        fi
     fi
     
     echo
