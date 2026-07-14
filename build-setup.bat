@@ -270,7 +270,7 @@ copy "%APPLICATION_PROPS%" "%APPLICATION_PROPS%.backup.%date:~-4%%date:~3,2%%dat
 
 REM Create temporary PowerShell script to update to H2 configuration
 echo $content = Get-Content '%APPLICATION_PROPS%' > update_h2.ps1
-echo $content = $content -replace '^spring\.datasource\.url=.*', 'spring.datasource.url=jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE' >> update_h2.ps1
+echo $content = $content -replace '^spring\.datasource\.url=.*', 'spring.datasource.url=jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;NON_KEYWORDS=USER' >> update_h2.ps1
 echo $content = $content -replace '^spring\.datasource\.username=.*', 'spring.datasource.username=sa' >> update_h2.ps1
 echo $content = $content -replace '^spring\.datasource\.password=.*', 'spring.datasource.password=' >> update_h2.ps1
 echo $content = $content -replace '^spring\.datasource\.driver-class-name=.*', 'spring.datasource.driver-class-name=org.h2.Driver' >> update_h2.ps1

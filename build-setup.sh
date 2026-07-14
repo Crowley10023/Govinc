@@ -468,7 +468,7 @@ setup_h2_fallback() {
     
     # Update to H2 configuration
     sed -i.tmp \
-        -e "s|^spring\.datasource\.url=.*|spring.datasource.url=jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE|" \
+        -e "s|^spring\.datasource\.url=.*|spring.datasource.url=jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;NON_KEYWORDS=USER|" \
         -e "s|^spring\.datasource\.username=.*|spring.datasource.username=sa|" \
         -e "s|^spring\.datasource\.password=.*|spring.datasource.password=|" \
         -e "s|^spring\.datasource\.driver-class-name=.*|spring.datasource.driver-class-name=org.h2.Driver|" \

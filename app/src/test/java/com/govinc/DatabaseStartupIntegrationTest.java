@@ -2,6 +2,8 @@ package com.govinc;
 
 import com.govinc.repository.DatabaseConfigRepository;
 import com.govinc.service.DatabaseMigrationService;
+import com.govinc.user.User;
+import com.govinc.user.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -26,6 +28,9 @@ class DatabaseStartupIntegrationTest {
     @Autowired
     private UserDetailsService userDetailsService;
 
+    @Autowired
+    private UserRepository userRepository;
+
     @Test
     void freshInstallBootstrapsQuotedUserTableAndCurrentSchemaVersion() {
         Integer userCount = jdbcTemplate.queryForObject("select count(*) from \"user\"", Integer.class);
@@ -45,5 +50,17 @@ class DatabaseStartupIntegrationTest {
         assertThat(admin.getAuthorities())
                 .extracting(GrantedAuthority::getAuthority)
                 .contains("ROLE_ADMIN");
+    }
+
+    @Test
+    void userRepositoryCanFetchAdminByEmailOnH2() {
+        User adminUser = new User("admin", "", "admin@example.com");
+        adminUser.setRole(com.govinc.user.Role.ADMIN);
+        userRepository.save(adminUser);
+
+        User admin = userRepository.findByEmail("admin@example.com").orElseThrow();
+
+        assertThat(admin.getEmail()).isEqualTo("admin@example.com");
+        assertThat(admin.getRole().name()).isEqualTo("ADMIN");
     }
 }
