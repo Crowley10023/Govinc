@@ -187,6 +187,87 @@ configure_auto_migration_properties() {
     set_app_property "app.database.auto-migrate.target-version" "$target_version"
 }
 
+set_db_schema_version() {
+    local host="$1"
+    local port="$2"
+    local user="$3"
+    local password="$4"
+    local database="$5"
+    local version="$6"
+    local description="$7"
+
+    local sql
+    sql="CREATE TABLE IF NOT EXISTS database_config (id BIGINT AUTO_INCREMENT PRIMARY KEY, version_key VARCHAR(255) NOT NULL UNIQUE, current_version VARCHAR(255) NOT NULL, description VARCHAR(2000));"
+    sql+="INSERT INTO database_config (version_key, current_version, description) VALUES ('schema_version', '${version}', '${description}') "
+    sql+="ON DUPLICATE KEY UPDATE current_version=VALUES(current_version), description=VALUES(description);"
+
+    execute_mysql_with_config "$host" "$port" "$user" "$password" "USE \`$database\`; $sql" >/dev/null
+}
+
+perform_external_migration_to_latest() {
+    local host="$1"
+    local port="$2"
+    local user="$3"
+    local password="$4"
+    local database="$5"
+    local current_version="$6"
+    local target_version="$7"
+
+    echo -e "${BLUE}Running database migration in build-setup (outside app startup)...${NC}"
+
+    while version_lt "$current_version" "$target_version"; do
+        case "$current_version" in
+            "0.9")
+                echo -e "${YELLOW}  Applying migration 0.9 -> 1.0${NC}"
+                execute_mysql_with_config "$host" "$port" "$user" "$password" "USE \`$database\`; ALTER TABLE ai_provider DROP INDEX UK_nmrpdeu19ured81litbflx252;" >/dev/null || true
+                execute_mysql_with_config "$host" "$port" "$user" "$password" "USE \`$database\`; ALTER TABLE ai_provider ADD CONSTRAINT UK_displayName UNIQUE (displayName);" >/dev/null || true
+                set_db_schema_version "$host" "$port" "$user" "$password" "$database" "1.0" "Fix AIProvider constraints"
+                current_version="1.0"
+                ;;
+            "1.0")
+                echo -e "${YELLOW}  Applying migration 1.0 -> 1.1${NC}"
+                execute_mysql_with_config "$host" "$port" "$user" "$password" "USE \`$database\`; ALTER TABLE org_unit DROP INDEX UK_7vv1bxh5ptib49lxwxwgfst7m;" >/dev/null || true
+                set_db_schema_version "$host" "$port" "$user" "$password" "$database" "1.1" "Allow multiple organization units per leader"
+                current_version="1.1"
+                ;;
+            "1.1")
+                echo -e "${YELLOW}  Applying migration 1.1 -> 1.2${NC}"
+                if ! execute_mysql_with_config "$host" "$port" "$user" "$password" "USE \`$database\`; ALTER TABLE assessment_control_answer MODIFY COLUMN maturity_answer_id BIGINT NULL;" >/dev/null; then
+                    echo -e "${RED}✗ Migration 1.1 -> 1.2 failed${NC}"
+                    return 1
+                fi
+                set_db_schema_version "$host" "$port" "$user" "$password" "$database" "1.2" "Make maturity_answer_id nullable"
+                current_version="1.2"
+                ;;
+            "1.2"|"1.3")
+                echo -e "${YELLOW}  Applying migration ${current_version} -> 1.4${NC}"
+                if ! execute_mysql_with_config "$host" "$port" "$user" "$password" "USE \`$database\`; ALTER TABLE \`user\` MODIFY COLUMN role VARCHAR(64) NOT NULL;" >/dev/null; then
+                    echo -e "${RED}✗ Migration ${current_version} -> 1.4 failed${NC}"
+                    return 1
+                fi
+                set_db_schema_version "$host" "$port" "$user" "$password" "$database" "1.4" "Normalize user.role"
+                current_version="1.4"
+                ;;
+            "1.4")
+                echo -e "${YELLOW}  Applying migration 1.4 -> 1.5${NC}"
+                if ! execute_mysql_with_config "$host" "$port" "$user" "$password" "USE \`$database\`; ALTER TABLE assessments MODIFY COLUMN status VARCHAR(20) NOT NULL DEFAULT 'OPEN';" >/dev/null; then
+                    echo -e "${RED}✗ Migration 1.4 -> 1.5 failed${NC}"
+                    return 1
+                fi
+                set_db_schema_version "$host" "$port" "$user" "$password" "$database" "1.5" "Convert assessments.status to VARCHAR"
+                current_version="1.5"
+                ;;
+            *)
+                echo -e "${RED}✗ Unknown/unsupported current schema version: $current_version${NC}"
+                return 1
+                ;;
+        esac
+    done
+
+    echo -e "${GREEN}✓ Database migrated to version $target_version before tests${NC}"
+    return 0
+}
+
 check_database_version_and_prompt_update() {
     local host="$1"
     local port="$2"
@@ -222,22 +303,28 @@ check_database_version_and_prompt_update() {
 
     if version_lt "$DETECTED_SCHEMA_VERSION" "$LATEST_SCHEMA_VERSION"; then
         echo -e "${YELLOW}Database schema is behind the application version.${NC}"
-        read -p "Enable automatic migration to $LATEST_SCHEMA_VERSION on next startup? (Y/n): " auto_migrate
-        auto_migrate=${auto_migrate:-Y}
-        if [[ $auto_migrate =~ ^[Yy]$ ]]; then
-            AUTO_SCHEMA_UPDATE="true"
-            configure_auto_migration_properties "true" "$LATEST_SCHEMA_VERSION"
-            echo -e "${GREEN}✓ Automatic schema migration enabled${NC}"
+        read -p "Perform automated update to $LATEST_SCHEMA_VERSION now (required before Gradle tests)? (Y/n): " do_update
+        do_update=${do_update:-Y}
+        if [[ $do_update =~ ^[Yy]$ ]]; then
+            if perform_external_migration_to_latest "$host" "$port" "$user" "$password" "$database" "$DETECTED_SCHEMA_VERSION" "$LATEST_SCHEMA_VERSION"; then
+                DETECTED_SCHEMA_VERSION="$LATEST_SCHEMA_VERSION"
+                AUTO_SCHEMA_UPDATE="false"
+                configure_auto_migration_properties "false" "$LATEST_SCHEMA_VERSION"
+            else
+                echo -e "${RED}✗ Automated database update failed. Aborting setup before tests.${NC}"
+                return 1
+            fi
         else
-            AUTO_SCHEMA_UPDATE="false"
-            configure_auto_migration_properties "false" "$LATEST_SCHEMA_VERSION"
-            echo -e "${YELLOW}Automatic migration disabled. You can run migration later from /admin/database-config.${NC}"
+            echo -e "${RED}✗ Database update declined. Tests must not run against outdated schema.${NC}"
+            return 1
         fi
     else
         AUTO_SCHEMA_UPDATE="false"
         configure_auto_migration_properties "false" "$LATEST_SCHEMA_VERSION"
         echo -e "${GREEN}✓ Database schema is up to date${NC}"
     fi
+
+    return 0
 }
 
 # Function to test if MySQL server is reachable
@@ -1062,7 +1149,10 @@ main() {
     if [ "$LAST_DB_TYPE" = "mariadb" ]; then
         echo
         echo -e "${BLUE}Step 3b: Database Schema Version Check${NC}"
-        check_database_version_and_prompt_update "$db_host" "$db_port" "$db_user" "$db_password" "$db_name"
+        if ! check_database_version_and_prompt_update "$db_host" "$db_port" "$db_user" "$db_password" "$db_name"; then
+            echo -e "${RED}✗ Database version check/update failed. Aborting before Gradle tests.${NC}"
+            return 1
+        fi
     else
         configure_auto_migration_properties "false" "$(extract_latest_schema_version)"
     fi
