@@ -844,14 +844,67 @@ build_application() {
         fi
     fi
     
-    echo -e "${YELLOW}Running Gradle build...${NC}"
-    ./gradlew build
+    echo -e "${YELLOW}Running Gradle assemble (tests run after deployment/migration)...${NC}"
+    ./gradlew assemble
     
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}✓ Application built successfully!${NC}"
         return 0
     else
         echo -e "${RED}✗ Build failed!${NC}"
+        return 1
+    fi
+}
+
+wait_for_migration_completion() {
+    local service_name="$1"
+
+    if [ "$LAST_DB_TYPE" != "mariadb" ] || [ "$AUTO_SCHEMA_UPDATE" != "true" ]; then
+        return 0
+    fi
+
+    echo -e "${BLUE}Waiting for automatic database migration to finish...${NC}"
+
+    local max_checks=60
+    local check=0
+    while [ $check -lt $max_checks ]; do
+        local recent_logs
+        recent_logs=$(journalctl -u "$service_name" -n 200 --no-pager 2>/dev/null || true)
+
+        if echo "$recent_logs" | grep -q "\[DB AutoMigration\] Automatic migration completed"; then
+            echo -e "${GREEN}✓ Database migration completed before tests${NC}"
+            return 0
+        fi
+
+        if echo "$recent_logs" | grep -q "\[DB AutoMigration\] Automatic migration failed"; then
+            echo -e "${RED}✗ Automatic database migration failed. Tests will not be started.${NC}"
+            return 1
+        fi
+
+        sleep 2
+        check=$((check + 1))
+    done
+
+    echo -e "${YELLOW}⚠ Migration completion marker not found in service logs within timeout.${NC}"
+    echo -e "${YELLOW}Proceeding to tests; verify migration status manually if needed.${NC}"
+    return 0
+}
+
+run_post_migration_tests() {
+    local service_name="$1"
+
+    if ! wait_for_migration_completion "$service_name"; then
+        return 1
+    fi
+
+    echo -e "${BLUE}Running Gradle tests after deployment/migration...${NC}"
+    ./gradlew test
+
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Gradle tests passed${NC}"
+        return 0
+    else
+        echo -e "${RED}✗ Gradle tests failed${NC}"
         return 1
     fi
 }
@@ -1058,6 +1111,14 @@ main() {
         echo -e "${BLUE}Step 6: Deploying JAR${NC}"
         
         if deploy_jar "$target_dir" "$service_name"; then
+            echo
+            echo -e "${BLUE}Step 7: Running Gradle Tests (Post-Migration)${NC}"
+            if ! run_post_migration_tests "$service_name"; then
+                echo
+                echo -e "${RED}✗ Deployment succeeded but post-migration tests failed.${NC}"
+                return 1
+            fi
+
             echo
             echo -e "${GREEN}========================================${NC}"
             echo -e "${GREEN}  Build Setup Completed Successfully!  ${NC}"
