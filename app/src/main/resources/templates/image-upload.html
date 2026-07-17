@@ -33,6 +33,7 @@
             
             <!-- Upload Form -->
             <form id="uploadForm" th:action="@{/config/image-upload}" method="post" enctype="multipart/form-data">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                 <div class="upload-area" id="uploadArea">
                     <div class="upload-instructions">
                         <h3>📁 Upload New Logo</h3>
@@ -106,23 +107,29 @@
         
         function handleFileSelect(input) {
             const file = input.files[0];
-            if (file) {
-                fileName.textContent = file.name;
-                fileSize.textContent = formatFileSize(file.size);
-                fileInfo.style.display = 'block';
-                
-                // Validate file type
-                if (!file.type.startsWith('image/')) {
-                    alert('Please select a valid image file.');
-                    return;
-                }
-                
-                // Validate file size (5MB limit)
-                if (file.size > 5 * 1024 * 1024) {
-                    alert('File size must be less than 5MB.');
-                    return;
-                }
+            if (!file) return;
+
+            // Validate file type
+            if (!file.type.startsWith('image/')) {
+                alert('Please select a valid image file.');
+                input.value = '';
+                fileInfo.classList.add('d-none');
+                return;
             }
+
+            // Validate file size (5MB limit)
+            if (file.size > 5 * 1024 * 1024) {
+                alert('File size must be less than 5MB.');
+                input.value = '';
+                fileInfo.classList.add('d-none');
+                return;
+            }
+
+            fileName.textContent = file.name;
+            fileSize.textContent = formatFileSize(file.size);
+            // The "d-none" class uses !important, so an inline style.display
+            // change alone would not make this panel (and its submit button) visible.
+            fileInfo.classList.remove('d-none');
         }
         
         function formatFileSize(bytes) {

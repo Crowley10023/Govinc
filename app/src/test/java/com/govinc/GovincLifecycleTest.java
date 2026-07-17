@@ -753,6 +753,14 @@ class GovincLifecycleTest {
         TESTED_ENDPOINTS.add("GET /assessment-direct.html");
     }
 
+    @Test
+    @Order(2107)
+    void assessment_directLanding_returnsOk() throws Exception {
+        mockMvc.perform(get("/assessment-direct"))
+                .andExpect(status().isOk());
+        TESTED_ENDPOINTS.add("GET /assessment-direct");
+    }
+
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Finalize / Reopen / Delete lifecycle
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

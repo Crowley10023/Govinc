@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -319,6 +320,32 @@ class GovincPagesTest {
                 .andExpect(result -> assertThat(result.getResponse().getStatus()).isBetween(200, 499));
         TESTED_ENDPOINTS.add("GET /config/image-upload/preview");
     }
+
+        @Test
+        @Order(4052)
+        @WithMockUser(username = "admin", roles = {"ADMIN"})
+        void config_imageUpload_post_savesAndServesPreview() throws Exception {
+        byte[] imageBytes = new byte[] { (byte) 0x89, 0x50, 0x4E, 0x47, 0x01, 0x02, 0x03 };
+        MockMultipartFile imageFile = new MockMultipartFile(
+            "imageFile",
+            "logo.png",
+            "image/png",
+            imageBytes);
+
+        mockMvc.perform(multipart("/config/image-upload")
+                .file(imageFile)
+                .with(csrf()))
+            .andExpect(status().isOk())
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("Image uploaded successfully!")));
+
+        MvcResult previewResult = mockMvc.perform(get("/config/image-upload/preview"))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType("image/png"))
+            .andReturn();
+
+        assertThat(previewResult.getResponse().getContentAsByteArray()).isEqualTo(imageBytes);
+        TESTED_ENDPOINTS.add("POST /config/image-upload");
+        }
 
     // ──────────────────────────────────────────────
     // Config: Organisation Details

@@ -8,6 +8,8 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
+import com.govinc.service.GeneralConfigService;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -17,6 +19,9 @@ import java.util.Optional;
 public class AssessmentUrlsController {
     @Autowired
     private AssessmentUrlsService assessmentUrlsService;
+
+    @Autowired
+    private GeneralConfigService generalConfigService;
 
     @PostMapping("/{id}/urls/create")
     @ResponseBody
@@ -53,6 +58,9 @@ public class AssessmentUrlsController {
     public String listUrls(Model model) {
         List<AssessmentUrls> urls = assessmentUrlsService.findAll();
         model.addAttribute("urls", urls);
+        model.addAttribute("externalUrlById", urls.stream()
+            .collect(java.util.stream.Collectors.toMap(AssessmentUrls::getId,
+                url -> generalConfigService.buildConfiguredExternalAssessmentDirectUrl(url.getUrl()))));
         return "assessment-urls-list";
     }
 

@@ -33,6 +33,51 @@ public class GeneralConfigService {
         initialized = true;
     }
 
+    /** Returns the configured external access URL normalized to end at /assessment-direct. */
+    public String getExternalAccessUrl() {
+        String value = getOrCreate().getExternalAccessUrl();
+        if (value == null) {
+            return "";
+        }
+
+        String normalized = value.trim();
+        if (normalized.isEmpty()) {
+            return "";
+        }
+
+        while (normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+
+        if (normalized.endsWith("/assessment-direct")) {
+            return normalized;
+        }
+
+        return normalized + "/assessment-direct";
+    }
+
+    public String buildConfiguredExternalAssessmentDirectUrl(String obfuscatedId) {
+        String externalAccessUrl = getExternalAccessUrl();
+        if (externalAccessUrl.isBlank()) {
+            return "";
+        }
+        return externalAccessUrl + "/" + obfuscatedId;
+    }
+
+    public String buildAssessmentDirectUrl(String obfuscatedId, String fallbackBaseUrl) {
+        String configuredUrl = buildConfiguredExternalAssessmentDirectUrl(obfuscatedId);
+        if (!configuredUrl.isBlank()) {
+            return configuredUrl;
+        }
+
+        String baseUrl = fallbackBaseUrl == null ? "" : fallbackBaseUrl.trim();
+        if (baseUrl.isBlank()) {
+            return "/assessment-direct/" + obfuscatedId;
+        }
+
+        return baseUrl.stripTrailing() + "/assessment-direct/" + obfuscatedId;
+    }
+
     /** Returns the persisted config row, creating a default one if absent. */
     public GeneralConfig getOrCreate() {
         return generalConfigRepository.findByConfigKey("default").orElseGet(() -> {

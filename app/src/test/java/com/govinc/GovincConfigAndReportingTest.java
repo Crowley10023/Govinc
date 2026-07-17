@@ -4,6 +4,7 @@ import com.govinc.catalog.*;
 import com.govinc.maturity.*;
 import com.govinc.organization.*;
 import com.govinc.reporting.*;
+import com.govinc.repository.GeneralConfigRepository;
 import com.govinc.user.*;
 
 import org.junit.jupiter.api.*;
@@ -65,6 +66,7 @@ class GovincConfigAndReportingTest {
     @Autowired private OrgUnitRepository orgUnitRepository;
     @Autowired private SecurityCatalogRepository securityCatalogRepository;
     @Autowired private CapabilityReportRepository capabilityReportRepository;
+    @Autowired private GeneralConfigRepository generalConfigRepository;
 
     private Long userId;
     private Long orgUnitId;
@@ -118,9 +120,50 @@ class GovincConfigAndReportingTest {
         System.setErr(originalErr);
     }
 
-    // ──────────────────────────────────────────────
-    // Email Configuration
-    // ──────────────────────────────────────────────
+        // ──────────────────────────────────────────────
+        // General Configuration
+        // ──────────────────────────────────────────────
+
+        @Test
+        @Order(6998)
+        @WithMockUser(username = "admin", roles = {"ADMIN"})
+        void generalConfig_getPage_returnsOk() throws Exception {
+        mockMvc.perform(get("/config/general"))
+            .andExpect(status().isOk());
+        TESTED_ENDPOINTS.add("GET /config/general");
+        }
+
+        @Test
+        @Order(6999)
+        @WithMockUser(username = "admin", roles = {"ADMIN"})
+        void externalAccess_getPage_returnsOk() throws Exception {
+        mockMvc.perform(get("/config/external-access"))
+            .andExpect(status().isOk());
+        TESTED_ENDPOINTS.add("GET /config/external-access");
+        }
+
+        @Test
+        @Order(6997)
+        @WithMockUser(username = "admin", roles = {"ADMIN"})
+        void externalAccess_save_returnsOk() throws Exception {
+        String json = "{\"externalAccessUrl\":\"https://example.com/assessment-direct\"}";
+        mockMvc.perform(post("/config/external-access")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.externalAccessUrl").value("https://example.com/assessment-direct"));
+
+        assertThat(generalConfigRepository.findByConfigKey("default")).isPresent();
+        assertThat(generalConfigRepository.findByConfigKey("default").orElseThrow().getExternalAccessUrl())
+            .isEqualTo("https://example.com/assessment-direct");
+        TESTED_ENDPOINTS.add("POST /config/external-access");
+        }
+
+        // ──────────────────────────────────────────────
+        // Email Configuration
+        // ──────────────────────────────────────────────
 
     @Test
     @Order(7000)

@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 @Controller
-@RequestMapping("/config/general")
 public class GeneralConfigController {
 
     @Autowired
@@ -22,13 +21,19 @@ public class GeneralConfigController {
     @Autowired
     private GeneralConfigRepository generalConfigRepository;
 
-    @GetMapping
+    @GetMapping("/config/general")
     public String getConfigPage(Model model) {
         model.addAttribute("config", generalConfigService.getOrCreate());
         return "general-config";
     }
 
-    @PostMapping
+    @GetMapping("/config/external-access")
+    public String getExternalAccessPage(Model model) {
+        model.addAttribute("config", generalConfigService.getOrCreate());
+        return "external-access";
+    }
+
+    @PostMapping("/config/general")
     @ResponseBody
     public ResponseEntity<?> saveConfig(@RequestBody Map<String, Object> data, HttpSession session) {
         try {
@@ -50,6 +55,28 @@ public class GeneralConfigController {
 
             return ResponseEntity.ok(Map.of("success", true,
                     "sessionTimeoutMinutes", config.getSessionTimeoutMinutes()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/config/external-access")
+    @ResponseBody
+    public ResponseEntity<?> saveExternalAccess(@RequestBody Map<String, Object> data) {
+        try {
+            GeneralConfig config = generalConfigService.getOrCreate();
+
+            Object externalAccessUrl = data.get("externalAccessUrl");
+            String normalized = externalAccessUrl == null ? "" : String.valueOf(externalAccessUrl).trim();
+            config.setExternalAccessUrl(normalized.isEmpty() ? null : normalized);
+
+            generalConfigRepository.save(config);
+
+            // Refresh in-memory cache so subsequent requests see new value
+            generalConfigService.refresh();
+
+            return ResponseEntity.ok(Map.of("success", true,
+                    "externalAccessUrl", generalConfigService.getExternalAccessUrl()));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }

@@ -16,6 +16,9 @@ public class GeneralConfig {
     @Column(name = "session_timeout_minutes", nullable = false)
     private int sessionTimeoutMinutes = 30;
 
+    @Column(name = "external_access_url")
+    private String externalAccessUrl;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -24,4 +27,7 @@ public class GeneralConfig {
 
     public int getSessionTimeoutMinutes() { return sessionTimeoutMinutes; }
     public void setSessionTimeoutMinutes(int sessionTimeoutMinutes) { this.sessionTimeoutMinutes = sessionTimeoutMinutes; }
+
+    public String getExternalAccessUrl() { return externalAccessUrl; }
+    public void setExternalAccessUrl(String externalAccessUrl) { this.externalAccessUrl = externalAccessUrl; }
 }

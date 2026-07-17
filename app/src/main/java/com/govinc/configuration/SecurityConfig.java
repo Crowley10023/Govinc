@@ -41,6 +41,8 @@ import java.util.Map;
 public class SecurityConfig {
     // Minimal public URL surface per security architecture
     private static final String[] PUBLIC_URLS = {
+            "/assessment-direct",
+            "/assessment-direct/",
             // Public (anonymous) assessment direct endpoints (read-only summaries and full data)
             "/assessment-direct/*/alldata",
             "/assessment-direct/*/data",

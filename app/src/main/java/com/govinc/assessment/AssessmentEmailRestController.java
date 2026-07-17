@@ -3,6 +3,7 @@ package com.govinc.assessment;
 import com.govinc.authorization.AuthorizationService;
 import com.govinc.authorization.UnauthorizedException;
 import com.govinc.service.EmailService;
+import com.govinc.service.GeneralConfigService;
 import com.govinc.user.User;
 import com.govinc.user.UserRepository;
 import com.govinc.util.OpenAIUtil;
@@ -45,6 +46,9 @@ public class AssessmentEmailRestController {
 
     @Autowired
     private AssessmentUrlsService assessmentUrlsService;
+
+    @Autowired
+    private GeneralConfigService generalConfigService;
 
     /**
      * Generate an AI-drafted e-mail subject and body for an assessment.
@@ -111,7 +115,7 @@ public class AssessmentEmailRestController {
             String directUrl = assessment.getAssessmentUrls().getUrl();
             assessmentLink = directUrl.startsWith("http")
                     ? directUrl
-                    : (baseUrl.isBlank() ? "/assessment-direct/" : baseUrl.stripTrailing() + "/assessment-direct/") + directUrl;
+                    : generalConfigService.buildAssessmentDirectUrl(directUrl, baseUrl);
         } else {
             assessmentLink = baseUrl.isBlank()
                     ? "/assessment/" + id

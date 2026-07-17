@@ -22,6 +22,7 @@ import java.util.stream.Collectors;
 
 import com.govinc.maturity.MaturityAnswer;
 import com.govinc.maturity.MaturityAnswerRepository;
+import com.govinc.service.GeneralConfigService;
 import com.govinc.assessment.Assessment;
 import com.govinc.catalog.SecurityCatalog;
 import com.govinc.catalog.SecurityControl;
@@ -49,7 +50,15 @@ public class AssessmentDirectController {
     @Autowired
     private AssessmentSseService assessmentSseService;
 
+    @Autowired
+    private GeneralConfigService generalConfigService;
+
     // Replaced Thymeleaf mapping with RESTful endpoints
+
+    @GetMapping({"/assessment-direct", "/assessment-direct/"})
+    public String showAssessmentDirectLanding() {
+        return "assessment-direct";
+    }
 
     // New JSON endpoint: Get all assessment data needed for the direct page (formerly Thymeleaf model)
     @GetMapping("/assessment-direct/{obfuscatedId}/alldata")
@@ -286,6 +295,10 @@ public class AssessmentDirectController {
         System.out.println("show assessment 3 ;-) : " + model);
         List<AssessmentUrls> allUrls = assessmentUrlsService.findAll();
         model.addAttribute("urls", allUrls);
+        Map<Long, String> externalUrlById = allUrls.stream()
+                .collect(Collectors.toMap(AssessmentUrls::getId,
+                        url -> generalConfigService.buildConfiguredExternalAssessmentDirectUrl(url.getUrl())));
+        model.addAttribute("externalUrlById", externalUrlById);
         return "assessment-urls-list";
     }
 

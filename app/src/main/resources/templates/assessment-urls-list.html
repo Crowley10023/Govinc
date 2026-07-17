@@ -29,11 +29,12 @@
                 <thead>
                     <tr>
                         <th class="sortable-th" data-col="0">Obfuscated URL<span class="sort-arrow"></span></th>
-                        <th class="sortable-th" data-col="1">Assessment Name<span class="sort-arrow"></span></th>
-                        <th class="sortable-th" data-col="2">Security Catalog<span class="sort-arrow"></span></th>
-                        <th class="sortable-th" data-col="3">Remaining Days<span class="sort-arrow"></span></th>
-                        <th class="sortable-th" data-col="4">Expiration Date<span class="sort-arrow"></span></th>
-                        <th class="sortable-th" data-col="5">Password<span class="sort-arrow"></span></th>
+                        <th class="sortable-th" data-col="1">External URL<span class="sort-arrow"></span></th>
+                        <th class="sortable-th" data-col="2">Assessment Name<span class="sort-arrow"></span></th>
+                        <th class="sortable-th" data-col="3">Security Catalog<span class="sort-arrow"></span></th>
+                        <th class="sortable-th" data-col="4">Remaining Days<span class="sort-arrow"></span></th>
+                        <th class="sortable-th" data-col="5">Expiration Date<span class="sort-arrow"></span></th>
+                        <th class="sortable-th" data-col="6">Password<span class="sort-arrow"></span></th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -46,6 +47,16 @@
                         <td>
                             <a th:href="@{'/assessment-direct/' + ${url.url}}" th:text="${url.url}" target="_blank"
                                 style="display:inline-block;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;" th:title="${url.url}"></a>
+                        </td>
+                        <td>
+                            <div th:if="${externalUrlById[url.id] != null and !#strings.isEmpty(externalUrlById[url.id])}" style="display:flex;align-items:center;gap:0.5em;">
+                                <a th:href="${externalUrlById[url.id]}" th:text="${externalUrlById[url.id]}" target="_blank"
+                                   style="display:inline-block;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;"
+                                   th:title="${externalUrlById[url.id]}"></a>
+                                <button type="button" class="btn-secondary" th:data-copy-url="${externalUrlById[url.id]}"
+                                        onclick="copyExternalUrl(this)" style="padding:0.35em 0.6em;">Copy</button>
+                            </div>
+                            <span th:if="${externalUrlById[url.id] == null or #strings.isEmpty(externalUrlById[url.id])}" class="text-muted">Not configured</span>
                         </td>
                         <td>
                             <a th:if="${url.assessment != null}" th:href="@{'/assessment/' + ${url.assessment.id}}"
@@ -391,6 +402,22 @@
             document.getElementById('urlDeleteForm').action = '/assessment-direct/urls/' + btn.getAttribute('data-id') + '/delete';
             document.getElementById('urlDeleteModal').style.display = 'flex';
         }
+        function copyExternalUrl(btn) {
+            var url = btn.getAttribute('data-copy-url');
+            if (!url) {
+                return;
+            }
+
+            navigator.clipboard.writeText(url).then(function() {
+                var originalText = btn.textContent;
+                btn.textContent = 'Copied';
+                setTimeout(function() {
+                    btn.textContent = originalText;
+                }, 1500);
+            }).catch(function(err) {
+                alert('Error copying URL: ' + err);
+            });
+        }
         function closeUrlDeleteModal() {
             document.getElementById('urlDeleteModal').style.display = 'none';
         }
@@ -427,11 +454,11 @@
                     rows.sort(function(a, b) {
                         var av = a.children[col].textContent.trim().toLowerCase();
                         var bv = b.children[col].textContent.trim().toLowerCase();
-                        if (col === 3) { // Remaining Days — numeric sort
+                        if (col === 4) { // Remaining Days — numeric sort
                             var an = parseFloat(av), bn = parseFloat(bv);
                             if (!isNaN(an) && !isNaN(bn)) return (an - bn) * dir;
                         }
-                        if (col === 4) { // Expiration Date — use data-iso or text
+                        if (col === 5) { // Expiration Date — use data-iso or text
                             var ad = a.children[col].getAttribute('data-iso') || av;
                             var bd = b.children[col].getAttribute('data-iso') || bv;
                             return ad.localeCompare(bd) * dir;
