@@ -771,6 +771,26 @@ class GovincLifecycleTest {
         TESTED_ENDPOINTS.add("GET /assessment-direct/{unknownId}");
     }
 
+    @Test
+    @Order(2109)
+    void assessment_directPasswordRequired_isPubliclyReachable() throws Exception {
+        // Anonymous (unauthenticated) request must NOT be redirected to /login.
+        mockMvc.perform(get("/assessment-direct/unknown-obfuscated-id-xyz/password-required"))
+                .andExpect(status().is(404));
+        TESTED_ENDPOINTS.add("GET /assessment-direct/{id}/password-required");
+    }
+
+    @Test
+    @Order(2110)
+    void assessment_directValidatePassword_isPubliclyReachable() throws Exception {
+        // Anonymous (unauthenticated) request must NOT be redirected to /login.
+        mockMvc.perform(post("/assessment-direct/unknown-obfuscated-id-xyz/validate-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"dummy\"}"))
+                .andExpect(status().is(404));
+        TESTED_ENDPOINTS.add("POST /assessment-direct/{id}/validate-password");
+    }
+
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Finalize / Reopen / Delete lifecycle
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
