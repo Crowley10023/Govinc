@@ -404,15 +404,43 @@
                 return;
             }
 
-            navigator.clipboard.writeText(url).then(function() {
+            function showCopied() {
                 var originalText = btn.textContent;
                 btn.textContent = 'Copied';
                 setTimeout(function() {
                     btn.textContent = originalText;
                 }, 1500);
-            }).catch(function(err) {
-                alert('Error copying URL: ' + err);
-            });
+            }
+
+            function fallbackCopy() {
+                try {
+                    var textarea = document.createElement('textarea');
+                    textarea.value = url;
+                    textarea.style.position = 'fixed';
+                    textarea.style.opacity = '0';
+                    textarea.style.left = '-9999px';
+                    document.body.appendChild(textarea);
+                    textarea.focus();
+                    textarea.select();
+                    var success = document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    if (success) {
+                        showCopied();
+                    } else {
+                        alert('Could not copy URL automatically. Please copy it manually:\n' + url);
+                    }
+                } catch (err) {
+                    alert('Could not copy URL automatically. Please copy it manually:\n' + url);
+                }
+            }
+
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(url).then(showCopied).catch(function() {
+                    fallbackCopy();
+                });
+            } else {
+                fallbackCopy();
+            }
         }
         function closeUrlDeleteModal() {
             document.getElementById('urlDeleteModal').style.display = 'none';

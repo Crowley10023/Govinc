@@ -171,6 +171,9 @@ public class AssessmentDirectController {
     @Deprecated
     @GetMapping("/assessment-direct/{obfuscatedId}")
     public String showAssessmentDirect(@PathVariable String obfuscatedId, Model model) {
+        if (assessmentUrlsService.findByObfuscated(obfuscatedId).isEmpty()) {
+            return "assessment-direct-landing";
+        }
         return "assessment-direct"; // fallback, all data fetched via API from now
     }
 

@@ -761,6 +761,16 @@ class GovincLifecycleTest {
         TESTED_ENDPOINTS.add("GET /assessment-direct");
     }
 
+    @Test
+    @Order(2108)
+    void assessment_directUnknownId_returnsLandingPage() throws Exception {
+        mockMvc.perform(get("/assessment-direct/unknown-obfuscated-id-xyz"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("assessmentDirectLanding")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("mainContainer"))));
+        TESTED_ENDPOINTS.add("GET /assessment-direct/{unknownId}");
+    }
+
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Finalize / Reopen / Delete lifecycle
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
