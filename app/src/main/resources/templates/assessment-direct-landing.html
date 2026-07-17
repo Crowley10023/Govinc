@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <meta charset="UTF-8">
+    <title>Assessment Direct Link</title>
+    <link rel="stylesheet" type="text/css" href="/style.css">
+    <th:block th:replace="~{fragments/theme-css :: themeCss}" />
+</head>
+
+<body>
+    <div id="assessmentDirectLanding"
+         style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;text-align:center;">
+        <img th:if="${layoutConfig != null and layoutConfig.imageData != null and layoutConfig.imageData.length > 0}" src="/config/image-upload/preview"
+            alt="Logo" style="max-width:260px;max-height:260px;object-fit:contain;" />
+        <img th:unless="${layoutConfig != null and layoutConfig.imageData != null and layoutConfig.imageData.length > 0}" src="/title.png"
+            alt="Logo" style="max-width:260px;max-height:260px;object-fit:contain;" />
+        <span class="tool-name" style="display:block;margin-top:1em;font-size:1.4em;"
+            th:text="${organisationDetails != null and organisationDetails.toolName != null ? organisationDetails.toolName : ''}"></span>
+    </div>
+</body>
+
+</html>

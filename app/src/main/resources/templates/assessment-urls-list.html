@@ -49,13 +49,9 @@
                                 style="display:inline-block;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;" th:title="${url.url}"></a>
                         </td>
                         <td>
-                            <div th:if="${externalUrlById[url.id] != null and !#strings.isEmpty(externalUrlById[url.id])}" style="display:flex;align-items:center;gap:0.5em;">
-                                <a th:href="${externalUrlById[url.id]}" th:text="${externalUrlById[url.id]}" target="_blank"
-                                   style="display:inline-block;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;"
-                                   th:title="${externalUrlById[url.id]}"></a>
-                                <button type="button" class="btn-secondary" th:data-copy-url="${externalUrlById[url.id]}"
-                                        onclick="copyExternalUrl(this)" style="padding:0.35em 0.6em;">Copy</button>
-                            </div>
+                            <button type="button" class="btn-secondary" th:if="${externalUrlById[url.id] != null and !#strings.isEmpty(externalUrlById[url.id])}"
+                                    th:data-copy-url="${externalUrlById[url.id]}" th:title="${externalUrlById[url.id]}"
+                                    onclick="copyExternalUrl(this)" style="padding:0.35em 0.6em;">Copy</button>
                             <span th:if="${externalUrlById[url.id] == null or #strings.isEmpty(externalUrlById[url.id])}" class="text-muted">Not configured</span>
                         </td>
                         <td>

@@ -57,7 +57,7 @@ public class AssessmentDirectController {
 
     @GetMapping({"/assessment-direct", "/assessment-direct/"})
     public String showAssessmentDirectLanding() {
-        return "assessment-direct";
+        return "assessment-direct-landing";
     }
 
     // New JSON endpoint: Get all assessment data needed for the direct page (formerly Thymeleaf model)
