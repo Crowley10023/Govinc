@@ -86,6 +86,7 @@ class GovincLifecycleTest {
     private Long orgServiceId;
     private Long assessorUserId;
     private Long mutableAssessmentId;
+    private String mutableDirectUrl;
 
     private static final List<String> TESTED_ENDPOINTS = new ArrayList<>();
 
@@ -724,7 +725,21 @@ class GovincLifecycleTest {
                 .andReturn();
         String body = result.getResponse().getContentAsString();
         assertThat(body).contains("directUrl");
+        // Extract the "directUrl":"/assessment-direct/<token>" value for the anonymous-access check below.
+        mutableDirectUrl = body.replaceAll(".*\"directUrl\"\\s*:\\s*\"([^\"]+)\".*", "$1");
         TESTED_ENDPOINTS.add("POST /assessment/{id}/create-url");
+    }
+
+    @Test
+    @Order(2101)
+    void assessment_direct_realObfuscatedUrl_isAnonymouslyAccessible_notRedirectedToLogin() throws Exception {
+        assertThat(mutableDirectUrl).isNotBlank();
+        // No @WithMockUser here: this must work for a completely anonymous caller.
+        // If PUBLIC_URLS ever stops covering this path, Spring Security would 3xx-redirect to /login instead.
+        mockMvc.perform(get(mutableDirectUrl))
+                .andExpect(status().isOk())
+                .andExpect(header().doesNotExist("Location"));
+        TESTED_ENDPOINTS.add("GET /assessment-direct/{realObfuscatedId} (anonymous, no login redirect)");
     }
 
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
