@@ -53,6 +53,23 @@ public class AssessmentDirectController {
     @Autowired
     private GeneralConfigService generalConfigService;
 
+    private static final String UNLOCK_SESSION_ATTR_PREFIX = "assessmentDirectUnlocked_";
+
+    // Server-side password gate: a password-protected obfuscated URL is only considered
+    // unlocked once validatePassword() has recorded that fact in this HTTP session.
+    // (The client-side gate alone is cosmetic; every data/write endpoint must re-check this.)
+    private boolean isAssessmentUnlocked(jakarta.servlet.http.HttpSession session, AssessmentUrls urlEntity) {
+        String password = urlEntity.getPassword();
+        if (password == null || password.trim().isEmpty()) {
+            return true;
+        }
+        return Boolean.TRUE.equals(session.getAttribute(UNLOCK_SESSION_ATTR_PREFIX + urlEntity.getUrl()));
+    }
+
+    private org.springframework.http.ResponseEntity<Map<String, Object>> passwordRequiredResponse() {
+        return org.springframework.http.ResponseEntity.status(401).body(Map.of("error", "password_required"));
+    }
+
     // Replaced Thymeleaf mapping with RESTful endpoints
 
     @GetMapping({"/assessment-direct", "/assessment-direct/"})
@@ -63,10 +80,15 @@ public class AssessmentDirectController {
     // New JSON endpoint: Get all assessment data needed for the direct page (formerly Thymeleaf model)
     @GetMapping("/assessment-direct/{obfuscatedId}/alldata")
     @org.springframework.web.bind.annotation.ResponseBody
-    public org.springframework.http.ResponseEntity<?> getAssessmentDirectAllData(@PathVariable String obfuscatedId) {
+    public org.springframework.http.ResponseEntity<?> getAssessmentDirectAllData(
+            @PathVariable String obfuscatedId,
+            jakarta.servlet.http.HttpSession session) {
         Optional<AssessmentUrls> maybeUrl = assessmentUrlsService.findByObfuscated(obfuscatedId);
         if (maybeUrl.isPresent()) {
             AssessmentUrls urlEntity = maybeUrl.get();
+            if (!isAssessmentUnlocked(session, urlEntity)) {
+                return passwordRequiredResponse();
+            }
             Assessment assessment = urlEntity.getAssessment();
             Map<String, Object> out = new HashMap<>();
 
@@ -184,9 +206,22 @@ public class AssessmentDirectController {
     }
 
     // Save/update answer for a single control (AJAX POST from assessment-direct UI)
-    @org.springframework.web.bind.annotation.PostMapping("/assessment-direct/{id}/answer")
+    @org.springframework.web.bind.annotation.PostMapping("/assessment-direct/{obfuscatedId}/answer")
     @org.springframework.web.bind.annotation.ResponseBody
-    public org.springframework.http.ResponseEntity<String> saveDirectAnswer(@PathVariable Long id, @org.springframework.web.bind.annotation.RequestParam Long controlId, @org.springframework.web.bind.annotation.RequestParam Long answerId) {
+    public org.springframework.http.ResponseEntity<String> saveDirectAnswer(
+            @PathVariable String obfuscatedId,
+            @org.springframework.web.bind.annotation.RequestParam Long controlId,
+            @org.springframework.web.bind.annotation.RequestParam Long answerId,
+            jakarta.servlet.http.HttpSession session) {
+        // Resolve the assessment strictly via the obfuscated URL so a caller cannot write to
+        // an arbitrary assessment by guessing/incrementing a numeric assessment ID.
+        Optional<AssessmentUrls> maybeUrl = assessmentUrlsService.findByObfuscated(obfuscatedId);
+        if (!maybeUrl.isPresent()) return org.springframework.http.ResponseEntity.notFound().build();
+        AssessmentUrls urlEntity = maybeUrl.get();
+        if (!isAssessmentUnlocked(session, urlEntity)) {
+            return org.springframework.http.ResponseEntity.status(401).body("password_required");
+        }
+        Long id = urlEntity.getAssessment().getId();
         // Tamper-safe: only allow writes when assessment is OPEN
         Assessment assessmentCheck = assessmentRepository.findById(id).orElse(null);
         if (assessmentCheck == null) return org.springframework.http.ResponseEntity.notFound().build();
@@ -240,9 +275,22 @@ public class AssessmentDirectController {
     }
 
     // Save/update comment for a single control (AJAX PUT from direct UI)
-    @org.springframework.web.bind.annotation.PutMapping("/assessment-direct/{id}/control/{controlId}/comment")
+    @org.springframework.web.bind.annotation.PutMapping("/assessment-direct/{obfuscatedId}/control/{controlId}/comment")
     @org.springframework.web.bind.annotation.ResponseBody
-    public org.springframework.http.ResponseEntity<String> saveDirectComment(@PathVariable Long id, @PathVariable Long controlId, @org.springframework.web.bind.annotation.RequestBody Map<String, String> body) {
+    public org.springframework.http.ResponseEntity<String> saveDirectComment(
+            @PathVariable String obfuscatedId,
+            @PathVariable Long controlId,
+            @org.springframework.web.bind.annotation.RequestBody Map<String, String> body,
+            jakarta.servlet.http.HttpSession session) {
+        // Resolve the assessment strictly via the obfuscated URL so a caller cannot write to
+        // an arbitrary assessment by guessing/incrementing a numeric assessment ID.
+        Optional<AssessmentUrls> maybeUrl = assessmentUrlsService.findByObfuscated(obfuscatedId);
+        if (!maybeUrl.isPresent()) return org.springframework.http.ResponseEntity.notFound().build();
+        AssessmentUrls urlEntity = maybeUrl.get();
+        if (!isAssessmentUnlocked(session, urlEntity)) {
+            return org.springframework.http.ResponseEntity.status(401).body("password_required");
+        }
+        Long id = urlEntity.getAssessment().getId();
         // Tamper-safe: only allow writes when assessment is OPEN
         Assessment assessmentCheck = assessmentRepository.findById(id).orElse(null);
         if (assessmentCheck == null) return org.springframework.http.ResponseEntity.notFound().build();
@@ -310,7 +358,8 @@ public class AssessmentDirectController {
     @org.springframework.web.bind.annotation.ResponseBody
     public org.springframework.http.ResponseEntity<?> validatePassword(
             @PathVariable String obfuscatedId,
-            @org.springframework.web.bind.annotation.RequestBody Map<String, String> body) {
+            @org.springframework.web.bind.annotation.RequestBody Map<String, String> body,
+            jakarta.servlet.http.HttpSession session) {
         String providedPassword = body.get("password");
         
         // Check if URL exists
@@ -322,6 +371,9 @@ public class AssessmentDirectController {
         // Check if password matches
         boolean isValid = assessmentUrlsService.validatePassword(obfuscatedId, providedPassword);
         if (isValid) {
+            // Record the unlock server-side so every other endpoint (alldata/answer/comment/
+            // ping/events/finalize) is actually gated, not just the client-side UI.
+            session.setAttribute(UNLOCK_SESSION_ATTR_PREFIX + obfuscatedId, Boolean.TRUE);
             return org.springframework.http.ResponseEntity.ok(java.util.Map.of("success", true));
         } else {
             return org.springframework.http.ResponseEntity.status(401).body(java.util.Map.of("error", "Invalid password"));
@@ -344,10 +396,16 @@ public class AssessmentDirectController {
     // Public summary JSON endpoint for assessment-direct
     @GetMapping("/assessment-direct/{obfuscatedId}/data")
     @org.springframework.web.bind.annotation.ResponseBody
-    public org.springframework.http.ResponseEntity<?> getAssessmentDirectSummary(@PathVariable String obfuscatedId) {
+    public org.springframework.http.ResponseEntity<?> getAssessmentDirectSummary(
+            @PathVariable String obfuscatedId,
+            jakarta.servlet.http.HttpSession session) {
         Optional<AssessmentUrls> maybeUrl = assessmentUrlsService.findByObfuscated(obfuscatedId);
         if (maybeUrl.isPresent()) {
-            Assessment assessment = maybeUrl.get().getAssessment();
+            AssessmentUrls urlEntity = maybeUrl.get();
+            if (!isAssessmentUnlocked(session, urlEntity)) {
+                return passwordRequiredResponse();
+            }
+            Assessment assessment = urlEntity.getAssessment();
             java.util.Map<String, Object> result = new java.util.HashMap<>();
             result.put("id", assessment.getId());
             result.put("name", assessment.getName());
@@ -431,7 +489,7 @@ public class AssessmentDirectController {
             @PathVariable String obfuscatedId,
             jakarta.servlet.http.HttpSession session) {
         Optional<AssessmentUrls> maybeUrl = assessmentUrlsService.findByObfuscated(obfuscatedId);
-        if (!maybeUrl.isPresent()) {
+        if (!maybeUrl.isPresent() || !isAssessmentUnlocked(session, maybeUrl.get())) {
             org.springframework.web.servlet.mvc.method.annotation.SseEmitter dead =
                     new org.springframework.web.servlet.mvc.method.annotation.SseEmitter();
             dead.complete();
@@ -504,6 +562,9 @@ public class AssessmentDirectController {
         if (!maybeUrl.isPresent()) {
             return org.springframework.http.ResponseEntity.notFound().build();
         }
+        if (!isAssessmentUnlocked(session, maybeUrl.get())) {
+            return org.springframework.http.ResponseEntity.status(401).body(Map.of("error", "password_required"));
+        }
         Assessment assessment = maybeUrl.get().getAssessment();
         // Register presence as "Anonymous" keyed by session ID
         assessmentPresenceService.register(assessment.getId(), session.getId(), "Anonymous");
@@ -550,10 +611,15 @@ public class AssessmentDirectController {
     // Finalize assessment via assessment-direct (POST by obfuscated ID)
     @PostMapping("/assessment-direct/{obfuscatedId}/finalize")
     @org.springframework.web.bind.annotation.ResponseBody
-    public org.springframework.http.ResponseEntity<Map<String, Object>> finalizeAssessmentDirect(@PathVariable String obfuscatedId) {
+    public org.springframework.http.ResponseEntity<Map<String, Object>> finalizeAssessmentDirect(
+            @PathVariable String obfuscatedId,
+            jakarta.servlet.http.HttpSession session) {
         Optional<AssessmentUrls> maybeUrl = assessmentUrlsService.findByObfuscated(obfuscatedId);
         if (!maybeUrl.isPresent()) {
             return org.springframework.http.ResponseEntity.notFound().build();
+        }
+        if (!isAssessmentUnlocked(session, maybeUrl.get())) {
+            return org.springframework.http.ResponseEntity.status(401).body(Map.of("success", false, "reason", "password_required"));
         }
 
         Assessment assessment = maybeUrl.get().getAssessment();

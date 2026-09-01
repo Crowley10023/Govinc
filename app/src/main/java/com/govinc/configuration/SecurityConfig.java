@@ -133,6 +133,12 @@ public class SecurityConfig {
                 // the security context is not propagated to async threads so we must not
                 // re-evaluate authorization on them.
                 .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
+                // Must be declared BEFORE the PUBLIC_URLS "/assessment-direct/*" wildcard below:
+                // that single-segment wildcard would otherwise also match /assessment-direct/urls
+                // (the admin management page listing every obfuscated URL), and Spring Security
+                // authorization rules are evaluated in order with first-match-wins.
+                .requestMatchers("/assessment-direct/urls", "/assessment-direct/urls/**")
+                    .hasAnyRole("ADMIN", "INFORMATION_SECURITY_MANAGER")
                 .requestMatchers(PUBLIC_URLS).permitAll()
                 // Corp-dir lookup used from assessment-details e-mail flow.
                 // Keep narrow scope: allow only this endpoint for assessor role.

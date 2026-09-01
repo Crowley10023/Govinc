@@ -520,7 +520,7 @@
                                 clearIcon(feedbackIcon);
                                 return;
                             }
-                            fetch('/assessment-direct/' + a.id + '/answer', {
+                            fetch('/assessment-direct/' + obfuscatedId + '/answer', {
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/x-www-form-urlencoded'
@@ -557,7 +557,7 @@
                             if (debounceTimers[controlId])
                                 clearTimeout(debounceTimers[controlId]);
                             debounceTimers[controlId] = setTimeout(function() {
-                                fetch('/assessment-direct/' + a.id + '/control/' + controlId + '/comment', {
+                                fetch('/assessment-direct/' + obfuscatedId + '/control/' + controlId + '/comment', {
                                     method: 'PUT',
                                     headers: {
                                         'Content-Type': 'application/json'
