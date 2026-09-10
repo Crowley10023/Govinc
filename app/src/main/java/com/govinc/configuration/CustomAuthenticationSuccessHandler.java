@@ -1,5 +1,6 @@
 package com.govinc.configuration;
 
+import com.govinc.authorization.AuthorizationService;
 import com.govinc.user.User;
 import com.govinc.user.UserRepository;
 import com.govinc.user.Role;
@@ -33,6 +34,8 @@ public class CustomAuthenticationSuccessHandler implements AuthenticationSuccess
     private org.springframework.core.env.Environment env;
     @Autowired
     private UserSession userSession;
+    @Autowired
+    private AuthorizationService authorizationService;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
@@ -66,7 +69,9 @@ public class CustomAuthenticationSuccessHandler implements AuthenticationSuccess
 
         if (authentication.getPrincipal() instanceof OidcUser oidcUser) {
             logger.info("[OAUTH2-FLOW] OidcUser detected");
-            email = oidcUser.getEmail();
+            // Azure AD ID tokens frequently omit a populated "email" claim; fall back to
+            // preferred_username/upn (same resolution used everywhere else, e.g. AuthorizationService).
+            email = authorizationService.resolveEmailFromAuth(authentication);
             // 1st choice: standard OIDC individual name claims (Keycloak always provides these)
             firstName = oidcUser.getGivenName();
             lastName = oidcUser.getFamilyName();

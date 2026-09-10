@@ -30,21 +30,14 @@ public class GlobalUserSessionAdvice {
             if (authentication != null && authentication.isAuthenticated() &&
                 !(authentication.getPrincipal() instanceof String principal && principal.equals("anonymousUser"))) {
                 Object principal = authentication.getPrincipal();
-                String email = null;
-                if (principal instanceof OidcUser oidcUser) {
-                    email = oidcUser.getEmail();
-                } else if (principal instanceof UserDetails userDetails) {
-                    email = userDetails.getUsername() + "@local";
-                } else if (principal instanceof String str) {
-                    email = str + "@local";
-                }
+                String email = authorizationService.resolveEmailFromAuth(authentication);
                 if (email != null) {
                     var user = userRepository.findByEmail(email);
                     if (user.isPresent()) return user.get().getName();
                 }
                 // Fallback: no DB record yet (e.g. first login before handler completes)
-                if (principal instanceof OidcUser oidcUser) {
-                    if (oidcUser.getEmail() != null) return oidcUser.getEmail();
+                if (email != null) {
+                    return email;
                 } else if (principal instanceof UserDetails userDetails) {
                     return userDetails.getUsername();
                 }

@@ -147,13 +147,21 @@ public class AuthorizationService {
 
     /**
      * Resolves the user's email address from the authentication principal.
-     * For OIDC users, reads the email claim directly.
+     * For OIDC users, reads the email claim directly, falling back to preferred_username/upn
+     * because Azure AD ID tokens frequently omit a populated "email" claim even when the
+     * "email" scope is requested (Keycloak reliably includes it, Azure AD does not).
      * For form-login users, maps the Spring Security username to the configured email address.
      */
-    private String resolveEmailFromAuth(Authentication auth) {
+    public String resolveEmailFromAuth(Authentication auth) {
         if (auth == null) return null;
         if (auth.getPrincipal() instanceof org.springframework.security.oauth2.core.oidc.user.OidcUser oidcUser) {
-            return oidcUser.getEmail();
+            String email = oidcUser.getEmail();
+            if (email != null && !email.isBlank()) return email;
+            String preferredUsername = oidcUser.getPreferredUsername();
+            if (preferredUsername != null && !preferredUsername.isBlank()) return preferredUsername;
+            Object upn = oidcUser.getClaims().get("upn");
+            if (upn instanceof String upnStr && !upnStr.isBlank()) return upnStr;
+            return null;
         } else if (auth.getPrincipal() instanceof org.springframework.security.core.userdetails.UserDetails ud) {
             String username = ud.getUsername();
             String entry = environment.getProperty("users." + username);
