@@ -140,6 +140,19 @@ public class SecurityConfig {
                 .requestMatchers("/assessment-direct/urls", "/assessment-direct/urls/**")
                     .hasAnyRole("ADMIN", "INFORMATION_SECURITY_MANAGER")
                 .requestMatchers(PUBLIC_URLS).permitAll()
+                // Must be declared BEFORE the "/orgservice-assessment/**" ADMIN/ISM-only rule below:
+                // an org service's responsible persons (any role) must be able to reach the simple
+                // assessment view and its save/e-mail endpoints. Fine-grained authorization
+                // (canAccessAssessmentFor) is enforced in OrgServiceAssessmentController itself.
+                .requestMatchers(
+                    "/orgservice-assessment/simple/**",
+                    "/orgservice-assessment/save-control",
+                    "/orgservice-assessment/save-control-comment",
+                    "/orgservice-assessment/*/email/generate",
+                    "/orgservice-assessment/*/email/send",
+                    // Read-only maturity model catalog needed to render the simple view's model dropdown.
+                    "/maturitymodel/api/all"
+                ).authenticated()
                 // Corp-dir lookup used from assessment-details e-mail flow.
                 // Keep narrow scope: allow only this endpoint for assessor role.
                 .requestMatchers("/users/api/find-by-email").hasAnyRole("ADMIN", "INFORMATION_SECURITY_MANAGER", "ASSESSOR")

@@ -2,8 +2,13 @@ package com.govinc;
 
 import com.govinc.entity.LayoutConfiguration;
 import com.govinc.entity.LayoutConfigurationRepository;
+import com.govinc.entity.OrganisationDetails;
+import com.govinc.entity.OrganisationDetailsRepository;
+import com.govinc.authorization.AuthorizationService;
 import com.govinc.authorization.UnauthorizedException;
 import com.govinc.service.ErrorLogService;
+import com.govinc.service.GeneralConfigService;
+import com.govinc.user.User;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
@@ -18,6 +23,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.Locale;
 import java.util.HashMap;
 import java.util.Map;
@@ -28,13 +35,25 @@ public class GlobalExceptionHandler {
     private final Environment env;
     private final LayoutConfigurationRepository layoutConfigurationRepository;
     private final ErrorLogService errorLogService;
+    private final OrganisationDetailsRepository organisationDetailsRepository;
+    private final AuthorizationService authorizationService;
+    private final GeneralConfigService generalConfigService;
+
+    @Value("${app.version:2.1.0}")
+    private String versionFile;
 
     public GlobalExceptionHandler(Environment env,
                                   LayoutConfigurationRepository layoutConfigurationRepository,
-                                  ErrorLogService errorLogService) {
+                                  ErrorLogService errorLogService,
+                                  OrganisationDetailsRepository organisationDetailsRepository,
+                                  AuthorizationService authorizationService,
+                                  GeneralConfigService generalConfigService) {
         this.env = env;
         this.layoutConfigurationRepository = layoutConfigurationRepository;
         this.errorLogService = errorLogService;
+        this.organisationDetailsRepository = organisationDetailsRepository;
+        this.authorizationService = authorizationService;
+        this.generalConfigService = generalConfigService;
     }
 
     /**
@@ -59,7 +78,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(UnauthorizedException.class)
-    public ResponseEntity<?> handleUnauthorizedException(UnauthorizedException ex, HttpServletRequest request) {
+    public Object handleUnauthorizedException(UnauthorizedException ex, HttpServletRequest request) {
         // Return JSON response for AJAX/API calls
         if (isApiCall(request)) {
             Map<String, Object> response = new HashMap<>();
@@ -72,9 +91,11 @@ public class GlobalExceptionHandler {
         // Return HTML response for page requests
         ModelAndView mav = new ModelAndView();
         mav.setViewName("not-authorized");
+        mav.setStatus(HttpStatus.FORBIDDEN);
         mav.addObject("message", ex.getMessage() != null ? ex.getMessage() : "You do not have permission to access this page or perform this action");
         addLayoutConfigToView(mav);
-        return new ResponseEntity<>(mav, HttpStatus.FORBIDDEN);
+        addNavigationAttributes(mav);
+        return mav;
     }
 
     @ExceptionHandler(Exception.class)
@@ -103,6 +124,7 @@ public class GlobalExceptionHandler {
         mav.addObject("showDetails", showDetails);
 
         addLayoutConfigToView(mav);
+        addNavigationAttributes(mav);
 
         if (showDetails) {
             StringWriter sw = new StringWriter();
@@ -147,7 +169,91 @@ public class GlobalExceptionHandler {
         }
         mav.addObject("layoutConfig", layoutConfig);
     }
-    
+
+    /**
+     * Populate the same navigation model attributes (user info, role-based menu
+     * visibility flags, org details, app version) that GlobalUserSessionAdvice /
+     * GlobalOrganisationDetailsAdvice normally contribute via @ModelAttribute.
+     * Those advice methods are NOT invoked for views rendered from an
+     * @ExceptionHandler, so without this the nav fragment renders with every
+     * menu hidden and "no user" / "No role" shown.
+     */
+    private void addNavigationAttributes(ModelAndView mav) {
+        String userName = null;
+        String userId = null;
+        String userRole = null;
+        boolean canAccessConfig = false;
+        boolean canAccessSecurityFramework = false;
+        boolean canAccessOrganization = false;
+        boolean canCreateAssessment = false;
+        boolean canViewAssessmentList = false;
+        boolean canAccessCompliance = false;
+        boolean canAccessStatistics = false;
+        boolean canAccessAssessmentUrls = false;
+        boolean canAccessGovernance = false;
+        try {
+            if (authorizationService != null) {
+                User currentUser = authorizationService.getCurrentUser();
+                if (currentUser != null) {
+                    userName = currentUser.getName();
+                    userId = String.valueOf(currentUser.getId());
+                }
+                com.govinc.user.Role role = authorizationService.getCurrentUserRole();
+                if (role != null) userRole = role.getDisplayName();
+                canAccessConfig = authorizationService.canAccessConfig();
+                canAccessSecurityFramework = authorizationService.canAccessSecurityFramework();
+                canAccessOrganization = authorizationService.canAccessOrganization();
+                canCreateAssessment = authorizationService.canCreateAssessment();
+                canViewAssessmentList = authorizationService.canViewAssessmentList();
+                canAccessCompliance = authorizationService.canAccessCompliance();
+                canAccessStatistics = authorizationService.canAccessStatistics();
+                canAccessAssessmentUrls = authorizationService.canAccessAssessmentUrls();
+                canAccessGovernance = authorizationService.canAccessGovernance();
+            }
+        } catch (Exception ex) {
+            // Fall back to the "no access" defaults declared above
+        }
+        mav.addObject("userName", userName);
+        mav.addObject("userId", userId);
+        mav.addObject("userRole", userRole);
+        mav.addObject("canAccessConfig", canAccessConfig);
+        mav.addObject("canAccessSecurityFramework", canAccessSecurityFramework);
+        mav.addObject("canAccessOrganization", canAccessOrganization);
+        mav.addObject("canCreateAssessment", canCreateAssessment);
+        mav.addObject("canViewAssessmentList", canViewAssessmentList);
+        mav.addObject("canAccessCompliance", canAccessCompliance);
+        mav.addObject("canAccessStatistics", canAccessStatistics);
+        mav.addObject("canAccessAssessmentUrls", canAccessAssessmentUrls);
+        mav.addObject("canAccessGovernance", canAccessGovernance);
+
+        int sessionTimeoutMinutes = 30;
+        try {
+            if (generalConfigService != null) sessionTimeoutMinutes = generalConfigService.getSessionTimeoutMinutes();
+        } catch (Exception ex) {
+            // keep default
+        }
+        mav.addObject("sessionTimeoutMinutes", sessionTimeoutMinutes);
+
+        OrganisationDetails organisationDetails;
+        try {
+            organisationDetails = organisationDetailsRepository.findAll().stream().findFirst().orElse(new OrganisationDetails());
+        } catch (Exception ex) {
+            organisationDetails = new OrganisationDetails();
+        }
+        mav.addObject("organisationDetails", organisationDetails);
+        mav.addObject("appVersion", getApplicationVersion());
+    }
+
+    private String getApplicationVersion() {
+        try {
+            String content = new String(Files.readAllBytes(Paths.get(versionFile))).trim();
+            if (!content.isEmpty()) return content;
+        } catch (Exception ex) {
+            // fall through to default
+        }
+        return "2.1.0";
+    }
+
     /**
      * Check if the request is an API call (JSON response expected) or page request.
      */
