@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -56,7 +55,10 @@ public class AssessmentEmailRestController {
      * Request body:
      * {
      *   "purpose": "assessment" | "checking",
-     *   "baseUrl": "https://app.example.com"   // optional, used to build the assessment link
+     *   "baseUrl": "https://app.example.com",       // optional, used to build the assessment link
+     *   "recipientEmails": ["a@b.com", ...],        // optional, all currently entered recipients
+     *   "recipientNames": ["Alice", ...],           // optional, parallel to recipientEmails (client-side hints)
+     *   "linkType": "internal" | "external"
      * }
      *
      * Response:
@@ -84,20 +86,20 @@ public class AssessmentEmailRestController {
         String senderName = currentUser != null ? currentUser.getName() : null;
         if (senderName == null || senderName.isBlank()) senderName = null;
 
-        // Resolve recipient names from supplied user IDs (filtered to assigned users)
+        // Resolve recipient names: prefer a registered user's stored name, fall back to the client-supplied hint
         List<String> recipientNames = new java.util.ArrayList<>();
-        Object rawIdsObj = payload.get("recipientUserIds");
-        if (rawIdsObj instanceof List<?> rawIds && !rawIds.isEmpty()) {
-            List<Long> assignedUserIds = assessment.getUsers().stream()
-                    .map(User::getId).collect(Collectors.toList());
-            for (Object o : rawIds) {
-                long uid = o instanceof Number n ? n.longValue() : Long.parseLong(String.valueOf(o));
-                if (assignedUserIds.contains(uid)) {
-                    userRepository.findById(uid).ifPresent(u -> {
-                        String name = u.getName();
-                        if (name != null && !name.isBlank()) recipientNames.add(name);
-                    });
-                }
+        Object rawEmailsObj = payload.get("recipientEmails");
+        if (rawEmailsObj instanceof List<?> rawEmails && !rawEmails.isEmpty()) {
+            Object rawNamesObj = payload.get("recipientNames");
+            List<?> rawNames = rawNamesObj instanceof List<?> ln ? ln : List.of();
+            for (int i = 0; i < rawEmails.size(); i++) {
+                String email = String.valueOf(rawEmails.get(i)).trim().toLowerCase();
+                if (email.isBlank() || "null".equals(email)) continue;
+                String hint = i < rawNames.size() ? String.valueOf(rawNames.get(i)) : "";
+                String name = userRepository.findByEmail(email).map(User::getName)
+                        .filter(n -> n != null && !n.isBlank())
+                        .orElse((hint != null && !hint.isBlank() && !"null".equals(hint)) ? hint : null);
+                if (name != null) recipientNames.add(name);
             }
         }
 
@@ -105,6 +107,7 @@ public class AssessmentEmailRestController {
         if ("null".equals(linkType)) linkType = "internal";
 
         String assessmentLink;
+        String urlPassword = null;
         if ("external".equalsIgnoreCase(linkType)) {
             // Ensure external URL exists; auto-create if missing
             if (assessment.getAssessmentUrls() == null || assessment.getAssessmentUrls().getUrl() == null) {
@@ -116,6 +119,8 @@ public class AssessmentEmailRestController {
             assessmentLink = directUrl.startsWith("http")
                     ? directUrl
                     : generalConfigService.buildAssessmentDirectUrl(directUrl, baseUrl);
+            String pw = assessment.getAssessmentUrls().getPassword();
+            if (pw != null && !pw.isBlank()) urlPassword = pw;
         } else {
             assessmentLink = baseUrl.isBlank()
                     ? "/assessment/" + id
@@ -135,7 +140,10 @@ public class AssessmentEmailRestController {
                 : "Recipient name(s): " + String.join(", ", recipientNames) + "\n";
         String senderLine = senderName != null ? "Sender name: " + senderName + "\n" : "";
         String personalisationNote = "Use the recipient's given name in the salutation and sign off with the sender's name.\n" +
-                                     "The body must be valid HTML (use <p>, <br>, etc.). Include the assessment link exactly as this HTML anchor: " + htmlLink + "\n";
+                                     "The body must be valid HTML (use <p>, <br>, etc.). Include the assessment link exactly as this HTML anchor: " + htmlLink + "\n" +
+                                     (urlPassword != null
+                                             ? "The external link is password-protected. Include this access password in the e-mail in clear text, e.g. \"Access password: " + urlPassword + "\".\n"
+                                             : "");
 
         String prompt;
         if ("checking".equalsIgnoreCase(purpose)) {
@@ -197,9 +205,11 @@ public class AssessmentEmailRestController {
      *
      * Request body:
      * {
-     *   "recipientUserIds": [1, 2, 3],   // user IDs from assessment.users
+     *   "recipientEmails": ["a@b.com", ...],       // every recipient currently entered (assigned/corp-dir/manual)
+     *   "corpDirRecipients": [{ "mail": ..., "displayName": ..., "givenName": ..., "surname": ... }, ...],
      *   "subject": "...",
-     *   "body": "..."
+     *   "body": "...",
+     *   "linkType": "internal" | "external"
      * }
      */
     @PostMapping("/{id}/email/send")
@@ -223,39 +233,30 @@ public class AssessmentEmailRestController {
         }
         String from = currentUser.getEmail();
 
-        // Resolve recipient e-mail addresses from provided user IDs
-        @SuppressWarnings("unchecked")
-        List<Object> rawIds = (List<Object>) payload.get("recipientUserIds");
+        Object rawEmailsObj = payload.get("recipientEmails");
+        List<?> rawEmails = rawEmailsObj instanceof List<?> l ? l : List.of();
         @SuppressWarnings("unchecked")
         List<Map<String, String>> corpDirRecipients =
                 (List<Map<String, String>>) payload.getOrDefault("corpDirRecipients", List.of());
 
-        boolean hasExistingRecipients = rawIds != null && !rawIds.isEmpty();
-        boolean hasCorpDirRecipients  = corpDirRecipients != null && !corpDirRecipients.isEmpty();
+        String linkType = payload.containsKey("linkType") ? String.valueOf(payload.get("linkType")) : "internal";
+        if ("null".equals(linkType)) linkType = "internal";
+        boolean internalLink = !"external".equalsIgnoreCase(linkType);
 
-        if (!hasExistingRecipients && !hasCorpDirRecipients) {
-            return ResponseEntity.badRequest().body(Map.of("error", "No recipients selected."));
+        // Normalize the freely-entered / picked recipient e-mail addresses
+        List<String> recipientEmails = new java.util.ArrayList<>();
+        for (Object o : rawEmails) {
+            String email = String.valueOf(o).trim().toLowerCase();
+            if (!email.isBlank() && email.contains("@") && !recipientEmails.contains(email)) {
+                recipientEmails.add(email);
+            }
         }
 
-        List<Long> userIds = hasExistingRecipients
-                ? rawIds.stream()
-                        .map(o -> o instanceof Number n ? n.longValue() : Long.parseLong(String.valueOf(o)))
-                        .collect(Collectors.toList())
-                : List.of();
+        boolean hasCorpDirRecipients = corpDirRecipients != null && !corpDirRecipients.isEmpty();
 
-        // Only allow selecting users that are assigned to this assessment (security check)
-        List<Long> assignedUserIds = assessment.getUsers().stream()
-                .map(User::getId)
-                .collect(Collectors.toList());
-
-        List<String> recipientEmails = new java.util.ArrayList<>(userIds.stream()
-                .filter(assignedUserIds::contains)
-                .map(uid -> userRepository.findById(uid))
-                .filter(Optional::isPresent)
-                .map(Optional::get)
-                .map(User::getEmail)
-                .filter(e -> e != null && !e.isBlank())
-                .collect(Collectors.toList()));
+        if (recipientEmails.isEmpty() && !hasCorpDirRecipients) {
+            return ResponseEntity.badRequest().body(Map.of("error", "No recipients selected."));
+        }
 
         // Process corp-dir recipients: find or create user (preserving existing role),
         // add to assessment users, and collect their e-mails for sending.
@@ -292,8 +293,8 @@ public class AssessmentEmailRestController {
                 }
 
                 if (cdDbUser.getEmail() != null && !cdDbUser.getEmail().isBlank()
-                        && !recipientEmails.contains(cdDbUser.getEmail())) {
-                    recipientEmails.add(cdDbUser.getEmail());
+                        && !recipientEmails.contains(cdDbUser.getEmail().toLowerCase())) {
+                    recipientEmails.add(cdDbUser.getEmail().toLowerCase());
                 }
             }
             assessmentRepository.save(assessment);
@@ -301,7 +302,20 @@ public class AssessmentEmailRestController {
 
         if (recipientEmails.isEmpty()) {
             return ResponseEntity.badRequest().body(
-                    Map.of("error", "None of the selected users have a valid e-mail address or are assigned to this assessment."));
+                    Map.of("error", "None of the selected recipients have a valid e-mail address."));
+        }
+
+        // Security check: the internal link requires a login, so it may only go to people who can log in —
+        // i.e. already-registered users (this also covers corp-dir users just created/found above).
+        if (internalLink) {
+            List<String> unregistered = recipientEmails.stream()
+                    .filter(email -> userRepository.findByEmail(email).isEmpty())
+                    .collect(Collectors.toList());
+            if (!unregistered.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error",
+                        "The internal link can only be sent to registered users or corporate directory members. " +
+                        "Not registered: " + String.join(", ", unregistered)));
+            }
         }
 
         String subject = String.valueOf(payload.getOrDefault("subject", ""));

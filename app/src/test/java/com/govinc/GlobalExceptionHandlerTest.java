@@ -1,9 +1,12 @@
 package com.govinc;
 
+import com.govinc.authorization.AuthorizationService;
 import com.govinc.authorization.UnauthorizedException;
 import com.govinc.entity.LayoutConfiguration;
 import com.govinc.entity.LayoutConfigurationRepository;
+import com.govinc.entity.OrganisationDetailsRepository;
 import com.govinc.service.ErrorLogService;
+import com.govinc.service.GeneralConfigService;
 import jakarta.servlet.AsyncContext;
 import jakarta.servlet.http.HttpServletRequest;
 import org.apache.catalina.connector.ClientAbortException;
@@ -49,6 +52,15 @@ class GlobalExceptionHandlerTest {
     private ErrorLogService errorLogService;
 
     @Mock
+    private OrganisationDetailsRepository organisationDetailsRepository;
+
+    @Mock
+    private AuthorizationService authorizationService;
+
+    @Mock
+    private GeneralConfigService generalConfigService;
+
+    @Mock
     private HttpServletRequest request;
 
     @Mock
@@ -60,7 +72,8 @@ class GlobalExceptionHandlerTest {
     void setUp() {
         lenient().when(env.getActiveProfiles()).thenReturn(new String[0]);
         lenient().when(layoutConfigurationRepository.findAll()).thenReturn(List.of());
-        handler = new GlobalExceptionHandler(env, layoutConfigurationRepository, errorLogService);
+        handler = new GlobalExceptionHandler(env, layoutConfigurationRepository, errorLogService,
+                organisationDetailsRepository, authorizationService, generalConfigService);
     }
 
     private void mockAsyncStartedRequest() {
@@ -261,7 +274,8 @@ class GlobalExceptionHandlerTest {
         when(request.getMethod()).thenReturn("GET");
         when(request.getRequestURI()).thenReturn("/dev");
 
-        handler = new GlobalExceptionHandler(env, layoutConfigurationRepository, errorLogService);
+        handler = new GlobalExceptionHandler(env, layoutConfigurationRepository, errorLogService,
+                organisationDetailsRepository, authorizationService, generalConfigService);
         ModelAndView mav = (ModelAndView) handler.handleException(request, new IllegalArgumentException("boom"));
 
         assertThat(mav.getModel().get("showDetails")).isEqualTo(true);
@@ -312,8 +326,10 @@ class GlobalExceptionHandlerTest {
         when(request.getRequestURI()).thenReturn("/secured");
         when(request.getHeader("X-Requested-With")).thenReturn(null);
 
-        ResponseEntity<?> response = handler.handleUnauthorizedException(new UnauthorizedException("forbidden"), request);
+        Object result = handler.handleUnauthorizedException(new UnauthorizedException("forbidden"), request);
 
+        assertThat(result).isInstanceOf(ResponseEntity.class);
+        ResponseEntity<?> response = (ResponseEntity<?>) result;
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(response.getBody()).isInstanceOf(Map.class);
     }
@@ -325,8 +341,10 @@ class GlobalExceptionHandlerTest {
         when(request.getRequestURI()).thenReturn("/secured");
         when(request.getHeader("X-Requested-With")).thenReturn(null);
 
-        ResponseEntity<?> response = handler.handleUnauthorizedException(new UnauthorizedException("forbidden"), request);
+        Object result = handler.handleUnauthorizedException(new UnauthorizedException("forbidden"), request);
 
+        assertThat(result).isInstanceOf(ResponseEntity.class);
+        ResponseEntity<?> response = (ResponseEntity<?>) result;
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(response.getBody()).isInstanceOf(Map.class);
     }
@@ -338,8 +356,10 @@ class GlobalExceptionHandlerTest {
         when(request.getRequestURI()).thenReturn("/api/secured");
         when(request.getHeader("X-Requested-With")).thenReturn(null);
 
-        ResponseEntity<?> response = handler.handleUnauthorizedException(new UnauthorizedException("forbidden"), request);
+        Object result = handler.handleUnauthorizedException(new UnauthorizedException("forbidden"), request);
 
+        assertThat(result).isInstanceOf(ResponseEntity.class);
+        ResponseEntity<?> response = (ResponseEntity<?>) result;
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(response.getBody()).isInstanceOf(Map.class);
     }
@@ -351,8 +371,10 @@ class GlobalExceptionHandlerTest {
         when(request.getRequestURI()).thenReturn("/secured");
         when(request.getHeader("X-Requested-With")).thenReturn("XMLHttpRequest");
 
-        ResponseEntity<?> response = handler.handleUnauthorizedException(new UnauthorizedException("forbidden"), request);
+        Object result = handler.handleUnauthorizedException(new UnauthorizedException("forbidden"), request);
 
+        assertThat(result).isInstanceOf(ResponseEntity.class);
+        ResponseEntity<?> response = (ResponseEntity<?>) result;
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(response.getBody()).isInstanceOf(Map.class);
     }
@@ -364,10 +386,11 @@ class GlobalExceptionHandlerTest {
         when(request.getRequestURI()).thenReturn("/secured/page");
         when(request.getHeader("X-Requested-With")).thenReturn(null);
 
-        ResponseEntity<?> response = handler.handleUnauthorizedException(new UnauthorizedException("forbidden"), request);
+        Object result = handler.handleUnauthorizedException(new UnauthorizedException("forbidden"), request);
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-        assertThat(response.getBody()).isInstanceOf(ModelAndView.class);
-        assertThat(((ModelAndView) response.getBody()).getViewName()).isEqualTo("not-authorized");
+        assertThat(result).isInstanceOf(ModelAndView.class);
+        ModelAndView mav = (ModelAndView) result;
+        assertThat(mav.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(mav.getViewName()).isEqualTo("not-authorized");
     }
 }

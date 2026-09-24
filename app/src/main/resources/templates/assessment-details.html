@@ -887,32 +887,29 @@
                     <!-- Two-column body -->
                     <div style="display:grid;grid-template-columns:220px 1fr;gap:1em;flex:1;min-height:0;overflow:hidden;">
 
-                        <!-- LEFT: recipients + link type + AI generate -->
+                        <!-- LEFT: add-recipients buttons + link type + AI generate -->
                         <div style="display:flex;flex-direction:column;gap:0.6em;min-height:0;">
-                            <div class="form-group" style="flex:1;display:flex;flex-direction:column;min-height:0;">
-                                <label style="margin-bottom:2px;">Recipients</label>
-                                <select id="email-recipients" multiple
-                                        style="flex:1;min-height:80px;max-height:140px;border:1px solid #ccc;border-radius:4px;padding:4px;font-size:0.88em;">
-                                    <!-- populated dynamically -->
-                                </select>
-                                <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px;">
-                                    <span class="help-text text-sm" style="width:100%;margin-bottom:1px;">Ctrl / Cmd for multiple.</span>
-                                    <button type="button" class="btn-action" style="font-size:0.78em;padding:2px 7px;"
+                            <div class="form-group" style="flex-shrink:0;">
+                                <label style="margin-bottom:4px;">Add Recipients</label>
+                                <div style="display:flex;flex-direction:column;gap:4px;">
+                                    <button type="button" class="btn-action" style="width:100%;font-size:0.85em;"
                                             onclick="openEmailUserPickModal()">&#128101; Assigned Users</button>
-                                    <button type="button" class="btn-action" style="font-size:0.78em;padding:2px 7px;"
+                                    <button type="button" class="btn-action" style="width:100%;font-size:0.85em;"
                                             onclick="openCorpDirModal()">&#9729; Corp Directory</button>
                                 </div>
+                                <span class="help-text text-sm" style="display:block;margin-top:3px;">Selecting a user inserts their e-mail into the Recipients field.</span>
                             </div>
 
                             <div class="form-group" style="flex-shrink:0;">
                                 <label style="margin-bottom:4px;">Link to include</label>
                                 <label style="display:flex;align-items:center;gap:6px;font-weight:normal;cursor:pointer;margin-bottom:2px;">
-                                    <input type="radio" name="emailLinkType" value="internal" id="email-link-internal" checked />
+                                    <input type="radio" name="emailLinkType" value="internal" id="email-link-internal"
+                                           th:checked="${!isAdminOrISM}" onchange="onEmailLinkTypeChange()" />
                                     Internal (assessment details)
                                 </label>
                                 <label style="display:flex;align-items:center;gap:6px;font-weight:normal;cursor:pointer;">
                                     <input type="radio" name="emailLinkType" value="external" id="email-link-external"
-                                           th:disabled="${!isAdminOrISM}" />
+                                           th:disabled="${!isAdminOrISM}" th:checked="${isAdminOrISM}" onchange="onEmailLinkTypeChange()" />
                                     External URL
                                     <span th:if="${assessment.assessmentUrls != null}" class="text-muted text-sm" style="white-space:nowrap;">(exists)</span>
                                     <span th:unless="${assessment.assessmentUrls != null}" class="text-muted text-sm" style="white-space:nowrap;">(will be created)</span>
@@ -931,8 +928,16 @@
                             </div>
                         </div>
 
-                        <!-- RIGHT: subject + body -->
+                        <!-- RIGHT: recipients + subject + body -->
                         <div style="display:flex;flex-direction:column;gap:0.6em;min-height:0;">
+                            <div class="form-group" style="flex-shrink:0;">
+                                <label for="email-recipient-input" style="margin-bottom:2px;">Recipients</label>
+                                <div id="email-recipient-chips" class="email-recipient-chips"></div>
+                                <input type="text" id="email-recipient-input" class="form-control"
+                                       placeholder="Type an e-mail address and press Enter or comma&hellip;"
+                                       style="width:100%;box-sizing:border-box;margin-top:4px;" />
+                                <div id="email-recipient-warning" class="text-sm" style="color:#c00;min-height:1.1em;margin-top:2px;"></div>
+                            </div>
                             <div class="form-group" style="flex-shrink:0;">
                                 <label for="email-subject" style="margin-bottom:2px;">Subject</label>
                                 <input type="text" id="email-subject" class="form-control"
@@ -1494,14 +1499,22 @@
 
         // ---- E-Mail Modal ----
         var emailQuill = null;
+        // Recipient state: {email, name, source, verified} — source: 'assigned' | 'corpdir' | 'manual'
+        var emailRecipients = [];
+        var corpDirRecipientDetails = {}; // lowercase e-mail -> raw corp-dir search result (for send payload)
+        var emailVerifyCache = {};        // lowercase e-mail -> boolean (registered user lookup result)
 
         function openEmailModal() {
             document.getElementById('email-modal-bg').style.display = 'flex';
             document.getElementById('email-modal-error').textContent = '';
             document.getElementById('email-modal-success').style.display = 'none';
-            // Clear recipients and pending corp-dir list on every open
-            document.getElementById('email-recipients').innerHTML = '';
-            corpDirPendingRecipients = [];
+            // Clear recipients on every open
+            emailRecipients = [];
+            corpDirRecipientDetails = {};
+            emailVerifyCache = {};
+            document.getElementById('email-recipient-input').value = '';
+            document.getElementById('email-recipient-warning').textContent = '';
+            renderEmailRecipients();
             if (!emailQuill) {
                 emailQuill = new Quill('#email-body-editor', {
                     theme: 'snow',
@@ -1519,6 +1532,131 @@
         function closeEmailModal() {
             document.getElementById('email-modal-bg').style.display = 'none';
         }
+
+        function currentEmailLinkType() {
+            var el = document.querySelector('input[name="emailLinkType"]:checked');
+            return el ? el.value : 'internal';
+        }
+
+        function onEmailLinkTypeChange() {
+            if (currentEmailLinkType() === 'internal') {
+                revalidateEmailRecipients();
+            } else {
+                document.getElementById('email-recipient-warning').textContent = '';
+                renderEmailRecipients();
+            }
+        }
+
+        // ---- Recipient chip management ----
+        function isValidEmailFormat(email) {
+            return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+        }
+
+        function addEmailRecipient(email, source, name) {
+            email = (email || '').trim().toLowerCase();
+            if (!email) return;
+            if (!isValidEmailFormat(email)) {
+                document.getElementById('email-recipient-warning').textContent = '"' + email + '" is not a valid e-mail address.';
+                return;
+            }
+            var existing = emailRecipients.find(function(r) { return r.email === email; });
+            if (existing) {
+                // Upgrade source when a picked user matches a manually typed address
+                if (source !== 'manual') { existing.source = source; existing.name = name || existing.name; existing.verified = true; }
+                renderEmailRecipients();
+                return;
+            }
+            emailRecipients.push({ email: email, name: name || '', source: source, verified: (source !== 'manual') });
+            renderEmailRecipients();
+            if (source === 'manual' && currentEmailLinkType() === 'internal') {
+                verifyManualRecipient(email);
+            }
+        }
+
+        function removeEmailRecipient(email) {
+            emailRecipients = emailRecipients.filter(function(r) { return r.email !== email; });
+            delete corpDirRecipientDetails[email];
+            renderEmailRecipients();
+        }
+
+        function renderEmailRecipients() {
+            var box = document.getElementById('email-recipient-chips');
+            box.innerHTML = '';
+            var linkType = currentEmailLinkType();
+            var anyInvalid = false;
+            emailRecipients.forEach(function(r) {
+                var invalid = linkType === 'internal' && r.source === 'manual' && r.verified === false;
+                if (invalid) anyInvalid = true;
+                var chip = document.createElement('span');
+                chip.className = 'email-chip' + (invalid ? ' email-chip-invalid' : '');
+                chip.title = invalid
+                    ? 'Not a registered user or corp directory member — cannot receive the internal link.'
+                    : r.email;
+                var label = document.createElement('span');
+                label.textContent = r.name ? (r.name + ' <' + r.email + '>') : r.email;
+                var remove = document.createElement('button');
+                remove.type = 'button';
+                remove.className = 'email-chip-remove';
+                remove.innerHTML = '&times;';
+                remove.setAttribute('aria-label', 'Remove ' + r.email);
+                remove.onclick = function() { removeEmailRecipient(r.email); };
+                chip.appendChild(label);
+                chip.appendChild(remove);
+                box.appendChild(chip);
+            });
+            var warn = document.getElementById('email-recipient-warning');
+            if (anyInvalid) {
+                warn.textContent = 'Recipients highlighted in red are not registered users or corp directory members and cannot receive the internal link. Remove them or switch to the external URL.';
+            } else {
+                warn.textContent = '';
+            }
+        }
+
+        function verifyManualRecipient(email) {
+            if (emailVerifyCache.hasOwnProperty(email)) {
+                applyEmailVerification(email, emailVerifyCache[email]);
+                return;
+            }
+            fetch('/api/find-by-email?email=' + encodeURIComponent(email))
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var found = !!(data && data.notFound !== true && data.email);
+                    emailVerifyCache[email] = found;
+                    applyEmailVerification(email, found);
+                })
+                .catch(function() { /* ignore — leave as unverified, checked again server-side on send */ });
+        }
+
+        function applyEmailVerification(email, verified) {
+            var rec = emailRecipients.find(function(r) { return r.email === email; });
+            if (rec) { rec.verified = verified; renderEmailRecipients(); }
+        }
+
+        function revalidateEmailRecipients() {
+            emailRecipients.forEach(function(r) {
+                if (r.source === 'manual' && !r.verified) verifyManualRecipient(r.email);
+            });
+            renderEmailRecipients();
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var input = document.getElementById('email-recipient-input');
+            if (!input) return;
+            function commitRecipientInput() {
+                var parts = input.value.split(/[,;\s]+/).map(function(s) { return s.trim(); }).filter(Boolean);
+                parts.forEach(function(p) { addEmailRecipient(p, 'manual', ''); });
+                input.value = '';
+            }
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' || e.key === ',' || e.key === ';') {
+                    e.preventDefault();
+                    commitRecipientInput();
+                } else if (e.key === 'Backspace' && input.value === '' && emailRecipients.length > 0) {
+                    removeEmailRecipient(emailRecipients[emailRecipients.length - 1].email);
+                }
+            });
+            input.addEventListener('blur', commitRecipientInput);
+        });
 
         // ---- E-Mail recipient picker (assigned users / interviewees) ----
         function openEmailUserPickModal() {
@@ -1577,24 +1715,14 @@
         }
 
         function addPickedUsersToRecipients() {
-            var select = document.getElementById('email-recipients');
             document.querySelectorAll('.email-user-pick-cb:checked').forEach(function(cb) {
-                var uid   = String(cb.getAttribute('data-id'));
                 var name  = cb.getAttribute('data-name')  || '';
                 var email = cb.getAttribute('data-email') || '';
-                var existing = Array.from(select.options).find(function(o) { return String(o.value) === uid; });
-                if (!existing) {
-                    var opt = document.createElement('option');
-                    opt.value = uid;
-                    opt.textContent = name + (email ? ' (' + email + ')' : ' (no e-mail)');
-                    opt.selected = true;
-                    select.appendChild(opt);
-                } else {
-                    existing.selected = true;
-                }
+                if (email) addEmailRecipient(email, 'assigned', name);
             });
             closeEmailUserPickModal();
         }
+
 
         document.addEventListener('DOMContentLoaded', function() {
             var bg = document.getElementById('email-user-pick-modal-bg');
@@ -1603,7 +1731,6 @@
 
         // ---- Corporate Directory sub-modal ----
         var corpDirResults = [];
-        var corpDirPendingRecipients = [];
 
         function openCorpDirModal() {
             document.getElementById('corp-dir-modal-bg').style.display = 'flex';
@@ -1708,7 +1835,6 @@
             if (selected.length === 0) return;
 
             var importStatusEl = document.getElementById('corp-dir-import-status');
-            var select = document.getElementById('email-recipients');
             var added  = 0;
             var errors = [];
 
@@ -1719,20 +1845,11 @@
                     errors.push('"' + displayName + '" has no valid e-mail address.');
                     return;
                 }
-                var marker = 'cd:' + mail.toLowerCase();
-                // Skip if already pending or already in select
-                if (corpDirPendingRecipients.some(function(p) {
-                    return (p.mail || p.userPrincipalName || '').toLowerCase() === mail.toLowerCase();
-                })) return;
-                if (Array.from(select.options).find(function(o) { return o.value === marker; })) return;
-
-                corpDirPendingRecipients.push(u);
-                var opt = document.createElement('option');
-                opt.value = marker;
-                opt.textContent = displayName + ' (' + mail + ') [new]';
-                opt.selected = true;
-                select.appendChild(opt);
-                added++;
+                var key = mail.toLowerCase();
+                var alreadyPresent = emailRecipients.some(function(r) { return r.email === key; });
+                corpDirRecipientDetails[key] = u;
+                addEmailRecipient(mail, 'corpdir', displayName);
+                if (!alreadyPresent) added++;
             });
 
             if (errors.length > 0) {
@@ -1773,18 +1890,18 @@
             genBtn1.disabled = true;
             genBtn2.disabled = true;
 
-            var recipientSelect = document.getElementById('email-recipients');
-            var selectedIds = Array.from(recipientSelect.selectedOptions)
-                .filter(function(o) { return !o.value.startsWith('cd:'); })
-                .map(function(o) { return parseInt(o.value); });
-
-            var linkTypeEl = document.querySelector('input[name="emailLinkType"]:checked');
-            var linkType = linkTypeEl ? linkTypeEl.value : 'internal';
+            var linkType = currentEmailLinkType();
 
             fetch('/assessment/' + window.assessmentId + '/email/generate', {
                 method: 'POST',
                 headers: { [csrfHeader]: csrfToken, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ purpose: purpose, baseUrl: window.location.origin, recipientUserIds: selectedIds, linkType: linkType })
+                body: JSON.stringify({
+                    purpose: purpose,
+                    baseUrl: window.location.origin,
+                    recipientEmails: emailRecipients.map(function(r) { return r.email; }),
+                    recipientNames: emailRecipients.map(function(r) { return r.name || ''; }),
+                    linkType: linkType
+                })
             })
             .then(function(r) { return r.json(); })
             .then(function(data) {
@@ -1808,34 +1925,33 @@
             var csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
             var csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
 
-            var recipientSelect = document.getElementById('email-recipients');
-            var selectedOptions = Array.from(recipientSelect.selectedOptions);
-            var selectedIds = selectedOptions
-                .filter(function(o) { return !o.value.startsWith('cd:'); })
-                .map(function(o) { return parseInt(o.value); });
-            var selectedCorpDir = selectedOptions
-                .filter(function(o) { return o.value.startsWith('cd:'); })
-                .map(function(o) {
-                    var email = o.value.substring(3);
-                    return corpDirPendingRecipients.find(function(p) {
-                        return (p.mail || p.userPrincipalName || '').toLowerCase() === email;
-                    }) || null;
-                })
-                .filter(function(u) { return u !== null; });
-
             var subject = document.getElementById('email-subject').value.trim();
             var rawBody = emailQuill ? emailQuill.root.innerHTML.trim() : '';
             var body    = (rawBody === '<p><br></p>' || rawBody === '') ? '' : rawBody;
             var errorEl   = document.getElementById('email-modal-error');
             var successEl = document.getElementById('email-modal-success');
             var sendBtn   = document.getElementById('email-send-btn');
+            var linkType  = currentEmailLinkType();
 
             errorEl.textContent = '';
             successEl.style.display = 'none';
 
-            if (selectedIds.length === 0 && selectedCorpDir.length === 0) { errorEl.textContent = 'Please select at least one recipient.'; return; }
-            if (!subject)                  { errorEl.textContent = 'Subject must not be empty.'; return; }
-            if (!body)                     { errorEl.textContent = 'Message body must not be empty.'; return; }
+            if (emailRecipients.length === 0) { errorEl.textContent = 'Please add at least one recipient.'; return; }
+            if (!subject)                     { errorEl.textContent = 'Subject must not be empty.'; return; }
+            if (!body)                        { errorEl.textContent = 'Message body must not be empty.'; return; }
+
+            if (linkType === 'internal') {
+                var unverified = emailRecipients.filter(function(r) { return r.source === 'manual' && r.verified === false; });
+                if (unverified.length > 0) {
+                    errorEl.textContent = 'The internal link can only be sent to registered users or corporate directory members. ' +
+                        'Please remove: ' + unverified.map(function(r) { return r.email; }).join(', ');
+                    return;
+                }
+            }
+
+            var corpDirRecipients = emailRecipients
+                .filter(function(r) { return r.source === 'corpdir'; })
+                .map(function(r) { return corpDirRecipientDetails[r.email] || { mail: r.email, displayName: r.name }; });
 
             sendBtn.disabled = true;
             sendBtn.textContent = 'Sending...';
@@ -1843,7 +1959,13 @@
             fetch('/assessment/' + window.assessmentId + '/email/send', {
                 method: 'POST',
                 headers: { [csrfHeader]: csrfToken, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ recipientUserIds: selectedIds, corpDirRecipients: selectedCorpDir, subject: subject, body: body })
+                body: JSON.stringify({
+                    recipientEmails: emailRecipients.map(function(r) { return r.email; }),
+                    corpDirRecipients: corpDirRecipients,
+                    subject: subject,
+                    body: body,
+                    linkType: linkType
+                })
             })
             .then(function(r) { return r.json(); })
             .then(function(data) {

@@ -11989,6 +11989,51 @@ a.back-link:hover {
     color: #c0392b;
     background: #fce8e6;
 }
+
+/* E-mail recipient chips (Send E-Mail modal) */
+.email-recipient-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35em;
+    min-height: 2.4em;
+    padding: 4px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #fafafa;
+}
+.email-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    padding: 0.2em 0.3em 0.2em 0.6em;
+    border-radius: 999px;
+    background: #e8f2fb;
+    border: 1px solid #a8c9e8;
+    color: #1a5a7a;
+    font-size: 0.85em;
+    max-width: 100%;
+}
+.email-chip-invalid {
+    background: #fdeceb;
+    border-color: #e6a29b;
+    color: #a33327;
+}
+.email-chip-remove {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #777;
+    font-size: 1.05em;
+    line-height: 1;
+    padding: 0 3px;
+    border-radius: 50%;
+    transition: color 0.15s, background 0.15s;
+}
+.email-chip-remove:hover {
+    color: #c0392b;
+    background: #fce8e6;
+}
+
 .add-cap-select {
     font-size: 0.85em;
     padding: 0.2em 0.5em;
