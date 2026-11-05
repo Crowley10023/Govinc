@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!-- Version selector + "make new version" button; needs model: assessment, versions, viewVersion, currentVersion, readOnly -->
+<div th:fragment="bar" class="osa-version-bar">
+    <label for="osaVersionSelect" class="osa-version-label">Version</label>
+    <select id="osaVersionSelect" class="osa-version-select" onchange="osaSwitchVersion(this.value)">
+        <option th:each="v : ${versions}" th:value="${v.number}" th:selected="${v.number == viewVersion}"
+                th:text="'v' + ${v.number} + (${v.current} ? ' (current)' : ' - ' + ${#temporals.format(v.createdAt, 'yyyy-MM-dd HH:mm')})">v1</option>
+    </select>
+    <button type="button" class="btn-action osa-new-version-btn" th:unless="${readOnly}"
+            th:attr="data-org-service-id=${assessment.orgService.id}" onclick="osaMakeNewVersion(this)"
+            title="Freeze the current ratings and comments as a version and start a new one">
+        &#10133; Make new version
+    </button>
+    <a th:if="${readOnly}" th:href="'?version=' + ${currentVersion}" class="btn-action osa-new-version-btn"
+       style="text-decoration:none;">Back to current (v<span th:text="${currentVersion}"></span>)</a>
+    <span th:if="${readOnly}" class="osa-readonly-note">Read-only: you are viewing a past version.</span>
+</div>
+</body>
+</html>

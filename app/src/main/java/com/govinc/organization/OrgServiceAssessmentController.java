@@ -93,12 +93,14 @@ public class OrgServiceAssessmentController {
     }
 
     @GetMapping("/edit/{orgServiceId}")
-    public String editAssessment(@PathVariable Long orgServiceId, Model model) {
+    public String editAssessment(@PathVariable Long orgServiceId,
+                                 @RequestParam(required = false) Integer version, Model model) {
         if (!authorizationService.canAccessOrganization()) {
             throw new UnauthorizedException("You do not have permission to access org service assessments.");
         }
         OrgServiceAssessment assessment = assessmentService.findOrCreateAssessment(orgServiceId);
-        List<OrgServiceAssessmentControl> controls = assessmentService.getAllControlsForAssessment(assessment);
+        int viewVersion = addVersionAttributes(model, assessment, version);
+        List<OrgServiceAssessmentControl> controls = assessmentService.getControlsForVersion(assessment, viewVersion);
         long applicableCount = controls.stream().filter(OrgServiceAssessmentControl::isApplicable).count();
         model.addAttribute("assessment", assessment);
         model.addAttribute("controls", controls);
@@ -106,19 +108,123 @@ public class OrgServiceAssessmentController {
         return "orgservice-assessment";
     }
 
+    /** Adds version selector data and the previous version's values; returns the version being viewed. */
+    private int addVersionAttributes(Model model, OrgServiceAssessment assessment, Integer requested) {
+        int current = assessment.getVersionNumber();
+        int viewVersion = (requested == null || requested < 1 || requested > current) ? current : requested;
+        model.addAttribute("currentVersion", current);
+        model.addAttribute("viewVersion", viewVersion);
+        model.addAttribute("readOnly", viewVersion != current);
+        model.addAttribute("versions", assessmentService.listVersions(assessment));
+        model.addAttribute("prevMap", assessmentService.getPreviousValues(assessment, viewVersion));
+        model.addAttribute("prevVersion", viewVersion - 1);
+        try {
+            model.addAttribute("historyJson", new com.fasterxml.jackson.databind.ObjectMapper()
+                    .writeValueAsString(assessmentService.getHistory(assessment, viewVersion, 5)));
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            model.addAttribute("historyJson", "{}");
+        }
+        return viewVersion;
+    }
+
     @GetMapping("/simple/{orgServiceId}")
-    public String simpleView(@PathVariable Long orgServiceId, Model model) {
+    public String simpleView(@PathVariable Long orgServiceId,
+                             @RequestParam(required = false) Integer version, Model model) {
         if (!canAccessAssessmentFor(orgServiceId)) {
             throw new UnauthorizedException("You do not have permission to access this org service assessment.");
         }
         OrgServiceAssessment assessment = assessmentService.findOrCreateAssessment(orgServiceId);
-        List<OrgServiceAssessmentControl> allControls = assessmentService.getAllControlsForAssessment(assessment);
-        List<OrgServiceAssessmentControl> applicableControls = allControls.stream()
+        int viewVersion = addVersionAttributes(model, assessment, version);
+        List<OrgServiceAssessmentControl> applicableControls = assessmentService.getControlsForVersion(assessment, viewVersion).stream()
                 .filter(OrgServiceAssessmentControl::isApplicable)
                 .collect(java.util.stream.Collectors.toList());
         model.addAttribute("assessment", assessment);
         model.addAttribute("controls", applicableControls);
         return "orgservice-assessment-simple";
+    }
+
+    @PostMapping("/{orgServiceId}/new-version")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> makeNewVersion(@PathVariable Long orgServiceId) {
+        Map<String, Object> response = new HashMap<>();
+        if (!canAccessAssessmentFor(orgServiceId)) {
+            response.put("success", false);
+            response.put("message", "You do not have permission to modify org service assessments.");
+            return ResponseEntity.status(403).body(response);
+        }
+        User user = authorizationService.getCurrentUser();
+        int newVersion = assessmentService.makeNewVersion(orgServiceId, user != null ? user.getName() : null);
+        response.put("success", true);
+        response.put("version", newVersion);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/simple/{orgServiceId}/export")
+    public ResponseEntity<byte[]> exportSimpleView(@PathVariable Long orgServiceId,
+                                                   @RequestParam(required = false) Integer version) throws java.io.IOException {
+        if (!canAccessAssessmentFor(orgServiceId)) {
+            throw new UnauthorizedException("You do not have permission to access this org service assessment.");
+        }
+        OrgServiceAssessment assessment = assessmentService.findOrCreateAssessment(orgServiceId);
+        int current = assessment.getVersionNumber();
+        int viewVersion = (version == null || version < 1 || version > current) ? current : version;
+        List<OrgServiceAssessmentControl> controls = assessmentService.getControlsForVersion(assessment, viewVersion).stream()
+                .filter(OrgServiceAssessmentControl::isApplicable).collect(Collectors.toList());
+        Map<Long, OrgServiceAssessmentVersionControl> prev = assessmentService.getPreviousValues(assessment, viewVersion);
+
+        try (org.apache.poi.ss.usermodel.Workbook wb = new org.apache.poi.xssf.usermodel.XSSFWorkbook();
+             java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream()) {
+            org.apache.poi.ss.usermodel.Sheet sheet = wb.createSheet("Assessment v" + viewVersion);
+            org.apache.poi.ss.usermodel.CellStyle header = wb.createCellStyle();
+            org.apache.poi.ss.usermodel.Font bold = wb.createFont();
+            bold.setBold(true);
+            header.setFont(bold);
+            org.apache.poi.ss.usermodel.CellStyle wrap = wb.createCellStyle();
+            wrap.setWrapText(true);
+            wrap.setVerticalAlignment(org.apache.poi.ss.usermodel.VerticalAlignment.TOP);
+
+            String[] titles = {"Security Control", "Detail", "Reference", "Rating (%)", "Comment",
+                    "Previous Rating (%) (v" + (viewVersion - 1) + ")", "Previous Comment (v" + (viewVersion - 1) + ")"};
+            org.apache.poi.ss.usermodel.Row head = sheet.createRow(0);
+            for (int i = 0; i < titles.length; i++) {
+                org.apache.poi.ss.usermodel.Cell cell = head.createCell(i);
+                cell.setCellValue(titles[i]);
+                cell.setCellStyle(header);
+            }
+            int r = 1;
+            for (OrgServiceAssessmentControl c : controls) {
+                org.apache.poi.ss.usermodel.Row row = sheet.createRow(r++);
+                OrgServiceAssessmentVersionControl p = prev.get(c.getSecurityControl().getId());
+                row.createCell(0).setCellValue(nz(c.getSecurityControl().getName()));
+                row.createCell(1).setCellValue(nz(c.getSecurityControl().getDetail()));
+                row.createCell(2).setCellValue(nz(c.getSecurityControl().getReference()));
+                row.createCell(3).setCellValue(c.getPercent());
+                row.createCell(4).setCellValue(nz(c.getComment()));
+                if (p != null) {
+                    row.createCell(5).setCellValue(p.getPercent());
+                    row.createCell(6).setCellValue(nz(p.getComment()));
+                }
+                for (int i = 0; i < titles.length; i++) {
+                    if (row.getCell(i) != null) row.getCell(i).setCellStyle(wrap);
+                }
+            }
+            int[] widths = {40, 60, 25, 12, 60, 18, 60};
+            for (int i = 0; i < widths.length; i++) sheet.setColumnWidth(i, widths[i] * 256);
+            sheet.createFreezePane(0, 1);
+            wb.write(out);
+
+            String name = assessment.getOrgService().getName() == null ? "service"
+                    : assessment.getOrgService().getName().replaceAll("[^A-Za-z0-9._-]+", "_");
+            return ResponseEntity.ok()
+                    .header("Content-Disposition", "attachment; filename=\"assessment_" + name + "_v" + viewVersion + ".xlsx\"")
+                    .contentType(org.springframework.http.MediaType.parseMediaType(
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .body(out.toByteArray());
+        }
+    }
+
+    private static String nz(String s) {
+        return s == null ? "" : s;
     }
 
     @PostMapping("/save-control")

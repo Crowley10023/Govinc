@@ -36,6 +36,16 @@
                     </span>
                 </div>
 
+                <div class="form-group">
+                    <label for="assessmentUrlLifetimeDays">External Assessment URL Lifetime (days)</label>
+                    <input type="number" id="assessmentUrlLifetimeDays" name="assessmentUrlLifetimeDays"
+                           class="form-control" min="1" max="3650" style="max-width:160px;"
+                           th:value="${config.assessmentUrlLifetimeDays}" />
+                    <span class="help-text">
+                        Applies to newly generated external assessment URLs (1-3650 days).
+                    </span>
+                </div>
+
                 <div class="button-group" style="margin-top:1.5em;">
                     <button type="button" class="btn-submit" onclick="saveGeneralConfig()">Save Configuration</button>
                 </div>
@@ -55,7 +65,12 @@
                 showBar('Please enter a value between 1 and 1440.', 'error');
                 return;
             }
-            var payload = { sessionTimeoutMinutes: minutes };
+            var lifetime = parseInt(document.getElementById('assessmentUrlLifetimeDays').value, 10);
+            if (isNaN(lifetime) || lifetime < 1 || lifetime > 3650) {
+                showBar('Please enter a URL lifetime between 1 and 3650 days.', 'error');
+                return;
+            }
+            var payload = { sessionTimeoutMinutes: minutes, assessmentUrlLifetimeDays: lifetime };
 
             fetch('/config/general', {
                 method: 'POST',

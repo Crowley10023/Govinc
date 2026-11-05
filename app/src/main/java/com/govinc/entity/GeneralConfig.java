@@ -16,6 +16,9 @@ public class GeneralConfig {
     @Column(name = "session_timeout_minutes", nullable = false)
     private int sessionTimeoutMinutes = 30;
 
+    @Column(name = "assessment_url_lifetime_days", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 30")
+    private int assessmentUrlLifetimeDays = 30;
+
     @Column(name = "external_access_url")
     private String externalAccessUrl;
 
@@ -27,6 +30,9 @@ public class GeneralConfig {
 
     public int getSessionTimeoutMinutes() { return sessionTimeoutMinutes; }
     public void setSessionTimeoutMinutes(int sessionTimeoutMinutes) { this.sessionTimeoutMinutes = sessionTimeoutMinutes; }
+
+    public int getAssessmentUrlLifetimeDays() { return assessmentUrlLifetimeDays; }
+    public void setAssessmentUrlLifetimeDays(int assessmentUrlLifetimeDays) { this.assessmentUrlLifetimeDays = assessmentUrlLifetimeDays; }
 
     public String getExternalAccessUrl() { return externalAccessUrl; }
     public void setExternalAccessUrl(String externalAccessUrl) { this.externalAccessUrl = externalAccessUrl; }

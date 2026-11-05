@@ -23,8 +23,8 @@ public class AssessmentUrlsService {
     private static final int OBFUSCATED_LENGTH = 100;
     private static final String URL_CHARS = "123456789";
     private static final SecureRandom random = new SecureRandom();
-    /** Default lifetime (days) for a newly created direct URL. */
-    private static final int DEFAULT_URL_LIFETIME_DAYS = 30;
+    @Autowired
+    private com.govinc.service.GeneralConfigService generalConfigService;
     
     // Password generation constants
     private static final String PASSWORD_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
@@ -56,7 +56,7 @@ public class AssessmentUrlsService {
         newUrl.setAssessment(assessment);
         assessment.setAssessmentUrls(newUrl);
         // Set the absolute expiration date on the assessment entity
-        assessment.setUrlExpirationDate(LocalDate.now().plusDays(DEFAULT_URL_LIFETIME_DAYS));
+        assessment.setUrlExpirationDate(LocalDate.now().plusDays(generalConfigService.getAssessmentUrlLifetimeDays()));
         // Only save the parent (Assessment); CascadeType.ALL on assessmentUrls will persist the child as well
         assessmentRepository.save(assessment);
         // Do NOT save newUrl directly to prevent duplicate entries

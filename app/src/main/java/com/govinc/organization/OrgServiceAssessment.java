@@ -19,6 +19,9 @@ public class OrgServiceAssessment {
     @Column(nullable = false)
     private LocalDate assessmentDate;
 
+    /** Current (live) version number; null on legacy rows means 1. */
+    private Integer versionNumber = 1;
+
     @OneToMany(mappedBy = "orgServiceAssessment", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrgServiceAssessmentControl> controls = new ArrayList<>();
 
@@ -52,6 +55,14 @@ public class OrgServiceAssessment {
 
     public void setAssessmentDate(LocalDate assessmentDate) {
         this.assessmentDate = assessmentDate;
+    }
+
+    public int getVersionNumber() {
+        return versionNumber == null ? 1 : versionNumber;
+    }
+
+    public void setVersionNumber(int versionNumber) {
+        this.versionNumber = versionNumber;
     }
 
     public List<OrgServiceAssessmentControl> getControls() {

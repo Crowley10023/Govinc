@@ -26,6 +26,11 @@ public class GeneralConfigService {
         return cachedTimeoutMinutes;
     }
 
+    /** Returns the configured lifetime (days) for newly created external assessment URLs. */
+    public int getAssessmentUrlLifetimeDays() {
+        return Math.max(1, getOrCreate().getAssessmentUrlLifetimeDays());
+    }
+
     /** Forces a reload of the cached config from the database. */
     public void refresh() {
         generalConfigRepository.findByConfigKey("default").ifPresent(c ->

@@ -45,6 +45,11 @@ public class GeneralConfigController {
                 config.setSessionTimeoutMinutes(minutes);
             }
 
+            Object lifetime = data.get("assessmentUrlLifetimeDays");
+            if (lifetime instanceof Number n) {
+                config.setAssessmentUrlLifetimeDays(Math.max(1, Math.min(3650, n.intValue())));
+            }
+
             generalConfigRepository.save(config);
 
             // Refresh in-memory cache so subsequent requests see new value
@@ -54,7 +59,8 @@ public class GeneralConfigController {
             session.setMaxInactiveInterval(config.getSessionTimeoutMinutes() * 60);
 
             return ResponseEntity.ok(Map.of("success", true,
-                    "sessionTimeoutMinutes", config.getSessionTimeoutMinutes()));
+                    "sessionTimeoutMinutes", config.getSessionTimeoutMinutes(),
+                    "assessmentUrlLifetimeDays", config.getAssessmentUrlLifetimeDays()));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }

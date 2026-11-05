@@ -26,6 +26,7 @@
                         <th>Service Name</th>
                         <th>Org Unit(s)</th>
                         <th>Assessment Date</th>
+                        <th>Version</th>
                         <th>Completeness</th>
                         <th style="white-space:nowrap;">Actions</th>
                     </tr>
@@ -40,6 +41,7 @@
                             </span>
                         </td>
                         <td th:text="${assessment.assessmentDate}"></td>
+                        <td th:text="'v' + ${assessment.versionNumber}"></td>
                         <td style="white-space:nowrap;">
                             <div class="completion-bar-wrapper" style="width:8em;"
                                  th:title="${completenessMap[assessment.id] != null ? completenessMap[assessment.id] : 0} + '% complete'">

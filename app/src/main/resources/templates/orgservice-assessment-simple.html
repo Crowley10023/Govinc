@@ -53,8 +53,14 @@
                             style="display:inline-flex;align-items:center;gap:6px;font-size:0.88em;">
                         &#9993; Send E-Mail
                     </button>
+                    <a class="btn-action" th:href="@{/orgservice-assessment/simple/{id}/export(id=${assessment.orgService.id},version=${viewVersion})}"
+                       title="Download this view as an Excel file"
+                       style="display:inline-flex;align-items:center;gap:6px;font-size:0.88em;text-decoration:none;">
+                        &#128196; Download XLS
+                    </a>
                 </div>
             </div>
+            <div th:replace="~{orgservice-assessment-version-bar :: bar}"></div>
         </div>
 
         <form id="assessmentForm">
@@ -92,6 +98,9 @@
                     <tbody id="controlsTableBody">
                         <tr th:each="control : ${controls}"
                             th:attr="data-control-id=${control.securityControl.id}"
+                            th:data-prev-percent="${prevVersion >= 1} ? ${prevMap[control.securityControl.id]?.percent ?: 0} : null"
+                            th:data-prev-comment="${prevVersion >= 1} ? ${prevMap[control.securityControl.id]?.comment ?: ''} : null"
+                            th:data-prev-version="${prevVersion >= 1} ? ${prevVersion} : null"
                             class="control-row">
                             <td>
                                 <div class="control-name-simple" th:text="${control.securityControl.name}"></div>
@@ -167,6 +176,8 @@
         </div>
     </div>
 
+    <script th:inline="javascript">window.OSA_READONLY = /*[[${readOnly}]]*/ false; window.OSA_HISTORY = JSON.parse(/*[[${historyJson}]]*/ '{}');</script>
+    <script src="/osa-versions.js"></script>
     <script>
         var assessmentId   = document.querySelector('input[name="id"]').value;
         var orgServiceId   = document.querySelector('input[name="orgServiceId"]').value;

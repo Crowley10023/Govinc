@@ -36,6 +36,7 @@
                     </button>
                 </div>
             </div>
+            <div th:replace="~{orgservice-assessment-version-bar :: bar}"></div>
         </div>
 
         <!-- Show error message if present -->
@@ -109,6 +110,9 @@
                     <tbody id="controlsTableBody">
                         <tr th:each="control,stat : ${controls}"
                             th:attr="data-control-id=${control.securityControl.id},data-catalog-id=${#lists.isEmpty(control.securityControl.securityCatalogs) ? '' : control.securityControl.securityCatalogs.iterator().next().id}"
+                            th:data-prev-percent="${prevVersion >= 1} ? ${prevMap[control.securityControl.id]?.percent ?: 0} : null"
+                            th:data-prev-comment="${prevVersion >= 1} ? ${prevMap[control.securityControl.id]?.comment ?: ''} : null"
+                            th:data-prev-version="${prevVersion >= 1} ? ${prevVersion} : null"
                             class="control-row">
                             <td>
                                 <div class="control-name" th:text="${control.securityControl.name}"></div>
@@ -209,6 +213,8 @@
         </div>
     </div>
 
+    <script th:inline="javascript">window.OSA_READONLY = /*[[${readOnly}]]*/ false; window.OSA_HISTORY = JSON.parse(/*[[${historyJson}]]*/ '{}');</script>
+    <script src="/osa-versions.js"></script>
     <script>
         const assessmentId = document.querySelector('input[name="id"]').value;
         const orgServiceId = document.querySelector('input[name="orgServiceId"]').value;

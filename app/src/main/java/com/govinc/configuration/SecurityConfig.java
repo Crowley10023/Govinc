@@ -148,6 +148,7 @@ public class SecurityConfig {
                     "/orgservice-assessment/simple/**",
                     "/orgservice-assessment/save-control",
                     "/orgservice-assessment/save-control-comment",
+                    "/orgservice-assessment/*/new-version",
                     "/orgservice-assessment/*/email/generate",
                     "/orgservice-assessment/*/email/send",
                     // Read-only maturity model catalog needed to render the simple view's model dropdown.
