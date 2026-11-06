@@ -40,6 +40,7 @@ public class SecurityCatalogService {
                 existing.setHeadline(catalog.getHeadline());
                 existing.setReportInstructions(catalog.getReportInstructions());
                 existing.setVersionManaged(catalog.isVersionManaged());
+                existing.setQualifiedFeedbackEnabled(catalog.isQualifiedFeedbackEnabled());
                 existing.setSecurityControls(new HashSet<>(catalog.getSecurityControls()));
                 // Fix: set maturity model, too
                 existing.setMaturityModel(catalog.getMaturityModel());

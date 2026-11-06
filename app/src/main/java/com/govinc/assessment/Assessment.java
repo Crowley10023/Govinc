@@ -213,6 +213,19 @@ public class Assessment {
         this.interviewees = interviewees;
     }
 
+    @ManyToMany
+    @JoinTable(name = "assessment_external_interviewees",
+            joinColumns = @JoinColumn(name = "assessment_id"),
+            inverseJoinColumns = @JoinColumn(name = "external_interviewee_id"))
+    private Set<com.govinc.user.ExternalInterviewee> externalInterviewees = new HashSet<>();
+
+    @OneToMany(mappedBy = "assessment", cascade = CascadeType.REMOVE)
+    private Set<QualifiedFeedback> qualifiedFeedback = new HashSet<>();
+
+    public Set<com.govinc.user.ExternalInterviewee> getExternalInterviewees() {
+        return externalInterviewees;
+    }
+
     // CREATED BY: single user reference
     @ManyToOne
     @JoinColumn(name = "created_by_id")

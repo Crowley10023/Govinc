@@ -55,6 +55,19 @@ public class GovernanceTaskService {
         return taskRepository.save(task);
     }
 
+    public GovernanceTask createAssessmentReviewTask(com.govinc.assessment.Assessment assessment) {
+        User creator = assessment.getCreatedBy();
+        String title = "Assessment ready for review: " + assessment.getName();
+        if (title.length() > 255) title = title.substring(0, 255);
+        GovernanceTask task = new GovernanceTask();
+        task.setTitle(title);
+        task.setDescription("The assessment '" + assessment.getName() + "' is ready for review.");
+        task.setAssignedUser(creator);
+        task.setCreatedBy(creator);
+        task.setAssessment(assessment);
+        return taskRepository.save(task);
+    }
+
     public GovernanceTask createTask(String title, String description, Long assignedUserId,
                                      Long securityControlId, Long securityCatalogId,
                                      Long securityControlDomainId, Long projectId,

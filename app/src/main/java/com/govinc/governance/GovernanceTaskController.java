@@ -1,6 +1,8 @@
 package com.govinc.governance;
 
 import com.govinc.authorization.AuthorizationService;
+import com.govinc.assessment.Assessment;
+import com.govinc.assessment.AssessmentRepository;
 import com.govinc.catalog.SecurityCatalogRepository;
 import com.govinc.catalog.SecurityControlDomainRepository;
 import com.govinc.catalog.SecurityControlRepository;
@@ -41,6 +43,9 @@ public class GovernanceTaskController {
     @Autowired
     private AuthorizationService authorizationService;
 
+    @Autowired
+    private AssessmentRepository assessmentRepository;
+
     @GetMapping("")
     public String listTasks(Model model) {
         model.addAttribute("tasks", taskService.findAll());
@@ -49,12 +54,15 @@ public class GovernanceTaskController {
         model.addAttribute("securityControls", securityControlRepository.findAll());
         model.addAttribute("securityCatalogs", securityCatalogRepository.findAll());
         model.addAttribute("securityControlDomains", securityControlDomainRepository.findAll());
+        model.addAttribute("assessments", assessmentRepository.findAll().stream()
+            .filter(authorizationService::canAccessAssessment).toList());
         model.addAttribute("statuses", TaskStatus.values());
         return "governance-tasks";
     }
 
     @PostMapping("/create")
     @ResponseBody
+    @org.springframework.transaction.annotation.Transactional
     public ResponseEntity<?> createTask(@RequestBody Map<String, Object> payload) {
         User currentUser = authorizationService.getCurrentUser();
 
@@ -65,10 +73,23 @@ public class GovernanceTaskController {
         Long securityCatalogId = payload.get("securityCatalogId") != null ? Long.valueOf(payload.get("securityCatalogId").toString()) : null;
         Long securityControlDomainId = payload.get("securityControlDomainId") != null ? Long.valueOf(payload.get("securityControlDomainId").toString()) : null;
         Long projectId = payload.get("projectId") != null ? Long.valueOf(payload.get("projectId").toString()) : null;
+        Long assessmentId = payload.get("assessmentId") != null ? Long.valueOf(payload.get("assessmentId").toString()) : null;
         String dueDate = (String) payload.get("dueDate");
+
+        Assessment assessment = null;
+        if (assessmentId != null) {
+            assessment = assessmentRepository.findById(assessmentId).orElse(null);
+            if (assessment == null) return ResponseEntity.notFound().build();
+            if (!authorizationService.canAccessAssessment(assessment)) return ResponseEntity.status(403).build();
+        }
 
         GovernanceTask task = taskService.createTask(title, description, assignedUserId,
                 securityControlId, securityCatalogId, securityControlDomainId, projectId, dueDate, currentUser);
+
+        if (assessment != null) {
+            task.setAssessment(assessment);
+            taskService.save(task);
+        }
 
         return ResponseEntity.ok(Map.of("id", task.getId(), "status", "created"));
     }
@@ -91,6 +112,14 @@ public class GovernanceTaskController {
         }
         GovernanceTask task = taskOpt.get();
 
+        Assessment assessment = null;
+        if (payload.containsKey("assessmentId") && payload.get("assessmentId") != null) {
+            Long assessmentId = Long.valueOf(payload.get("assessmentId").toString());
+            assessment = assessmentRepository.findById(assessmentId).orElse(null);
+            if (assessment == null) return ResponseEntity.notFound().build();
+            if (!authorizationService.canAccessAssessment(assessment)) return ResponseEntity.status(403).build();
+        }
+
         if (payload.containsKey("title")) task.setTitle((String) payload.get("title"));
         if (payload.containsKey("description")) task.setDescription((String) payload.get("description"));
         if (payload.containsKey("status")) task.setStatus(TaskStatus.valueOf((String) payload.get("status")));
@@ -102,6 +131,15 @@ public class GovernanceTaskController {
             Long pid = payload.get("projectId") != null ? Long.valueOf(payload.get("projectId").toString()) : null;
             task.setProject(pid != null ? projectRepository.findById(pid).orElse(null) : null);
         }
+        if (payload.containsKey("securityControlId")) {
+            Long controlId = payload.get("securityControlId") != null ? Long.valueOf(payload.get("securityControlId").toString()) : null;
+            task.setSecurityControl(controlId != null ? securityControlRepository.findById(controlId).orElse(null) : null);
+        }
+        if (payload.containsKey("securityCatalogId")) {
+            Long catalogId = payload.get("securityCatalogId") != null ? Long.valueOf(payload.get("securityCatalogId").toString()) : null;
+            task.setSecurityCatalog(catalogId != null ? securityCatalogRepository.findById(catalogId).orElse(null) : null);
+        }
+        if (payload.containsKey("assessmentId")) task.setAssessment(assessment);
         if (payload.containsKey("dueDate")) {
             String dd = (String) payload.get("dueDate");
             task.setDueDate(dd != null && !dd.isBlank() ? java.time.LocalDate.parse(dd) : null);

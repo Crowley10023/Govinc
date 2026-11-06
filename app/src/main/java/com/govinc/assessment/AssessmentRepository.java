@@ -7,6 +7,10 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 
 public interface AssessmentRepository extends JpaRepository<Assessment, Long> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT a FROM Assessment a WHERE a.id = :id")
+    java.util.Optional<Assessment> findByIdForUpdate(@Param("id") Long id);
+
     @Query("SELECT COUNT(a) FROM Assessment a WHERE a.securityCatalog.id = :catalogId")
     long countBySecurityCatalogId(@Param("catalogId") Long catalogId);
 

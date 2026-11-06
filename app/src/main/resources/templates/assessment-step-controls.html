@@ -9,6 +9,14 @@
     <div th:replace="~{navigation :: mainNav}"></div>
     <div class="container">
         <h1 class="page-title" th:text="'Assessment: ' + ${assessment.name}"></h1>
+        <label th:if="${assessment.securityCatalog != null and assessment.securityCatalog.qualifiedFeedbackEnabled}">
+            Qualified Feedback
+            <select id="step-feedback-filter">
+                <option value="">All</option><option value="UNSET">Not rated</option>
+                <option value="MORE_DETAIL_NEEDED">More detail needed</option>
+                <option value="REVISION_NEEDED">Revision needed</option><option value="ACCEPTED">Accepted</option>
+            </select>
+        </label>
         <section>
             <form th:action="@{'/assessment/' + ${assessment.id} + '/controls'}" method="post">
                 <table class="table card">
@@ -19,7 +27,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr th:each="control : ${controls}">
+                        <tr th:each="control : ${controls}" class="step-control-row">
                             <td th:text="${control.name}"></td>
                             <td>
                                 <select th:name="${'control_' + control.id}">
@@ -29,6 +37,16 @@
                                             th:text="${ans.answer + ' - ' + ans.description}"
                                             th:selected="${controlAnswers[control.id]} == ${ans.id}"></option>
                                 </select>
+                                <label th:if="${assessment.securityCatalog != null and assessment.securityCatalog.qualifiedFeedbackEnabled}">
+                                    Qualified Feedback
+                                    <select class="qualified-feedback-select" th:data-control-id="${control.id}"
+                                            th:disabled="${!canEditQualifiedFeedback}">
+                                        <option value="">Not rated</option>
+                                        <option value="MORE_DETAIL_NEEDED" th:selected="${qualifiedFeedback[control.id] == 'MORE_DETAIL_NEEDED'}">More detail needed</option>
+                                        <option value="REVISION_NEEDED" th:selected="${qualifiedFeedback[control.id] == 'REVISION_NEEDED'}">Revision needed</option>
+                                        <option value="ACCEPTED" th:selected="${qualifiedFeedback[control.id] == 'ACCEPTED'}">Accepted</option>
+                                    </select>
+                                </label>
                             </td>
                         </tr>
                     </tbody>
@@ -42,5 +60,16 @@
             <a href="/assessment/list" class="back-link">&larr; Back to list</a>
         </div>
     </div>
+    <script th:inline="javascript">window.assessmentId = /*[[${assessment.id}]]*/ 0;</script>
+    <script src="/qualified-feedback.js"></script>
+    <script>
+        var feedbackFilter = document.getElementById('step-feedback-filter');
+        if (feedbackFilter) feedbackFilter.addEventListener('change', function() {
+            document.querySelectorAll('.step-control-row').forEach(function(row) {
+                var rating = row.querySelector('.qualified-feedback-select').value || 'UNSET';
+                row.style.display = !feedbackFilter.value || feedbackFilter.value === rating ? '' : 'none';
+            });
+        });
+    </script>
 </body>
 </html>

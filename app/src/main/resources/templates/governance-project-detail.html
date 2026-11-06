@@ -89,7 +89,7 @@
                 <th>Title</th>
                 <th>Status</th>
                 <th>Assigned To</th>
-                <th>Security Control / Catalog</th>
+                <th>Related Item</th>
                 <th>Due Date</th>
                 <th>Actions</th>
             </tr>
@@ -103,6 +103,7 @@
                 th:data-user-id="${task.assignedUser != null ? task.assignedUser.id : ''}"
                 th:data-control-id="${task.securityControl != null ? task.securityControl.id : ''}"
                 th:data-catalog-id="${task.securityCatalog != null ? task.securityCatalog.id : ''}"
+                th:data-assessment-id="${task.assessment != null ? task.assessment.id : ''}"
                 th:data-due-date="${task.dueDate != null ? #temporals.format(task.dueDate, 'yyyy-MM-dd') : ''}"
                 onclick="openEditTaskModal(this)">
                 <td th:text="${task.title}"></td>
@@ -118,7 +119,7 @@
                 </td>
                 <td th:text="${task.assignedUser != null ? task.assignedUser.name : '-'}"></td>
                 <td onclick="event.stopPropagation()">
-                    <span th:if="${task.securityControl == null and task.securityCatalog == null}">-</span>
+                    <span th:if="${task.securityControl == null and task.securityCatalog == null and task.assessment == null}">-</span>
                     <a th:if="${task.securityControl != null}"
                        th:href="@{/security-control/edit(id=${task.securityControl.id},returnUrl=${'/governance/projects/' + project.id})}"
                        th:text="${task.securityControl.name}"
@@ -129,6 +130,9 @@
                        th:text="${task.securityCatalog.name}"
                        class="link related-item-catalog"
                        onclick="event.stopPropagation()"></a>
+                          <a th:if="${task.assessment != null}" th:href="@{/assessment/{id}(id=${task.assessment.id})}"
+                              th:text="${task.assessment.name}" class="link related-item-assessment"
+                              onclick="event.stopPropagation()"></a>
                 </td>
                 <td th:text="${task.dueDate != null ? #temporals.format(task.dueDate, 'yyyy-MM-dd') : '-'}"></td>
                 <td onclick="event.stopPropagation()">
@@ -180,6 +184,7 @@
                     <button type="button" class="link-type-btn link-active" data-type="none" onclick="setNewTaskLinkType('none')">None</button>
                     <button type="button" class="link-type-btn" data-type="control" onclick="setNewTaskLinkType('control')">Security Control</button>
                     <button type="button" class="link-type-btn" data-type="catalog" onclick="setNewTaskLinkType('catalog')">Security Catalog</button>
+                    <button type="button" class="link-type-btn" data-type="assessment" onclick="setNewTaskLinkType('assessment')">Assessment</button>
                 </div>
                 <div id="newTaskControlRow" style="display:none;">
                     <select id="newTaskControl">
@@ -191,6 +196,12 @@
                     <select id="newTaskCatalog">
                         <option value="">— Select Catalog —</option>
                         <option th:each="cat : ${catalogs}" th:value="${cat.id}" th:text="${cat.name}"></option>
+                    </select>
+                </div>
+                <div id="newTaskAssessmentRow" style="display:none;">
+                    <select id="newTaskAssessment">
+                        <option value="">-- Select Assessment --</option>
+                        <option th:each="assessment : ${assessments}" th:value="${assessment.id}" th:text="${assessment.name}"></option>
                     </select>
                 </div>
             </div>
@@ -244,6 +255,7 @@
                     <button type="button" class="link-type-btn link-active" data-type="none" onclick="setEditTaskLinkType('none')">None</button>
                     <button type="button" class="link-type-btn" data-type="control" onclick="setEditTaskLinkType('control')">Security Control</button>
                     <button type="button" class="link-type-btn" data-type="catalog" onclick="setEditTaskLinkType('catalog')">Security Catalog</button>
+                    <button type="button" class="link-type-btn" data-type="assessment" onclick="setEditTaskLinkType('assessment')">Assessment</button>
                 </div>
                 <div id="editTaskControlRow" style="display:none;">
                     <select id="editTaskControl">
@@ -255,6 +267,12 @@
                     <select id="editTaskCatalog">
                         <option value="">— Select Catalog —</option>
                         <option th:each="cat : ${catalogs}" th:value="${cat.id}" th:text="${cat.name}"></option>
+                    </select>
+                </div>
+                <div id="editTaskAssessmentRow" style="display:none;">
+                    <select id="editTaskAssessment">
+                        <option value="">-- Select Assessment --</option>
+                        <option th:each="assessment : ${assessments}" th:value="${assessment.id}" th:text="${assessment.name}"></option>
                     </select>
                 </div>
             </div>
@@ -354,6 +372,7 @@
         });
         document.getElementById('newTaskControlRow').style.display = type === 'control' ? '' : 'none';
         document.getElementById('newTaskCatalogRow').style.display = type === 'catalog' ? '' : 'none';
+        document.getElementById('newTaskAssessmentRow').style.display = type === 'assessment' ? '' : 'none';
     }
     function setEditTaskLinkType(type) {
         document.querySelectorAll('#editTaskLinkToggle .link-type-btn').forEach(function(b) {
@@ -361,6 +380,7 @@
         });
         document.getElementById('editTaskControlRow').style.display = type === 'control' ? '' : 'none';
         document.getElementById('editTaskCatalogRow').style.display = type === 'catalog' ? '' : 'none';
+        document.getElementById('editTaskAssessmentRow').style.display = type === 'assessment' ? '' : 'none';
     }
     function getActiveLinkType(toggleId) {
         var active = document.querySelector('#' + toggleId + ' .link-active');
@@ -397,6 +417,7 @@
             projectId: document.getElementById('currentProjectId').value || null,
             securityControlId: linkType === 'control' ? (document.getElementById('newTaskControl').value || null) : null,
             securityCatalogId: linkType === 'catalog' ? (document.getElementById('newTaskCatalog').value || null) : null,
+            assessmentId: linkType === 'assessment' ? (document.getElementById('newTaskAssessment').value || null) : null,
             dueDate: document.getElementById('newTaskDueDate').value || null
         };
         var headers = { 'Content-Type': 'application/json' };
@@ -431,10 +452,12 @@
         document.getElementById('editTaskDueDate').value = btn.getAttribute('data-due-date') || '';
         var controlId = btn.getAttribute('data-control-id') || '';
         var catalogId = btn.getAttribute('data-catalog-id') || '';
-        var linkType = controlId ? 'control' : (catalogId ? 'catalog' : 'none');
+        var assessmentId = btn.getAttribute('data-assessment-id') || '';
+        var linkType = assessmentId ? 'assessment' : (controlId ? 'control' : (catalogId ? 'catalog' : 'none'));
         setEditTaskLinkType(linkType);
         if (controlId) document.getElementById('editTaskControl').value = controlId;
         if (catalogId) document.getElementById('editTaskCatalog').value = catalogId;
+        if (assessmentId) document.getElementById('editTaskAssessment').value = assessmentId;
         var err = document.getElementById('editTaskTitleError');
         if (err) err.style.display = 'none';
         document.getElementById('editTaskModal').style.display = 'flex';
@@ -458,6 +481,7 @@
             projectId: projectId || null,
             securityControlId: linkType === 'control' ? (document.getElementById('editTaskControl').value || null) : null,
             securityCatalogId: linkType === 'catalog' ? (document.getElementById('editTaskCatalog').value || null) : null,
+            assessmentId: linkType === 'assessment' ? (document.getElementById('editTaskAssessment').value || null) : null,
             dueDate: document.getElementById('editTaskDueDate').value || null
         };
         var headers = { 'Content-Type': 'application/json' };

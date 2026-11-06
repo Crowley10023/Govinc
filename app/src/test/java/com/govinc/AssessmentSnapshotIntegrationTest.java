@@ -67,6 +67,11 @@ class AssessmentSnapshotIntegrationTest {
     // Repositories
     @Autowired private AssessmentRepository assessmentRepository;
     @Autowired private AssessmentDetailsService assessmentDetailsService;
+        @Autowired private QualifiedFeedbackService qualifiedFeedbackService;
+        @Autowired private AssessmentUrlsService assessmentUrlsService;
+        @Autowired private com.govinc.governance.GovernanceTaskRepository governanceTaskRepository;
+        @Autowired private com.govinc.user.ExternalIntervieweeService externalIntervieweeService;
+        @Autowired private com.govinc.user.ExternalIntervieweeRepository externalIntervieweeRepository;
     @Autowired private SecurityCatalogRepository catalogRepository;
     @Autowired private SecurityControlRepository controlRepository;
     @Autowired private SecurityControlDomainRepository domainRepository;
@@ -95,6 +100,82 @@ class AssessmentSnapshotIntegrationTest {
 
     /** Rating 75 â†’ "Managed" level used for all answers */
     private Long answerId75;
+
+    @Test
+    @Order(550)
+    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    void qualifiedFeedbackIsPersistedAndRendered() throws Exception {
+        writeInTx(() -> {
+            SecurityCatalog catalog = catalogRepository.findById(catalogId).orElseThrow();
+            catalog.setQualifiedFeedbackEnabled(true);
+            catalogRepository.save(catalog);
+            return null;
+        });
+        Long controlId = control5Ids.get(0);
+        mockMvc.perform(put("/assessment/{id}/control/{control}/qualified-feedback", assessmentId, controlId)
+                .with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"rating\":\"ACCEPTED\"}"))
+                .andExpect(status().isOk());
+        assertThat(qualifiedFeedbackService.ratings(assessmentId)).containsEntry(controlId, "ACCEPTED");
+        mockMvc.perform(get("/assessment/{id}", assessmentId)).andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("filter-qualified-feedback")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("ACCEPTED")));
+        mockMvc.perform(get("/assessment/{id}/controls", assessmentId)).andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("step-feedback-filter")));
+        String url = assessmentUrlsService.createOrReplaceUrl(assessmentId).getUrl();
+        mockMvc.perform(get("/assessment-direct/{url}/alldata", url)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.qualifiedFeedbackEnabled").value(true))
+                .andExpect(jsonPath("$.qualifiedFeedback." + controlId).value("ACCEPTED"));
+        mockMvc.perform(get("/reporting/compare/data").param("a1", assessmentId.toString()).param("a2", assessmentId.toString()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.feedbackEnabled1").value(true))
+                .andExpect(jsonPath("$.controls[0].feedback1").value("ACCEPTED"));
+    }
+
+    @Test
+    @Order(551)
+    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    void externalDirectoryLinksAndDeletesInterviewees() throws Exception {
+        externalIntervieweeService.recordRecipients(assessmentId, List.of("external@example.test", "admin@example.com"));
+        assertThat(externalIntervieweeService.getEmails(assessmentId)).containsExactly("external@example.test");
+        Long externalId = externalIntervieweeRepository.findByEmailIgnoreCase("external@example.test").orElseThrow().getId();
+        mockMvc.perform(get("/assessment/{id}", assessmentId)).andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("external@example.test")));
+        mockMvc.perform(get("/users")).andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("external@example.test")));
+        mockMvc.perform(post("/users/external/{id}/delete", externalId).with(csrf())).andExpect(status().is3xxRedirection());
+        assertThat(externalIntervieweeService.getEmails(assessmentId)).isEmpty();
+        assertThat(externalIntervieweeRepository.findById(externalId)).isEmpty();
+    }
+
+        @Test
+        @Order(552)
+        @WithMockUser(username = "admin", roles = {"ADMIN"})
+        void directReviewCreatesCreatorTaskOnce() throws Exception {
+                Long creatorId = userRepository.findByEmail("admin@example.com").orElseThrow().getId();
+                Long newAssessmentId = writeInTx(() -> {
+                        Assessment created = new Assessment(catalogRepository.findById(catalogId).orElseThrow(),
+                                        LocalDate.now(), "External review test", AssessmentStatus.OPEN);
+                        created.setCreatedBy(userRepository.findById(creatorId).orElseThrow());
+                        created = assessmentRepository.save(created);
+                        AssessmentDetails details = new AssessmentDetails();
+                        details.getAssessments().add(created);
+                        details.getControlAnswers().add(new AssessmentControlAnswer(
+                                        controlRepository.findById(control5Ids.get(0)).orElseThrow(),
+                                        maturityAnswerRepository.findById(answerId75).orElseThrow()));
+                        assessmentDetailsService.save(details);
+                        return created.getId();
+                });
+                String url = assessmentUrlsService.createOrReplaceUrl(newAssessmentId).getUrl();
+                long before = governanceTaskRepository.findByAssignedUserId(creatorId).size();
+                mockMvc.perform(post("/assessment-direct/{url}/finalize", url).with(csrf())).andExpect(status().isOk());
+                mockMvc.perform(post("/assessment-direct/{url}/finalize", url).with(csrf())).andExpect(status().isConflict());
+                assertThat(governanceTaskRepository.findByAssignedUserId(creatorId)).hasSize((int) before + 1)
+                        .anyMatch(task -> task.getTitle().contains("External review test")
+                                && task.getAssessment() != null && newAssessmentId.equals(task.getAssessment().getId()));
+                assertThat(assessmentRepository.findById(newAssessmentId).orElseThrow().getStatus()).isEqualTo(AssessmentStatus.REVIEW);
+                String landing = mockMvc.perform(get("/")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+                assertThat(landing.substring(landing.indexOf("My Tasks")))
+                        .contains("href=\"/assessment/" + newAssessmentId + "\"");
+        }
 
     private final List<Long> control5Ids = new ArrayList<>();
     private Long extraControlId; // added AFTER finalization

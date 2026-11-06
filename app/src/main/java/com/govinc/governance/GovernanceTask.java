@@ -3,6 +3,7 @@ package com.govinc.governance;
 import com.govinc.catalog.SecurityCatalog;
 import com.govinc.catalog.SecurityControl;
 import com.govinc.catalog.SecurityControlDomain;
+import com.govinc.assessment.Assessment;
 import com.govinc.user.User;
 
 import jakarta.persistence.*;
@@ -36,6 +37,10 @@ public class GovernanceTask {
     @ManyToOne(optional = true)
     @JoinColumn(name = "security_catalog_id")
     private SecurityCatalog securityCatalog;
+
+    @ManyToOne(optional = true)
+    @JoinColumn(name = "assessment_id")
+    private Assessment assessment;
 
     @ManyToOne(optional = true)
     @JoinColumn(name = "security_control_domain_id")
@@ -78,6 +83,9 @@ public class GovernanceTask {
 
     public SecurityCatalog getSecurityCatalog() { return securityCatalog; }
     public void setSecurityCatalog(SecurityCatalog securityCatalog) { this.securityCatalog = securityCatalog; }
+
+    public Assessment getAssessment() { return assessment; }
+    public void setAssessment(Assessment assessment) { this.assessment = assessment; }
 
     public SecurityControlDomain getSecurityControlDomain() { return securityControlDomain; }
     public void setSecurityControlDomain(SecurityControlDomain securityControlDomain) { this.securityControlDomain = securityControlDomain; }

@@ -62,6 +62,7 @@ class GovincGovernanceTest {
     @Autowired private SecurityControlRepository securityControlRepository;
     @Autowired private OrgUnitRepository orgUnitRepository;
     @Autowired private ComplianceCheckRepository complianceCheckRepository;
+    @Autowired private com.govinc.assessment.AssessmentRepository assessmentRepository;
 
     private Long userId;
     private Long projectId;
@@ -312,6 +313,41 @@ class GovincGovernanceTest {
         taskId = null; // consumed
         TESTED_ENDPOINTS.add("DELETE /governance/tasks/{id}");
     }
+
+        @Test
+        @Order(6015)
+        @WithMockUser(username = "admin", roles = {"ADMIN"})
+        void task_assessmentRelatedItemCanBeCreatedEditedAndDeleted() throws Exception {
+        com.govinc.assessment.Assessment assessment = new com.govinc.assessment.Assessment();
+        assessment.setName("Related assessment");
+        assessment = assessmentRepository.save(assessment);
+        Long assessmentId = assessment.getId();
+        String json = "{\"title\":\"Assessment task\",\"assessmentId\":" + assessmentId
+            + ",\"projectId\":" + projectId + "}";
+        mockMvc.perform(post("/governance/tasks/create").with(csrf())
+            .contentType(MediaType.APPLICATION_JSON).content(json)).andExpect(status().isOk());
+        GovernanceTask task = taskRepository.findAll().stream()
+            .filter(item -> "Assessment task".equals(item.getTitle())).findFirst().orElseThrow();
+        Long linkedTaskId = task.getId();
+        assertThat(task.getAssessment().getId()).isEqualTo(assessmentId);
+        mockMvc.perform(get("/governance/tasks")).andExpect(status().isOk())
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("data-assessment-id=\"" + assessmentId + "\"")));
+        mockMvc.perform(get("/governance/projects/{id}", projectId)).andExpect(status().isOk())
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("href=\"/assessment/" + assessmentId + "\"")));
+
+        mockMvc.perform(put("/governance/tasks/{id}", linkedTaskId).with(csrf())
+            .contentType(MediaType.APPLICATION_JSON).content("{\"assessmentId\":null}"))
+            .andExpect(status().isOk());
+        assertThat(taskRepository.findById(linkedTaskId).orElseThrow().getAssessment()).isNull();
+        mockMvc.perform(put("/governance/tasks/{id}", linkedTaskId).with(csrf())
+            .contentType(MediaType.APPLICATION_JSON).content("{\"assessmentId\":" + assessmentId + "}"))
+            .andExpect(status().isOk());
+        mockMvc.perform(post("/assessment/{id}/delete", assessmentId).with(csrf()))
+            .andExpect(status().is3xxRedirection());
+        assertThat(assessmentRepository.findById(assessmentId)).isEmpty();
+        assertThat(taskRepository.findById(linkedTaskId).orElseThrow().getAssessment()).isNull();
+        taskRepository.deleteById(linkedTaskId);
+        }
 
     // ──────────────────────────────────────────────
     // Deviation Analysis

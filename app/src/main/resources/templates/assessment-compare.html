@@ -84,6 +84,13 @@
                     <input type="checkbox" id="onlyDiffsToggle" onchange="applyDiffFilter()" disabled>
                     <span>Show only differences</span>
                 </label>
+                <label id="compare-feedback-filter-wrap" hidden>Qualified Feedback
+                    <select id="compare-feedback-filter" onchange="applyDiffFilter()">
+                        <option value="">All</option><option value="UNSET">Not rated</option>
+                        <option value="MORE_DETAIL_NEEDED">More detail needed</option>
+                        <option value="REVISION_NEEDED">Revision needed</option><option value="ACCEPTED">Accepted</option>
+                    </select>
+                </label>
                 <span id="diffStats" style="display:none;font-size:0.88em;color:#666;"></span>
             </div>
 
@@ -251,6 +258,8 @@
         }
 
         function renderCompare(data) {
+            document.getElementById('compare-feedback-filter-wrap').hidden = !(data.feedbackEnabled1 || data.feedbackEnabled2);
+            document.getElementById('compare-feedback-filter').value = '';
             // Column headers
             document.getElementById('th-a1').textContent = data.assessment1.name || 'Assessment 1';
             document.getElementById('th-a2').textContent = data.assessment2.name || 'Assessment 2';
@@ -277,6 +286,37 @@
                     '<td>' + escHtml(row.controlName || '') + '</td>' +
                     '<td>' + answerBadge(row.answer1, row.rating1) + '</td>' +
                     '<td>' + answerBadge(row.answer2, row.rating2) + '</td>';
+                [1, 2].forEach(function(number) {
+                    if (!data['feedbackEnabled' + number] || !row['inAssessment' + number]) return;
+                    var assessment = data['assessment' + number];
+                    var label = document.createElement('label');
+                    label.textContent = 'Qualified Feedback ';
+                    var select = document.createElement('select');
+                    [ ['', 'Not rated'], ['MORE_DETAIL_NEEDED', 'More detail needed'], ['REVISION_NEEDED', 'Revision needed'], ['ACCEPTED', 'Accepted'] ].forEach(function(option) {
+                        select.add(new Option(option[1], option[0]));
+                    });
+                    select.value = row['feedback' + number] || '';
+                    select.disabled = !data.canEditFeedback || assessment.status === 'CLOSED';
+                    select.onchange = function() {
+                        var previous = row['feedback' + number] || '';
+                        var value = select.value;
+                        var headers = { 'Content-Type': 'application/json' };
+                        headers[document.querySelector('meta[name="_csrf_header"]').content] = document.querySelector('meta[name="_csrf"]').content;
+                        select.disabled = true;
+                        fetch('/assessment/' + assessment.id + '/control/' + row.controlId + '/qualified-feedback', {
+                            method: 'PUT', headers: headers, body: JSON.stringify({ rating: value })
+                        }).then(function(response) {
+                            if (!response.ok) throw new Error();
+                            row['feedback' + number] = value;
+                            applyDiffFilter();
+                        }).catch(function() { select.value = previous; alert('Could not save qualified feedback.'); })
+                          .finally(function() { select.disabled = false; });
+                    };
+                    label.appendChild(select);
+                    tr.children[2 + number].appendChild(document.createElement('br'));
+                    tr.children[2 + number].appendChild(label);
+                });
+                tr._compareRow = row;
                 tbody.appendChild(tr);
             });
 
@@ -318,8 +358,12 @@
 
         function applyDiffFilter() {
             var onlyDiffs = document.getElementById('onlyDiffsToggle').checked;
+            var feedback = document.getElementById('compare-feedback-filter').value;
             document.querySelectorAll('#compareTableBody tr').forEach(function (tr) {
-                tr.style.display = (onlyDiffs && tr.dataset.same === '1') ? 'none' : '';
+                var row = tr._compareRow;
+                var matches = !feedback || (currentCompareData.feedbackEnabled1 && row.inAssessment1 && (row.feedback1 || 'UNSET') === feedback)
+                    || (currentCompareData.feedbackEnabled2 && row.inAssessment2 && (row.feedback2 || 'UNSET') === feedback);
+                tr.style.display = (onlyDiffs && tr.dataset.same === '1') || !matches ? 'none' : '';
             });
         }
 

@@ -7,6 +7,7 @@
     <title>Assessment Direct Link</title>
     <link rel="stylesheet" type="text/css" href="/style.css">    <th:block th:replace="~{fragments/theme-css :: themeCss}" />
     <style>
+        #direct-feedback-filter-section[hidden] { display: none; }
         .na-control-row {
             background: #f2f2f2;
             color: #7a7a7a;
@@ -18,6 +19,30 @@
         .na-control-row .comment-textarea,
         .na-control-row .answering-guide-btn {
             opacity: 0.7;
+        }
+        .direct-feedback-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            flex: 0 0 10.5rem;
+            width: 10.5rem;
+            min-height: 2rem;
+            padding: 0.3rem 0.65rem;
+            border-radius: 999px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            line-height: 1.2;
+            text-align: center;
+            color: var(--feedback-text) !important;
+            background: var(--feedback-background);
+        }
+        .direct-feedback-more-detail { --feedback-text: #805100; --feedback-background: #fff1ca; }
+        .direct-feedback-revision { --feedback-text: #9c2c32; --feedback-background: #ffe4e3; }
+        .direct-feedback-accepted { --feedback-text: #17613c; --feedback-background: #dff3e7; }
+        .direct-feedback-unset { --feedback-text: #59636b; --feedback-background: #e9edef; }
+        @media (max-width: 600px) {
+            .dropdown-row { flex-wrap: wrap; }
         }
     </style>
 </head>
@@ -67,6 +92,18 @@
     <div class="container" id="mainContainer" style="display:none;">
         <!-- Filter and Progress Bar (Sticky at Top) -->
         <div class="controls-filter-bar sticky-filter-bar" id="progress-bar-sticky">
+            <div class="filter-section" id="direct-feedback-filter-section" hidden>
+                <div class="filter-item">
+                    <label for="direct-feedback-filter">Feedback:</label>
+                    <select id="direct-feedback-filter" class="filter-select">
+                        <option value="">All</option>
+                        <option value="UNSET">Not rated</option>
+                        <option value="MORE_DETAIL_NEEDED">More detail needed</option>
+                        <option value="REVISION_NEEDED">Revision needed</option>
+                        <option value="ACCEPTED">Accepted</option>
+                    </select>
+                </div>
+            </div>
             <div class="progress-section">
                 <div class="progress-info">
                     <span class="progress-label">Completion:</span>
@@ -441,6 +478,8 @@
                 var controlAnswers = data.controlAnswers || {};
                 var comments = data.controlComments || {};
                 var notApplicable = data.notApplicable || {};
+                var qualifiedFeedback = data.qualifiedFeedback || {};
+                document.getElementById('direct-feedback-filter-section').hidden = !data.qualifiedFeedbackEnabled;
                 var isOpen = data.isOpen;
                 var guideVisible = data.guideVisibleInDirect === true;
                 window._directNotApplicable = notApplicable;
@@ -496,18 +535,40 @@
                             var selected = (controlAnswers && controlAnswers[ctrl.id] && ans.answer === controlAnswers[ctrl.id]) ? 'selected' : '';
                             ansCell += '<option value="' + ans.id + '" ' + selected + '>' + ans.answer + '</option>';
                         });
-                        ansCell += '</select><span class="answer-feedback"></span></div>' +
+                        ansCell += '</select>';
+                        if (data.qualifiedFeedbackEnabled) {
+                            var feedbackOptions = {
+                                MORE_DETAIL_NEEDED: { label: 'More detail needed', style: 'more-detail' },
+                                REVISION_NEEDED: { label: 'Revision needed', style: 'revision' },
+                                ACCEPTED: { label: 'Accepted', style: 'accepted' }
+                            };
+                            var feedback = feedbackOptions[qualifiedFeedback[ctrl.id]] || { label: 'Not rated', style: 'unset' };
+                            ansCell += '<span class="direct-feedback-pill direct-feedback-' + feedback.style + '">' + feedback.label + '</span>';
+                        }
+                        ansCell += '<span class="answer-feedback"></span></div>' +
                             '<div class="testarea-row">' +
                             '<textarea class="comment-textarea comment-textarea-sized" name="comment_' + ctrl.id + '" data-control-id="' + ctrl.id + '" placeholder="Add comment (optional)"' + disabledAttr + '>' + (comments && comments[ctrl.id] ? comments[ctrl.id] : '') + '</textarea><span class="comment-feedback"></span>' +
                             '</div>' +
                             '</div>';
-                        controlsHtml += '<tr data-control-id="' + ctrl.id + '" data-not-applicable="' + (isNotApplicable ? 'true' : 'false') + '"' + (isNotApplicable ? ' class="na-control-row"' : '') + '><td class="ctrl-name-col"><div class="ctrl-desc-wrap"><span class="text-bold">' + (ctrl.name != null ? ctrl.name : '-') + '</span>' +
+                        controlsHtml += '<tr data-feedback="' + (qualifiedFeedback[ctrl.id] || 'UNSET') + '" data-control-id="' + ctrl.id + '" data-not-applicable="' + (isNotApplicable ? 'true' : 'false') + '"' + (isNotApplicable ? ' class="na-control-row"' : '') + '><td class="ctrl-name-col"><div class="ctrl-desc-wrap"><span class="text-bold">' + (ctrl.name != null ? ctrl.name : '-') + '</span>' +
                             '<div>' + ((ctrl.detail && ctrl.detail !== '') ? ctrl.detail : 'No detail') + '</div></div></td>' +
                             '<td>' + ansCell + '</td></tr>';
                     });
                     controlsHtml += '</tbody></table></div></div></div>';
                 });
                 document.getElementById('controls-container').innerHTML = controlsHtml;
+                document.getElementById('direct-feedback-filter').onchange = function() {
+                    var value = this.value;
+                    document.querySelectorAll('#controls-container .domain-collapsible').forEach(function(domain) {
+                        var visible = false;
+                        domain.querySelectorAll('tr[data-control-id]').forEach(function(row) {
+                            var matches = !value || row.dataset.feedback === value;
+                            row.style.display = matches ? '' : 'none';
+                            if (matches) visible = true;
+                        });
+                        domain.style.display = visible ? '' : 'none';
+                    });
+                };
                 if (isOpen) {
                     document.querySelectorAll('.answer-select').forEach(function(select) {
                         select.addEventListener('change', function() {

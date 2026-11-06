@@ -49,6 +49,17 @@ public class AssessmentEmailRestController {
     @Autowired
     private GeneralConfigService generalConfigService;
 
+    @Autowired
+    private com.govinc.user.ExternalIntervieweeService externalIntervieweeService;
+
+    @GetMapping("/{id}/email/external-interviewees")
+    public List<String> externalInterviewees(@PathVariable Long id) {
+        if (!authorizationService.canCreateAssessment() || !authorizationService.canAccessAssessment(id)) {
+            throw new UnauthorizedException("You do not have permission to send e-mails for this assessment.");
+        }
+        return externalIntervieweeService.getEmails(id);
+    }
+
     /**
      * Generate an AI-drafted e-mail subject and body for an assessment.
      *
@@ -330,9 +341,6 @@ public class AssessmentEmailRestController {
 
         try {
             emailService.sendEmail(from, recipientEmails, subject, body);
-            return ResponseEntity.ok(Map.of(
-                    "success", true,
-                    "message", "E-mail sent to " + recipientEmails.size() + " recipient(s)."));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (IllegalStateException e) {
@@ -341,5 +349,18 @@ public class AssessmentEmailRestController {
             return ResponseEntity.internalServerError().body(
                     Map.of("error", "Failed to send e-mail: " + e.getMessage()));
         }
+        if (!internalLink) {
+            try {
+                externalIntervieweeService.recordRecipients(id, recipientEmails);
+            } catch (Exception e) {
+                org.slf4j.LoggerFactory.getLogger(AssessmentEmailRestController.class)
+                    .error("E-mail sent but external interviewees could not be recorded for assessment {}", id, e);
+                return ResponseEntity.ok(Map.of("success", true, "warning", true, "message",
+                        "E-mail sent, but external interviewees could not be recorded. Please contact an administrator."));
+            }
+        }
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "E-mail sent to " + recipientEmails.size() + " recipient(s)."));
     }
 }

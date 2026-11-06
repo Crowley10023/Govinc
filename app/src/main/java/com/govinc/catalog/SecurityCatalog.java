@@ -33,6 +33,8 @@ public class SecurityCatalog {
     @Column(nullable = false)
     private boolean versionManaged = false;
 
+    private Boolean qualifiedFeedbackEnabled = false;
+
     @Column(length = 10000)
     private String wizardControlOrder;
 
@@ -94,6 +96,12 @@ public class SecurityCatalog {
     }
     public void setVersionManaged(boolean versionManaged) {
         this.versionManaged = versionManaged;
+    }
+    public boolean isQualifiedFeedbackEnabled() {
+        return Boolean.TRUE.equals(qualifiedFeedbackEnabled);
+    }
+    public void setQualifiedFeedbackEnabled(boolean enabled) {
+        this.qualifiedFeedbackEnabled = enabled;
     }
     public String getWizardControlOrder() {
         return wizardControlOrder;

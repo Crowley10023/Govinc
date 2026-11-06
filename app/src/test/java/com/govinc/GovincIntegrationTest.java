@@ -492,6 +492,34 @@ class GovincIntegrationTest {
     }
 
     @Test
+    @Order(416)
+    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    void securityCatalog_qualifiedFeedbackCheckboxPersists() throws Exception {
+        SecurityCatalog catalog = securityCatalogRepository.findAll().get(0);
+        String catalogId = catalog.getId().toString();
+        String modelId = catalog.getMaturityModel().getId().toString();
+        String[] controlIds = securityControlRepository.findAll().stream()
+                .map(control -> control.getId().toString()).toArray(String[]::new);
+
+        mockMvc.perform(post("/security-catalog/edit").with(csrf())
+                .param("id", catalogId).param("name", catalog.getName())
+                .param("description", catalog.getDescription()).param("revision", catalog.getRevision())
+                .param("reportInstructions", catalog.getReportInstructions()).param("maturityModelId", modelId)
+                .param("securityControls", controlIds).param("_qualifiedFeedbackEnabled", "on")
+                .param("qualifiedFeedbackEnabled", "true"))
+                .andExpect(status().is3xxRedirection());
+        assertThat(securityCatalogRepository.findById(catalog.getId()).orElseThrow().isQualifiedFeedbackEnabled()).isTrue();
+
+        mockMvc.perform(post("/security-catalog/edit").with(csrf())
+                .param("id", catalogId).param("name", catalog.getName())
+                .param("description", catalog.getDescription()).param("revision", catalog.getRevision())
+                .param("reportInstructions", catalog.getReportInstructions()).param("maturityModelId", modelId)
+                .param("securityControls", controlIds).param("_qualifiedFeedbackEnabled", "on"))
+                .andExpect(status().is3xxRedirection());
+        assertThat(securityCatalogRepository.findById(catalog.getId()).orElseThrow().isQualifiedFeedbackEnabled()).isFalse();
+    }
+
+    @Test
     @Order(420)
     @WithMockUser(username = "admin", roles = {"ADMIN"})
     void securityCatalog_list() throws Exception {

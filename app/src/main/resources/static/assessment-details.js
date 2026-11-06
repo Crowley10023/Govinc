@@ -1299,6 +1299,9 @@ function initializeFilterBar() {
         });
     }
 
+    var feedbackFilter = document.getElementById('filter-qualified-feedback');
+    if (feedbackFilter) feedbackFilter.addEventListener('change', applyFilters);
+
     var sortSelect = document.getElementById('filter-sort-select');
     if (sortSelect) {
         sortSelect.addEventListener('change', function(e) {
@@ -1410,7 +1413,9 @@ function sortControls(sortBy) {
 function applyFilters() {
     var allRows = document.querySelectorAll('.controls-table tbody tr');
     var visibleCount = 0;
-    var isFilterActive = filterState.showUnansweredOnly || filterState.selectedMaturityLevel;
+    var feedbackFilter = document.getElementById('filter-qualified-feedback');
+    var feedbackValue = feedbackFilter ? feedbackFilter.value : '';
+    var isFilterActive = filterState.showUnansweredOnly || filterState.selectedMaturityLevel || feedbackValue;
 
     // Ensure domain completeness icons are up-to-date so we can rely on them
     checkDomainCompleteness();
@@ -1422,6 +1427,12 @@ function applyFilters() {
         if (!select) return;
 
         var isNotApplicable = isRowNotApplicable(row);
+
+        var feedbackSelect = row.querySelector('.qualified-feedback-select');
+        if (feedbackValue && (!feedbackSelect || (feedbackSelect.value || 'UNSET') !== feedbackValue)) {
+            row.style.display = 'none';
+            return;
+        }
 
         if (isNotApplicable) {
             row.style.display = filterState.showUnansweredOnly ? 'none' : '';
@@ -1471,7 +1482,7 @@ function applyFilters() {
         // If a filter is active and the domain is fully answered we should hide the whole domain
         var checkmarkSpan = domain.querySelector('.domain-checkmark');
         var domainComplete = checkmarkSpan && checkmarkSpan.innerHTML && checkmarkSpan.innerHTML.trim() !== '';
-        if (isFilterActive && domainComplete) {
+        if (filterState.showUnansweredOnly && domainComplete) {
             domain.style.display = 'none';
             // remove any empty-row messages if present
             var existingEmpty = table.querySelector('.no-results-message');

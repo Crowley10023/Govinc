@@ -7,6 +7,8 @@ import java.util.Optional;
 import java.util.List;
 
 public interface UserRepository extends JpaRepository<User, Long> {
+    boolean existsByEmailIgnoreCase(String email);
+
     @Query("SELECT DISTINCT u FROM User u LEFT JOIN FETCH u.leadsOrgUnits WHERE u.email = :email")
     Optional<User> findByEmail(@Param("email") String email);
     

@@ -236,7 +236,7 @@
                                     <span th:if="${task.dueDate != null}" class="assessment-date" th:text="'Due: ' + ${#temporals.format(task.dueDate, 'yyyy-MM-dd')}"></span>
                                 </div>
                             </div>
-                            <a th:href="@{/governance/tasks}" class="btn-action btn-sm">View</a>
+                            <a th:href="${task.assessment != null} ? @{/assessment/{id}(id=${task.assessment.id})} : @{/governance/tasks}" class="btn-action btn-sm">View</a>
                         </div>
                     </li>
                 </ul>

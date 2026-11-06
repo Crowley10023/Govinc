@@ -36,6 +36,12 @@ public class UserController {
     @Autowired
     private AssessmentRepository assessmentRepository;
 
+    @Autowired
+    private ExternalIntervieweeRepository externalIntervieweeRepository;
+
+    @Autowired
+    private ExternalIntervieweeService externalIntervieweeService;
+
     @GetMapping
     public String listUsers(Model model) {
         // Authorization check: only ADMIN can view users
@@ -44,6 +50,7 @@ public class UserController {
         }
         List<User> users = userRepository.findAll();
         model.addAttribute("users", users);
+        model.addAttribute("externalInterviewees", externalIntervieweeRepository.findAll());
 
         List<Assessment> assessments = assessmentRepository.findAll();
         Map<Long, List<Map<String, Object>>> userAssessmentsMap = new HashMap<>();
@@ -83,6 +90,15 @@ public class UserController {
         List<OrgUnit> orgUnits = orgUnitService.getAllOrgUnits();
         model.addAttribute("orgUnits", orgUnits);
         return "users";
+    }
+
+    @PostMapping("/external/{id}/delete")
+    public String deleteExternalInterviewee(@PathVariable Long id) {
+        if (!authorizationService.isAdmin()) {
+            throw new UnauthorizedException("You do not have permission to delete external users.");
+        }
+        externalIntervieweeService.delete(id);
+        return "redirect:/users?tab=external";
     }
 
     @GetMapping("/new")

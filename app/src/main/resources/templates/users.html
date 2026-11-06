@@ -11,6 +11,11 @@
 <div th:replace="~{navigation :: mainNav}"></div>
 <div class="container">
     <h1 class="page-title">User List</h1>
+    <div role="tablist" class="flex-row gap-sm mb-md">
+        <button type="button" class="btn-action" id="internal-tab" role="tab" onclick="showUserTab('internal')">Internal</button>
+        <button type="button" class="btn-action" id="external-tab" role="tab" onclick="showUserTab('external')">External</button>
+    </div>
+    <div id="internal-users" role="tabpanel">
     <div class="flex-row gap-sm mb-md">
         <a href="/users/new" class="btn-action">Add User</a>
         <button type="button" class="btn-action" onclick="openAzureImportModal()">&#9729; Import from Azure AD</button>
@@ -44,6 +49,24 @@
                            class="btn-danger"
                            th:attr="data-user-id=${user.id},data-user-name=${user.name}"
                            onclick="return openDeleteModal(event)">Delete</a>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    </div>
+    <div id="external-users" role="tabpanel" hidden>
+        <p th:if="${#lists.isEmpty(externalInterviewees)}" class="text-muted">No external interviewees found.</p>
+        <table th:unless="${#lists.isEmpty(externalInterviewees)}" class="table card">
+            <thead><tr><th>Email</th><th>Actions</th></tr></thead>
+            <tbody>
+                <tr th:each="interviewee : ${externalInterviewees}">
+                    <td th:text="${interviewee.email}"></td>
+                    <td>
+                        <form th:action="@{/users/external/{id}/delete(id=${interviewee.id})}" method="post"
+                              onsubmit="return confirm('Delete this external interviewee from all assessments?')">
+                            <button type="submit" class="btn-danger">Delete</button>
+                        </form>
                     </td>
                 </tr>
             </tbody>
@@ -118,6 +141,14 @@
 </div>
 
 <script th:inline="javascript">
+    function showUserTab(tab) {
+        document.getElementById('internal-users').hidden = tab !== 'internal';
+        document.getElementById('external-users').hidden = tab !== 'external';
+        document.getElementById('internal-tab').setAttribute('aria-selected', tab === 'internal');
+        document.getElementById('external-tab').setAttribute('aria-selected', tab === 'external');
+    }
+    showUserTab(new URLSearchParams(window.location.search).get('tab') === 'external' ? 'external' : 'internal');
+
     const userAssessmentsMap = /*[[${userAssessmentsMap}]]*/ {};
     const createdByAssessmentsMap = /*[[${createdByAssessmentsMap}]]*/ {};
 

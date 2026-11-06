@@ -41,6 +41,9 @@ public class GovernanceProjectController {
     @Autowired
     private OrgUnitService orgUnitService;
 
+    @Autowired
+    private com.govinc.assessment.AssessmentRepository assessmentRepository;
+
     @GetMapping("")
     public String listProjects(Model model) {
         model.addAttribute("projects", projectService.findAll());
@@ -61,6 +64,8 @@ public class GovernanceProjectController {
         model.addAttribute("statuses", TaskStatus.values());
         model.addAttribute("catalogs", securityCatalogRepository.findAll());
         model.addAttribute("securityControls", securityControlRepository.findAll());
+        model.addAttribute("assessments", assessmentRepository.findAll().stream()
+            .filter(authorizationService::canAccessAssessment).toList());
         return "governance-project-detail";
     }
 

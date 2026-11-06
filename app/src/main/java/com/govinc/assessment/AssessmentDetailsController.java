@@ -78,6 +78,9 @@ public class AssessmentDetailsController {
             if (ad.getAssessments() != null && !ad.getAssessments().isEmpty()) {
                 assessment = ad.getAssessments().iterator().next();
             }
+            if (assessment != null) {
+                return "redirect:/assessment/" + assessment.getId();
+            }
             System.out.println("Now proceeding with assessment logic");
             
             // --- Improved logic for taken-over and display answer ---

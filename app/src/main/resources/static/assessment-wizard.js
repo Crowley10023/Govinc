@@ -30,6 +30,17 @@
         wizardState.prefetchQueue = [];
         wizardState.currentIndex = 0;
         wizardState.saving = false;
+        var feedbackFilter = document.getElementById('wizard-feedback-filter');
+        if (feedbackFilter) {
+            feedbackFilter.value = document.getElementById('filter-qualified-feedback').value;
+            feedbackFilter.onchange = function() {
+                saveCurrentComment();
+                collectControlsFromDOM();
+                wizardState.currentIndex = 0;
+                renderCurrentControl();
+                prefetchNextGuesses();
+            };
+        }
 
         // Collect controls from DOM
         collectControlsFromDOM();
@@ -49,6 +60,9 @@
         var controls = [];
         $('tr[data-control-id]').each(function() {
             var $row = $(this);
+            var feedbackFilter = document.getElementById('wizard-feedback-filter');
+            var feedback = $row.find('.qualified-feedback-select').val() || 'UNSET';
+            if (feedbackFilter && feedbackFilter.value && feedbackFilter.value !== feedback) return;
             var controlId = $row.data('control-id');
             var controlName = $row.data('control-name') || '';
             var $select = $row.find('.answer-select');
@@ -304,6 +318,13 @@
     function renderCurrentControl() {
         var ctrl = wizardState.controls[wizardState.currentIndex];
         if (!ctrl) {
+            if (document.getElementById('wizard-feedback-filter') && document.getElementById('wizard-feedback-filter').value) {
+                $('#wizard-control-info').text('No controls match the selected feedback.');
+                $('#wizard-answer-cards, #wizard-comment-area, #wizard-ai-guide').empty();
+                updateWizardProgress();
+                updateNavigationState();
+                return;
+            }
             renderWizardComplete();
             return;
         }
@@ -323,6 +344,20 @@
                 '<div class="wizard-control-detail">' + escapeHtml(ctrl.controlDetail || 'No detail available') + '</div>' +
             '</div>'
         );
+
+        var originalFeedback = document.querySelector('tr[data-control-id="' + ctrl.controlId + '"] .qualified-feedback-select');
+        if (originalFeedback) {
+            var feedbackLabel = document.createElement('label');
+            feedbackLabel.textContent = 'Qualified Feedback ';
+            var feedbackSelect = originalFeedback.cloneNode(true);
+            feedbackSelect.value = originalFeedback.value;
+            feedbackSelect.addEventListener('change', function() {
+                originalFeedback.value = feedbackSelect.value;
+                originalFeedback.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+            feedbackLabel.appendChild(feedbackSelect);
+            $info.append(feedbackLabel);
+        }
 
         // Taken-over notice
         if (ctrl.disabled) {

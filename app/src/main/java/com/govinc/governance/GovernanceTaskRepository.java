@@ -9,4 +9,8 @@ public interface GovernanceTaskRepository extends JpaRepository<GovernanceTask, 
     List<GovernanceTask> findBySecurityControlId(Long controlId);
     List<GovernanceTask> findBySecurityCatalogId(Long catalogId);
     List<GovernanceTask> findByStatus(TaskStatus status);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("UPDATE GovernanceTask task SET task.assessment = null WHERE task.assessment.id = :assessmentId")
+    void clearAssessmentReferences(@org.springframework.data.repository.query.Param("assessmentId") Long assessmentId);
 }

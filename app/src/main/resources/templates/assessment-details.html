@@ -12,6 +12,7 @@
     <meta name="_csrf" th:content="${_csrf.token}" />
     <meta name="_csrf_header" th:content="${_csrf.headerName}" />
     <style>
+        #email-external-interviewees[hidden] { display: none; }
         /* Active users presence strip — fixed overlay, never affects page flow */
         .presence-strip {
             position: fixed;
@@ -115,6 +116,16 @@
             <label for="filter-maturity-select">Filter by Maturity Level:</label>
             <select id="filter-maturity-select" class="filter-select">
                 <option value="">-- All Levels --</option>
+            </select>
+        </div>
+        <div class="filter-item" th:if="${assessment.securityCatalog != null and assessment.securityCatalog.qualifiedFeedbackEnabled}">
+            <label for="filter-qualified-feedback">Qualified Feedback:</label>
+            <select id="filter-qualified-feedback" class="filter-select">
+                <option value="">All</option>
+                <option value="UNSET">Not rated</option>
+                <option value="MORE_DETAIL_NEEDED">More detail needed</option>
+                <option value="REVISION_NEEDED">Revision needed</option>
+                <option value="ACCEPTED">Accepted</option>
             </select>
         </div>
         <div class="filter-item" id="sort-filter-container">
@@ -314,10 +325,11 @@
                         <tr>
                             <th>Interviewees</th>
                             <td id="assessment-interviewees-cell">
-                                <div th:if="${assessment.interviewees != null && !assessment.interviewees.isEmpty()}" class="pill-list">
+                                <div th:if="${!assessment.interviewees.isEmpty() or !assessment.externalInterviewees.isEmpty()}" class="pill-list">
                                     <span th:each="user : ${assessment.interviewees}" class="user-pill" th:text="${user.name}"></span>
+                                    <span th:each="external : ${assessment.externalInterviewees}" class="user-pill external-interviewee-pill" th:text="${external.email}"></span>
                                 </div>
-                                <span th:if="${assessment.interviewees == null || assessment.interviewees.isEmpty()}" class="text-muted">None</span>
+                                <span th:if="${assessment.interviewees.isEmpty() and assessment.externalInterviewees.isEmpty()}" class="text-muted">None</span>
                             </td>
                             <td class="details-action-col">
                                 <button th:if="${isAdminOrISM}" type="button" class="btn-action" onclick="openIntervieweeModal()">Assign</button>
@@ -480,6 +492,16 @@
                                         </td>
                                         <td>
                                             <div class="control-actions-flex-row">
+                                                <label th:if="${assessment.securityCatalog != null and assessment.securityCatalog.qualifiedFeedbackEnabled}">
+                                                    Qualified Feedback
+                                                    <select class="qualified-feedback-select" th:data-control-id="${ctrl.id}"
+                                                            th:disabled="${!isAdminOrISM or assessment.closed}">
+                                                        <option value="">Not rated</option>
+                                                        <option value="MORE_DETAIL_NEEDED" th:selected="${qualifiedFeedback[ctrl.id] == 'MORE_DETAIL_NEEDED'}">More detail needed</option>
+                                                        <option value="REVISION_NEEDED" th:selected="${qualifiedFeedback[ctrl.id] == 'REVISION_NEEDED'}">Revision needed</option>
+                                                        <option value="ACCEPTED" th:selected="${qualifiedFeedback[ctrl.id] == 'ACCEPTED'}">Accepted</option>
+                                                    </select>
+                                                </label>
                                                 <!-- Row 1: Guide Button and Answer Dropdown -->
                                                 <div class="control-action-row">
                                                     <div class="answering-guide-row">
@@ -780,6 +802,14 @@
                     <div class="wizard-header">
                         <div class="wizard-header-left">
                             <h3>&#129302; Assessment Wizard</h3>
+                            <label th:if="${assessment.securityCatalog != null and assessment.securityCatalog.qualifiedFeedbackEnabled}">
+                                Qualified Feedback
+                                <select id="wizard-feedback-filter">
+                                    <option value="">All</option><option value="UNSET">Not rated</option>
+                                    <option value="MORE_DETAIL_NEEDED">More detail needed</option>
+                                    <option value="REVISION_NEEDED">Revision needed</option><option value="ACCEPTED">Accepted</option>
+                                </select>
+                            </label>
                             <div class="wizard-progress-info">
                                 <span>Control <strong id="wizard-progress-current">1</strong> of <strong id="wizard-progress-total">0</strong></span>
                                 <span class="wizard-progress-sep">|</span>
@@ -916,6 +946,11 @@
                                 </label>
                             </div>
 
+                            <div id="email-external-interviewees" class="form-group" hidden>
+                                <label>External Interviewees</label>
+                                <div id="email-external-list"></div>
+                            </div>
+
                             <div class="form-group" style="flex-shrink:0;">
                                 <label style="margin-bottom:4px;">Generate with AI</label>
                                 <div style="display:flex;flex-direction:column;gap:4px;">
@@ -1033,6 +1068,7 @@
     <script src="/webjars/jquery/3.6.0/jquery.min.js"></script>
     <script src="/org-unit-wizard.js"></script>
     <script src="/assessment-details.js"></script>
+    <script src="/qualified-feedback.js"></script>
     <script src="/assessment-wizard.js"></script>
     <script src="/assessment-import.js"></script>
 
@@ -1515,6 +1551,7 @@
             document.getElementById('email-recipient-input').value = '';
             document.getElementById('email-recipient-warning').textContent = '';
             renderEmailRecipients();
+            onEmailLinkTypeChange();
             if (!emailQuill) {
                 emailQuill = new Quill('#email-body-editor', {
                     theme: 'snow',
@@ -1539,11 +1576,30 @@
         }
 
         function onEmailLinkTypeChange() {
+            var externalSection = document.getElementById('email-external-interviewees');
+            externalSection.hidden = currentEmailLinkType() !== 'external';
             if (currentEmailLinkType() === 'internal') {
                 revalidateEmailRecipients();
             } else {
                 document.getElementById('email-recipient-warning').textContent = '';
                 renderEmailRecipients();
+                var list = document.getElementById('email-external-list');
+                list.textContent = 'Loading...';
+                fetch('/assessment/' + window.assessmentId + '/email/external-interviewees')
+                    .then(function(response) { if (!response.ok) throw new Error(); return response.json(); })
+                    .then(function(emails) {
+                        list.textContent = '';
+                        if (!emails.length) { list.textContent = 'None'; return; }
+                        emails.forEach(function(email) {
+                            var button = document.createElement('button');
+                            button.type = 'button';
+                            button.className = 'btn-action';
+                            button.textContent = email;
+                            button.onclick = function() { addEmailRecipient(email, 'manual', ''); };
+                            list.appendChild(button);
+                        });
+                    })
+                    .catch(function() { list.textContent = 'Unable to load external interviewees.'; });
             }
         }
 
@@ -1975,7 +2031,8 @@
                     successEl.textContent = data.message || 'E-mail sent successfully.';
                     successEl.style.display = 'block';
                     errorEl.textContent = '';
-                    setTimeout(function() { closeEmailModal(); }, 2500);
+                    if (linkType === 'external' && !data.warning) refreshExternalInterviewees();
+                    if (!data.warning) setTimeout(function() { closeEmailModal(); }, 2500);
                 } else {
                     errorEl.textContent = data.error || 'Unknown error while sending.';
                 }
@@ -1985,6 +2042,28 @@
                 sendBtn.textContent = 'Send';
                 errorEl.textContent = 'Request failed: ' + err;
             });
+        }
+
+        function refreshExternalInterviewees() {
+            fetch('/assessment/' + window.assessmentId + '/email/external-interviewees')
+                .then(function(response) { if (!response.ok) throw new Error(); return response.json(); })
+                .then(function(emails) {
+                    var cell = document.getElementById('assessment-interviewees-cell');
+                    cell.querySelectorAll('.external-interviewee-pill').forEach(function(pill) { pill.remove(); });
+                    var list = cell.querySelector('.pill-list');
+                    if (!list && emails.length) {
+                        cell.textContent = '';
+                        list = document.createElement('div');
+                        list.className = 'pill-list';
+                        cell.appendChild(list);
+                    }
+                    emails.forEach(function(email) {
+                        var pill = document.createElement('span');
+                        pill.className = 'user-pill external-interviewee-pill';
+                        pill.textContent = email;
+                        list.appendChild(pill);
+                    });
+                }).catch(function() {});
         }
     </script>
 

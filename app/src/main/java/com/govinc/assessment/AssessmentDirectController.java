@@ -53,6 +53,12 @@ public class AssessmentDirectController {
     @Autowired
     private GeneralConfigService generalConfigService;
 
+    @Autowired
+    private com.govinc.governance.GovernanceTaskService governanceTaskService;
+
+    @Autowired
+    private QualifiedFeedbackService qualifiedFeedbackService;
+
     private static final String UNLOCK_SESSION_ATTR_PREFIX = "assessmentDirectUnlocked_";
 
     // Server-side password gate: a password-protected obfuscated URL is only considered
@@ -104,6 +110,9 @@ public class AssessmentDirectController {
             out.put("guideVisibleInDirect", assessment.isGuideVisibleInDirect());
             out.put("securityCatalogId", assessment.getSecurityCatalog() != null ? assessment.getSecurityCatalog().getId() : null);
             out.put("catalogHeadline", assessment.getSecurityCatalog() != null ? assessment.getSecurityCatalog().getHeadline() : null);
+            boolean feedbackEnabled = assessment.getSecurityCatalog() != null && assessment.getSecurityCatalog().isQualifiedFeedbackEnabled();
+            out.put("qualifiedFeedbackEnabled", feedbackEnabled);
+            if (feedbackEnabled) out.put("qualifiedFeedback", qualifiedFeedbackService.ratings(assessment.getId()));
 
             // Controls, sorted (uses frozen snapshot for closed assessments)
             List<SecurityControl> controls = new ArrayList<>(assessment.getEffectiveControls());
@@ -611,6 +620,7 @@ public class AssessmentDirectController {
     // Finalize assessment via assessment-direct (POST by obfuscated ID)
     @PostMapping("/assessment-direct/{obfuscatedId}/finalize")
     @org.springframework.web.bind.annotation.ResponseBody
+    @org.springframework.transaction.annotation.Transactional
     public org.springframework.http.ResponseEntity<Map<String, Object>> finalizeAssessmentDirect(
             @PathVariable String obfuscatedId,
             jakarta.servlet.http.HttpSession session) {
@@ -622,7 +632,8 @@ public class AssessmentDirectController {
             return org.springframework.http.ResponseEntity.status(401).body(Map.of("success", false, "reason", "password_required"));
         }
 
-        Assessment assessment = maybeUrl.get().getAssessment();
+        Assessment assessment = assessmentRepository.findByIdForUpdate(maybeUrl.get().getAssessment().getId()).orElse(null);
+        if (assessment == null) return org.springframework.http.ResponseEntity.notFound().build();
 
         // Tamper-safe: only OPEN assessments can be moved to REVIEW
         if (assessment.getStatus() != AssessmentStatus.OPEN) {
@@ -642,6 +653,10 @@ public class AssessmentDirectController {
         // Move assessment to REVIEW state so the IS Manager can review before closing
         assessment.setStatus(AssessmentStatus.REVIEW);
         assessmentRepository.save(assessment);
+
+        if (assessment.getCreatedBy() != null) {
+            governanceTaskService.createAssessmentReviewTask(assessment);
+        }
 
         return org.springframework.http.ResponseEntity.ok(Map.of("success", true));
     }

@@ -39,6 +39,9 @@ public class ReportingController {
     @Autowired
     private SecurityCatalogService securityCatalogService;
 
+    @Autowired
+    private com.govinc.assessment.QualifiedFeedbackService qualifiedFeedbackService;
+
     @GetMapping("/org-unit")
     public String orgUnitReportingPage(Model model) {
         if (!authorizationService.canAccessCompliance()) {
@@ -203,14 +206,23 @@ public class ReportingController {
         }
         // Union of both assessments' effective controls
         Map<Long, SecurityControl> allControls = new LinkedHashMap<>();
-        for (SecurityControl sc : assessment1.getEffectiveControls()) allControls.put(sc.getId(), sc);
-        for (SecurityControl sc : assessment2.getEffectiveControls()) allControls.put(sc.getId(), sc);
+        Set<Long> controlIds1 = new HashSet<>();
+        Set<Long> controlIds2 = new HashSet<>();
+        for (SecurityControl sc : assessment1.getEffectiveControls()) { allControls.put(sc.getId(), sc); controlIds1.add(sc.getId()); }
+        for (SecurityControl sc : assessment2.getEffectiveControls()) { allControls.put(sc.getId(), sc); controlIds2.add(sc.getId()); }
         List<SecurityControl> sortedControls = new ArrayList<>(allControls.values());
         sortedControls.sort(Comparator
                 .comparing(SecurityControl::getReference, Comparator.nullsLast(String::compareTo))
                 .thenComparing(SecurityControl::getName, Comparator.nullsLast(String::compareTo)));
         result.put("assessment1", buildAssessmentMeta(assessment1, fmt));
         result.put("assessment2", buildAssessmentMeta(assessment2, fmt));
+        boolean enabled1 = assessment1.getSecurityCatalog() != null && assessment1.getSecurityCatalog().isQualifiedFeedbackEnabled();
+        boolean enabled2 = assessment2.getSecurityCatalog() != null && assessment2.getSecurityCatalog().isQualifiedFeedbackEnabled();
+        result.put("feedbackEnabled1", enabled1);
+        result.put("feedbackEnabled2", enabled2);
+        result.put("canEditFeedback", authorizationService.isAdmin() || authorizationService.isInformationSecurityManager());
+        Map<Long, String> feedback1 = enabled1 ? qualifiedFeedbackService.ratings(a1) : Collections.emptyMap();
+        Map<Long, String> feedback2 = enabled2 ? qualifiedFeedbackService.ratings(a2) : Collections.emptyMap();
         List<Map<String, Object>> controls = new ArrayList<>();
         for (SecurityControl sc : sortedControls) {
             Map<String, Object> row = new LinkedHashMap<>();
@@ -228,6 +240,10 @@ public class ReportingController {
             row.put("rating1", rating1);
             row.put("answer2", answer2Text);
             row.put("rating2", rating2);
+            row.put("feedback1", feedback1.get(sc.getId()));
+            row.put("feedback2", feedback2.get(sc.getId()));
+            row.put("inAssessment1", controlIds1.contains(sc.getId()));
+            row.put("inAssessment2", controlIds2.contains(sc.getId()));
             row.put("same", Objects.equals(answer1Text, answer2Text));
             controls.add(row);
         }

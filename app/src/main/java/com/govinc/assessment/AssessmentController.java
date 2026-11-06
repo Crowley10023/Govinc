@@ -51,6 +51,10 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @Controller
 @RequestMapping("/assessment")
 public class AssessmentController {
+    @Autowired
+    private QualifiedFeedbackService qualifiedFeedbackService;
+    @Autowired
+    private com.govinc.governance.GovernanceTaskRepository governanceTaskRepository;
     private static final DateTimeFormatter FRIENDLY_DATE_FORMATTER = DateTimeFormatter.ofPattern("dd MMM yyyy");
 
     @Autowired
@@ -398,6 +402,8 @@ public class AssessmentController {
         }
         Assessment assessment = assessmentOpt.get();
         model.addAttribute("assessment", assessment);
+        model.addAttribute("qualifiedFeedback", qualifiedFeedbackService.ratings(id));
+        model.addAttribute("canEditQualifiedFeedback", (authorizationService.isAdmin() || authorizationService.isInformationSecurityManager()) && !assessment.isClosed());
         // Sorted controls by name (uses frozen snapshot for closed assessments)
         List<SecurityControl> controls = new ArrayList<>(assessment.getEffectiveControls());
         controls.sort(Comparator.comparing(SecurityControl::getName, Comparator.nullsLast(String::compareTo)));
@@ -561,6 +567,7 @@ public class AssessmentController {
         if (assessmentOpt.isPresent()) {
             Assessment assessment = assessmentOpt.get();
             model.addAttribute("assessment", assessment);
+            model.addAttribute("qualifiedFeedback", qualifiedFeedbackService.ratings(id));
 
             // All security controls (uses frozen snapshot for closed assessments)
             List<SecurityControl> controls = new ArrayList<>(assessment.getEffectiveControls());
@@ -1297,6 +1304,7 @@ public class AssessmentController {
 
     // Delete assessment (POST)
     @PostMapping("/{id}/delete")
+    @org.springframework.transaction.annotation.Transactional
     public String deleteAssessment(@PathVariable Long id) {
         // Authorization check: only ADMIN and ISM can delete
         if (!authorizationService.canDeleteAssessment(id)) {
@@ -1313,6 +1321,7 @@ public class AssessmentController {
                     assessmentDetailsService.save(details);
                 }
             }
+            governanceTaskRepository.clearAssessmentReferences(id);
             assessmentRepository.delete(assessment);
         }
         return "redirect:/assessment/list";
