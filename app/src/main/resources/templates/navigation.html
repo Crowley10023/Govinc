@@ -28,7 +28,8 @@
       </div>
       <div class="user-section">
         <div class="user-info-card">
-          <span class="nav-label">&#128100;</span>
+          <button th:if="${userName != null}" type="button" class="personal-settings-trigger" id="personalSettingsOpen" title="Personal settings" aria-label="Personal settings">&#128100;</button>
+          <span th:unless="${userName != null}" class="nav-label">&#128100;</span>
           <span class="user-name"
             th:text="${userName != null} ? ${userName} : (${userId != null} ? ${userId} : 'no user')"></span>
           <span class="user-role-sep"></span>
@@ -122,6 +123,20 @@
 
 
   </nav>
+  <dialog th:if="${userName != null}" id="personalSettingsDialog" class="personal-settings-dialog" aria-labelledby="personalSettingsTitle">
+    <div class="personal-settings-header">
+      <h2 id="personalSettingsTitle">Personal Settings</h2>
+      <button type="button" id="personalSettingsClose" class="personal-settings-close" title="Close" aria-label="Close">&#10005;</button>
+    </div>
+    <div id="personalSettingsForm" class="personal-settings-content" th:attr="data-csrf-header=${_csrf.headerName},data-csrf-token=${_csrf.token}">
+      <h3>E-Mail Settings</h3>
+      <label class="personal-settings-option">
+        <input type="checkbox" id="mailForNewTasks" name="mailForNewTasks" disabled>
+        <span>Mail me for new tasks</span>
+      </label>
+      <p id="personalSettingsStatus" role="status" aria-live="polite"></p>
+    </div>
+  </dialog>
   <!-- Session expiry warning overlay -->
   <div id="sessionExpiryOverlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="sessionExpiryTitle">
     <div id="sessionExpiryPopup">
@@ -134,6 +149,7 @@
   <script src="/general.js"></script>
   <script src="/authorization.js"></script>
   <script src="/session-timer.js"></script>
+  <script src="/personal-settings.js"></script>
   <script>
     // Click-based dropdown toggle
     document.querySelectorAll('.dropdown-button').forEach(function(btn) {

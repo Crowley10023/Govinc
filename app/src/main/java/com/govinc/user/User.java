@@ -24,6 +24,7 @@ public class User {
     private String firstName;
     private String lastName;
     private String email;
+    private Boolean mailForNewTasks = false;
     
     @Enumerated(EnumType.STRING)
     private Role role = Role.ASSESSMENT_DELEGATE;
@@ -81,6 +82,14 @@ public class User {
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public boolean isMailForNewTasks() {
+        return Boolean.TRUE.equals(mailForNewTasks);
+    }
+
+    public void setMailForNewTasks(boolean mailForNewTasks) {
+        this.mailForNewTasks = mailForNewTasks;
     }
     
     public Role getRole() {

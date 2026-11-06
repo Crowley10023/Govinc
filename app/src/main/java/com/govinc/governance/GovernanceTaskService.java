@@ -9,6 +9,7 @@ import com.govinc.catalog.SecurityControlDomainRepository;
 import com.govinc.user.User;
 import com.govinc.user.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -34,6 +35,9 @@ public class GovernanceTaskService {
 
     @Autowired
     private SecurityControlDomainRepository securityControlDomainRepository;
+
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
 
     public List<GovernanceTask> findAll() {
         return taskRepository.findAll();
@@ -65,7 +69,7 @@ public class GovernanceTaskService {
         task.setAssignedUser(creator);
         task.setCreatedBy(creator);
         task.setAssessment(assessment);
-        return taskRepository.save(task);
+        return saveNewTask(task);
     }
 
     public GovernanceTask createTask(String title, String description, Long assignedUserId,
@@ -97,7 +101,19 @@ public class GovernanceTaskService {
             task.setDueDate(java.time.LocalDate.parse(dueDateStr));
         }
 
-        return taskRepository.save(task);
+        return saveNewTask(task);
+    }
+
+    private GovernanceTask saveNewTask(GovernanceTask task) {
+        GovernanceTask saved = taskRepository.save(task);
+        User assignee = saved.getAssignedUser();
+        User creator = saved.getCreatedBy();
+        if (assignee != null && assignee.isMailForNewTasks()
+                && assignee.getEmail() != null && !assignee.getEmail().isBlank()) {
+            eventPublisher.publishEvent(new NewTaskNotification(
+                    assignee.getEmail(), creator != null ? creator.getEmail() : null, saved.getTitle()));
+        }
+        return saved;
     }
 
     public void updateStatus(Long taskId, TaskStatus status) {

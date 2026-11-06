@@ -190,6 +190,7 @@ public class UserController {
         Optional<User> existingUserOpt = userRepository.findById(id);
         if (existingUserOpt.isPresent()) {
             User existingUser = existingUserOpt.get();
+            user.setMailForNewTasks(existingUser.isMailForNewTasks());
             
             // If current role is Team Leader, remove from any org units they currently lead
             if (Role.ORGANISATION_TEAM_LEADER == existingUser.getRole()) {
