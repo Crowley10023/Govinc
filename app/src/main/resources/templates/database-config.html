@@ -237,6 +237,7 @@
         let pendingMigrationVersion = null;
         let pendingImportFile = null;
         let statusMessageTimeout = null;
+        let backupPollTimer = null;
 
         /**
          * Show an inline status message
@@ -435,6 +436,7 @@
 
         function createBackup() {
             showStatus('Creating database backup...', 'info');
+            setBackupRunning(true);
 
             const csrf = getCsrfToken();
             const headers = {
@@ -448,18 +450,70 @@
                 method: 'POST',
                 headers: headers
             })
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) throw new Error('Could not start the backup');
+                    return response.json();
+                })
                 .then(data => {
-                    if (data && data.success) {
-                        showStatus('Backup created successfully: ' + data.backup.fileName, 'success');
-                        loadBackups();
-                    } else {
-                        throw new Error((data && data.error) ? data.error : 'Backup failed');
-                    }
+                    if (!data || !data.success) throw new Error('Could not start the backup');
+                    pollBackupStatus(true);
                 })
                 .catch(error => {
                     console.error('Backup error:', error);
-                    showStatus('Backup failed: ' + error.message, 'error');
+                    showStatus('Could not confirm whether the backup started. Checking its status...', 'error');
+                    pollBackupStatus(false);
+                });
+        }
+
+        function setBackupRunning(running) {
+            const button = document.getElementById('createBackupBtn');
+            if (button) {
+                button.disabled = running;
+                button.textContent = running ? 'Creating backup...' : 'Create Full Backup';
+            }
+        }
+
+        function pollBackupStatus(tracking, showPreviousFailure = false) {
+            fetch('/config/database/backup/status', { cache: 'no-store' })
+                .then(response => {
+                    if (response.redirected || response.status === 401 || response.status === 403) {
+                        const error = new Error('Your session has expired. Sign in again to check the backup.');
+                        error.authentication = true;
+                        throw error;
+                    }
+                    if (!response.ok) throw new Error('Status request failed');
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.state === 'RUNNING') {
+                        setBackupRunning(true);
+                        if (!tracking) showStatus('Creating database backup...', 'info');
+                        backupPollTimer = setTimeout(() => pollBackupStatus(true), 2000);
+                        return;
+                    }
+                    setBackupRunning(false);
+                    if (!tracking && !(showPreviousFailure && data.state === 'FAILED')) return;
+                    if (data.state === 'SUCCEEDED' && data.backup) {
+                        showStatus('Backup created successfully: ' + escapeHtml(data.backup.fileName), 'success');
+                        loadBackups();
+                    } else if (data.state === 'FAILED') {
+                        showStatus(escapeHtml(data.error || 'Database backup failed.'), 'error');
+                    } else {
+                        showStatus('Backup did not start or was interrupted. Check the server logs.', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Backup status error:', error);
+                    if (error.authentication) {
+                        setBackupRunning(false);
+                        showStatus(escapeHtml(error.message), 'error');
+                    } else if (tracking) {
+                        showStatus('Could not check backup status. Retrying...', 'error');
+                        backupPollTimer = setTimeout(() => pollBackupStatus(true), 5000);
+                    } else {
+                        setBackupRunning(false);
+                        showStatus('Could not check backup status.', 'error');
+                    }
                 });
         }
 
@@ -901,6 +955,8 @@
             const createBackupBtn = document.getElementById('createBackupBtn');
             if (createBackupBtn) {
                 createBackupBtn.addEventListener('click', createBackup);
+                setBackupRunning(true);
+                pollBackupStatus(false, true);
             }
 
             const importBackupBtn = document.getElementById('importBackupBtn');
@@ -968,6 +1024,9 @@
             }
 
             loadBackups();
+        });
+        window.addEventListener('beforeunload', function () {
+            if (backupPollTimer) clearTimeout(backupPollTimer);
         });
     </script>
 </body>

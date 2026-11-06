@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -100,7 +101,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public Object handleException(HttpServletRequest request, Exception ex) {
-        if (isClientDisconnectException(ex)) {
+        if (!(ex instanceof CannotCreateTransactionException) && isClientDisconnectException(ex)) {
             // Connection closed by client while writing response (SSE/reload/tab close).
             // This is expected and should not pollute error logs or trigger stack traces.
             completeAsyncRequest(request);
@@ -108,6 +109,12 @@ public class GlobalExceptionHandler {
         }
         errorLogService.logException(ex, request);
         ex.printStackTrace();
+        if (ex instanceof CannotCreateTransactionException && request != null
+                && request.getHeader("Accept") != null
+                && request.getHeader("Accept").contains("text/event-stream")) {
+            completeAsyncRequest(request);
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
+        }
         boolean showDetails = false;
         // You can configure this with a specific property or use Spring's built-in
         // profile

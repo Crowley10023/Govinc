@@ -2305,6 +2305,8 @@
     <script>
         (function() {
             var _es = null;
+            var _esRetryTimer = null;
+            var _esRetryDelay = 2000;
 
             function flashElement(el) {
                 el.classList.remove('sse-updated');
@@ -2392,6 +2394,8 @@
                 if (!id) return;
                 if (_es) { _es.close(); _es = null; }
                 _es = new EventSource('/assessment/' + id + '/events', { withCredentials: true });
+                var source = _es;
+                source.onopen = function() { _esRetryDelay = 2000; };
                 _es.addEventListener('update', function(e) {
                     try { applyInlineUpdate(JSON.parse(e.data)); } catch (ex) {}
                 });
@@ -2399,7 +2403,12 @@
                     try { renderPresence(JSON.parse(e.data)); } catch (ex) {}
                 });
                 _es.onerror = function() {
-                    // EventSource auto-reconnects on error — no manual action needed
+                    if (_es !== source || source.readyState !== EventSource.CLOSED || _esRetryTimer) return;
+                    _esRetryTimer = setTimeout(function() {
+                        _esRetryTimer = null;
+                        startEventSource();
+                    }, _esRetryDelay);
+                    _esRetryDelay = Math.min(_esRetryDelay * 2, 30000);
                 };
             }
 
@@ -2409,6 +2418,7 @@
                 setTimeout(startEventSource, 500);
             });
             window.addEventListener('beforeunload', function() {
+                if (_esRetryTimer) { clearTimeout(_esRetryTimer); _esRetryTimer = null; }
                 if (_es) { _es.close(); _es = null; }
             });
         })();

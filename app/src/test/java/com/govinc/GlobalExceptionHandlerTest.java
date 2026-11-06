@@ -2,6 +2,7 @@ package com.govinc;
 
 import com.govinc.authorization.AuthorizationService;
 import com.govinc.authorization.UnauthorizedException;
+import com.govinc.configuration.GlobalLayoutConfigAdvice;
 import com.govinc.entity.LayoutConfiguration;
 import com.govinc.entity.LayoutConfigurationRepository;
 import com.govinc.entity.OrganisationDetailsRepository;
@@ -21,8 +22,16 @@ import org.mockito.quality.Strictness;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.CannotCreateTransactionException;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.servlet.ModelAndView;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.util.List;
@@ -37,6 +46,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @org.junit.jupiter.api.extension.ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -211,6 +224,83 @@ class GlobalExceptionHandlerTest {
         assertNoContentResponse(response);
         verify(asyncContext).complete();
         verifyNoInteractions(errorLogService);
+    }
+
+    @Test
+    void handleException_eventStreamTransactionFailureIsLoggedAndUnavailable() {
+        mockAsyncStartedRequest();
+        when(request.getHeader("Accept")).thenReturn("text/event-stream");
+        CannotCreateTransactionException failure = new CannotCreateTransactionException("database unavailable",
+                new IOException("Connection reset by peer"));
+
+        Object response = handler.handleException(request, failure);
+
+        assertThat(response).isInstanceOf(ResponseEntity.class);
+        assertThat(((ResponseEntity<?>) response).getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        verify(asyncContext).complete();
+        verify(errorLogService).logException(failure, request);
+        verifyNoInteractions(layoutConfigurationRepository);
+    }
+
+    @Test
+    void handleException_transactionFailureOnPageIsNotTreatedAsClientDisconnect() {
+        when(request.getHeader("Accept")).thenReturn("text/html");
+        CannotCreateTransactionException failure = new CannotCreateTransactionException("database unavailable",
+                new IOException("Connection reset by peer"));
+
+        Object response = handler.handleException(request, failure);
+
+        assertThat(response).isInstanceOf(ModelAndView.class);
+        verify(errorLogService).logException(failure, request);
+        verify(request, never()).getAsyncContext();
+    }
+
+    @Test
+    void eventStreamTransactionFailureDuringAsyncDispatchReturnsUnavailable() throws Exception {
+        GlobalLayoutConfigAdvice layoutAdvice = new GlobalLayoutConfigAdvice();
+        ReflectionTestUtils.setField(layoutAdvice, "layoutConfigurationRepository", layoutConfigurationRepository);
+        CannotCreateTransactionException failure = new CannotCreateTransactionException("database unavailable");
+        when(layoutConfigurationRepository.findAll()).thenReturn(List.of()).thenThrow(failure);
+        EventStreamController controller = new EventStreamController();
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(layoutAdvice, handler).build();
+
+        MvcResult result = mvc.perform(get("/test-events").accept("text/event-stream"))
+                .andExpect(request().asyncStarted()).andReturn();
+        controller.emitter.complete();
+        mvc.perform(asyncDispatch(result)).andExpect(status().isServiceUnavailable());
+
+        verify(errorLogService).logException(any(CannotCreateTransactionException.class), any(HttpServletRequest.class));
+    }
+
+    @Test
+    void eventStreamTransactionFailureAfterResponseCommittedIsLogged() throws Exception {
+        GlobalLayoutConfigAdvice layoutAdvice = new GlobalLayoutConfigAdvice();
+        ReflectionTestUtils.setField(layoutAdvice, "layoutConfigurationRepository", layoutConfigurationRepository);
+        CannotCreateTransactionException failure = new CannotCreateTransactionException("database unavailable");
+        when(layoutConfigurationRepository.findAll()).thenReturn(List.of()).thenThrow(failure);
+        EventStreamController controller = new EventStreamController();
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(layoutAdvice, handler).build();
+
+        MvcResult result = mvc.perform(get("/test-events").accept("text/event-stream"))
+                .andExpect(request().asyncStarted()).andReturn();
+        controller.emitter.send(SseEmitter.event().name("update").data("initial"));
+        result.getResponse().flushBuffer();
+        controller.emitter.complete();
+        mvc.perform(asyncDispatch(result)).andExpect(status().isOk());
+
+        verify(errorLogService).logException(any(CannotCreateTransactionException.class), any(HttpServletRequest.class));
+    }
+
+    @RestController
+    static class EventStreamController {
+        private final SseEmitter emitter = new SseEmitter();
+
+        @GetMapping(value = "/test-events", produces = "text/event-stream")
+        SseEmitter events() {
+            return emitter;
+        }
     }
 
     @Test

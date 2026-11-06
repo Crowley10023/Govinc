@@ -3,6 +3,7 @@ package com.govinc.controller;
 import com.govinc.entity.DatabaseConfig;
 import com.govinc.service.BackupExtractService;
 import com.govinc.service.BackupExtractService.BackupSnapshot;
+import com.govinc.service.DatabaseBackupJobService;
 import com.govinc.service.DatabaseMigrationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.PathResource;
@@ -30,12 +31,15 @@ import java.util.Set;
 public class DatabaseConfigController {
     private final DatabaseMigrationService databaseMigrationService;
     private final BackupExtractService backupExtractService;
+    private final DatabaseBackupJobService databaseBackupJobService;
 
     @Autowired
     public DatabaseConfigController(DatabaseMigrationService databaseMigrationService,
-                                    BackupExtractService backupExtractService) {
+                                    BackupExtractService backupExtractService,
+                                    DatabaseBackupJobService databaseBackupJobService) {
         this.databaseMigrationService = databaseMigrationService;
         this.backupExtractService = backupExtractService;
+        this.databaseBackupJobService = databaseBackupJobService;
     }
 
     /**
@@ -125,17 +129,19 @@ public class DatabaseConfigController {
     @ResponseBody
     public ResponseEntity<?> createBackup() {
         try {
-            Map<String, Object> backup = databaseMigrationService.createFullBackup();
-            return ResponseEntity.ok(Map.of(
-                    "success", true,
-                    "message", "Database backup created successfully",
-                    "backup", backup
-            ));
+            boolean started = databaseBackupJobService.startBackup();
+            return ResponseEntity.accepted().body(Map.of("success", true, "started", started));
         } catch (Exception e) {
             return ResponseEntity.status(500).body(
-                    Map.of("success", false, "error", "Database backup failed: " + e.getMessage())
+                    Map.of("success", false, "error", "Could not start the database backup.")
             );
         }
+    }
+
+    @GetMapping(path = "/backup/status", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public DatabaseBackupJobService.BackupStatus backupStatus() {
+        return databaseBackupJobService.getStatus();
     }
 
     /**

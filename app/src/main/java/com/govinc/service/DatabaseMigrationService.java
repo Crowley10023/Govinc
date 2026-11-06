@@ -488,7 +488,13 @@ public class DatabaseMigrationService {
         String fileName = "govinc_v" + safeVersion + "_" + timestamp + ".sql";
         Path backupFile = backupDir.resolve(fileName).normalize();
 
-        writeFullDumpUsingJdbc(backupFile);
+        Path temporaryFile = Files.createTempFile(backupDir, ".govinc-backup-", ".tmp");
+        try {
+            writeFullDumpUsingJdbc(temporaryFile);
+            Files.move(temporaryFile, backupFile);
+        } finally {
+            Files.deleteIfExists(temporaryFile);
+        }
 
         return createBackupInfo(backupFile);
     }
@@ -706,10 +712,6 @@ public class DatabaseMigrationService {
     }
 
     private void writeFullDumpUsingJdbc(Path backupFile) throws Exception {
-        if (Files.exists(backupFile)) {
-            Files.delete(backupFile);
-        }
-
         try (Connection connection = dataSource.getConnection();
              BufferedWriter writer = Files.newBufferedWriter(backupFile, StandardCharsets.UTF_8)) {
 

@@ -1001,6 +1001,8 @@
     <script>
         (function() {
             var _es = null;
+            var _esRetryTimer = null;
+            var _esRetryDelay = 2000;
 
             function applyInlineUpdate(data) {
                 var answers = data.controlAnswers || {};
@@ -1051,11 +1053,18 @@
                 if (!obfId) return;
                 if (_es) { _es.close(); _es = null; }
                 _es = new EventSource('/assessment-direct/' + obfId + '/events');
+                var source = _es;
+                source.onopen = function() { _esRetryDelay = 2000; };
                 _es.addEventListener('update', function(e) {
                     try { applyInlineUpdate(JSON.parse(e.data)); } catch (ex) {}
                 });
                 _es.onerror = function() {
-                    // EventSource auto-reconnects on error
+                    if (_es !== source || source.readyState !== EventSource.CLOSED || _esRetryTimer) return;
+                    _esRetryTimer = setTimeout(function() {
+                        _esRetryTimer = null;
+                        startEventSource();
+                    }, _esRetryDelay);
+                    _esRetryDelay = Math.min(_esRetryDelay * 2, 30000);
                 };
             }
 
@@ -1066,6 +1075,7 @@
             };
 
             window.addEventListener('beforeunload', function() {
+                if (_esRetryTimer) { clearTimeout(_esRetryTimer); _esRetryTimer = null; }
                 if (_es) { _es.close(); _es = null; }
             });
         })();
