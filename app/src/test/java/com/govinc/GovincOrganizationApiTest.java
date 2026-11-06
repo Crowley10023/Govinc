@@ -455,14 +455,18 @@ class GovincOrganizationApiTest {
     @Order(3026)
     @WithMockUser(username = "admin", roles = {"ADMIN"})
     void orgService_postJsonCreate_createsService() throws Exception {
-        // JSON POST has known charset mismatch on controllers with consumes=APPLICATION_JSON_VALUE;
-        // global handler returns 200 with error body. Assert endpoint is routed (not 404).
+        String serviceName = "Temp API Service";
         mockMvc.perform(post("/orgservices")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON)
-                        .content("{\"name\": \"Temp API Service\"}"))
-                .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(404));
+                        .content("{\"name\": \"" + serviceName + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.name").value(serviceName));
+
+        assertThat(orgServiceRepository.findAll())
+                .anySatisfy(service -> assertThat(service.getName()).isEqualTo(serviceName));
         TESTED_ENDPOINTS.add("POST /orgservices (JSON create)");
     }
 

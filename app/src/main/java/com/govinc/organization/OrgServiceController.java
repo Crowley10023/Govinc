@@ -96,9 +96,12 @@ public class OrgServiceController {
 
     @ResponseBody
     @PostMapping
-    public OrgService addOrgService(@RequestBody OrgService orgService) {
+    public OrgService addOrgService(@RequestBody CreateOrgServiceRequest request) {
+        OrgService orgService = new OrgService(request.name(), request.description());
         return orgServiceService.saveOrgService(orgService);
     }
+
+    public record CreateOrgServiceRequest(String name, String description) {}
 
     @ResponseBody
     @DeleteMapping("/{id}")
