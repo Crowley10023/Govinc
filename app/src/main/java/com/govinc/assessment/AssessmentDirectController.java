@@ -497,14 +497,22 @@ public class AssessmentDirectController {
     public org.springframework.web.servlet.mvc.method.annotation.SseEmitter subscribeDirectEvents(
             @PathVariable String obfuscatedId,
             jakarta.servlet.http.HttpSession session) {
-        Optional<AssessmentUrls> maybeUrl = assessmentUrlsService.findByObfuscated(obfuscatedId);
-        if (!maybeUrl.isPresent() || !isAssessmentUnlocked(session, maybeUrl.get())) {
+        // Resolve inside a transaction: SSE requests run without an open EntityManager, and a
+        // pinned connection on a long-lived stream would starve the pool.
+        Long resolvedId = readOnlyTx().execute(s -> {
+            Optional<AssessmentUrls> maybeUrl = assessmentUrlsService.findByObfuscated(obfuscatedId);
+            if (!maybeUrl.isPresent() || !isAssessmentUnlocked(session, maybeUrl.get())) {
+                return null;
+            }
+            return maybeUrl.get().getAssessment().getId();
+        });
+        if (resolvedId == null) {
             org.springframework.web.servlet.mvc.method.annotation.SseEmitter dead =
                     new org.springframework.web.servlet.mvc.method.annotation.SseEmitter();
             dead.complete();
             return dead;
         }
-        Long assessmentId = maybeUrl.get().getAssessment().getId();
+        Long assessmentId = resolvedId;
         // Use a per-connection UUID so multiple tabs in the same browser each get a distinct presence entry
         String connectionKey = java.util.UUID.randomUUID().toString();
 
@@ -534,7 +542,22 @@ public class AssessmentDirectController {
         return emitter;
     }
 
+    @Autowired
+    private org.springframework.transaction.PlatformTransactionManager transactionManager;
+
+    // Lazy associations are read inside a transaction so the JDBC connection is released on commit.
     private Map<String, Object> buildDirectUpdatePayload(Long assessmentId) {
+        return readOnlyTx().execute(status -> buildDirectUpdatePayloadInTx(assessmentId));
+    }
+
+    private org.springframework.transaction.support.TransactionTemplate readOnlyTx() {
+        org.springframework.transaction.support.TransactionTemplate tx =
+                new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+        tx.setReadOnly(true);
+        return tx;
+    }
+
+    private Map<String, Object> buildDirectUpdatePayloadInTx(Long assessmentId) {
         Map<String, Long> controlAnswersMap = new java.util.LinkedHashMap<>();
         Map<String, String> commentsMap = new java.util.LinkedHashMap<>();
         Map<String, Boolean> notApplicableMap = new java.util.LinkedHashMap<>();

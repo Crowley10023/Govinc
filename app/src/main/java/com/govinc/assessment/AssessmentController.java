@@ -55,6 +55,8 @@ public class AssessmentController {
     private QualifiedFeedbackService qualifiedFeedbackService;
     @Autowired
     private com.govinc.governance.GovernanceTaskRepository governanceTaskRepository;
+    @Autowired
+    private com.govinc.governance.GovernanceTaskService governanceTaskService;
     private static final DateTimeFormatter FRIENDLY_DATE_FORMATTER = DateTimeFormatter.ofPattern("dd MMM yyyy");
 
     @Autowired
@@ -1224,8 +1226,7 @@ public class AssessmentController {
         // If no newStatus param (legacy call), fall back to forward progression
         if (newStatus == null || newStatus.isBlank()) {
             if (assessment.isOpen()) {
-                assessment.setStatus(AssessmentStatus.REVIEW);
-                assessmentRepository.save(assessment);
+                moveToReview(assessment);
             } else if (assessment.isReview()) {
                 doFinalizeAssessment(assessment, id);
             }
@@ -1251,10 +1252,23 @@ public class AssessmentController {
                 assessment.setCloseDate(null);
                 assessment.setClosedBy(null);
             }
-            assessment.setStatus(targetStatus);
-            assessmentRepository.save(assessment);
+            if (targetStatus == AssessmentStatus.REVIEW) {
+                moveToReview(assessment);
+            } else {
+                assessment.setStatus(targetStatus);
+                assessmentRepository.save(assessment);
+            }
         }
         return "redirect:/assessment/" + id;
+    }
+
+    // Sets REVIEW and creates a review task for the assessment creator
+    private void moveToReview(Assessment assessment) {
+        assessment.setStatus(AssessmentStatus.REVIEW);
+        assessmentRepository.save(assessment);
+        if (assessment.getCreatedBy() != null) {
+            governanceTaskService.createAssessmentReviewTask(assessment);
+        }
     }
 
     // Ready for Review: interviewee-initiated OPENâ†’REVIEW
@@ -1275,8 +1289,7 @@ public class AssessmentController {
         if (!isAdminOrISM && !isInterviewee) {
             throw new UnauthorizedException("You do not have permission to change assessment status.");
         }
-        assessment.setStatus(AssessmentStatus.REVIEW);
-        assessmentRepository.save(assessment);
+        moveToReview(assessment);
         return "redirect:/assessment/" + id;
     }
 
@@ -2115,7 +2128,8 @@ public class AssessmentController {
             try { done.complete(); } catch (Exception ignored) {}
             return done;
         }
-        if (!authorizationService.canAccessAssessment(id)) {
+        // Lazy associations are read in a transaction so no connection stays pinned to the long-lived SSE request.
+        if (!Boolean.TRUE.equals(readOnlyTx().execute(s -> authorizationService.canAccessAssessment(id)))) {
             throw new com.govinc.authorization.UnauthorizedException("You do not have permission to access this assessment.");
         }
         String displayName = "Unknown";
@@ -2168,8 +2182,26 @@ public class AssessmentController {
         return false;
     }
 
-    /** Builds the controlAnswers + comments payload used by SSE update events and the ping endpoint. */
+    @Autowired
+    private org.springframework.transaction.PlatformTransactionManager transactionManager;
+
+    /**
+     * Builds the controlAnswers + comments payload used by SSE update events and the ping endpoint.
+     * Lazy associations are read inside a transaction so the JDBC connection is released on commit
+     * instead of being pinned to the request's EntityManager.
+     */
     private Map<String, Object> buildUpdatePayload(Long assessmentId) {
+        return readOnlyTx().execute(status -> buildUpdatePayloadInTx(assessmentId));
+    }
+
+    private org.springframework.transaction.support.TransactionTemplate readOnlyTx() {
+        org.springframework.transaction.support.TransactionTemplate tx =
+                new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+        tx.setReadOnly(true);
+        return tx;
+    }
+
+    private Map<String, Object> buildUpdatePayloadInTx(Long assessmentId) {
         Map<String, Long> controlAnswersMap = new java.util.LinkedHashMap<>();
         Map<String, String> commentsMap = new java.util.LinkedHashMap<>();
         Map<String, Boolean> notApplicableMap = new java.util.LinkedHashMap<>();

@@ -1,11 +1,13 @@
 package com.govinc.configuration;
 
 import com.govinc.service.GeneralConfigService;
+import jakarta.persistence.EntityManagerFactory;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.orm.jpa.support.OpenEntityManagerInViewInterceptor;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
@@ -17,6 +19,9 @@ public class WebConfig implements WebMvcConfigurer {
     @Autowired
     private GeneralConfigService generalConfigService;
 
+    @Autowired
+    private EntityManagerFactory entityManagerFactory;
+
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         registry
@@ -24,8 +29,17 @@ public class WebConfig implements WebMvcConfigurer {
           .addResourceLocations("file:uploads/img/");
     }
 
+    // Open-in-view is registered here (spring.jpa.open-in-view=false) so long-lived SSE streams
+    // are excluded: an async request keeps its EntityManager, and thus a JDBC connection, open
+    // until the stream ends, which exhausts the Hikari pool.
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        OpenEntityManagerInViewInterceptor osiv = new OpenEntityManagerInViewInterceptor();
+        osiv.setEntityManagerFactory(entityManagerFactory);
+        registry.addWebRequestInterceptor(osiv)
+                .addPathPatterns("/**")
+                .excludePathPatterns("/assessment/*/events", "/assessment-direct/*/events");
+
         registry.addInterceptor(new HandlerInterceptor() {
             @Override
             public boolean preHandle(HttpServletRequest request,
